@@ -1,0 +1,16 @@
+{
+  "name": "달그락 대장간 · 시연",
+  "short_name": "달그락",
+  "description": "아이디어에서 회로·3D·팀 협업·파일 생성까지, 달그락 대장간 실제 작동 시연",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EDEEF0",
+  "theme_color": "#94D2C9",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

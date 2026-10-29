@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "./lib/session";
 
-const publicPaths = new Set(["/login", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png"]);
+const publicPaths = new Set(["/login", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
+// The install prompt fetches the manifest and icons before anyone logs in.
+const publicPrefixes = ["/icons/", "/demo/"];
 
 export async function proxy(request: NextRequest) {
-  if (publicPaths.has(request.nextUrl.pathname)) return NextResponse.next();
+  const { pathname } = request.nextUrl;
+  if (publicPaths.has(pathname) || publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return NextResponse.next();
   if (!process.env.APP_PASSWORD || !process.env.SESSION_SECRET) {
     if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "로그인 설정이 필요합니다." }, { status: 503 });
     const url = request.nextUrl.clone();
