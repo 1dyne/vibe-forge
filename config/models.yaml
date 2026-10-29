@@ -1,0 +1,29 @@
+profiles:
+  small:
+    primary: { provider: anthropic, model_env: ANTHROPIC_MODEL_SMALL }
+    fallback: { provider: openai, model_env: OPENAI_MODEL_SMALL }
+  designer:
+    primary: { provider: anthropic, model_env: ANTHROPIC_MODEL_LARGE }
+    fallback: { provider: openai, model_env: OPENAI_MODEL_LARGE }
+  reviewer:
+    primary: { provider: openai, model_env: OPENAI_MODEL_LARGE }
+    fallback: { provider: anthropic, model_env: ANTHROPIC_MODEL_LARGE }
+  code:
+    primary: { provider: openai, model_env: OPENAI_MODEL_CODE }
+    fallback: { provider: anthropic, model_env: ANTHROPIC_MODEL_CODE }
+roles:
+  router: small
+  reply: small
+  scout_query: small
+  domain_hw: designer
+  domain_sw: designer
+  domain_me: designer
+  domain_id: designer
+  card_writer: designer
+  task_writer: designer
+  scout_parse: designer
+  evaluator_hw: reviewer
+  evaluator_sw: reviewer
+  firmware_writer: code
+  planner: code
+  cadquery_codegen: code

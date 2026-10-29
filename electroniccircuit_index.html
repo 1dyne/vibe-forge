@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onyx SDI — TOYTHON 해커톤 BOM &amp; 회로도</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+ 
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --warn: #ffd166;
+    --ok: #06d6a0;
+    --buy: #ff4d8d;
+    --rent: #ffd166;
+    --text: #e0e0f0;
+    --text-dim: #6b6b8a;
+    --imu: #c084fc;
+    --fsr: #06d6a0;
+    --resistor: #ff6b35;
+    --adc: #ff4d8d;
+  }
+ 
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 300;
+    line-height: 1.6;
+    padding: 40px 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+ 
+  .mono { font-family: 'Space Mono', monospace; }
+ 
+  header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+  }
+  .project-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--buy);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: #fff; }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 6px;
+    font-family: 'Space Mono', monospace;
+  }
+ 
+  section { margin-bottom: 52px; }
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  h2 { font-size: 18px; font-weight: 500; margin-bottom: 20px; color: #fff; }
+  h3 { font-size: 14px; font-weight: 500; margin: 24px 0 12px; color: var(--accent); font-family: 'Space Mono', monospace; letter-spacing: 1px;}
+ 
+  .schematic-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px 16px;
+    overflow-x: auto;
+  }
+  svg.schematic { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+ 
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .num { font-family:'Space Mono', monospace; color: var(--text-dim); font-size: 11px;}
+ 
+  .tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 3px 7px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .t-buy  { background: rgba(255,77,141,0.15);  color: var(--buy);   border: 1px solid rgba(255,77,141,0.4); }
+  .t-have { background: rgba(6,214,160,0.12);   color: var(--ok);    border: 1px solid rgba(6,214,160,0.35); }
+  .t-rent { background: rgba(255,209,102,0.12); color: var(--rent);  border: 1px solid rgba(255,209,102,0.35); }
+  .t-opt  { background: rgba(107,107,138,0.15); color: var(--text-dim); border: 1px solid rgba(107,107,138,0.4); }
+ 
+  .cat {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: rgba(0,229,255,0.1);
+    color: var(--accent);
+  }
+  .cat-m { background: rgba(255,107,53,0.1); color: var(--accent2); }
+  .cat-t { background: rgba(192,132,252,0.1); color: var(--imu); }
+ 
+  .note-box {
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 16px 18px;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+  .note-box strong { font-weight: 500; color: #fff; }
+ 
+  .callout-buy { border-left-color: var(--buy); }
+  .callout-warn { border-left-color: var(--warn); }
+  .callout-ok { border-left-color: var(--ok); }
+ 
+  ul { margin: 8px 0 0 18px; }
+  li { margin-bottom: 6px; font-size: 13px; }
+ 
+  .legend { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:16px; }
+ 
+  .total-row td { border-bottom: none; padding-top: 16px; font-weight: 500; }
+ 
+  .diff-grid { display:grid; grid-template-columns: 1fr; gap: 0; }
+  @media (min-width: 700px) { .diff-grid { grid-template-columns: 1fr 1fr; gap: 20px; } }
+ 
+  code { font-family:'Space Mono', monospace; background: rgba(0,229,255,0.08); padding: 2px 5px; border-radius: 3px; font-size: 12px; color: var(--accent);}
+ 
+  footer { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 40px; font-family:'Space Mono', monospace; font-size: 10px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+ 
+<header>
+  <div class="project-label">Onyx SDI · TOYTHON Hackathon Build · 2026-08-17</div>
+  <h1>해커톤 전용 BOM &amp; 회로도</h1>
+  <div class="subtitle">오른발 유닛 — NU-40 DK + ADS1015 Qwiic ADC + MPU-6050 · 2026-08-22 (토) 서울 AI 허브</div>
+</header>
+ 
+<!-- 01 시스템 구조 -->
+<section>
+  <div class="section-label">01 &nbsp; 시스템 구조</div>
+  <h2>블록 다이어그램 — 왼발(기존) vs 오른발(해커톤)</h2>
+ 
+  <div class="schematic-wrap">
+    <svg class="schematic" viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="Space Mono, monospace">
+ 
+      <!-- LEFT FOOT (existing) -->
+      <text x="20" y="24" font-size="10" fill="#6b6b8a" letter-spacing="2">왼발 V2.5 — 기존 (ESP32)</text>
+      <rect x="16" y="34" width="688" height="118" rx="6" fill="#0d0d14" stroke="#1e1e2e"/>
+ 
+      <g>
+        <rect x="34" y="70" width="86" height="44" rx="4" fill="#0a2a1a" stroke="#06d6a0" stroke-width="1.5"/>
+        <text x="77" y="88" text-anchor="middle" font-size="9" fill="#06d6a0" font-weight="700">FSR402 ×4</text>
+        <text x="77" y="102" text-anchor="middle" font-size="7.5" fill="#4a8a6a">+ 10kΩ 분압</text>
+      </g>
+      <line x1="120" y1="92" x2="164" y2="92" stroke="#06d6a0" stroke-width="1.5"/>
+      <polygon points="164,92 158,89 158,95" fill="#06d6a0"/>
+ 
+      <g>
+        <rect x="166" y="62" width="104" height="60" rx="4" fill="#0d1424" stroke="#2a5caa" stroke-width="1.5"/>
+        <text x="218" y="80" text-anchor="middle" font-size="9" fill="#4a8ada" font-weight="700">Nano ESP32</text>
+        <text x="218" y="94" text-anchor="middle" font-size="7.5" fill="#5a7aaa">내장 ADC 12bit</text>
+        <text x="218" y="108" text-anchor="middle" font-size="7.5" fill="#5a7aaa">퍼프보드 납땜</text>
+      </g>
+ 
+      <g>
+        <rect x="166" y="34" width="104" height="0" fill="none"/>
+      </g>
+ 
+      <!-- IMU left -->
+      <g>
+        <rect x="290" y="70" width="92" height="44" rx="4" fill="#180d24" stroke="#c084fc" stroke-width="1.5"/>
+        <text x="336" y="88" text-anchor="middle" font-size="9" fill="#c084fc" font-weight="700">BNO055</text>
+        <text x="336" y="102" text-anchor="middle" font-size="7.5" fill="#8a5aba">9축 · 융합 내장</text>
+      </g>
+      <line x1="270" y1="92" x2="290" y2="92" stroke="#c084fc" stroke-width="1.5"/>
+ 
+      <!-- power left -->
+      <g>
+        <rect x="402" y="62" width="150" height="60" rx="4" fill="#1a0e05" stroke="#ff6b35" stroke-width="1.5"/>
+        <text x="477" y="80" text-anchor="middle" font-size="9" fill="#ff6b35" font-weight="700">전원부 3단</text>
+        <text x="477" y="94" text-anchor="middle" font-size="7.5" fill="#aa6a40">LiPo→TP4056→MT3608</text>
+        <text x="477" y="108" text-anchor="middle" font-size="7.5" fill="#aa6a40">→스위치→ESP32 5V</text>
+      </g>
+ 
+      <g>
+        <rect x="572" y="70" width="114" height="44" rx="4" fill="#0d1a1f" stroke="#00e5ff" stroke-width="1.5"/>
+        <text x="629" y="88" text-anchor="middle" font-size="9" fill="#00e5ff" font-weight="700">BLE NUS</text>
+        <text x="629" y="102" text-anchor="middle" font-size="7.5" fill="#4a8a9a">→ PWA 대시보드</text>
+      </g>
+      <line x1="552" y1="92" x2="572" y2="92" stroke="#00e5ff" stroke-width="1.5"/>
+ 
+      <!-- RIGHT FOOT (hackathon) -->
+      <text x="20" y="196" font-size="10" fill="#ff4d8d" letter-spacing="2">오른발 — 해커톤 (NU-40 DK)</text>
+      <rect x="16" y="206" width="688" height="118" rx="6" fill="#140d13" stroke="#3a1e2e"/>
+ 
+      <g>
+        <rect x="34" y="242" width="86" height="44" rx="4" fill="#0a2a1a" stroke="#06d6a0" stroke-width="1.5"/>
+        <text x="77" y="260" text-anchor="middle" font-size="9" fill="#06d6a0" font-weight="700">FSR402 ×4</text>
+        <text x="77" y="274" text-anchor="middle" font-size="7.5" fill="#4a8a6a">+ 10kΩ 분압</text>
+      </g>
+      <line x1="120" y1="264" x2="150" y2="264" stroke="#06d6a0" stroke-width="1.5"/>
+      <polygon points="150,264 144,261 144,267" fill="#06d6a0"/>
+      <text x="135" y="256" text-anchor="middle" font-size="6.5" fill="#4a8a6a">동일</text>
+ 
+      <g>
+        <rect x="152" y="234" width="96" height="60" rx="4" fill="#240d18" stroke="#ff4d8d" stroke-width="1.5"/>
+        <text x="200" y="252" text-anchor="middle" font-size="9" fill="#ff4d8d" font-weight="700">ADS1015</text>
+        <text x="200" y="266" text-anchor="middle" font-size="7.5" fill="#ba5a7a">외장 ADC 4ch</text>
+        <text x="200" y="280" text-anchor="middle" font-size="7.5" fill="#ba5a7a">나사단자 무납땜</text>
+      </g>
+ 
+      <line x1="248" y1="264" x2="278" y2="264" stroke="#ffd166" stroke-width="2" stroke-dasharray="4 2"/>
+      <text x="263" y="256" text-anchor="middle" font-size="6.5" fill="#ffd166">Qwiic</text>
+ 
+      <g>
+        <rect x="280" y="234" width="100" height="60" rx="4" fill="#1a1409" stroke="#ffd166" stroke-width="1.5"/>
+        <text x="330" y="252" text-anchor="middle" font-size="9" fill="#ffd166" font-weight="700">NU-40 DK</text>
+        <text x="330" y="266" text-anchor="middle" font-size="7.5" fill="#aa9a50">nRF52840</text>
+        <text x="330" y="280" text-anchor="middle" font-size="7.5" fill="#aa9a50">I2C 400kHz</text>
+      </g>
+ 
+      <line x1="330" y1="234" x2="330" y2="216" stroke="#ffd166" stroke-width="2" stroke-dasharray="4 2"/>
+      <line x1="330" y1="216" x2="424" y2="216" stroke="#ffd166" stroke-width="2" stroke-dasharray="4 2"/>
+      <line x1="424" y1="216" x2="424" y2="234" stroke="#ffd166" stroke-width="2" stroke-dasharray="4 2"/>
+ 
+      <g>
+        <rect x="380" y="234" width="88" height="60" rx="4" fill="#180d24" stroke="#c084fc" stroke-width="1.5"/>
+        <text x="424" y="252" text-anchor="middle" font-size="9" fill="#c084fc" font-weight="700">MPU-6050</text>
+        <text x="424" y="266" text-anchor="middle" font-size="7.5" fill="#8a5aba">6축 · 융합 없음</text>
+        <text x="424" y="280" text-anchor="middle" font-size="7.5" fill="#8a5aba">Madgwick 필요</text>
+      </g>
+ 
+      <g>
+        <rect x="490" y="242" width="66" height="44" rx="4" fill="#1a0e05" stroke="#ff6b35" stroke-width="1.5"/>
+        <text x="523" y="260" text-anchor="middle" font-size="9" fill="#ff6b35" font-weight="700">LiPo</text>
+        <text x="523" y="274" text-anchor="middle" font-size="7.5" fill="#aa6a40">직결 (?)</text>
+      </g>
+      <line x1="380" y1="288" x2="490" y2="288" stroke="#ff6b35" stroke-width="1.5" stroke-dasharray="2 2"/>
+ 
+      <g>
+        <rect x="572" y="242" width="114" height="44" rx="4" fill="#0d1a1f" stroke="#00e5ff" stroke-width="1.5"/>
+        <text x="629" y="260" text-anchor="middle" font-size="9" fill="#00e5ff" font-weight="700">BLE NUS</text>
+        <text x="629" y="274" text-anchor="middle" font-size="7.5" fill="#4a8a9a">→ 동일 대시보드</text>
+      </g>
+      <line x1="556" y1="264" x2="572" y2="264" stroke="#00e5ff" stroke-width="1.5"/>
+ 
+      <!-- legend -->
+      <text x="20" y="348" font-size="8" fill="#6b6b8a">── 전선 배선　　┈┈ Qwiic 커넥터 (무납땜)</text>
+    </svg>
+  </div>
+ 
+  <div class="note-box callout-ok">
+    <strong>양쪽 동일한 것</strong> — FSR402 4채널 / 10kΩ 분압 회로 / 3.3V 기준 전압 / 깔창 압력점 배치 / 케이블 색상 표준 / 데이터 포맷 <code>fsr1~4,roll,pitch,yaw</code> 10Hz / BLE Nordic UART Service / PWA 대시보드 (무수정)
+  </div>
+</section>
+ 
+<!-- 02 회로도 -->
+<section>
+  <div class="section-label">02 &nbsp; 회로도</div>
+  <h2>Schematic — 오른발 해커톤 유닛</h2>
+ 
+  <div class="schematic-wrap">
+    <svg class="schematic" viewBox="0 0 700 430" xmlns="http://www.w3.org/2000/svg" font-family="Space Mono, monospace">
+ 
+      <!-- zones -->
+      <rect x="14" y="28" width="250" height="386" rx="6" fill="#0d1a12" stroke="#1a3a22"/>
+      <text x="26" y="48" font-size="9" fill="#2a6b3a" letter-spacing="2">INSOLE ZONE (오른발)</text>
+ 
+      <rect x="286" y="28" width="400" height="386" rx="6" fill="#140d13" stroke="#3a1e2e"/>
+      <text x="298" y="48" font-size="9" fill="#8a3a5a" letter-spacing="2">HOUSING ZONE</text>
+ 
+      <!-- 3.3V rail -->
+      <line x1="150" y1="72" x2="470" y2="72" stroke="#a78bfa" stroke-width="2"/>
+      <text x="160" y="66" font-size="8" fill="#a78bfa">3.3V RAIL (ADS1015 3V3 핀)</text>
+ 
+      <!-- GND rail -->
+      <line x1="60" y1="392" x2="470" y2="392" stroke="#6b6b8a" stroke-width="2"/>
+      <text x="70" y="386" font-size="8" fill="#6b6b8a">GND RAIL</text>
+ 
+      <!-- 4 channels -->
+      <g id="ch1" transform="translate(0,0)">
+        <!-- FSR -->
+        <rect x="30" y="112" width="62" height="26" rx="4" fill="#0a2a1a" stroke="#06d6a0" stroke-width="1.5"/>
+        <text x="61" y="123" text-anchor="middle" font-size="7.5" fill="#06d6a0" font-weight="700">FSR #1</text>
+        <text x="61" y="133" text-anchor="middle" font-size="6" fill="#4a8a6a">엄지 끝</text>
+        <!-- R -->
+        <rect x="128" y="112" width="46" height="26" rx="3" fill="#1a0e05" stroke="#ff6b35" stroke-width="1"/>
+        <text x="151" y="123" text-anchor="middle" font-size="7" fill="#ff6b35" font-weight="700">R1</text>
+        <text x="151" y="133" text-anchor="middle" font-size="6.5" fill="#aa4a20">10kΩ</text>
+        <!-- wires -->
+        <line x1="151" y1="112" x2="151" y2="72" stroke="#a78bfa" stroke-width="1.5"/>
+        <line x1="128" y1="125" x2="92" y2="125" stroke="#ff4d8d" stroke-width="1.5"/>
+        <circle cx="110" cy="125" r="2.5" fill="#ff4d8d"/>
+        <text x="110" y="116" text-anchor="middle" font-size="6" fill="#ff4d8d">측정점</text>
+        <line x1="110" y1="125" x2="110" y2="150" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="110" y1="150" x2="336" y2="150" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="30" y1="125" x2="20" y2="125" stroke="#6b6b8a" stroke-width="1.5"/>
+        <line x1="20" y1="125" x2="20" y2="392" stroke="#6b6b8a" stroke-width="1.5"/>
+        <text x="200" y="146" font-size="6.5" fill="#ba5a7a">빨강 → A0</text>
+      </g>
+ 
+      <g id="ch2">
+        <rect x="30" y="186" width="62" height="26" rx="4" fill="#0a2a1a" stroke="#06d6a0" stroke-width="1.5"/>
+        <text x="61" y="197" text-anchor="middle" font-size="7.5" fill="#06d6a0" font-weight="700">FSR #2</text>
+        <text x="61" y="207" text-anchor="middle" font-size="6" fill="#4a8a6a">엄지 뿌리</text>
+        <rect x="128" y="186" width="46" height="26" rx="3" fill="#1a0e05" stroke="#ff6b35" stroke-width="1"/>
+        <text x="151" y="197" text-anchor="middle" font-size="7" fill="#ff6b35" font-weight="700">R2</text>
+        <text x="151" y="207" text-anchor="middle" font-size="6.5" fill="#aa4a20">10kΩ</text>
+        <line x1="151" y1="186" x2="151" y2="72" stroke="#a78bfa" stroke-width="1.5"/>
+        <line x1="128" y1="199" x2="92" y2="199" stroke="#ff4d8d" stroke-width="1.5"/>
+        <circle cx="110" cy="199" r="2.5" fill="#ff4d8d"/>
+        <line x1="110" y1="199" x2="110" y2="224" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="110" y1="224" x2="336" y2="224" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="30" y1="199" x2="20" y2="199" stroke="#6b6b8a" stroke-width="1.5"/>
+        <text x="200" y="220" font-size="6.5" fill="#ba5a7a">노랑 → A1</text>
+      </g>
+ 
+      <g id="ch3">
+        <rect x="30" y="260" width="62" height="26" rx="4" fill="#0a2a1a" stroke="#06d6a0" stroke-width="1.5"/>
+        <text x="61" y="271" text-anchor="middle" font-size="7.5" fill="#06d6a0" font-weight="700">FSR #3</text>
+        <text x="61" y="281" text-anchor="middle" font-size="6" fill="#4a8a6a">새끼 옆</text>
+        <rect x="128" y="260" width="46" height="26" rx="3" fill="#1a0e05" stroke="#ff6b35" stroke-width="1"/>
+        <text x="151" y="271" text-anchor="middle" font-size="7" fill="#ff6b35" font-weight="700">R3</text>
+        <text x="151" y="281" text-anchor="middle" font-size="6.5" fill="#aa4a20">10kΩ</text>
+        <line x1="151" y1="260" x2="151" y2="72" stroke="#a78bfa" stroke-width="1.5"/>
+        <line x1="128" y1="273" x2="92" y2="273" stroke="#ff4d8d" stroke-width="1.5"/>
+        <circle cx="110" cy="273" r="2.5" fill="#ff4d8d"/>
+        <line x1="110" y1="273" x2="110" y2="298" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="110" y1="298" x2="336" y2="298" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="30" y1="273" x2="20" y2="273" stroke="#6b6b8a" stroke-width="1.5"/>
+        <text x="200" y="294" font-size="6.5" fill="#ba5a7a">초록 → A2</text>
+      </g>
+ 
+      <g id="ch4">
+        <rect x="30" y="334" width="62" height="26" rx="4" fill="#0a2a1a" stroke="#06d6a0" stroke-width="1.5"/>
+        <text x="61" y="345" text-anchor="middle" font-size="7.5" fill="#06d6a0" font-weight="700">FSR #4</text>
+        <text x="61" y="355" text-anchor="middle" font-size="6" fill="#4a8a6a">뒷꿈치</text>
+        <rect x="128" y="334" width="46" height="26" rx="3" fill="#1a0e05" stroke="#ff6b35" stroke-width="1"/>
+        <text x="151" y="345" text-anchor="middle" font-size="7" fill="#ff6b35" font-weight="700">R4</text>
+        <text x="151" y="355" text-anchor="middle" font-size="6.5" fill="#aa4a20">10kΩ</text>
+        <line x1="151" y1="334" x2="151" y2="72" stroke="#a78bfa" stroke-width="1.5"/>
+        <line x1="128" y1="347" x2="92" y2="347" stroke="#ff4d8d" stroke-width="1.5"/>
+        <circle cx="110" cy="347" r="2.5" fill="#ff4d8d"/>
+        <line x1="110" y1="347" x2="110" y2="372" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="110" y1="372" x2="336" y2="372" stroke="#ff4d8d" stroke-width="1.5"/>
+        <line x1="30" y1="347" x2="20" y2="347" stroke="#6b6b8a" stroke-width="1.5"/>
+        <text x="200" y="368" font-size="6.5" fill="#ba5a7a">파랑 → A3</text>
+      </g>
+ 
+      <!-- ADS1015 -->
+      <rect x="336" y="120" width="120" height="266" rx="5" fill="#240d18" stroke="#ff4d8d" stroke-width="2"/>
+      <text x="396" y="142" text-anchor="middle" font-size="10" fill="#ff4d8d" font-weight="700">ADS1015</text>
+      <text x="396" y="155" text-anchor="middle" font-size="6.5" fill="#ba5a7a">Qwiic 12bit ADC</text>
+      <text x="396" y="166" text-anchor="middle" font-size="6.5" fill="#ba5a7a">I2C 0x48</text>
+ 
+      <text x="348" y="153" font-size="7" fill="#ff4d8d">A0</text>
+      <text x="348" y="227" font-size="7" fill="#ff4d8d">A1</text>
+      <text x="348" y="301" font-size="7" fill="#ff4d8d">A2</text>
+      <text x="348" y="375" font-size="7" fill="#ff4d8d">A3</text>
+      <text x="396" y="196" text-anchor="middle" font-size="6.5" fill="#8a8aaa">▲ 나사단자 4ch</text>
+ 
+      <text x="396" y="330" text-anchor="middle" font-size="6.5" fill="#a78bfa">3V3 / GND 핀</text>
+      <text x="396" y="342" text-anchor="middle" font-size="6.5" fill="#a78bfa">→ 분압 상단/하단</text>
+ 
+      <!-- 3.3V and GND to ADS -->
+      <line x1="470" y1="72" x2="470" y2="336" stroke="#a78bfa" stroke-width="2"/>
+      <line x1="456" y1="336" x2="470" y2="336" stroke="#a78bfa" stroke-width="2"/>
+      <line x1="470" y1="392" x2="456" y2="392" stroke="#6b6b8a" stroke-width="2"/>
+      <line x1="470" y1="360" x2="470" y2="392" stroke="#6b6b8a" stroke-width="2"/>
+      <line x1="456" y1="360" x2="470" y2="360" stroke="#6b6b8a" stroke-width="2"/>
+ 
+      <!-- Qwiic to NU40 -->
+      <line x1="456" y1="200" x2="516" y2="200" stroke="#ffd166" stroke-width="2.5" stroke-dasharray="5 3"/>
+      <text x="486" y="192" text-anchor="middle" font-size="6.5" fill="#ffd166">Qwiic</text>
+ 
+      <!-- NU40 -->
+      <rect x="516" y="120" width="150" height="128" rx="5" fill="#1a1409" stroke="#ffd166" stroke-width="2"/>
+      <text x="591" y="146" text-anchor="middle" font-size="10" fill="#ffd166" font-weight="700">NU-40 DK</text>
+      <text x="591" y="160" text-anchor="middle" font-size="6.5" fill="#aa9a50">nRF52840</text>
+      <text x="591" y="176" text-anchor="middle" font-size="6.5" fill="#aa9a50">I2C · BLE · LiPo JST</text>
+      <text x="591" y="196" text-anchor="middle" font-size="6.5" fill="#aa9a50">Qwiic ×2 (데이지체인)</text>
+      <text x="591" y="216" text-anchor="middle" font-size="6.5" fill="#aa9a50">LED ×4 / 버튼 ×4</text>
+      <text x="591" y="236" text-anchor="middle" font-size="6.5" fill="#00e5ff">BLE NUS → PWA</text>
+ 
+      <!-- Qwiic to MPU -->
+      <line x1="591" y1="248" x2="591" y2="278" stroke="#ffd166" stroke-width="2.5" stroke-dasharray="5 3"/>
+ 
+      <!-- MPU6050 -->
+      <rect x="516" y="278" width="150" height="76" rx="5" fill="#180d24" stroke="#c084fc" stroke-width="2"/>
+      <text x="591" y="302" text-anchor="middle" font-size="10" fill="#c084fc" font-weight="700">MPU-6050</text>
+      <text x="591" y="318" text-anchor="middle" font-size="6.5" fill="#8a5aba">6축 IMU · I2C 0x68</text>
+      <text x="591" y="332" text-anchor="middle" font-size="6.5" fill="#8a5aba">Qwiic 풀업 내장</text>
+      <text x="591" y="346" text-anchor="middle" font-size="6.5" fill="#8a5aba">Madgwick → roll/pitch</text>
+ 
+      <!-- LiPo -->
+      <rect x="516" y="374" width="150" height="30" rx="4" fill="#1a0e05" stroke="#ff6b35" stroke-width="1.5"/>
+      <text x="591" y="393" text-anchor="middle" font-size="8" fill="#ff6b35">LiPo 3.7V → JST 직결</text>
+    </svg>
+  </div>
+ 
+  <div class="note-box callout-warn">
+    <strong>분압 회로 방향 — 왼발과 동일</strong><br>
+    <code>3.3V → R(10kΩ) → [측정점] → FSR → GND</code><br>
+    압력 증가 → FSR 저항 감소 → 측정점 전압 하강 → ADC 값 감소. 펌웨어에서 반전 필요.
+    <br><br>
+    <strong>주의:</strong> ADS1015는 단일 입력 시 11비트고, PGA 설정에 따라 풀스케일이 달라져. <code>1023 - read()</code> 상수를 그대로 쓰면 안 되고, mV 단위로 변환한 뒤 반전하는 게 안전해. PGA ±4.096V 기준 3.3V ≈ 1650카운트.
+  </div>
+ 
+  <h3>나사단자 배선표</h3>
+  <table>
+    <thead><tr><th>단자</th><th>연결</th><th>케이블 색상</th><th>압력점</th></tr></thead>
+    <tbody>
+      <tr><td class="mono" style="color:var(--adc)">A0</td><td>R1·FSR#1 측정점</td><td>빨강</td><td>엄지 끝</td></tr>
+      <tr><td class="mono" style="color:var(--adc)">A1</td><td>R2·FSR#2 측정점</td><td>노랑</td><td>엄지 뿌리</td></tr>
+      <tr><td class="mono" style="color:var(--adc)">A2</td><td>R3·FSR#3 측정점</td><td>초록</td><td>새끼 옆</td></tr>
+      <tr><td class="mono" style="color:var(--adc)">A3</td><td>R4·FSR#4 측정점</td><td>파랑</td><td>뒷꿈치</td></tr>
+      <tr><td class="mono" style="color:#a78bfa">3V3 핀</td><td>R1~R4 상단 (4갈래)</td><td>—</td><td>분압 상단</td></tr>
+      <tr><td class="mono" style="color:var(--text-dim)">GND 핀</td><td>FSR#1~4 하단 (4갈래)</td><td>검정</td><td>공통 접지</td></tr>
+    </tbody>
+  </table>
+ 
+  <div class="note-box callout-ok">
+    <strong>A3 트림팟 격리 필요</strong><br>
+    ADS1015 보드에는 A3 채널에 10kΩ 트림팟이 기본 연결돼 있어. FSR#4를 A3에 물리려면 <strong>격리 점퍼를 끊어야</strong> 해. 보드 수령 후 가장 먼저 확인할 것.
+  </div>
+</section>
+ 
+<!-- 03 BOM -->
+<section>
+  <div class="section-label">03 &nbsp; 부품 명세서</div>
+  <h2>Bill of Materials — 해커톤 오른발 유닛</h2>
+ 
+  <div class="legend">
+    <span class="tag t-buy">구매 필요</span>
+    <span class="tag t-have">보유 · 재사용</span>
+    <span class="tag t-rent">현장 대여</span>
+    <span class="tag t-opt">선택</span>
+  </div>
+ 
+  <table>
+    <thead>
+      <tr><th>#</th><th>분류</th><th>부품명</th><th>규격</th><th>수량</th><th>상태</th><th>비고</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">01</td><td><span class="cat">전자</span></td>
+        <td><strong>SparkFun Qwiic 12Bit ADC</strong></td>
+        <td>ADS1015, 4채널, DEV-15334</td>
+        <td>2</td>
+        <td><span class="tag t-buy">구매 필요</span></td>
+        <td><strong>오늘 주문 필수.</strong> 여유분 1개 포함. 나사단자 있는 SparkFun판으로. Adafruit STEMMA QT판은 나사단자 없음</td>
+      </tr>
+      <tr>
+        <td class="num">02</td><td><span class="cat">전자</span></td>
+        <td>FSR402 압력 센서</td>
+        <td>0.5인치 원형</td>
+        <td>4</td>
+        <td><span class="tag t-buy">구매 필요</span></td>
+        <td>오른발용 신규. 여유분 1~2개 권장 (개체 편차 있음)</td>
+      </tr>
+      <tr>
+        <td class="num">03</td><td><span class="cat">전자</span></td>
+        <td>저항</td>
+        <td>10kΩ, 1/4W</td>
+        <td>4</td>
+        <td><span class="tag t-buy">구매 필요</span></td>
+        <td>보유분 4개는 왼발에 사용 중. 신규 필요. <strong>BNO055 풀업용 2개도 같이 주문</strong></td>
+      </tr>
+      <tr>
+        <td class="num">04</td><td><span class="cat">전자</span></td>
+        <td>NU-40 DK 보드</td>
+        <td>nRF52840, Qwiic ×2</td>
+        <td>1</td>
+        <td><span class="tag t-rent">현장 대여</span></td>
+        <td>현장 구매 가능 (가격 미확인). <strong>구매해야 들고 올 수 있음</strong></td>
+      </tr>
+      <tr>
+        <td class="num">05</td><td><span class="cat">전자</span></td>
+        <td>MPU-6050 6축 IMU</td>
+        <td>Qwiic, I2C 0x68</td>
+        <td>1</td>
+        <td><span class="tag t-rent">현장 대여</span></td>
+        <td>Hard Mode 기본 제공. 종료 후 반납</td>
+      </tr>
+      <tr>
+        <td class="num">06</td><td><span class="cat">전자</span></td>
+        <td>Qwiic 케이블</td>
+        <td>4핀 JST 1mm</td>
+        <td>2</td>
+        <td><span class="tag t-rent">현장 대여</span></td>
+        <td>NU40↔ADS1015, NU40↔MPU6050. 짧을수록 400kHz 안정</td>
+      </tr>
+      <tr>
+        <td class="num">07</td><td><span class="cat">전자</span></td>
+        <td>LiPo 배터리</td>
+        <td>3.7V 300mAh, JST</td>
+        <td>1</td>
+        <td><span class="tag t-rent">현장 대여</span></td>
+        <td>보유 880mAh보다 작음. 데모 시간엔 충분</td>
+      </tr>
+      <tr>
+        <td class="num">08</td><td><span class="cat">전자</span></td>
+        <td>30AWG 실리콘 케이블</td>
+        <td>5색 25m</td>
+        <td>적량</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td>색상 표준 유지: 검정=GND / 빨강=A0 / 노랑=A1 / 초록=A2 / 파랑=A3</td>
+      </tr>
+      <tr>
+        <td class="num">09</td><td><span class="cat cat-m">재료</span></td>
+        <td>EVA 깔창</td>
+        <td>235mm, 오른발</td>
+        <td>1</td>
+        <td><span class="tag t-buy">구매 필요</span></td>
+        <td>왼발용과 좌우 대칭. 다이소·마트에서 당일 구입 가능</td>
+      </tr>
+      <tr>
+        <td class="num">10</td><td><span class="cat cat-m">재료</span></td>
+        <td>자석 시트 + 자석</td>
+        <td>자석 ×4</td>
+        <td>1세트</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td>FSR 위치 가변 고정. 잔량 확인 필요</td>
+      </tr>
+      <tr>
+        <td class="num">11</td><td><span class="cat cat-m">재료</span></td>
+        <td>열수축 튜브</td>
+        <td>소경</td>
+        <td>적량</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td><strong>저항 절연 겸용.</strong> 분압 저항을 케이블에 직결 후 감싸면 쇼트 위험 제거</td>
+      </tr>
+      <tr>
+        <td class="num">12</td><td><span class="cat cat-m">재료</span></td>
+        <td>패브릭 테이프</td>
+        <td>얇은 타입</td>
+        <td>1롤</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td>인솔 케이블 고정</td>
+      </tr>
+      <tr>
+        <td class="num">13</td><td><span class="cat cat-m">재료</span></td>
+        <td>PP 케이스 (기성품)</td>
+        <td>투명, 100×70×40mm 이상</td>
+        <td>2~3</td>
+        <td><span class="tag t-buy">구매 필요</span></td>
+        <td>다이소. 보드 3장 수납. 투명 = 데모 시 내부 가시성. 실패 대비 복수 구입</td>
+      </tr>
+      <tr>
+        <td class="num">14</td><td><span class="cat cat-t">공구</span></td>
+        <td>미니 브레드보드</td>
+        <td>170홀 또는 830홀</td>
+        <td>1</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td>현장 우회용 백업. 배선 문제 시 즉시 재구성</td>
+      </tr>
+      <tr>
+        <td class="num">15</td><td><span class="cat cat-t">공구</span></td>
+        <td>정밀 드라이버 (일자)</td>
+        <td>나사단자용 소형</td>
+        <td>1</td>
+        <td><span class="tag t-opt">선택</span></td>
+        <td><strong>ADS1015 나사단자 조임에 필수.</strong> 없으면 현장에서 못 물림</td>
+      </tr>
+      <tr>
+        <td class="num">16</td><td><span class="cat cat-t">공구</span></td>
+        <td>멀티미터</td>
+        <td>ZOYI ZT102</td>
+        <td>1</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td>도통 확인. 현장 지참 권장</td>
+      </tr>
+      <tr>
+        <td class="num">17</td><td><span class="cat cat-t">공구</span></td>
+        <td>솔더링 인두 + 납</td>
+        <td>—</td>
+        <td>1세트</td>
+        <td><span class="tag t-opt">선택</span></td>
+        <td>현장 사용 가능 여부 확인 필요. 사전 작업 완료 시 불필요</td>
+      </tr>
+      <tr>
+        <td class="num">18</td><td><span class="cat cat-t">공구</span></td>
+        <td>USB-C 데이터 케이블</td>
+        <td>충전 전용 아님</td>
+        <td>1</td>
+        <td><span class="tag t-have">보유 · 재사용</span></td>
+        <td>가이드에 명시된 흔한 실패 원인. 데이터 통신 가능 여부 사전 확인</td>
+      </tr>
+    </tbody>
+  </table>
+ 
+  <div class="note-box callout-buy">
+    <strong>오늘(8/17) 안에 주문해야 하는 것</strong>
+    <ul>
+      <li><strong>ADS1015 Qwiic ADC ×2</strong> — 디바이스마트 / 아이씨뱅큐. 배송 3~4일이면 오늘이 마지노선</li>
+      <li><strong>FSR402 ×4~6</strong> — 오른발 신규</li>
+      <li><strong>10kΩ 저항 ×6</strong> — 오른발 분압 4개 + BNO055 풀업 2개</li>
+    </ul>
+    오프라인 당일 구입 가능: EVA 깔창, PP 케이스, 정밀 드라이버
+  </div>
+ 
+  <div class="note-box callout-warn">
+    <strong>운영진 확인 필요 (카톡 오픈채팅)</strong>
+    <ul>
+      <li>NU-40 DK 현장 구매 가격</li>
+      <li><strong>보드에 LiPo 충전 회로 내장 여부</strong> — 내장이면 TP4056·MT3608 완전 제거 가능</li>
+      <li>현장 납땜 가능 여부 / 인두 지참 허용</li>
+      <li>ADS1015 사전 구매 반입 시 반납 대상인지 (본인 구매품이므로 아닐 것으로 예상)</li>
+    </ul>
+  </div>
+</section>
+ 
+<!-- 04 왼발 대비 변경점 -->
+<section>
+  <div class="section-label">04 &nbsp; 변경점 요약</div>
+  <h2>왼발 V2.5 → 오른발 해커톤 구성</h2>
+ 
+  <table>
+    <thead><tr><th>층</th><th>왼발 (기존)</th><th>오른발 (해커톤)</th><th>영향</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>센싱</td><td>FSR402 ×4 + 10kΩ</td><td>동일</td>
+        <td><span class="tag t-have">변경 없음</span></td>
+      </tr>
+      <tr>
+        <td>ADC</td><td>ESP32 내장 12bit</td><td>ADS1015 외장 11bit + PGA</td>
+        <td>펌웨어 읽기 함수 수정. 선형성·저압 감도 개선 기대</td>
+      </tr>
+      <tr>
+        <td>MCU</td><td>Nano ESP32 (ESP32-S3)</td><td>NU-40 DK (nRF52840)</td>
+        <td>BLE 초기화 코드만 교체. WiFi 상실, BLE OTA 획득</td>
+      </tr>
+      <tr>
+        <td>IMU</td><td>BNO055 9축 · 융합 내장</td><td>MPU-6050 6축 · 융합 없음</td>
+        <td><strong>yaw 드리프트 발생.</strong> Madgwick 직접 구현 필요. roll/pitch는 정상</td>
+      </tr>
+      <tr>
+        <td>전원</td><td>LiPo→TP4056→MT3608→스위치</td><td>LiPo → 보드 직결 (확인 필요)</td>
+        <td>승압 불필요 (3.7V 직접 구동). 부피·사고 지점 대폭 감소 가능</td>
+      </tr>
+      <tr>
+        <td>조립</td><td>퍼프보드 + 구리테이프 + 납땜</td><td>Qwiic 데이지체인 + 나사단자</td>
+        <td>보드 간 납땜 0회. 분압 저항은 케이블 직결 + 열수축</td>
+      </tr>
+      <tr>
+        <td>하우징</td><td>케이스 v9 · CadQuery · PLA</td><td>기성 PP 케이스</td>
+        <td>보드 3장이라 v9 미수용. 임시 대응</td>
+      </tr>
+      <tr>
+        <td>대시보드</td><td>PWA · Web Bluetooth · NUS</td><td>동일</td>
+        <td><span class="tag t-have">무수정</span></td>
+      </tr>
+    </tbody>
+  </table>
+ 
+  <div class="note-box">
+    <strong>펌웨어 수정 범위 — 3곳</strong>
+    <ul>
+      <li><strong>FSR 읽기</strong> — <code>analogRead()</code> → ADS1015 라이브러리 호출, 반전 상수 재계산</li>
+      <li><strong>IMU 융합</strong> — BNO055 Euler 직접 읽기 → MPU-6050 raw + Madgwick 필터</li>
+      <li><strong>BLE 초기화</strong> — ESP32 NimBLE → Bluefruit <code>BLEUart</code></li>
+    </ul>
+    임계값 판정, 오디오 피드백, 세션 품질 계산 등 나머지 로직은 그대로 유지.
+  </div>
+</section>
+ 
+<!-- 05 사전 작업 -->
+<section>
+  <div class="section-label">05 &nbsp; 사전 작업</div>
+  <h2>8/17 (월) ~ 8/21 (금) 준비 항목</h2>
+ 
+  <table>
+    <thead><tr><th>일자</th><th>작업</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td class="mono" style="color:var(--buy)">8/17 월</td><td>부품 주문 (ADS1015·FSR·저항)</td><td><strong>되돌릴 수 없는 마감</strong></td></tr>
+      <tr><td class="mono">8/18 화</td><td>오른발 FSR 깔창 제작</td><td>가장 오래 걸리는 작업. 저항을 케이블에 직결 + 열수축 동시 진행</td></tr>
+      <tr><td class="mono">8/19 수</td><td>Madgwick 파이프라인 사전 작성</td><td>BNO055 raw 모드로 집에서 검증 가능 (풀업 저항 확보 시)</td></tr>
+      <tr><td class="mono">8/20 목</td><td>노션 포트폴리오 정리</td><td>사진 위주. 링크 제출용</td></tr>
+      <tr><td class="mono">8/21 금</td><td>Arduino IDE에 NUCODE BSP 설치 / 짐 싸기</td><td>보드 패키지 URL 사전 등록해두면 현장 시간 절약</td></tr>
+      <tr><td class="mono" style="color:var(--warn)">8/22 토</td><td>TOYTHON · 10:30~19:00 · 서울 AI 허브 4층</td><td>MAKER MODE</td></tr>
+    </tbody>
+  </table>
+ 
+  <div class="note-box callout-ok">
+    <strong>현장 작업 최소화 목표</strong><br>
+    사전 작업이 끝나면 당일 하드웨어 작업은 <strong>"나사단자에 선 4개 조이기 + Qwiic 케이블 2개 꽂기"</strong>로 끝나. 나머지 시간은 펌웨어 이식과 디버깅에 쓸 수 있어.
+  </div>
+ 
+  <div class="note-box callout-warn">
+    <strong>최소 성공 기준</strong><br>
+    5시간 안에 전부 완성하지 못해도, <strong>오른발에서 압력 4채널 + roll/pitch가 대시보드에 실시간으로 뜨는 것</strong>까지는 확보. 진동모터·부저 피드백은 시간이 남을 때.
+  </div>
+</section>
+ 
+<footer>
+  <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+    <span>Onyx SDI · TOYTHON Hackathon Build · 오른발 유닛 · 2026-08-17</span>
+    <span>NU-40 DK + ADS1015 + MPU-6050 · 본 BOM은 Rev 0.9와 별도 관리</span>
+  </div>
+</footer>
+ 
+</body>
+</html>

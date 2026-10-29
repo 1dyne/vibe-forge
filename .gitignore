@@ -1,0 +1,27 @@
+# Local credentials. Keep only the empty, shareable example.
+.env
+.env.*
+!.env.example
+
+# Local app data, generated artifacts and logs.
+.data/
+logs/
+*.log
+
+# Build and test output.
+node_modules/
+.next/
+dist/
+coverage/
+test-results/
+playwright-report/
+__pycache__/
+.venv/
+.tools/
+artifacts/demo/clips/
+artifacts/demo/frames/
+artifacts/demo/edited-frames/
+
+# Local scratch and incremental build state.
+tmp/
+*.tsbuildinfo

@@ -1,0 +1,50 @@
+{
+  "name": "dalgeurak-daejanggan",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "node scripts/run-next.mjs dev",
+    "worker": "npm run start --workspace=@dalgeurak/worker",
+    "build": "node scripts/run-next.mjs build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "doctor": "node --env-file-if-exists=.env.local scripts/doctor.mjs",
+    "db:migrate": "node --env-file-if-exists=.env.local scripts/migrate.mjs",
+    "smoke:web": "node --env-file-if-exists=.env.local scripts/smoke-web.mjs",
+    "smoke:live-build": "node --env-file-if-exists=.env.local scripts/smoke-live-build.mjs",
+    "smoke:live-evaluator": "node --env-file-if-exists=.env.local scripts/smoke-live-evaluator.mjs",
+    "smoke:live-repair": "node --env-file-if-exists=.env.local scripts/smoke-live-repair.mjs",
+    "smoke:live-read": "node --env-file-if-exists=.env.local scripts/smoke-live-read.mjs",
+    "lint:parts": "node scripts/lint-prompts.mjs",
+    "discover:models": "node --env-file-if-exists=.env.local scripts/discover-models.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0",
+    "drizzle-orm": "^0.45.2",
+    "next": "^16.3.5",
+    "openai": "^5.20.3",
+    "pg": "^8.16.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "yaml": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

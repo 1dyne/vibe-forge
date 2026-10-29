@@ -1,0 +1,11 @@
+turn:
+  max_logical_calls: 24
+  max_tool_rounds_per_agent: 6
+  max_scout_concurrency: 3
+  max_domain_concurrency: 4
+  default_timeout_ms: 90000
+  scout_parse_timeout_ms: 30000
+uploads:
+  log_max_bytes: 5242880
+  source_bundle_max_bytes: 20971520
+  cad_output_max_bytes: 104857600

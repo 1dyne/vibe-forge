@@ -1,0 +1,12 @@
+vendors:
+  - id: devicemart
+    type: shop
+    domain: devicemart.co.kr
+    min_interval_ms: 1000
+  - id: eleparts
+    type: shop
+    domain: eleparts.co.kr
+    min_interval_ms: 1000
+  - id: user_provided
+    type: user_link
+    min_interval_ms: 1000

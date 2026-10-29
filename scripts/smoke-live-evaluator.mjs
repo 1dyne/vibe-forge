@@ -1,0 +1,13 @@
+const baseUrl = process.argv[2] ?? process.env.APP_BASE_URL ?? "http://localhost:3000";
+const form = new FormData();
+form.set("password", process.env.APP_PASSWORD ?? "");
+const login = await fetch(`${baseUrl}/api/session`, { method: "POST", body: form, redirect: "manual" });
+const cookie = login.headers.get("set-cookie")?.split(";", 1)[0];
+if (login.status !== 303 || !cookie) throw new Error("login failed");
+const list = await (await fetch(`${baseUrl}/api/projects`, { headers: { cookie } })).json();
+const project = list.projects?.find((item) => item.build);
+if (!project) throw new Error("a project with build artifacts is required");
+const response = await fetch(`${baseUrl}/api/projects/${project.id}/evaluate`, { method: "POST", headers: { cookie, origin: baseUrl, "content-type": "application/json" }, body: "{}" });
+const body = await response.json();
+if (!response.ok || !body.project?.build) throw new Error(body.error ?? `evaluator failed ${response.status}`);
+console.log(JSON.stringify({ ok: true, revision: body.project.designRevision, hw: body.project.build.evaluator.hw.verdict, sw: body.project.build.evaluator.sw.verdict, checks: body.project.build.checks.map((item) => `${item.id}:${item.verdict}`) }, null, 2));

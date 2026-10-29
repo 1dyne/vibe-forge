@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dalgeurak}
+      POSTGRES_DB: ${POSTGRES_DB:-dalgeurak_daejanggan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.local}
+    ports: ["5432:5432"]
+    volumes: ["dalgeurak-postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dalgeurak} -d ${POSTGRES_DB:-dalgeurak_daejanggan}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  web:
+    build: .
+    command: npm run dev
+    env_file: [.env.local]
+    ports: ["3000:3000"]
+    volumes: [".:/app", "/app/node_modules"]
+    depends_on:
+      postgres: { condition: service_healthy }
+  worker:
+    build: .
+    command: npm run worker
+    env_file: [.env.local]
+    volumes: [".:/app", "/app/node_modules"]
+    depends_on:
+      postgres: { condition: service_healthy }
+volumes:
+  dalgeurak-postgres:
