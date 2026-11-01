@@ -9,4 +9,7 @@ COPY packages/agents/package.json packages/agents/package.json
 COPY packages/db/package.json packages/db/package.json
 RUN npm ci
 COPY . .
-CMD ["npm", "run", "dev"]
+RUN npm run build
+ENV NODE_ENV=production
+# Project data lives in /app/.data; mount a volume there in hosted deploys.
+CMD ["npm", "run", "start"]

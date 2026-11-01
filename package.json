@@ -11,6 +11,7 @@
     "dev": "node scripts/run-next.mjs dev",
     "worker": "npm run start --workspace=@dalgeurak/worker",
     "build": "node scripts/run-next.mjs build",
+    "start": "node scripts/run-next.mjs start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
