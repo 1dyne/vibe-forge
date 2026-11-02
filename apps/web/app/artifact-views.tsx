@@ -42,8 +42,11 @@ export function MockupView({ blueprint }: { blueprint: BuildBlueprint }) {
   const { widthMm: w, depthMm: d, heightMm: h, wallMm: wall } = blueprint.enclosure;
   const faces = useMemo(() => {
     const output: Array<{ points: string; z: number; fill: string; label: string }> = [];
-    const scale = 285 / Math.max(w, d, h) * rotation.zoom;
-    const rotate = ([x, y, z]: Point) => {
+    const extent = Math.max(w, d, h, ...(blueprint.shape ?? []).flatMap((p) => [Math.abs(p.position[0]) * 2 + p.size[0], Math.abs(p.position[1]) * 2 + p.size[1], p.position[2] + p.size[2]]));
+    const scale = 285 / extent * rotation.zoom;
+    // Lift tall described shapes so their middle sits where the box's floor did.
+    const zc = blueprint.shape?.length ? Math.max(...blueprint.shape.map((p) => p.position[2] + p.size[2])) * .45 : 0;
+    const rotate = ([x, y, z0]: Point) => { const z = z0 - zc;
       const xx = x * Math.cos(rotation.yaw) - y * Math.sin(rotation.yaw);
       const yy = x * Math.sin(rotation.yaw) + y * Math.cos(rotation.yaw);
       return [280 + xx * scale, 205 + (yy * Math.sin(rotation.pitch) - z * Math.cos(rotation.pitch)) * scale, yy * Math.cos(rotation.pitch) + z * Math.sin(rotation.pitch)];
@@ -55,6 +58,28 @@ export function MockupView({ blueprint }: { blueprint: BuildBlueprint }) {
         output.push({ points: transformed.map(([px,py]) => `${px},${py}`).join(" "), z: transformed.reduce((a,p) => a+p[2],0)/4, fill: color, label });
       }
     };
+    const shape = blueprint.shape ?? [];
+    if (shape.length) {
+      // Described outer form: each part as a low-poly mesh, painter-sorted.
+      const palette = ["#94D2C9", "#b7d7cf", "#e9e3cf", "#d9b8c4", "#a9b7d9", "#424b48"];
+      const face = (pts: Point[], fill: string, label: string) => { const t = pts.map(rotate); output.push({ points: t.map(([px, py]) => `${px},${py}`).join(" "), z: t.reduce((a, p) => a + p[2], 0) / t.length, fill, label }); };
+      shape.forEach((part, index) => {
+        const fill = part.color ?? palette[index % palette.length];
+        const [sx, sy, sz] = part.size; const [px, py, pz] = part.position;
+        if (part.primitive === "box") { box(px - sx / 2, py - sy / 2, pz, sx, sy, sz, fill, part.name); return; }
+        const seg = 16;
+        if (part.primitive === "sphere") {
+          const rings = 8; const at = (i: number, j: number): Point => { const th = Math.PI * i / rings, ph = 2 * Math.PI * j / seg; return [px + sx / 2 * Math.sin(th) * Math.cos(ph), py + sy / 2 * Math.sin(th) * Math.sin(ph), pz + sz / 2 - sz / 2 * Math.cos(th)]; };
+          for (let i = 0; i < rings; i++) for (let j = 0; j < seg; j++) face([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)], fill, part.name);
+          return;
+        }
+        const ring = (z: number, scale: number) => Array.from({ length: seg }, (_, j): Point => [px + sx / 2 * scale * Math.cos(2 * Math.PI * j / seg), py + sy / 2 * scale * Math.sin(2 * Math.PI * j / seg), z]);
+        const bottom = ring(pz, 1); const top = ring(pz + sz, part.primitive === "cone" ? 0 : 1);
+        for (let j = 0; j < seg; j++) face([bottom[j], bottom[(j + 1) % seg], top[(j + 1) % seg], top[j]], fill, part.name);
+        face(bottom, fill, part.name); if (part.primitive === "cylinder") face(top, fill, part.name);
+      });
+      return output.sort((a, b) => a.z - b.z);
+    }
     box(-w/2,-d/2,0,w,d,wall,"#b5d8d1","하우징 바닥");
     box(-w/2,-d/2,wall,w,wall,h-wall,"#cbe0db","후면 벽");
     box(-w/2,d/2-wall,wall,w,wall,h-wall,"#a6ccc3","전면 벽");
@@ -63,7 +88,7 @@ export function MockupView({ blueprint }: { blueprint: BuildBlueprint }) {
     box(-w*.30,-d*.29,wall+1,w*.55,d*.50,3,"#2e786b",blueprint.board + " 자리표시자");
     box(w*.13,-d*.12,wall+5,w*.1,d*.15,h*.18,"#424b48","부품 자리표시자");
     return output.sort((a,b) => a.z-b.z);
-  }, [w,d,h,wall,rotation,blueprint.board]);
+  }, [w,d,h,wall,rotation,blueprint.board,blueprint.shape]);
   return <div className="mockup-view">
     <div className="view-toolbar"><span>{w} × {d} × {h} mm</span><button onClick={() => setRotation({yaw:-.6,pitch:.55,zoom:1})}>시점 초기화</button></div>
     <svg className="orbit-canvas" viewBox="0 0 560 360" role="img" aria-label="드래그로 회전 가능한 3D 하우징 목업" tabIndex={0}
@@ -76,7 +101,7 @@ export function MockupView({ blueprint }: { blueprint: BuildBlueprint }) {
       <text x="22" y="335" fill="#64736e" fontSize="11">드래그 / 방향키로 회전 · 치수 기반 기구 목업</text>
     </svg>
     <label className="zoom-slider">확대 <input aria-label="3D 확대" type="range" min=".5" max="1.8" step=".05" value={rotation.zoom} onChange={(e)=>setRotation({...rotation,zoom:Number(e.target.value)})}/></label>
-    <p className="muted">벽 두께 {wall} mm. 보드와 부품은 자리표시자이며, 실제 부품 치수를 받으면 기구 설계를 조정합니다. 출력 전 CAD 렌더와 간섭 확인이 필요합니다.</p>
+    <p className="muted">{blueprint.shape?.length ? `설명한 형태를 ${blueprint.shape.length}개의 기본 도형으로 만든 외형 목업이에요. 내부 전자부품 공간은 ${w}×${d}×${h}mm 기준이에요. ` : ""}벽 두께 {wall} mm. 보드와 부품은 자리표시자이며, 실제 부품 치수를 받으면 기구 설계를 조정합니다. 출력 전 CAD 렌더와 간섭 확인이 필요합니다.</p>
   </div>;
 }
 

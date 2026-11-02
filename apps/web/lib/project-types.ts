@@ -30,7 +30,10 @@ export type ChatMessage = {
   shared?: boolean;
 };
 
-export type CircuitComponent = { ref: string; type: string; valueOrModel: string; reason: string };
+export type ConnectionKind = "builtin" | "socket" | "qwiic" | "grove" | "breadboard" | "solder";
+export type CircuitComponent = { ref: string; type: string; valueOrModel: string; reason: string; connection?: ConnectionKind };
+// Rough outer form for the 3D mockup, in mm, origin at the floor centre.
+export type ShapePart = { name: string; primitive: "box" | "sphere" | "cylinder" | "cone"; size: [number, number, number]; position: [number, number, number]; color?: string };
 export type CircuitNet = { name: string; kind: "power" | "ground" | "signal"; members: string[] };
 export type PinAssignment = { symbol: string; pin: number; role: "digital_input" | "analog_input" | "digital_output" | "pwm_output" | "servo" };
 
@@ -44,6 +47,7 @@ export type BuildBlueprint = {
   firmware: { platform: "arduino"; behavior: string; pinAssignments: PinAssignment[]; loopSteps: string[] };
   assumptions: string[];
   humanChecks: string[];
+  shape?: ShapePart[];
 };
 
 export type RuleCheck = { id: string; verdict: "pass" | "fail" | "unknown"; message: string };
@@ -82,6 +86,7 @@ export type LocalProject = {
   oneLiner: string;
   stage: "idea" | "spec" | "workshop";
   workflow?: Workflow;
+  buildPlan?: BuildPlan;
   workspaceFiles?: Array<{ id: string; agent: AgentId; filename: string; content: string; createdAt: string }>;
   designRevision: number;
   slots: DesignSlot[];
@@ -96,7 +101,33 @@ export type LocalProject = {
 export type AgentId = "chief" | "hw" | "sw" | "me" | "id";
 export type ChatChannel = "main" | AgentId;
 export type ImageAttachment = { name: string; dataUrl: string };
-export type MakerProfile = { tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string };
+export type MakerProfile = {
+  tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string;
+  // Extended checklist; optional so older projects keep loading.
+  solderingSkill?: "unanswered" | "none" | "tried" | "comfortable";
+  printerAccess?: "unanswered" | "own" | "makerspace" | "service" | "none";
+  region?: string;
+  budgetKRW?: number | null;
+  purpose?: "unanswered" | "personal" | "gift" | "sell" | "lecture";
+  targetPriceKRW?: number | null;
+};
+
+// The chief's whole-project design: board, connection method, modules and the
+// staged path (including practice) before any circuit is drawn.
+export type BuildPlan = {
+  track: "software" | "hardware" | "both";
+  summary: string;
+  board: { choice: "arduino" | "raspberry_pi" | "pico" | "esp32" | "nuboard" | "other"; model: string; why: string; alternatives: string };
+  connection: { method: "solder" | "qwiic" | "grove" | "breadboard" | "socket" | "mixed"; why: string };
+  modules: Array<{ function: string; part: string; why: string; connection: string; whereToBuy: string; searchKeyword: string; estPriceKRW: number | null; difficulty: "쉬움" | "보통" | "어려움" }>;
+  structure: Array<{ name: string; role: string; connectsTo: string }>;
+  stages: Array<{ title: string; goal: string; learn: string; practice: string; doneWhen: string; parts: string[] }>;
+  prerequisites: Array<{ skill: string; why: string; practice: string; timeEstimate: string }>;
+  cost: { totalKRW: number; budgetKRW: number | null; verdict: "within" | "tight" | "over" | "unknown"; options: string[]; marginNote: string };
+  fabrication: { needs3DPrint: boolean; plan: string };
+  risks: string[];
+  updatedAt: string;
+};
 export type PartSource = { url: string; title: string; price: string | null; checkedAt: string; note: string };
 export type DevProfile = {
   codingExperience: "unanswered" | "none" | "guided" | "independent";
