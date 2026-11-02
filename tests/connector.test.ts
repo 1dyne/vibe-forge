@@ -11,6 +11,7 @@ import { POST as workflowPost } from "../apps/web/app/api/projects/[id]/workflow
 import { createUser, updateUser } from "../apps/web/lib/users";
 import { GET as meRoute } from "../apps/web/app/api/me/route";
 import { signSession } from "../apps/web/lib/session";
+import { workflowFor } from "../apps/web/lib/workflow";
 
 const SECRET = "test-secret-for-connector-routes-0123456789";
 let folder: string;
@@ -29,6 +30,8 @@ const blueprint = { title: "버튼 램프", board: "Arduino Nano", supplyVoltage
 const review = { summary: "실측 전에는 판단 보류", hwVerdict: "unknown", hwFinding: "LED 저항값 실측 필요", measurement: "전원 인가 후 PS1.OUT-GND를 DC전압 모드로 재서 4.75~5.25V인지 알려주세요.", swVerdict: "unknown", swFinding: "컴파일 전", firmwareRun: "Arduino IDE에서 Arduino Nano를 고르고 업로드 후 버튼으로 LED가 토글되는지 확인해주세요." };
 
 const buildPlan = { track: "hardware", summary: "버튼과 LED로 켜고 끄는 탁상 램프", board: { choice: "arduino", model: "Arduino Nano", why: "B-1 움직임만 필요", alternatives: "ESP32는 무선이 필요할 때" }, connection: { method: "breadboard", why: "납땜 없이 시작" }, modules: [{ function: "입력", part: "택트 스위치", why: "누르면 토글", connection: "브레드보드", whereToBuy: "디바이스마트", searchKeyword: "택트 스위치 6x6", estPriceKRW: 500, difficulty: "쉬움" }, { function: "보드", part: "Arduino Nano 호환", why: "제어", connection: "USB", whereToBuy: "엘레파츠", searchKeyword: "아두이노 나노", estPriceKRW: 9500, difficulty: "쉬움" }], structure: [{ name: "입력부", role: "버튼", connectsTo: "D2" }], stages: [{ title: "Blink", goal: "LED 깜빡이기", learn: "업로드", practice: "Blink 예제", doneWhen: "1초마다 깜빡임", parts: ["Nano"] }], prerequisites: [{ skill: "업로드", why: "처음", practice: "Blink", timeEstimate: "30분" }], cost: { options: ["2단계로 나누면 1단계 1만 원"], marginNote: "" }, fabrication: { needs3DPrint: false, plan: "종이 상자" }, risks: [] };
+
+const productForm = { summary: "손바닥 크기 원통형 램프", answers: [{ question: "크기", answer: "손바닥" }], shape: [{ name: "몸통", primitive: "cylinder", size: [70, 70, 90], position: [0, 0, 0] }], features: [{ name: "버튼", kind: "button", facing: "top", position: [0, 0, 90], size: [12, 12] }], internals: [{ ref: "U1", label: "Arduino Nano", size: [45, 18, 8], position: [0, 0, 5] }], material: "PLA 흰색" };
 
 beforeAll(async () => {
   folder = await mkdtemp(path.join(tmpdir(), "forge-connector-test-"));
@@ -66,8 +69,9 @@ describe("Claude connector", () => {
 
     const noPlan = await tool(token, "submit_circuit", { projectId: id, blueprint, review });
     expect(noPlan.isError).toBe(true);
-    expect(noPlan.content[0].text).toContain("set_build_plan");
+    expect(noPlan.content[0].text).toContain("set_product_form");
     await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "버튼을 누르면 LED가 켜지고 다시 누르면 꺼진다", tools: ["멀티미터", "브레드보드"], toolsConfirmed: true, firmwareExperience: "guided", budgetKRW: 8000 });
+    await tool(token, "set_product_form", { projectId: id, form: productForm });
     const planned = await tool(token, "set_build_plan", { projectId: id, plan: buildPlan });
     expect(planned.isError).toBeFalsy();
     expect(planned.structuredContent!.buildPlan.cost).toMatchObject({ totalKRW: 10000, budgetKRW: 8000, verdict: "over" });
@@ -147,6 +151,7 @@ describe("Claude connector", () => {
     expect(guide.content[0].text).toContain("record_part_source");
 
     await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "버튼으로 LED 토글", tools: [], toolsConfirmed: true, firmwareExperience: "none" });
+    await tool(token, "set_product_form", { projectId: id, form: productForm });
     await tool(token, "set_build_plan", { projectId: id, plan: buildPlan });
     await tool(token, "submit_circuit", { projectId: id, blueprint, review });
     const source = await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "https://example.com/tact-switch", title: "택트 스위치 6x6", price: "100원" });
@@ -184,6 +189,7 @@ describe("Claude connector", () => {
     await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "말하면 눈을 깜빡인다", tools: [], toolsConfirmed: true, firmwareExperience: "none", solderingSkill: "none", printerAccess: "makerspace", region: "서울 마포구", budgetKRW: 150000, purpose: "personal" });
     const kept = await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "말하면 눈을 깜빡이고 소리를 낸다", tools: [], toolsConfirmed: true, firmwareExperience: "none" });
     expect(kept.structuredContent!.profile).toMatchObject({ solderingSkill: "none", budgetKRW: 150000, region: "서울 마포구" });
+    await tool(token, "set_product_form", { projectId: id, form: productForm });
     await tool(token, "set_build_plan", { projectId: id, plan: buildPlan });
 
     const robot = { ...blueprint, board: "XIAO ESP32S3 Sense", sensor: "내장 마이크", actuator: "원형 디스플레이", camera: "내장 OV2640",
@@ -218,5 +224,55 @@ describe("Claude connector", () => {
     expect(cad).toContain("sphere(d=1)");
     expect(cad).toContain("cylinder(h=30, d1=1, d2=0)");
     expect(cad).toContain("difference()");
+  });
+
+  it("shows the finished product first, then guides assembly step by step into the workshop", async () => {
+    const { user, token } = await createUser("참여자 F", false);
+    const id = (await tool(token, "create_project", { idea: "버튼 램프", plan })).structuredContent!.id as string;
+    await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "버튼으로 LED 토글", tools: [], toolsConfirmed: true, firmwareExperience: "none" });
+    await tool(token, "set_build_plan", { projectId: id, plan: buildPlan });
+    const noForm = await tool(token, "submit_circuit", { projectId: id, blueprint, review });
+    expect(noForm.isError).toBe(true);
+    expect(noForm.content[0].text).toContain("set_product_form");
+    const outside = await tool(token, "set_product_form", { projectId: id, form: { ...productForm, internals: [{ ref: "BAT1", label: "보조배터리", size: [150, 70, 20], position: [0, 0, 5] }] } });
+    expect(outside.content[0].text).toContain("BAT1");
+    const formed = await tool(token, "set_product_form", { projectId: id, form: productForm });
+    expect(formed.structuredContent!.files.map((f: { kind: string }) => f.kind)).toContain("product");
+    await tool(token, "submit_circuit", { projectId: id, blueprint: { ...blueprint, components: [{ ref: "U1", type: "controller", valueOrModel: "Arduino Nano", reason: "제어", connection: "breadboard" }, { ref: "SW1", type: "switch", valueOrModel: "택트 스위치", reason: "입력", connection: "breadboard" }], nets: [{ name: "5V", kind: "power", members: ["U1.5V", "SW1.A"] }, { name: "GND", kind: "ground", members: ["U1.GND", "SW1.B"] }] }, review });
+
+    const cookie = "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, user.id);
+    const act = async (body: unknown) => (await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) })).json();
+    const approved = await act({ action: "approve_circuit" });
+    const cad = approved.project.build.artifacts.find((a: { kind: string }) => a.kind === "cad").content as string;
+    expect(cad).toContain("// 몸통");
+    expect(cad).toContain("cylinder(h=90, d=1)");
+
+    const guide = { stage: "1단계 버튼 입력", base: { name: "하프 브레드보드", kind: "breadboard", width: 82, height: 55 },
+      parts: [{ ref: "U1", label: "Arduino Nano", x: 10, y: 20, width: 43, height: 18, pins: [{ name: "5V", x: 2, y: 17 }, { name: "D2", x: 20, y: 1 }, { name: "GND", x: 6, y: 17 }] }, { ref: "SW1", label: "택트 스위치", x: 60, y: 22, width: 6, height: 6, pins: [{ name: "A", x: 0, y: 0 }, { name: "B", x: 6, y: 6 }] }],
+      steps: [
+        { title: "보드 꽂기", action: "Nano를 브레드보드 가운데 홈을 가로질러 USB가 왼쪽으로 가게 꽂아요.", place: ["U1"], wires: [], check: "핀이 양쪽 줄에 나뉘어 꽂혔는지", cards: [{ symptom: "USB를 꽂아도 불이 안 켜져요", check: "멀티미터 DC 20V로 5V 핀과 GND 사이를 재요", expected: "4.75~5.25V", ifNot: "케이블이 데이터용인지, 다른 USB 포트인지 확인" }] },
+        { title: "버튼 연결", action: "버튼을 꽂고 D2와 GND에 이어요.", place: ["SW1"], wires: [{ from: "U1.D2", to: "SW1.A", color: "#2e7bd6" }, { from: "U1.GND", to: "SW1.B", color: "#333333" }], check: "시리얼 모니터에 눌림이 찍히는지", cards: [] }
+      ] };
+    const badPin = await tool(token, "set_assembly_guide", { projectId: id, guide: { ...guide, steps: [{ ...guide.steps[1], wires: [{ from: "U1.D9", to: "SW1.A", color: "#2e7bd6" }] }] } });
+    expect(badPin.isError).toBe(true);
+    expect(badPin.content[0].text).toContain("U1.D9");
+    const saved = await tool(token, "set_assembly_guide", { projectId: id, guide });
+    expect(saved.isError).toBeFalsy();
+    expect(saved.structuredContent!.assembly.steps[0].cards[0].id).toBe("s1-c1");
+
+    await act({ action: "approve_mockup" });
+    await tool(token, "set_team", { projectId: id, agents: ["hw"] });
+    const entered = await act({ action: "enter_workshop" });
+    expect(workflowFor(entered.project).phase).toBe("workshop");
+    const reported = await act({ action: "assembly_report", step: 1, cardId: "s1-c1", text: "3.1V 나와요" });
+    expect(reported.project.assemblyReports).toHaveLength(1);
+    const state = await tool(token, "get_project", { projectId: id });
+    expect(state.structuredContent!.phase).toBe("workshop");
+    expect(state.structuredContent!.assemblyReports[0]).toMatchObject({ step: 1, cardId: "s1-c1", text: "3.1V 나와요" });
+    expect(state.structuredContent!.recentMessages.at(-1).text).toContain("기대값: 4.75~5.25V");
+    const reply = await tool(token, "log_team_turn", { projectId: id, channel: "hw", mode: "evaluate", userMessage: "3.1V 나와요", replies: [{ agent: "hw", text: "5V가 낮아요. 케이블과 포트를 바꿔 다시 재주세요." }], sharedSummary: "사용자 관측: 5V 핀 3.1V. 미검증: 원인" });
+    expect(reply.isError).toBeFalsy();
+    await tool(token, "record_assembly_result", { projectId: id, step: 1, cardId: "s1-c1", text: "케이블 바꾸니 5.0V" });
+    expect((await tool(token, "get_project", { projectId: id })).structuredContent!.assemblyReports).toHaveLength(2);
   });
 });

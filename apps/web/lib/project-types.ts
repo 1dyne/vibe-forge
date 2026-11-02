@@ -87,6 +87,9 @@ export type LocalProject = {
   stage: "idea" | "spec" | "workshop";
   workflow?: Workflow;
   buildPlan?: BuildPlan;
+  productForm?: ProductForm;
+  assembly?: AssemblyGuide;
+  assemblyReports?: AssemblyReport[];
   workspaceFiles?: Array<{ id: string; agent: AgentId; filename: string; content: string; createdAt: string }>;
   designRevision: number;
   slots: DesignSlot[];
@@ -111,6 +114,35 @@ export type MakerProfile = {
   purpose?: "unanswered" | "personal" | "gift" | "sell" | "lecture";
   targetPriceKRW?: number | null;
 };
+
+// What the finished product looks like, settled before any circuit: the
+// outer form, where the screen/camera/buttons sit and the real parts inside.
+export type ProductFeature = { name: string; kind: "screen" | "camera" | "button" | "speaker" | "mic" | "port" | "light" | "other"; facing: "front" | "back" | "top" | "bottom" | "left" | "right"; position: [number, number, number]; size: [number, number] };
+export type ProductInternal = { ref: string; label: string; size: [number, number, number]; position: [number, number, number] };
+export type ProductForm = {
+  summary: string;
+  answers: Array<{ question: string; answer: string }>;
+  shape: ShapePart[];
+  features: ProductFeature[];
+  internals: ProductInternal[];
+  material: string;
+  updatedAt: string;
+};
+
+// Step-by-step build on the real board footprint, with trouble cards the
+// person checks and reports back from.
+export type AssemblyPart = { ref: string; label: string; x: number; y: number; width: number; height: number; color?: string; pins?: Array<{ name: string; x: number; y: number }> };
+export type AssemblyWire = { from: string; to: string; color: string; label?: string };
+export type TroubleCard = { id: string; symptom: string; check: string; expected: string; ifNot: string };
+export type AssemblyStep = { title: string; action: string; place: string[]; wires: AssemblyWire[]; check: string; cards: TroubleCard[] };
+export type AssemblyGuide = {
+  stage: string;
+  base: { name: string; kind: "breadboard" | "board" | "stack" | "perfboard"; width: number; height: number };
+  parts: AssemblyPart[];
+  steps: AssemblyStep[];
+  updatedAt: string;
+};
+export type AssemblyReport = { step: number; cardId: string | null; text: string; createdAt: string };
 
 // The chief's whole-project design: board, connection method, modules and the
 // staged path (including practice) before any circuit is drawn.

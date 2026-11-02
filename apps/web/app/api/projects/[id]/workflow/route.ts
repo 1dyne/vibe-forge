@@ -6,6 +6,7 @@ import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied } from "../../../../../lib/viewer";
 import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, runBuildPipeline } from "../../../../../lib/build-pipeline";
+import { recordAssembly } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
@@ -20,6 +21,7 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reopen") }),
   z.object({ action: z.literal("evidence"), taskId: z.string(), text: z.string().trim().min(1).max(3000) }),
   z.object({ action: z.literal("dev_profile"), devProfile: z.object({ codingExperience: z.enum(["unanswered", "none", "guided", "independent"]), tool: z.enum(["undecided", "claude_code", "codex"]), os: z.enum(["unanswered", "mac", "windows", "linux"]), installed: z.array(z.string().max(40)).max(12), confirmed: z.boolean() }).strict() }),
+  z.object({ action: z.literal("assembly_report"), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^s\d+-c\d+$/).optional(), text: z.string().trim().min(1).max(1000) }),
   z.object({ action: z.literal("purchase"), ref: z.string().max(80), status: z.enum(["needed", "ordered", "received", "problem"]), note: z.string().max(1000).default("") })
 ]);
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -50,6 +52,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         w.profile = input.profile as MakerProfile;
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `제작 프로필을 알려드릴게요.\n핵심 동작: ${w.profile.coreBehavior || "아직 논의 중"}\n보유 도구: ${w.profile.tools.join(", ") || "없음"}\n펌웨어 경험: ${{ unanswered: "아직 답변 안 함", none: "처음이에요", guided: "안내를 보며 해봤어요", independent: "직접 할 수 있어요" }[w.profile.firmwareExperience]}`, createdAt: now });
         announce("제작 프로필을 저장했어요. 목표는 유지하면서 경험에 맞춰 설명할게요. 아이디어를 더 논의하거나, 준비되었다면 계획 시작을 눌러주세요.");
+      } else if (input.action === "assembly_report") {
+        recordAssembly(p, input.step, input.cardId ?? null, input.text);
       } else if (input.action === "dev_profile") {
         w.devProfile = input.devProfile as DevProfile;
       } else if (input.action === "agents") {
@@ -81,7 +85,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           p.tasks = p.tasks.map((task) => task.kind === "confirm_spec" ? { ...task, status: "completed" } : task);
           announce("브레인스토밍을 마치고 회로 초안을 준비했어요. 오른쪽 회로 탭에서 연결과 미확정 사항을 확인해주세요. 회로 방향을 승인하면 3D 목업을 만듭니다.");
         } else if (input.action === "approve_circuit") {
-          p.build = approvedCad(p.build!);
+          p.build = approvedCad(p.build!, p.productForm?.shape);
           announce("회로 방향을 승인했어요. 승인된 부품과 치수로 3D 목업을 만들었어요. 드래그해서 돌려보고 형태를 검토해주세요. 이 승인은 실물 전기 검증의 합격과는 별개예요.");
         } else if (input.action === "approve_mockup") {
           announce("3D 목업 방향을 승인했어요. 다음 할 일 탭에서 사람과 AI의 작업을 나누고 BOM의 구매 상태를 확인해주세요.");

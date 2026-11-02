@@ -4,7 +4,7 @@ import { workflowFor } from "./workflow";
 export type WorkbenchItem = {
   id: string;
   filename: string;
-  kind: "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
+  kind: "product" | "assembly" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
 };
@@ -41,7 +41,13 @@ export function workbenchItems(project: LocalProject | null): WorkbenchItem[] {
   if (!project) return [];
   const workflow = workflowFor(project);
   const stem = project.name.replace(/[\\/:*?"<>|\r\n]/g, "-").slice(0, 80) || "project";
-  const items: WorkbenchItem[] = project.buildPlan ? [{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan) }] : [];
+  const items: WorkbenchItem[] = [];
+  if (project.productForm) items.push({ id: "document:product", filename: `${stem}-완성품.json`, kind: "product", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.productForm, null, 2) });
+  if (project.assembly) {
+    const g = project.assembly;
+    items.push({ id: "document:assembly", filename: `${stem}-조립가이드.md`, kind: "assembly", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 조립 가이드\n\n${g.stage} · ${g.base.name} (${g.base.width}×${g.base.height}mm)\n\n${g.steps.map((s, i) => `## ${i + 1}. ${s.title}\n\n${s.action}\n\n${s.wires.map(w => `- ${w.from} → ${w.to}${w.label ? ` (${w.label})` : ""}`).join("\n")}\n\n확인: ${s.check}\n\n${s.cards.map(c => `> ⚠ ${c.symptom}\n> 확인: ${c.check}\n> 정상: ${c.expected}\n> 아니면: ${c.ifNot}`).join("\n\n")}`).join("\n\n")}\n` });
+  }
+  if (project.buildPlan) items.push(...[{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan) }] as WorkbenchItem[]);
   items.push(...(project.build?.artifacts ?? [])
     .filter(a => a.kind !== "cad" || Boolean(workflow.circuitApprovedAt))
     .map(a => ({ id: `artifact:${a.id}`, filename: a.filename, kind: a.kind, mimeType: a.mimeType, content: a.content })));

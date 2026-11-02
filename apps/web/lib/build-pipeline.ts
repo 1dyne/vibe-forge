@@ -437,10 +437,12 @@ export function buildFromSubmission(seed: unknown, review: unknown, profile?: Ma
   return { status: buildStatus(checks, evaluator), blueprint, checks, evaluator, artifacts, createdAt: now };
 }
 
-export function approvedCad(build: BuildResult): BuildResult {
+// The settled product form, when there is one, gives the CAD its outer shape.
+export function approvedCad(build: BuildResult, formShape?: ShapePart[]): BuildResult {
   const now = new Date().toISOString();
-  const cad: ProjectArtifact = { id: randomUUID(), kind: "cad", filename: "enclosure-mockup.scad", mimeType: "text/plain; charset=utf-8", content: generateScad(build.blueprint), createdAt: now };
-  return { ...build, artifacts: [...build.artifacts.filter((artifact) => artifact.kind !== "cad"), cad] };
+  const blueprint = formShape?.length ? { ...build.blueprint, shape: formShape } : build.blueprint;
+  const cad: ProjectArtifact = { id: randomUUID(), kind: "cad", filename: "enclosure-mockup.scad", mimeType: "text/plain; charset=utf-8", content: generateScad(blueprint), createdAt: now };
+  return { ...build, blueprint, artifacts: [...build.artifacts.filter((artifact) => artifact.kind !== "cad"), cad] };
 }
 
 export async function reevaluateBuild(project: LocalProject): Promise<BuildResult> {
