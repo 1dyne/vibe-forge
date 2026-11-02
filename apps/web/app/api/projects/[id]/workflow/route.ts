@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
+import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied } from "../../../../../lib/viewer";
 import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import type { MakerProfile } from "../../../../../lib/project-types";
@@ -21,9 +22,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   try {
     const input = Input.parse(await request.json());
+    const viewer = await getViewer(request);
+    if (!viewer) return unauthorized();
     const { id } = await context.params;
     const project = await getProject(id);
-    if (!project) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
+    if (!project || !canAccess(viewer, project)) return notFound();
+    // Approvals and records stay open to everyone; only "plan" calls the in-app AI.
+    if (input.action === "plan" && !canUseWebAi(viewer)) return webAiDenied();
     const current = workflowFor(project);
     let newBuild = null;
     if (input.action === "plan") {
@@ -83,7 +88,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       }
       p.workflow = w;
     }, project.designRevision);
-    if (input.action === "profile") await saveMakerProfile(input.profile as MakerProfile);
+    if (input.action === "profile") await saveMakerProfile(input.profile as MakerProfile, ownerIdOf(viewer));
     return NextResponse.json({ project: updated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "요청에 실패했습니다.";

@@ -1,0 +1,11 @@
+{
+  "name": "dalgeurak",
+  "owner": { "name": "1dyne" },
+  "plugins": [
+    {
+      "name": "dalgeurak-forge",
+      "source": "./plugin/dalgeurak-forge",
+      "description": "달그락 대장간: 아이디어를 하드웨어 시제품까지. 내 Claude로 설계하고 대시보드에 누적 기록해요."
+    }
+  ]
+}

@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
+import { canAccess, getViewer } from "../../../../../../lib/viewer";
 import { getProject } from "../../../../../../lib/local-project-store";
 import { workflowFor } from "../../../../../../lib/workflow";
 
-export async function GET(_request: NextRequest, context: { params: Promise<{ id: string; artifactId: string }> }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string; artifactId: string }> }) {
   const { id, artifactId } = await context.params;
-  const project = await getProject(id);
+  const viewer = await getViewer(request);
+  const found = await getProject(id);
+  const project = viewer && canAccess(viewer, found) ? found : null;
   const artifact = project?.build?.artifacts.find((item) => item.id === artifactId);
   if (!artifact) return Response.json({ error: "파일을 찾을 수 없습니다." }, { status: 404 });
   if (artifact.kind === "cad" && project && !workflowFor(project).circuitApprovedAt) return Response.json({ error: "회로 승인 후 3D 산출물을 열 수 있습니다." }, { status: 409 });

@@ -294,6 +294,23 @@ async function callBlueprint(project: LocalProject): Promise<BuildBlueprint> {
   });
 }
 
+type EvaluatorCompact = z.infer<typeof EvaluatorCompactSchema>;
+
+function expandEvaluator(compact: EvaluatorCompact, checks: RuleCheck[], blueprint: BuildBlueprint): EvaluatorReport {
+  const value: EvaluatorReport = {
+    summary: compact.summary,
+    hw: { verdict: compact.hwVerdict, findings: compact.hwFinding ? [compact.hwFinding] : [], requiredMeasurements: compact.measurement ? [compact.measurement] : [] },
+    sw: { verdict: compact.swVerdict, findings: compact.swFinding ? [compact.swFinding] : [], requiredRuns: compact.firmwareRun ? [compact.firmwareRun] : [] }
+  };
+  if (checks.some((check) => check.id === "CAMERA_VOLTAGE_DOMAIN" && check.verdict === "unknown")) {
+    value.hw.requiredMeasurements.push("카메라 모듈의 정확한 모델/전원 핀 허용치를 확인하고, 전원 인가 후 LS1.LV_OUT-GND를 DC전압 모드로 측정해 HIGH가 3.2~3.4V인지 알려주세요.");
+  }
+  if (blueprint.components.some((item) => /servo|SG90/i.test(item.valueOrModel))) {
+    value.hw.requiredMeasurements.push("서보 2개가 동시에 움직일 때 PS1.OUT-GND를 DC전압 모드로 측정해 4.75~5.25V가 유지되는지 알려주세요. 4.5V 미만이면 서보 전원을 분리해야 합니다.");
+  }
+  return value;
+}
+
 async function callEvaluator(project: LocalProject, blueprint: BuildBlueprint, checks: RuleCheck[], firmware: string): Promise<EvaluatorReport> {
   const adapter = new AnthropicModelAdapter(process.env.ANTHROPIC_MODEL_LARGE ?? "");
   const maximumUsd = 0.03;
@@ -330,18 +347,7 @@ async function callEvaluator(project: LocalProject, blueprint: BuildBlueprint, c
       }
     }, EvaluatorCompactSchema);
     const actualUsd = calculateModelCost({ input: 5, output: 25 }, result.usage);
-    const compact = result.parsed as z.infer<typeof EvaluatorCompactSchema>;
-    const value: EvaluatorReport = {
-      summary: compact.summary,
-      hw: { verdict: compact.hwVerdict, findings: compact.hwFinding ? [compact.hwFinding] : [], requiredMeasurements: compact.measurement ? [compact.measurement] : [] },
-      sw: { verdict: compact.swVerdict, findings: compact.swFinding ? [compact.swFinding] : [], requiredRuns: compact.firmwareRun ? [compact.firmwareRun] : [] }
-    };
-    if (checks.some((check) => check.id === "CAMERA_VOLTAGE_DOMAIN" && check.verdict === "unknown")) {
-      value.hw.requiredMeasurements.push("카메라 모듈의 정확한 모델/전원 핀 허용치를 확인하고, 전원 인가 후 LS1.LV_OUT-GND를 DC전압 모드로 측정해 HIGH가 3.2~3.4V인지 알려주세요.");
-    }
-    if (blueprint.components.some((item) => /servo|SG90/i.test(item.valueOrModel))) {
-      value.hw.requiredMeasurements.push("서보 2개가 동시에 움직일 때 PS1.OUT-GND를 DC전압 모드로 측정해 4.75~5.25V가 유지되는지 알려주세요. 4.5V 미만이면 서보 전원을 분리해야 합니다.");
-    }
+    const value = expandEvaluator(result.parsed as EvaluatorCompact, checks, blueprint);
     return { value, actualUsd };
   });
 }
@@ -358,6 +364,28 @@ export async function runBuildPipeline(project: LocalProject, circuitOnly = fals
   const artifacts = [
     artifact("circuit", "circuit-plan.md", "text/markdown; charset=utf-8", generateCircuitMarkdown(blueprint, checks)),
     ...(circuitOnly ? [] : [artifact("cad", "enclosure-mockup.scad", "text/plain; charset=utf-8", scad)]),
+    artifact("firmware", "dalgeurak_firmware.ino", "text/plain; charset=utf-8", firmware)
+  ];
+  return { status: buildStatus(checks, evaluator), blueprint, checks, evaluator, artifacts, createdAt: now };
+}
+
+// Plugin users design with their own Claude: the server takes the submitted
+// seed and review, then runs the same deterministic wiring, firmware, CAD and
+// rule checks as the in-app pipeline. Deterministic fails still block "ready".
+export const BlueprintSubmissionSchema = BlueprintSeedSchema;
+export const EvaluatorSubmissionSchema = EvaluatorCompactSchema;
+export { blueprintJsonSchema };
+
+export function buildFromSubmission(seed: unknown, review: unknown): BuildResult {
+  const blueprint = normalizeBlueprintWiring(expandBlueprint(BlueprintSeedSchema.parse(seed) as BlueprintSeed));
+  const firmware = generateFirmware(blueprint);
+  const scad = generateScad(blueprint);
+  const checks = [...deterministicChecks(blueprint), ...firmwareChecks(firmware, blueprint), ...scadChecks(scad, blueprint)];
+  const evaluator = expandEvaluator(EvaluatorCompactSchema.parse(review), checks, blueprint);
+  const now = new Date().toISOString();
+  const artifact = (kind: ProjectArtifact["kind"], filename: string, mimeType: string, content: string): ProjectArtifact => ({ id: randomUUID(), kind, filename, mimeType, content, createdAt: now });
+  const artifacts = [
+    artifact("circuit", "circuit-plan.md", "text/markdown; charset=utf-8", generateCircuitMarkdown(blueprint, checks)),
     artifact("firmware", "dalgeurak_firmware.ino", "text/plain; charset=utf-8", firmware)
   ];
   return { status: buildStatus(checks, evaluator), blueprint, checks, evaluator, artifacts, createdAt: now };

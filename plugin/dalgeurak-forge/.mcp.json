@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dalgeurak": {
+      "type": "http",
+      "url": "${DALGEURAK_CONNECTOR_URL}"
+    }
+  }
+}

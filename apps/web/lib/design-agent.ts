@@ -9,7 +9,7 @@ import { workflowFor } from "./workflow";
 const slotKeys = ["power", "wireless", "sensing", "actuation", "data_sink", "form", "runtime", "fab"] as const;
 const taskKinds = ["confirm_spec", "confirm_availability", "measure", "run_firmware", "provide_info"] as const;
 
-const PlanSchema = z.object({
+export const PlanSchema = z.object({
   projectName: z.string().min(1).max(80),
   oneLiner: z.string().min(1).max(240),
   reply: z.string().min(1).max(2400),

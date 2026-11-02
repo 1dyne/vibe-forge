@@ -15,7 +15,7 @@ const labels: Array<[DesignSlot["key"], string]> = [
   ["fab", "제작 방식"]
 ];
 
-type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile };
+type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile> };
 let queue: Promise<unknown> = Promise.resolve();
 
 function dataFile() {
@@ -51,9 +51,10 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
   return next;
 }
 
-export async function listProjects(): Promise<LocalProject[]> {
+// ownerId null lists every project (operator); a user id lists only theirs.
+export async function listProjects(ownerId: string | null = null): Promise<LocalProject[]> {
   await queue;
-  return (await readDatabase()).projects.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return (await readDatabase()).projects.filter((project) => ownerId === null || project.ownerId === ownerId).toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function getProject(id: string): Promise<LocalProject | null> {
@@ -61,13 +62,15 @@ export async function getProject(id: string): Promise<LocalProject | null> {
   return (await readDatabase()).projects.find((project) => project.id === id) ?? null;
 }
 
-export function createProject(idea: string, plan: AgentPlan, mode: LocalProject["lastAgentMode"], attachments: ImageAttachment[] = []): Promise<LocalProject> {
+export function createProject(idea: string, plan: AgentPlan, mode: LocalProject["lastAgentMode"], attachments: ImageAttachment[] = [], owner: { ownerId?: string; origin?: LocalProject["origin"] } = {}): Promise<LocalProject> {
   return serialized(async () => {
     const database = await readDatabase();
     const now = new Date().toISOString();
     const updates = new Map(plan.slotUpdates.map((slot) => [slot.key, slot]));
     const project: LocalProject = {
       id: randomUUID(),
+      ...(owner.ownerId ? { ownerId: owner.ownerId } : {}),
+      origin: owner.origin ?? "web",
       name: plan.projectName,
       idea,
       oneLiner: plan.oneLiner,
@@ -85,7 +88,8 @@ export function createProject(idea: string, plan: AgentPlan, mode: LocalProject[
       updatedAt: now
     };
     project.workflow = workflowFor(project);
-    if (database.profile) project.workflow.profile = { ...database.profile, coreBehavior: "" };
+    const savedProfile = profileFor(database, owner.ownerId ?? null);
+    if (savedProfile) project.workflow.profile = { ...savedProfile, coreBehavior: "" };
     database.projects.push(project);
     await writeDatabase(database);
     return structuredClone(project);
@@ -162,7 +166,16 @@ export function mutateProject(id: string, operation: (project: LocalProject) => 
   });
 }
 
-export async function getMakerProfile() { await queue; return (await readDatabase()).profile ?? null; }
-export function saveMakerProfile(profile: MakerProfile) {
-  return serialized(async () => { const database = await readDatabase(); database.profile = profile; await writeDatabase(database); return profile; });
+function profileFor(database: Database, ownerId: string | null): MakerProfile | null {
+  return ownerId ? database.profiles?.[ownerId] ?? null : database.profile ?? null;
+}
+export async function getMakerProfile(ownerId: string | null = null) { await queue; return profileFor(await readDatabase(), ownerId); }
+export function saveMakerProfile(profile: MakerProfile, ownerId: string | null = null) {
+  return serialized(async () => {
+    const database = await readDatabase();
+    if (ownerId) database.profiles = { ...database.profiles, [ownerId]: profile };
+    else database.profile = profile;
+    await writeDatabase(database);
+    return profile;
+  });
 }

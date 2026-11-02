@@ -4,7 +4,8 @@ import { publicUrl } from "./lib/request-security";
 
 const publicPaths = new Set(["/login", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
 // The install prompt fetches the manifest and icons before anyone logs in.
-const publicPrefixes = ["/icons/", "/demo/"];
+// /api/mcp/ and /u/ authenticate with the invited user's token in the path.
+const publicPrefixes = ["/icons/", "/demo/", "/api/mcp/", "/u/"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

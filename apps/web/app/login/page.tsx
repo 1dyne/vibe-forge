@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="eyebrow">나만의 제작 작업 공간</p>
         <h1>달그락 대장간</h1>
         <p>{!configured ? "로그인 준비 중이에요. 관리자에게 접근 설정을 확인해주세요." : "아이디어를 이어서 만들어볼까요?\n접근 비밀번호로 로그인해주세요."}</p>
-        {params.error ? <p className="login-error" role="alert">비밀번호가 맞지 않습니다. 다시 입력해주세요.</p> : null}
+        {params.error === "link" ? <p className="login-error" role="alert">개인 링크가 올바르지 않거나 사용이 중지됐어요. 운영자에게 새 링크를 받아주세요.</p> : params.error ? <p className="login-error" role="alert">비밀번호가 맞지 않습니다. 다시 입력해주세요.</p> : null}
         <form method="post" action="/api/session">
           <label htmlFor="password">접근 비밀번호</label>
           <input id="password" name="password" type="password" autoComplete="current-password" autoFocus required disabled={!configured} />

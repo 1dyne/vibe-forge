@@ -73,6 +73,10 @@ export type BuildResult = {
 
 export type LocalProject = {
   id: string;
+  // Invited user who owns the project; absent for the operator's own projects.
+  ownerId?: string;
+  // Where the conversation happens: the in-app agents or the owner's own Claude.
+  origin?: "web" | "connector";
   name: string;
   idea: string;
   oneLiner: string;
