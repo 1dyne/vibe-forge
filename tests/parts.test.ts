@@ -164,4 +164,22 @@ describe("assembly guide on real parts", () => {
     expect(reset.structuredContent!).toMatchObject({ phase: "brainstorm", productForm: null, assembly: null, circuit: null });
     expect(reset.structuredContent!.buildPlan).not.toBeNull();
   });
+
+  it("adds one-time setup cost to the budget and judges the timeline against skill", async () => {
+    const { token } = await createUser("기간 테스트", false);
+    let n = 100;
+    const tool = async (name: string, args: Record<string, unknown>) => (await (await mcpPost(new NextRequest(`http://localhost/api/mcp/${token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: ++n, method: "tools/call", params: { name, arguments: args } }) }), { params: Promise.resolve({ token }) })).json()).result as { content: Array<{ text: string }>; structuredContent?: Record<string, any>; isError?: boolean };
+    const id = (await tool("create_project", { idea: "말하면 반응하는 로봇", plan: { projectName: "로봇", oneLiner: "o", reply: "r", slotUpdates: [], tasks: [] } })).structuredContent!.id as string;
+    const profile = await tool("set_maker_profile", { projectId: id, coreBehavior: "말하면 눈을 깜빡인다", tools: [], toolsConfirmed: true, firmwareExperience: "none", budgetKRW: 50000, timelineWeeks: 1, travelRange: "transit30" });
+    expect(profile.structuredContent!.profile).toMatchObject({ timelineWeeks: 1, travelRange: "transit30" });
+    const planned = await tool("set_build_plan", { projectId: id, plan: { track: "hardware", summary: "s", board: { choice: "esp32", model: "ESP32 DevKit V1", why: "w", alternatives: "a" }, connection: { method: "breadboard", why: "w" }, modules: [{ function: "f", part: "p", why: "w", connection: "c", whereToBuy: "w", searchKeyword: "k", estPriceKRW: 30000, difficulty: "보통" }], setupItems: [{ item: "멀티미터", why: "측정", estPriceKRW: 15000 }, { item: "브레드보드·점퍼선", why: "연습", estPriceKRW: 8000 }], timeline: { stages: [{ title: "업로드 익히기", weeks: 1 }, { title: "마이크·화면", weeks: 2 }, { title: "외형", weeks: 1 }], reason: "펌웨어가 처음이라 업로드와 부품 하나씩 시험이 먼저예요." }, structure: [{ name: "n", role: "r", connectsTo: "c" }], stages: [{ title: "t", goal: "g", learn: "l", practice: "p", doneWhen: "d", parts: [] }], prerequisites: [], cost: { options: [], marginNote: "" }, fabrication: { needs3DPrint: false, plan: "p" }, risks: [] } });
+    const plan = planned.structuredContent!.buildPlan;
+    expect(plan.cost).toMatchObject({ partsKRW: 30000, setupKRW: 23000, totalKRW: 53000, verdict: "over" });
+    expect(plan.timeline).toMatchObject({ totalWeeks: 4, targetWeeks: 1, feasibility: "unlikely" });
+    expect(planned.content[0].text).toContain("개발 환경 세팅 23,000원");
+    expect(planned.content[0].text).toContain("달성 가능성이 낮아요");
+    const guide = await tool("dalgeurak_guide", {});
+    expect(guide.content[0].text).toContain("현재 서버 도구");
+    expect(guide.content[0].text).toContain("이동 가능 범위");
+  });
 });

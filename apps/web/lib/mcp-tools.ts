@@ -40,6 +40,9 @@ export const SERVER_INSTRUCTIONS = [
 
 const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 
+## 도구 목록 확인
+이 규칙에 나오는 도구가 내 도구 목록에 없으면 커넥터의 도구 목록이 예전 버전이다. 비슷한 도구로 우회하지 말고 사용자에게 "claude.ai 설정 → 커넥터에서 달그락 대장간을 연결 해제 후 다시 연결하고 새 대화를 열어주세요"라고 안내한다. 단계 되돌리기는 대시보드 왼쪽 아래 '↺ 단계 되돌리기'로도 할 수 있다.
+
 달그락은 하드웨어 경험이 전혀 없는 사람도 저전력 장치를 만들 수 있게 돕는다. 아이디어를 설계도로 바꾸고, 실제 부품을 사기 전에 어떤 선택지와 구조가 있는지, 다음 단계로 가려면 지금 무엇을 익혀야 하는지 안내하며 하나씩 구현하게 한다. 부품 구매·납땜·측정은 사람이 한다.
 
 ## 작업 중인 프로젝트 고정
@@ -127,8 +130,16 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 국내 전자부품 쇼핑몰: 디바이스마트, 엘레파츠, 메카솔루션, 아이씨뱅큐. 쿠팡은 배송이 빠르지만 판매자마다 품질 편차, 알리익스프레스는 싸지만 2~3주 배송·품질 편차. 같은 모델명으로 검색해 비교하라고 안내한다.
 - 웹 검색을 쓸 수 있으면 실제 판매 페이지를 찾아 record_part_source로 링크·가격·확인 날짜를 남긴다. 가격·재고는 검색 시점 기준, 구매 전 확인.
 
-### 3D 프린터가 없으면
-- 체크리스트의 3D 프린터 접근이 "없음"이거나 "메이커스페이스"면, 사용자 지역의 메이커스페이스를 안내한다. 한국은 메이크올(makeall.com)에서 지역 메이커스페이스와 장비를 찾을 수 있고, 지역 과학관·도서관·구청·대학 팹랩에도 공간이 있다. 기본 교육 후 3D 프린터를 예약해 무료나 재료비만 내고 쓰는 경우가 많지만 공간마다 다르니, 검색해서 현재 운영·예약 방법을 확인해 알려준다. 3D 출력 대행 서비스도 대안으로 말한다.
+### 3D 프린터가 없으면 (메이커스페이스 안내)
+- 체크리스트의 3D 프린터 접근이 "메이커스페이스"·"없음"·"모르겠음"이면 먼저 메이커스페이스가 무엇인지 쉬운 말로 설명한다: 3D 프린터·레이저 커터·납땜 도구 같은 장비를 교육 후 무료나 재료비 정도로 빌려 쓰는 공공·민간 작업 공간이다.
+- 비슷한 부류도 함께 알려준다: 팹랩(Fab Lab), 무한상상실, 공공도서관·과학관 메이커존, 구청·시청 메이커스페이스, 대학 팹랩·창업지원센터, 3D 출력 대행 서비스.
+- 그다음 사용자에게 지금 사는 곳(시·구·동네)과 이동 가능 범위(도보, 대중교통 30분, 1시간, 차량)를 먼저 묻는다. 체크리스트의 region·travelRange가 있으면 그 값을 확인만 한다.
+- 웹 검색으로 그 범위 안의 사용 가능한 공간을 찾는다: 메이크올(makeall.com) 공간 검색, "[지역] 메이커스페이스 3D 프린터 예약", "[지역] 팹랩", "[지역] 무한상상실". 공간마다 이름, 대략 거리, 보유 장비, 이용 조건(교육 이수·예약·비용), 공식 링크를 정리하고, 운영 시간과 예약 방법은 방문 전에 공식 페이지에서 다시 확인하라고 안내한다. 찾지 못한 정보는 꾸며내지 않는다.
+
+### 예산과 기간 (체크리스트에서 선택)
+- 예산은 선택이다. 정확한 금액이 아니라 이 프로젝트에 투자하고 싶은 만큼(심리적 비용)을 적어도 된다고 안내한다.
+- 사용자에게 없는 기본 도구가 있으면 plan.setupItems에 최소 개발 환경 세팅 비용을 따로 적는다(예: 멀티미터, 브레드보드·점퍼선 세트, 데이터 전송 USB 케이블, 납땜이 필요할 때만 인두·납). 부품비와 별개로 "처음 한 번은 세팅 비용으로 약 얼마가 더 든다"고 숫자로 말한다. 서버가 부품비+세팅비를 예산과 비교한다.
+- 기간도 선택이다. 원하는 기간이 있으면 plan.timeline에 단계별 예상 주 수를 적는다. 서버가 합계를 원하는 기간과 비교해 실현 가능성(가능/빠듯함/어려움)을 판정한다. 어려우면 목표는 유지하되 달성 가능성이 낮은 이유(어떤 기술을 먼저 익혀야 하고 어떤 단계로 진행돼야 하는지)를 쉬운 말로 설명하고, 기간 안에 할 수 있는 범위(예: 1단계까지)를 제안한다. 사용자의 실력이 낮다고 목표를 임의로 줄이지 않는다.
 
 ## 완성품 미리보기를 먼저 (set_product_form)
 대장 달그락이 보여주는 3D는 최종 완성품의 모습이다. 사용자가 자기가 생각한 제품의 완성 모양을 먼저 보고 동의해야 회로로 간다. 형태가 정해지지 않으면 submit_circuit은 거절된다.
@@ -167,7 +178,9 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 
 ## 달그락 팀 (log_team_turn)
 - chief(대장): 전체 구조·순서·의존성·담당 조율. hw: 회로·펌웨어. sw: 웹/앱. me: 구조·실측. id: 형태·사용감·착용감·안전.
-- main 채널이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다. evaluate 모드는 files 없이 검사와 사람 확인 요청만 한다.
+- main 채널이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다.
+- 모드의 기본은 work다. 사용자가 검토·평가를 요청할 때만 evaluate로 기록한다. "회로도 보여줘", "만들어줘", "고쳐줘"는 work다. evaluate 모드는 files 없이 검사와 사람 확인 요청만 한다.
+- 회로도·조립도·3D를 보여 달라고 하면 대시보드 작업대의 해당 탭(회로·조립 가이드·완성품 미리보기)을 안내하고, 부족하면 그 도구로 만들거나 고친다.
 - sharedSummary에는 변경 제안, 사용자 관측, 해결, 미검증을 구분해 적는다.
 
 ## 소프트웨어가 필요할 때 (SW 달그락)
@@ -231,6 +244,8 @@ const buildPlanJsonSchema = {
     structure: { type: "array", minItems: 1, maxItems: 12, description: "하위 시스템과 연결 관계", items: { type: "object", additionalProperties: false, required: ["name", "role", "connectsTo"], properties: { name: { type: "string" }, role: { type: "string" }, connectsTo: { type: "string" } } } },
     stages: { type: "array", minItems: 1, maxItems: 10, description: "부품 하나씩 단독 동작 → 합치기 순서", items: { type: "object", additionalProperties: false, required: ["title", "goal", "learn", "practice", "doneWhen", "parts"], properties: { title: { type: "string" }, goal: { type: "string" }, learn: { type: "string" }, practice: { type: "string" }, doneWhen: { type: "string" }, parts: { type: "array", items: { type: "string" } } } } },
     prerequisites: { type: "array", maxItems: 8, description: "체크리스트에서 부족한 기술을 메우는 연습 (예: 납땜 처음이면 납땜 연습)", items: { type: "object", additionalProperties: false, required: ["skill", "why", "practice", "timeEstimate"], properties: { skill: { type: "string" }, why: { type: "string" }, practice: { type: "string" }, timeEstimate: { type: "string" } } } },
+    setupItems: { type: "array", description: "사용자에게 없는 기본 도구의 최소 개발 환경 세팅 비용 (멀티미터, 브레드보드·점퍼선, 데이터 USB 케이블, 필요할 때만 인두·납). 부품비와 별개", items: { type: "object", additionalProperties: false, required: ["item", "why", "estPriceKRW"], properties: { item: { type: "string" }, why: { type: "string" }, estPriceKRW: { type: ["integer", "null"] } } } },
+    timeline: { type: "object", additionalProperties: false, required: ["stages", "reason"], description: "사용자 실력 기준 단계별 예상 주 수. 서버가 원하는 기간과 비교한다", properties: { stages: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "weeks"], properties: { title: { type: "string" }, weeks: { type: "number" } } } }, reason: { type: "string", description: "왜 이만큼 걸리는지: 먼저 익힐 기술과 진행 순서" } } },
     cost: { type: "object", additionalProperties: false, required: ["options", "marginNote"], properties: { options: { type: "array", items: { type: "string" }, description: "예산 초과·빠듯할 때 숫자가 들어간 병목 제안 (예산 상향, 단계 개발, 대체 부품)" }, marginNote: { type: "string", description: "판매 목적이면 판매가 대비 원가·마진, 아니면 빈 문자열" } } },
     fabrication: { type: "object", additionalProperties: false, required: ["needs3DPrint", "plan"], properties: { needs3DPrint: { type: "boolean" }, plan: { type: "string", description: "외형 제작 방법. 프린터가 없으면 지역 메이커스페이스·출력 대행 안내" } } },
     risks: { type: "array", maxItems: 6, items: { type: "string" } }
@@ -325,7 +340,9 @@ const ProfileInput = z.object({
   region: z.string().trim().max(60).optional(),
   budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(),
-  targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional()
+  targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
+  timelineWeeks: z.number().min(0.5).max(104).nullable().optional()
 }).strict();
 
 const TeamTurnInput = z.object({
@@ -350,6 +367,8 @@ const BuildPlanSchema = z.object({
   stages: z.array(z.object({ title: z.string().min(1).max(80), goal: z.string().min(1).max(400), learn: z.string().min(1).max(400), practice: z.string().min(1).max(400), doneWhen: z.string().min(1).max(300), parts: z.array(z.string().max(80)).max(12) }).strict()).min(1).max(10),
   prerequisites: z.array(z.object({ skill: z.string().min(1).max(60), why: z.string().min(1).max(300), practice: z.string().min(1).max(400), timeEstimate: z.string().min(1).max(60) }).strict()).max(8),
   cost: z.object({ options: z.array(z.string().min(1).max(300)).max(6), marginNote: z.string().max(400) }).strict(),
+  setupItems: z.array(z.object({ item: z.string().min(1).max(80), why: z.string().min(1).max(200), estPriceKRW: z.number().int().min(0).max(1_000_000).nullable() }).strict()).max(8).optional(),
+  timeline: z.object({ stages: z.array(z.object({ title: z.string().min(1).max(80), weeks: z.number().min(0.1).max(52) }).strict()).min(1).max(12), reason: z.string().max(600) }).strict().optional(),
   fabrication: z.object({ needs3DPrint: z.boolean(), plan: z.string().min(1).max(600) }).strict(),
   risks: z.array(z.string().min(1).max(300)).max(6)
 }).strict();
@@ -388,7 +407,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "달그락 대장간의 단계, 역할, 기록 규칙을 읽는다. 처음 쓸 때나 규칙이 헷갈릴 때 먼저 호출한다.",
     inputSchema: { type: "object", additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
-    run: async (_input, context) => ({ text: `${GUIDE}\n\n내 대시보드: ${context.dashboardUrl}` })
+    run: async (_input, context) => ({ text: `${GUIDE}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
   },
   {
     name: "list_projects", title: "내 프로젝트 목록",
@@ -442,7 +461,8 @@ export const TOOLS: ToolDefinition[] = [
       firmwareExperience: { type: "string", enum: ["unanswered", "none", "guided", "independent"], description: "none=처음, guided=안내 보며 해봄, independent=직접 가능" },
       solderingSkill: { type: "string", enum: ["unanswered", "none", "tried", "comfortable"] }, printerAccess: { type: "string", enum: ["unanswered", "own", "makerspace", "service", "none"] },
       region: { type: "string", description: "시·구 (메이커스페이스 안내용)" }, budgetKRW: { type: ["integer", "null"], description: "부품 총 예산 상한(원)" },
-      purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" }
+      purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" },
+      travelRange: { type: "string", enum: ["unanswered", "walk", "transit30", "transit60", "car"], description: "메이커스페이스까지 이동 가능 범위" }, timelineWeeks: { type: ["number", "null"], description: "원하는 완성 기간(주). 선택" }
     } },
     run: async (input, context) => {
       const { projectId: id, ...parsed } = ProfileInput.parse(input) as MakerProfile & { projectId: string };
@@ -460,6 +480,8 @@ export const TOOLS: ToolDefinition[] = [
           profile.printerAccess && profile.printerAccess !== "unanswered" && `3D 프린터: ${{ own: "보유", makerspace: "메이커스페이스", service: "출력 대행", none: "미정" }[profile.printerAccess]}`,
           profile.region && `지역: ${profile.region}`,
           profile.budgetKRW != null && `예산: ${profile.budgetKRW.toLocaleString("ko-KR")}원 이하`,
+          profile.timelineWeeks != null && `원하는 기간: ${profile.timelineWeeks}주`,
+          profile.travelRange && profile.travelRange !== "unanswered" && `이동 범위: ${{ walk: "도보", transit30: "대중교통 30분", transit60: "대중교통 1시간", car: "차량" }[profile.travelRange]}`,
           profile.purpose && profile.purpose !== "unanswered" && `목적: ${{ personal: "개인용", gift: "선물", sell: "판매", lecture: "수업·강연" }[profile.purpose]}${profile.targetPriceKRW != null ? ` (판매가 ${profile.targetPriceKRW.toLocaleString("ko-KR")}원)` : ""}`
         ].filter(Boolean);
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `제작 체크리스트\n${lines.join("\n")}`, createdAt: now });
@@ -491,14 +513,20 @@ export const TOOLS: ToolDefinition[] = [
     description: "대장 달그락으로서 회로 전에 전체 프로젝트의 구조와 연결 단계를 정의한다: A/B(소프트웨어·하드웨어) → 메인 보드(아두이노·라즈베리파이·피코·ESP32·Nu보드) → 연결 방식(납땜·Qwiic/Grove·브레드보드) → 기능별 모듈과 구매 방법·예상 금액 → 단계별 구현과 연습 → 먼저 익힐 기술 → 예산 비교와 병목 제안 → 외형 제작(메이커스페이스). 서버가 모듈 금액 합계를 예산과 비교한다. 이 설계도가 있어야 submit_circuit을 쓸 수 있다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "plan"], properties: { projectId, plan: buildPlanJsonSchema } },
     run: async (input, context) => {
-      const { projectId: id, plan } = z.object({ projectId: z.string().uuid(), plan: BuildPlanSchema }).strict().parse(input) as { projectId: string; plan: Omit<BuildPlan, "cost" | "updatedAt"> & { cost: { options: string[]; marginNote: string } } };
+      const { projectId: id, plan } = z.object({ projectId: z.string().uuid(), plan: BuildPlanSchema }).strict().parse(input) as { projectId: string; plan: Omit<BuildPlan, "cost" | "updatedAt" | "timeline"> & { cost: { options: string[]; marginNote: string }; timeline?: { stages: Array<{ title: string; weeks: number }>; reason: string } } };
       const project = await ownedProject(id, context);
       const profile = workflowFor(project).profile;
-      const totalKRW = plan.modules.reduce((sum, module) => sum + (module.estPriceKRW ?? 0), 0);
-      const unpriced = plan.modules.filter((module) => module.estPriceKRW == null).length;
+      const partsKRW = plan.modules.reduce((sum, module) => sum + (module.estPriceKRW ?? 0), 0);
+      const setupKRW = (plan.setupItems ?? []).reduce((sum, item) => sum + (item.estPriceKRW ?? 0), 0);
+      const totalKRW = partsKRW + setupKRW;
+      const unpriced = plan.modules.filter((module) => module.estPriceKRW == null).length + (plan.setupItems ?? []).filter((item) => item.estPriceKRW == null).length;
       const budgetKRW = profile.budgetKRW ?? null;
       const verdict: BuildPlan["cost"]["verdict"] = budgetKRW == null ? "unknown" : totalKRW > budgetKRW ? "over" : totalKRW > budgetKRW * 0.85 ? "tight" : "within";
-      const saved: BuildPlan = { ...plan, cost: { totalKRW, budgetKRW, verdict, options: plan.cost.options, marginNote: plan.cost.marginNote }, updatedAt: new Date().toISOString() };
+      // Weeks needed at the person's level against the weeks they want.
+      const totalWeeks = plan.timeline ? Number(plan.timeline.stages.reduce((sum, stage) => sum + stage.weeks, 0).toFixed(1)) : 0;
+      const targetWeeks = profile.timelineWeeks ?? null;
+      const timeline = plan.timeline ? { ...plan.timeline, totalWeeks, targetWeeks, feasibility: (targetWeeks == null ? "unknown" : totalWeeks <= targetWeeks ? "likely" : totalWeeks <= targetWeeks * 1.5 ? "stretch" : "unlikely") as NonNullable<BuildPlan["timeline"]>["feasibility"] } : undefined;
+      const saved: BuildPlan = { ...plan, timeline, cost: { totalKRW, partsKRW, setupKRW, budgetKRW, verdict, options: plan.cost.options, marginNote: plan.cost.marginNote }, updatedAt: new Date().toISOString() };
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = saved.updatedAt;
@@ -509,7 +537,9 @@ export const TOOLS: ToolDefinition[] = [
         p.workflow = w;
       });
       const gap = budgetKRW == null ? "예산을 아직 몰라요. 체크리스트에서 예산을 물어보세요." : verdict === "over" ? `예산보다 ${(totalKRW - budgetKRW).toLocaleString("ko-KR")}원(${Math.round((totalKRW / budgetKRW - 1) * 100)}%) 많아요. cost.options의 병목 제안을 숫자와 함께 사용자에게 설명하세요.` : verdict === "tight" ? `예산의 ${Math.round(totalKRW / budgetKRW * 100)}%라 여유가 적어요(배송비·예비 부품 고려). 대안을 함께 말해주세요.` : `예산 안이에요 (예산의 ${Math.round(totalKRW / budgetKRW * 100)}%).`;
-      return stored(updated, context, `설계도를 저장했어요. 예상 부품비 ${totalKRW.toLocaleString("ko-KR")}원${unpriced ? `, 가격 미정 ${unpriced}개` : ""}. ${gap}\n사용자에게 설계도의 단계와 먼저 익힐 것을 쉬운 말로 설명하고, 1단계 회로를 원하면 submit_circuit으로 제출하세요.`);
+      const setupText = setupKRW ? ` (부품 ${partsKRW.toLocaleString("ko-KR")}원 + 처음 한 번 드는 개발 환경 세팅 ${setupKRW.toLocaleString("ko-KR")}원)` : "";
+      const timeText = !timeline ? "" : timeline.feasibility === "unknown" ? ` 예상 기간 ${totalWeeks}주 (원하는 기간을 아직 몰라요).` : timeline.feasibility === "likely" ? ` 예상 ${totalWeeks}주로 원하는 ${targetWeeks}주 안에 가능해요.` : timeline.feasibility === "stretch" ? ` 예상 ${totalWeeks}주라 원하는 ${targetWeeks}주는 빠듯해요. 이유와 줄일 방법을 설명하세요.` : ` 예상 ${totalWeeks}주라 원하는 ${targetWeeks}주 안에는 달성 가능성이 낮아요. 목표는 유지하되 이유(먼저 익힐 기술·진행 순서)와 기간 안에 가능한 범위를 설명하세요.`;
+      return stored(updated, context, `설계도를 저장했어요. 예상 비용 ${totalKRW.toLocaleString("ko-KR")}원${setupText}${unpriced ? `, 가격 미정 ${unpriced}개` : ""}. ${gap}${timeText}\n사용자에게 설계도의 단계와 먼저 익힐 것을 쉬운 말로 설명하고, 1단계 회로를 원하면 submit_circuit으로 제출하세요.`);
     }
   },
   {
@@ -576,7 +606,7 @@ export const TOOLS: ToolDefinition[] = [
     name: "log_team_turn", title: "대장간 대화 턴 기록",
     description: "회로 제출 이후 단계에서 한 턴의 팀 대화를 기록한다. workshop 전에는 channel을 chief로 쓴다. main이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다. evaluate 모드에서는 files를 비운다. files는 승인된 회로를 덮어쓰지 않는 작업 초안으로 저장된다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "channel", "mode", "userMessage", "replies", "sharedSummary"], properties: {
-      projectId, channel: { type: "string", enum: ["main", ...AgentIds] }, mode: { type: "string", enum: ["work", "evaluate"] },
+      projectId, channel: { type: "string", enum: ["main", ...AgentIds] }, mode: { type: "string", enum: ["work", "evaluate"], description: "기본은 work. 사용자가 '검토해줘·평가해줘·맞는지 봐줘'처럼 평가를 요청할 때만 evaluate. 보여 달라·만들어 달라·고쳐 달라는 요청은 항상 work" },
       userMessage: { type: "string", description: "사용자가 이번 턴에 한 말" },
       replies: { type: "array", minItems: 1, maxItems: 5, items: { type: "object", additionalProperties: false, required: ["agent", "text"], properties: { agent: { type: "string", enum: AgentIds }, text: { type: "string", description: "1800자 이내" } } } },
       sharedSummary: { type: "string", description: "팀 공통 기록: 변경 제안 / 사용자 관측 / 해결 / 미검증을 구분 (1000자 이내)" },

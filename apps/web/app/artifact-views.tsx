@@ -2,8 +2,16 @@
 import { useMemo, useRef, useState } from "react";
 import type { BuildBlueprint, LocalProject, ProductForm } from "../lib/project-types";
 import { AGENTS, workflowFor } from "../lib/workflow";
+import { CircuitPartsView } from "./circuit-parts";
 
 export function CircuitView({ blueprint }: { blueprint: BuildBlueprint }) {
+  // Circuits built from part cards are drawn as real parts; older circuits
+  // without cards keep the net diagram below.
+  if (blueprint.components.some((c) => c.catalogId)) return <CircuitPartsView blueprint={blueprint} />;
+  return <NetDiagram blueprint={blueprint} />;
+}
+
+function NetDiagram({ blueprint }: { blueprint: BuildBlueprint }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const components = blueprint.components;
@@ -30,6 +38,7 @@ export function CircuitView({ blueprint }: { blueprint: BuildBlueprint }) {
         </g>;
       })}
     </svg></div>
+    <p className="notice">이 회로는 부품 카드 없이 제출돼서 실제 부품 모양으로 그릴 수 없어요. Claude에게 “부품 카드(find_part_cards)로 회로를 다시 제출해줘”라고 하면 실제 부품 배치도로 바뀌어요.</p>
     <p className="muted">같은 선의 단자는 전기적으로 연결됩니다. 선을 누르면 해당 net을 강조합니다. 실제 부품의 단자명·정격을 확인할 회로 초안입니다.</p>
     <details><summary>부품별 연결표</summary><table><thead><tr><th>NET</th><th>연결 단자</th></tr></thead><tbody>{blueprint.nets.map((n) => <tr key={n.name}><td>{n.name}</td><td>{n.members.join(" · ")}</td></tr>)}</tbody></table></details>
   </div>;

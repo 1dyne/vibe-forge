@@ -119,6 +119,8 @@ export type MakerProfile = {
   budgetKRW?: number | null;
   purpose?: "unanswered" | "personal" | "gift" | "sell" | "lecture";
   targetPriceKRW?: number | null;
+  travelRange?: "unanswered" | "walk" | "transit30" | "transit60" | "car";
+  timelineWeeks?: number | null;
 };
 
 // What the finished product looks like, settled before any circuit: the
@@ -176,7 +178,10 @@ export type BuildPlan = {
   structure: Array<{ name: string; role: string; connectsTo: string }>;
   stages: Array<{ title: string; goal: string; learn: string; practice: string; doneWhen: string; parts: string[] }>;
   prerequisites: Array<{ skill: string; why: string; practice: string; timeEstimate: string }>;
-  cost: { totalKRW: number; budgetKRW: number | null; verdict: "within" | "tight" | "over" | "unknown"; options: string[]; marginNote: string };
+  // totalKRW counts parts plus the one-time setup items.
+  cost: { totalKRW: number; partsKRW?: number; setupKRW?: number; budgetKRW: number | null; verdict: "within" | "tight" | "over" | "unknown"; options: string[]; marginNote: string };
+  setupItems?: Array<{ item: string; why: string; estPriceKRW: number | null }>;
+  timeline?: { stages: Array<{ title: string; weeks: number }>; reason: string; totalWeeks: number; targetWeeks: number | null; feasibility: "likely" | "stretch" | "unlikely" | "unknown" };
   fabrication: { needs3DPrint: boolean; plan: string };
   risks: string[];
   updatedAt: string;

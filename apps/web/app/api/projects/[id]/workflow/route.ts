@@ -12,7 +12,8 @@ import type { DevProfile, MakerProfile } from "../../../../../lib/project-types"
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
   solderingSkill: z.enum(["unanswered", "none", "tried", "comfortable"]).optional(), printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
   region: z.string().max(60).optional(), budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
-  purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(), targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional() }).strict();
+  purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(), targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(), timelineWeeks: z.number().min(0.5).max(104).nullable().optional() }).strict();
 const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("profile"), profile: ProfileSchema }),
   z.object({ action: z.literal("agents"), agents: z.array(z.enum(["hw", "sw", "me", "id"])).min(1).max(4) }),

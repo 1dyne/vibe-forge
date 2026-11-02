@@ -1,22 +1,11 @@
 "use client";
-import { createElement, useEffect, useMemo, useRef, useState } from "react";
-import type { AssemblyPart, LocalProject } from "../lib/project-types";
-import { findCard, type PartCard } from "../lib/parts/catalog";
-import { resolvePin } from "../lib/parts/rules";
+import { useEffect, useMemo, useState } from "react";
+import type { LocalProject } from "../lib/project-types";
 import { judgeReading, libraryCardsForStep, type ExpectedRange } from "../lib/parts/trouble-cards";
 import { stepBasis, wireLengths } from "../lib/assembly-utils";
-import wokwiSizes from "../lib/parts/wokwi-pins.json";
+import { PartsBoard, placeParts } from "./parts-board";
 
-const MM = 3.7795; // CSS px per mm; Wokwi elements are sized in mm.
 const RED = "#d64545", BLACK = "#222222";
-
-type Placed = { part: AssemblyPart; card: PartCard | null; tag: string | null; w: number; h: number };
-
-function rotatePoint(x: number, y: number, w: number, h: number, rotation: number): [number, number] {
-  const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy;
-  const r = (rotation * Math.PI) / 180;
-  return [cx + dx * Math.cos(r) - dy * Math.sin(r), cy + dx * Math.sin(r) + dy * Math.cos(r)];
-}
 
 function rangeText(range: ExpectedRange | null): string {
   if (!range) return "정상 범위 확인 필요";
@@ -32,19 +21,13 @@ export function AssemblyView({ project, busy, onAction }: { project: LocalProjec
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [replay, setReplay] = useState(0);
-  const [zoom, setZoom] = useState(1);
-  const [fit, setFit] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [readings, setReadings] = useState<Record<string, { value: string; yes: boolean | null }>>({});
   const [showDetail, setShowDetail] = useState(false);
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
-  const [ready, setReady] = useState(false);
-  const frame = useRef<HTMLDivElement>(null);
   const current = guide.steps[step];
   const blocked = (project.build?.checks ?? []).filter((c) => c.severity === "blocked");
 
-  // Wokwi custom elements need the browser; load them once on the client.
-  useEffect(() => { let alive = true; import("@wokwi/elements").then(() => { if (alive) setReady(true); }).catch(() => {}); return () => { alive = false; }; }, []);
   useEffect(() => {
     if (!playing) return;
     const timer = setTimeout(() => { if (step < guide.steps.length - 1) setStep(step + 1); else setPlaying(false); }, 4500);
@@ -55,50 +38,27 @@ export function AssemblyView({ project, busy, onAction }: { project: LocalProjec
 
   const margin = 8;
   const { width: W, height: H } = guide.base;
-  useEffect(() => {
-    const el = frame.current; if (!el) return;
-    const measure = () => setFit(Math.min(1.6, (el.clientWidth - 4) / ((W + margin * 2) * MM)));
-    measure(); const ro = new ResizeObserver(measure); ro.observe(el); return () => ro.disconnect();
-  }, [W]);
-
   const components = project.build?.blueprint.components ?? [];
   const nets = project.build?.blueprint.nets ?? [];
-  const placed: Placed[] = useMemo(() => guide.parts.map((part) => {
-    const card = findCard(part.catalogId ?? components.find((c) => c.ref === part.ref)?.catalogId);
-    const tag = card?.renderer.type === "wokwi" ? card.renderer.ref : null;
-    const size = tag ? (wokwiSizes as Record<string, { widthMm: number; heightMm: number }>)[tag.replace(/^wokwi-/, "")] : null;
-    return { part, card, tag, w: size?.widthMm ?? part.width, h: size?.heightMm ?? part.height };
-  }), [guide.parts, components]);
+  const placedAll = useMemo(() => placeParts(guide.parts.map((part) => ({ ...part, catalogId: part.catalogId ?? components.find((c) => c.ref === part.ref)?.catalogId }))), [guide.parts, components]);
   const placedAt = new Map<string, number>();
   guide.steps.forEach((s, i) => s.place.forEach((ref) => { if (!placedAt.has(ref)) placedAt.set(ref, i); }));
-  const visible = placed.filter((p) => (placedAt.get(p.part.ref) ?? 0) <= step);
+  const visible = placedAll.filter((p) => (placedAt.get(p.ref) ?? 0) <= step);
+  const placed = visible;
 
-  const pinPoint = (end: string): [number, number] | null => {
-    const [ref, ...rest] = end.split(".");
-    const pin = rest.join(".");
-    const p = placed.find((item) => item.part.ref === ref);
-    if (!p) return null;
-    const cp = p.card ? resolvePin(p.card, pin) : null;
-    const local = cp && cp.xMm != null && cp.yMm != null ? [cp.xMm, cp.yMm] : p.part.pins?.find((x) => x.name === pin) ? [p.part.pins.find((x) => x.name === pin)!.x, p.part.pins.find((x) => x.name === pin)!.y] : null;
-    if (!local) return null;
-    const [rx, ry] = rotatePoint(local[0], local[1], p.w, p.h, p.part.rotation ?? 0);
-    return [p.part.x + rx, p.part.y + ry];
-  };
   const wireColor = (from: string, to: string, given: string) => {
     const net = nets.find((n) => n.members.includes(from) || n.members.includes(to));
     return net?.kind === "power" ? RED : net?.kind === "ground" ? BLACK : given;
   };
   const wires = guide.steps.slice(0, step + 1).flatMap((s, i) => s.wires.map((wire) => ({ ...wire, fresh: i === step, stroke: wireColor(wire.from, wire.to, wire.color) })));
   const activePins = new Set(current.wires.flatMap((w) => [w.from, w.to]));
-  const fallbacks = placed.filter((p) => !p.tag);
+  const fallbacks = placedAll.filter((p) => !p.tag);
   const library = libraryCardsForStep(project, step);
   const lengths = wireLengths(project, step);
   const detail = (project.assemblyDetails ?? []).find((d) => d.step === step + 1);
   const stale = detail && detail.basis !== stepBasis(project, step);
   const pending = (project.assemblyRequests ?? []).find((r) => r.step === step + 1 && !r.doneAt);
   const stepReports = reports.filter((r) => r.step === step + 1);
-  const scale = fit * zoom;
-  const holes = guide.base.kind === "breadboard" || guide.base.kind === "perfboard";
 
   const sendText = (cardId: string | null, key: string, fallback?: string) => {
     const text = (answers[key] ?? "").trim() || fallback;
@@ -110,39 +70,11 @@ export function AssemblyView({ project, busy, onAction }: { project: LocalProjec
   return <div className="assembly-view">
     <div className="artifact-title"><span className="pill">조립 가이드</span><h3>{guide.stage}</h3></div>
     {blocked.length > 0 && <p className="notice danger-notice">회로에 꼭 고쳐야 할 문제가 있어 조립을 진행할 수 없어요: {blocked.map((c) => c.message).join(" / ")}</p>}
-    <div className="view-toolbar"><span>{guide.base.name} · {W}×{H}mm 실제 비율</span><button aria-label="축소" onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}>−</button><button onClick={() => setZoom(1)}>맞춤</button><button aria-label="확대" onClick={() => setZoom(Math.min(3, zoom + 0.25))}>＋</button><button onClick={() => setReplay(replay + 1)}>↺</button></div>
-    <div className="assembly-frame" ref={frame}>
-      <div className="assembly-scaler" style={{ width: (W + margin * 2) * MM * scale, height: (H + margin * 2) * MM * scale }}>
-        <div key={`${step}-${replay}`} className="assembly-stage" style={{ width: `${W + margin * 2}mm`, height: `${H + margin * 2}mm`, transform: `scale(${scale})` }}>
-          <svg className="assembly-layer" viewBox={`${-margin} ${-margin} ${W + margin * 2} ${H + margin * 2}`} aria-hidden="true">
-            <rect x={0} y={0} width={W} height={H} rx={2} fill={guide.base.kind === "board" || guide.base.kind === "stack" ? "#2f6f5e" : "#f4f2ea"} stroke="#9aa59f" strokeWidth={0.4} />
-            {holes && Array.from({ length: Math.floor(W / 2.54) }, (_, i) => Array.from({ length: Math.floor(H / 2.54) }, (_, j) => <circle key={`${i}-${j}`} cx={1.27 + i * 2.54} cy={1.27 + j * 2.54} r={0.35} fill="#c9c6bb" />))}
-            {guide.base.kind === "breadboard" && <><line x1={2} x2={W - 2} y1={2.2} y2={2.2} stroke={RED} strokeWidth={0.3} /><line x1={2} x2={W - 2} y1={H - 2.2} y2={H - 2.2} stroke="#3a5fbf" strokeWidth={0.3} /></>}
-            {visible.filter((p) => !p.tag).map((p) => <g key={p.part.ref} className={placedAt.get(p.part.ref) === step ? "assembly-fresh" : ""} transform={`rotate(${p.part.rotation ?? 0} ${p.part.x + p.w / 2} ${p.part.y + p.h / 2})`}>
-              <rect x={p.part.x} y={p.part.y} width={p.w} height={p.h} rx={0.8} fill={p.part.color ?? "#5b6b66"} stroke="#e0a43a" strokeDasharray="1 0.8" strokeWidth={0.4} />
-              <text x={p.part.x + p.w / 2} y={p.part.y + p.h / 2 - 1} textAnchor="middle" fontSize={Math.min(3, p.w / 5)} fill="#fff" fontWeight={700}>{p.part.ref}</text>
-              <text x={p.part.x + p.w / 2} y={p.part.y + p.h / 2 + 2.4} textAnchor="middle" fontSize={1.8} fill="#ffe2a8">대체 표시</text>
-            </g>)}
-          </svg>
-          {ready && visible.filter((p) => p.tag).map((p) => {
-            const fresh = placedAt.get(p.part.ref) === step;
-            return <div key={p.part.ref} className={"wokwi-slot " + (fresh ? "assembly-fresh current-part" : step > (placedAt.get(p.part.ref) ?? 0) ? "past-part" : "")} style={{ left: `${margin + p.part.x}mm`, top: `${margin + p.part.y}mm`, width: `${p.w}mm`, height: `${p.h}mm`, transform: `rotate(${p.part.rotation ?? 0}deg)` }} title={`${p.part.ref} · ${p.card?.model ?? p.part.label}`}>
-              {createElement(p.tag!, p.tag === "wokwi-led" ? { color: p.part.color === "#2e7bd6" ? "blue" : "red" } : {})}
-            </div>;
-          })}
-          <svg className="assembly-layer wires" viewBox={`${-margin} ${-margin} ${W + margin * 2} ${H + margin * 2}`} aria-hidden="true">
-            {wires.map((wire, i) => {
-              const a = pinPoint(wire.from), b = pinPoint(wire.to);
-              if (!a || !b) return null;
-              const mid: [number, number] = [(a[0] + b[0]) / 2, Math.min(a[1], b[1]) - 4];
-              return <path key={i} className={wire.fresh ? "assembly-wire-fresh" : ""} pathLength={1} d={`M${a[0]},${a[1]} Q${mid[0]},${mid[1]} ${b[0]},${b[1]}`} fill="none" stroke={wire.stroke} strokeWidth={wire.fresh ? 0.9 : 0.6} strokeLinecap="round" opacity={wire.fresh ? 1 : 0.6} />;
-            })}
-            {[...activePins].map((end) => { const p = pinPoint(end); return p ? <g key={end}><circle cx={p[0]} cy={p[1]} r={0.9} fill="#e0a43a" /><text x={p[0]} y={p[1] - 1.6} textAnchor="middle" fontSize={2} fill="#7a4a00">{end.split(".").slice(1).join(".")}</text></g> : null; })}
-          </svg>
-        </div>
-      </div>
-    </div>
-    {fallbacks.length > 0 && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.part.ref}(${p.card?.model ?? p.part.label})`).join(", ")}는 실제 모양이 아직 준비되지 않아 사각형으로 보여요. 핀 위치는 {fallbacks.some((p) => p.card?.pins.length) ? "부품 카드" : "가이드"} 기준이니, 판매 페이지 사진과 핀 이름으로 방향을 확인하세요.</p>}
+    <PartsBoard base={guide.base} placed={placed} label={`${guide.base.name} · ${W}×${H}mm 실제 비율`} replayKey={`${step}-${replay}`}
+      wires={wires.map((w) => ({ from: w.from, to: w.to, stroke: w.stroke, fresh: w.fresh }))} freshRefs={new Set(visible.filter((p) => placedAt.get(p.ref) === step).map((p) => p.ref))}
+      pastRefs={new Set(visible.filter((p) => (placedAt.get(p.ref) ?? 0) < step).map((p) => p.ref))} activePins={activePins} />
+    <div className="board-actions"><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button></div>
+    {fallbacks.length > 0 && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 준비되지 않아 사각형으로 보여요. 핀 위치는 {fallbacks.some((p) => p.card?.pins.length) ? "부품 카드" : "가이드"} 기준이니, 판매 페이지 사진과 핀 이름으로 방향을 확인하세요.</p>}
     <div className="assembly-controls">
       <button disabled={step === 0} onClick={() => { setPlaying(false); setStep(step - 1); setShowDetail(false); }}>◀ 이전</button>
       <button className="primary" onClick={() => { if (!playing && step === guide.steps.length - 1) setStep(0); setPlaying(!playing); }}>{playing ? "⏸ 멈춤" : "▶ 전체 재생"}</button>
