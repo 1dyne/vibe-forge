@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SERVER_INSTRUCTIONS, TOOLS, callTool } from "../../../../lib/mcp-tools";
 import { publicUrl } from "../../../../lib/request-security";
-import { findUserByToken } from "../../../../lib/users";
+import { findUserByToken, recordClient } from "../../../../lib/users";
 
 // MCP Streamable HTTP endpoint, stateless with plain JSON responses. The
 // secret token in the path identifies the invited user, so the URL works as a
@@ -32,6 +32,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ to
   switch (message.method) {
     case "initialize": {
       const requested = String(message.params?.protocolVersion ?? "");
+      const client = message.params?.clientInfo as { name?: unknown; version?: unknown } | undefined;
+      // Shown on the dashboard as "Claude Code 연결됨"; never blocks the handshake.
+      await recordClient(user.id, String(client?.name ?? "unknown"), String(client?.version ?? "")).catch(() => {});
       return reply({
         protocolVersion: SUPPORTED_VERSIONS.includes(requested) ? requested : SUPPORTED_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },

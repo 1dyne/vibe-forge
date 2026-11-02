@@ -9,6 +9,7 @@ import { GET as listRoute } from "../apps/web/app/api/projects/route";
 import { POST as messagePost } from "../apps/web/app/api/projects/[id]/messages/route";
 import { POST as workflowPost } from "../apps/web/app/api/projects/[id]/workflow/route";
 import { createUser, updateUser } from "../apps/web/lib/users";
+import { GET as meRoute } from "../apps/web/app/api/me/route";
 import { signSession } from "../apps/web/lib/session";
 
 const SECRET = "test-secret-for-connector-routes-0123456789";
@@ -121,5 +122,41 @@ describe("Claude connector", () => {
     expect(after.headers.get("location")).toContain("/login?error=link");
     const cookie = response.headers.get("set-cookie")!.split(";")[0];
     expect((await listRoute(new NextRequest("http://localhost:3000/api/projects", { headers: { cookie } }))).status).toBe(401);
+  });
+
+  it("pins a Claude Project to one project, records sources and hands software off to coding tools", async () => {
+    const { user, token } = await createUser("참여자 D", false);
+    await rpc(token, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "claude-code", version: "2.1.0" } });
+    const created = await tool(token, "create_project", { idea: "버튼을 누르면 켜지는 탁상 램프", plan });
+    const id = created.structuredContent!.id as string;
+    expect(created.content[0].text).toContain(`달그락 프로젝트 ID: ${id}`);
+    expect(created.structuredContent!.claudeProjectInstructions).toContain("새 달그락 프로젝트를 만들지 마");
+    const guide = await tool(token, "dalgeurak_guide", {});
+    expect(guide.content[0].text).toContain("추측하지 말고");
+    expect(guide.content[0].text).toContain("record_part_source");
+
+    await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "버튼으로 LED 토글", tools: [], toolsConfirmed: true, firmwareExperience: "none" });
+    await tool(token, "submit_circuit", { projectId: id, blueprint, review });
+    const source = await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "https://example.com/tact-switch", title: "택트 스위치 6x6", price: "100원" });
+    expect(source.structuredContent!.partSources.S1[0]).toMatchObject({ url: "https://example.com/tact-switch", price: "100원" });
+    expect((await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "javascript:alert(1)", title: "x" })).isError).toBe(true);
+
+    const dev = await tool(token, "set_dev_profile", { projectId: id, codingExperience: "none", tool: "undecided", os: "mac", installed: [], confirmed: true });
+    expect(dev.structuredContent!.devProfileMissing).toEqual([]);
+    const spec = await tool(token, "write_dev_spec", { projectId: id, title: "램프 제어 웹", goal: "휴대폰으로 램프 상태를 본다", whyCode: "버튼만으로는 원격 확인이 안 돼요", pieces: [{ name: "웹 대시보드", kind: "web", purpose: "상태 표시" }], features: [{ name: "상태 보기", detail: "켜짐/꺼짐 표시" }], acceptance: ["버튼을 누르면 2초 안에 화면이 바뀐다"], outOfScope: ["로그인"], dataInterface: { transport: "serial", format: "state=1\\n" }, stack: [{ name: "HTML+JS", reason: "설치 없이 브라우저에서 돌아가요" }], learningSteps: [{ step: "폴더 만들기", explain: "코드를 모을 곳" }], recommendedTool: "claude_code" });
+    expect(spec.isError).toBeFalsy();
+    const files = spec.structuredContent!.files.map((f: { filename: string }) => f.filename);
+    expect(files).toEqual(expect.arrayContaining(["SPEC.md", "CLAUDE.md", "AGENTS.md"]));
+    expect(spec.structuredContent!.team).toContain("sw");
+    expect(spec.structuredContent!.devProfile.tool).toBe("claude_code");
+    const again = await tool(token, "write_dev_spec", { projectId: id, title: "램프 제어 웹 v2", goal: "g", whyCode: "w", pieces: [{ name: "웹", kind: "web", purpose: "p" }], features: [{ name: "f", detail: "d" }], acceptance: ["a"], outOfScope: [], dataInterface: { transport: "none", format: "-" }, stack: [{ name: "s", reason: "r" }], learningSteps: [{ step: "s", explain: "e" }], recommendedTool: "codex" });
+    expect(again.structuredContent!.files.filter((f: { filename: string }) => f.filename === "SPEC.md")).toHaveLength(1);
+
+    const progress = await tool(token, "log_dev_progress", { projectId: id, summary: "시리얼 읽기 완성", done: ["포트 열기"], next: ["화면 표시"], hardwareRequests: ["보드를 USB로 연결하고 시리얼 모니터에 state=1이 찍히는지 알려주세요."] });
+    expect(progress.structuredContent!.openTasks.some((t: { title: string }) => t.title === "개발 중 하드웨어 확인")).toBe(true);
+
+    const me = await (await meRoute(new NextRequest("http://localhost:3000/api/me", { headers: { cookie: "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, user.id) } }))).json();
+    expect(me.connectorUrl).toBe(`https://forge.example/api/mcp/${token}`);
+    expect(me.clients[0].name).toBe("claude-code");
   });
 });

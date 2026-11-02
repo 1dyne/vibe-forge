@@ -1,20 +1,24 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { timingSafeEqualText } from "./session";
 
 // People the operator invites. Each gets one secret token that works both as
-// their Claude connector URL and as their dashboard sign-in link. Only the
-// token's hash is stored, so the plain token is shown once at creation.
+// their Claude connector URL and as their dashboard sign-in link. Lookups use
+// the token's hash; a copy sealed with SESSION_SECRET lets the person's own
+// dashboard show their connector address again.
+export type ConnectedClient = { name: string; version: string; lastSeenAt: string };
 export type ForgeUser = {
   id: string;
   name: string;
   tokenHash: string;
+  tokenSealed?: string;
+  clients?: ConnectedClient[];
   webAi: boolean;
   createdAt: string;
   revokedAt: string | null;
 };
-export type PublicUser = Omit<ForgeUser, "tokenHash">;
+export type PublicUser = Omit<ForgeUser, "tokenHash" | "tokenSealed">;
 
 type UserDatabase = { version: 1; users: ForgeUser[] };
 let queue: Promise<unknown> = Promise.resolve();
@@ -52,7 +56,29 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
-const toPublic = ({ tokenHash: _hash, ...user }: ForgeUser): PublicUser => user;
+const toPublic = ({ tokenHash: _hash, tokenSealed: _sealed, ...user }: ForgeUser): PublicUser => user;
+const sealingKey = () => createHash("sha256").update(`dalgeurak-token:${process.env.SESSION_SECRET ?? ""}`).digest();
+
+function sealToken(token: string): string | undefined {
+  if (!process.env.SESSION_SECRET) return undefined;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", sealingKey(), iv);
+  const body = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+  return [iv, cipher.getAuthTag(), body].map((part) => part.toString("base64url")).join(".");
+}
+
+function unsealToken(sealed: string | undefined): string | null {
+  if (!sealed || !process.env.SESSION_SECRET) return null;
+  try {
+    const [iv, tag, body] = sealed.split(".").map((part) => Buffer.from(part, "base64url"));
+    const decipher = createDecipheriv("aes-256-gcm", sealingKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
+  } catch {
+    // SESSION_SECRET changed since the link was made; the operator issues a new one.
+    return null;
+  }
+}
 
 export async function listUsers(): Promise<PublicUser[]> {
   await queue;
@@ -77,7 +103,7 @@ export function createUser(name: string, webAi: boolean): Promise<{ user: Public
   return serialized(async () => {
     const database = await readUsers();
     const token = randomBytes(24).toString("base64url");
-    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null };
+    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), tokenSealed: sealToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null };
     database.users.push(user);
     await writeUsers(database);
     return { user: toPublic(user), token };
@@ -93,5 +119,23 @@ export function updateUser(id: string, change: { webAi?: boolean; revoke?: boole
     if (change.revoke) user.revokedAt ??= new Date().toISOString();
     await writeUsers(database);
     return toPublic(user);
+  });
+}
+
+export async function revealToken(id: string): Promise<string | null> {
+  await queue;
+  const user = (await readUsers()).users.find((item) => item.id === id && !item.revokedAt);
+  return unsealToken(user?.tokenSealed);
+}
+
+// Remembers which MCP clients (claude.ai, Claude Code, Codex…) have connected.
+export function recordClient(id: string, name: string, version: string): Promise<void> {
+  return serialized(async () => {
+    const database = await readUsers();
+    const user = database.users.find((item) => item.id === id);
+    if (!user) return;
+    const clients = (user.clients ?? []).filter((client) => client.name !== name);
+    user.clients = [{ name: name.slice(0, 80), version: version.slice(0, 40), lastSeenAt: new Date().toISOString() }, ...clients].slice(0, 8);
+    await writeUsers(database);
   });
 }

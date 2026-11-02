@@ -97,6 +97,14 @@ export type AgentId = "chief" | "hw" | "sw" | "me" | "id";
 export type ChatChannel = "main" | AgentId;
 export type ImageAttachment = { name: string; dataUrl: string };
 export type MakerProfile = { tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string };
+export type PartSource = { url: string; title: string; price: string | null; checkedAt: string; note: string };
+export type DevProfile = {
+  codingExperience: "unanswered" | "none" | "guided" | "independent";
+  tool: "undecided" | "claude_code" | "codex";
+  os: "unanswered" | "mac" | "windows" | "linux";
+  installed: string[];
+  confirmed: boolean;
+};
 export type Workflow = {
   phase: "brainstorm" | "circuit" | "mockup" | "handoff" | "workshop";
   profile: MakerProfile;
@@ -106,6 +114,10 @@ export type Workflow = {
   sharedUpdates: Array<{ id: string; agent: AgentId; text: string; createdAt: string }>;
   purchases: Record<string, "needed" | "ordered" | "received" | "problem">;
   evidence: Array<{ taskId: string; text: string; createdAt: string }>;
+  // Where Claude found each part (web search or a link the person gave).
+  partSources?: Record<string, PartSource[]>;
+  // How the person will build the software part; shapes the SW guidance.
+  devProfile?: DevProfile;
 };
 
 export type AgentPlan = {

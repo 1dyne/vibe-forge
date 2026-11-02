@@ -3,7 +3,8 @@ import { z } from "zod";
 import { buildFromSubmission } from "./build-pipeline";
 import { PlanSchema } from "./design-agent";
 import { applyAgentPlan, createProject, getProject, listProjects, mutateProject, saveMakerProfile } from "./local-project-store";
-import type { AgentId, AgentPlan, LocalProject, MakerProfile } from "./project-types";
+import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile } from "./project-types";
+import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
@@ -21,11 +22,17 @@ type ToolDefinition = { name: string; title: string; description: string; inputS
 export const SERVER_INSTRUCTIONS = [
   "달그락 대장간: 아이디어를 실제 하드웨어 시제품까지 가져가는 제작 프로젝트 관리 도구다. 대화와 설계는 너(사용자의 Claude)가 하고, 결과는 이 도구로 달그락 대장간에 누적 기록한다. 사용자는 웹 대시보드에서 회로·3D 목업·부품목록·할 일을 보고 승인한다.",
   "처음 쓰거나 규칙이 헷갈리면 dalgeurak_guide를 먼저 호출한다. 기존 프로젝트를 이어갈 때는 get_project로 현재 단계와 다음에 할 일을 읽고 시작한다.",
+  "작업 중인 프로젝트를 고정한다: Claude 프로젝트 지침이나 대화에 '달그락 프로젝트 ID'가 있으면 그 ID에만 기록한다. ID를 모르면 추측하지 말고 list_projects를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 새 프로젝트를 만들지 않는다.",
   "회로 승인, 3D 목업 승인, 대장간 입장은 사람만 대시보드에서 한다. 너는 승인했다고 말하거나 승인된 것처럼 진행하지 않는다.",
-  "확인·측정·실행하지 않은 것은 unknown으로 둔다. 재고·가격·치수를 확인했다고 꾸며내지 않는다. 사용자가 준 자료와 링크만 근거로 쓴다."
+  "확인·측정·실행하지 않은 것은 unknown으로 둔다. 웹 검색을 쓸 수 있으면 부품·데이터시트·가격을 찾아도 되지만, 출처 링크와 확인 날짜를 record_part_source로 남기고 가격·재고는 '검색 시점 기준, 구매 전 확인'으로 안내한다. 찾지 못한 값은 꾸며내지 않는다."
 ].join("\n");
 
 const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
+
+## 작업 중인 프로젝트 고정
+- Claude 프로젝트 지침이나 대화에 "달그락 프로젝트 ID"가 있으면 모든 도구 호출에 그 ID만 쓴다. 대화를 시작하면 그 ID로 get_project를 호출한다.
+- ID를 모르면 추측하지 말고 list_projects 결과를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 create_project를 호출하지 않는다.
+- 새 프로젝트를 만든 뒤에는 결과의 claudeProjectInstructions를 사용자에게 보여주고, Claude 프로젝트 지침에 붙여넣으라고 안내한다. 그러면 같은 Claude 프로젝트의 다음 대화도 이 프로젝트에 이어서 쌓인다.
 
 ## 단계 (phase)
 1. brainstorm: 아이디어 구체화. 대장 달그락으로서 질문 2개 이하씩 하며 8개 설계 슬롯(power, wireless, sensing, actuation, data_sink, form, runtime, fab)을 채운다. 매 턴 결과를 record_brainstorm으로 남긴다. 사용자가 말한 사실만 filled, 합리적 임시값은 assumed(+acknowledged=false), 확인 안 된 assumed는 최대 3개.
@@ -45,6 +52,18 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - main 채널이면 chief와 활성화된 팀원이 각자 한 번씩 답한다. 개별 채널이면 그 역할만 답한다.
 - work 모드: 결과물(코드·문서·OpenSCAD 등)을 files로 남길 수 있다. evaluate 모드: files 없이 검사와 사람 확인 요청만 한다. 예: "멀티미터 DC전압 모드로 PS1.OUT-GND를 재서 4.75~5.25V인지 알려주세요."
 - sharedSummary에는 변경 제안, 사용자 관측, 해결된 항목, 아직 검증 안 된 항목을 구분해 적는다. 다른 방의 달그락도 이 기록을 보고 이어서 작업한다.
+
+## 부품 찾기와 출처
+- 웹 검색을 쓸 수 있으면 부품 모델, 데이터시트, 판매처, 가격을 찾아도 된다. 찾은 것은 record_part_source로 부품(ref)마다 출처 링크, 제목, 가격(있으면), 확인 날짜를 남긴다.
+- 가격·재고는 검색 시점 기준이며 구매 전 확인이 필요하다고 안내한다. 데이터시트 수치와 회로의 전압·핀이 다르면 HW 관점에서 짚는다.
+- 검색할 수 없거나 찾지 못했으면 꾸며내지 말고 사용자에게 링크를 요청한다.
+
+## 소프트웨어가 필요할 때 (SW 달그락)
+1. 사용자의 개발 경험을 체크리스트로 확인해 set_dev_profile로 저장한다: 코딩 경험, 쓸 도구(Claude Code/Codex/미정), 컴퓨터 종류, 설치된 것. 대시보드의 "💻 개발 연결"에서도 사용자가 직접 채울 수 있다.
+2. 어떤 코드가 왜 필요한지, 어떤 도구로 만들지를 경험 수준에 맞는 쉬운 말로 설명한다. 처음인 사람에게는 터미널·폴더·실행 같은 개념부터 풀어서 말한다.
+3. write_dev_spec으로 명세서를 만든다. 서버가 승인된 회로의 보드·핀 정보를 붙여 SPEC.md(무엇을·왜·완료 기준·진행 순서), CLAUDE.md(Claude Code용), AGENTS.md(Codex용)를 작업대에 저장한다.
+4. 사용자에게 대시보드의 "💻 개발 연결"을 열라고 안내한다. 거기서 체크리스트에 맞춘 설치 순서, 연결 명령어, 첫 프롬프트를 볼 수 있다.
+5. 실제 구현은 Claude Code나 Codex에서 한다. 그쪽의 Claude는 log_dev_progress로 한 일·다음 할 일·막힌 점을 남긴다.
 
 ## 사람이 하는 일
 - 승인 세 가지, 부품 구매, 납땜, 측정, 보드에 코드 올리기. 사용자가 결과를 말해주면 record_task_result(측정·실행 결과)와 set_purchase_status(구매 상태)로 기록한다. 결과 제출은 합격을 뜻하지 않는다.
@@ -136,6 +155,9 @@ function summarize(project: LocalProject, context: ToolContext) {
       checks: project.build.checks, evaluator: project.build.evaluator
     } : null,
     files: workbenchItems(project).map(({ filename, kind }) => ({ filename, kind })),
+    partSources: workflow.partSources ?? {},
+    devProfile: workflow.devProfile ?? emptyDevProfile(), devProfileMissing: devProfileMissing(workflow.devProfile),
+    claudeProjectInstructions: claudeProjectInstructions(project),
     evidence: workflow.evidence.slice(-10),
     sharedUpdates: workflow.sharedUpdates.slice(-10).map(({ agent, text, createdAt }) => ({ agent, text, createdAt })),
     recentMessages: project.messages.slice(-8).map(({ role, agent, channel, text }) => ({ role, agent, channel, text })),
@@ -207,7 +229,7 @@ export const TOOLS: ToolDefinition[] = [
     run: async (input, context) => {
       const { idea, plan } = z.object({ idea: z.string().trim().min(3).max(4000), plan: PlanSchema }).strict().parse(input);
       const project = await createProject(idea, plan as AgentPlan, "live", [], { ownerId: context.user.id, origin: "connector" });
-      return stored(project, context, `'${project.name}' 프로젝트를 만들었어요.`);
+      return stored(project, context, `'${project.name}' 프로젝트를 만들었어요. 같은 Claude 프로젝트에서 계속 이어가려면 아래 문구를 Claude 프로젝트 지침에 붙여넣으라고 사용자에게 안내하세요.\n\n${claudeProjectInstructions(project)}\n`);
     }
   },
   {
@@ -376,6 +398,115 @@ export const TOOLS: ToolDefinition[] = [
     }
   }
 ];
+
+const DevProfileInput = z.object({
+  projectId: z.string().uuid(),
+  codingExperience: z.enum(["unanswered", "none", "guided", "independent"]),
+  tool: z.enum(["undecided", "claude_code", "codex"]),
+  os: z.enum(["unanswered", "mac", "windows", "linux"]),
+  installed: z.array(z.string().max(40)).max(12),
+  confirmed: z.boolean()
+}).strict();
+
+const DevSpecSchema = z.object({
+  projectId: z.string().uuid(),
+  title: z.string().min(1).max(100),
+  goal: z.string().min(1).max(1200),
+  whyCode: z.string().min(1).max(1200),
+  pieces: z.array(z.object({ name: z.string().min(1).max(80), kind: z.enum(["firmware", "web", "app", "script", "server"]), purpose: z.string().min(1).max(400) }).strict()).min(1).max(6),
+  features: z.array(z.object({ name: z.string().min(1).max(80), detail: z.string().min(1).max(800) }).strict()).min(1).max(12),
+  acceptance: z.array(z.string().min(1).max(300)).min(1).max(12),
+  outOfScope: z.array(z.string().min(1).max(300)).max(10),
+  dataInterface: z.object({ transport: z.enum(["serial", "ble", "wifi_http", "wifi_mqtt", "none"]), format: z.string().min(1).max(800) }).strict(),
+  stack: z.array(z.object({ name: z.string().min(1).max(60), reason: z.string().min(1).max(400) }).strict()).min(1).max(8),
+  learningSteps: z.array(z.object({ step: z.string().min(1).max(120), explain: z.string().min(1).max(600) }).strict()).min(1).max(12),
+  recommendedTool: z.enum(["claude_code", "codex"])
+}).strict();
+
+TOOLS.push(
+  {
+    name: "record_part_source", title: "부품 출처 기록",
+    description: "웹 검색이나 사용자가 준 링크로 찾은 부품 정보(판매처·데이터시트)를 회로 부품(ref)에 기록한다. 가격은 검색 시점 기준이다. 실제로 확인한 링크만 기록한다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "ref", "url", "title"], properties: { projectId, ref: { type: "string", description: "회로 부품 ref (예: U1, S1). 회로 제출 전이면 임시 이름도 가능" }, url: { type: "string", description: "출처 링크 (http/https)" }, title: { type: "string", description: "상품명 또는 문서 제목" }, price: { type: "string", description: "보인 가격과 통화 (예: 3,900원). 모르면 생략" }, note: { type: "string", description: "전압·핀 호환성, 대체품 등 메모" } } },
+    run: async (input, context) => {
+      const { projectId: id, ref, url, title, price, note } = z.object({ projectId: z.string().uuid(), ref: z.string().min(1).max(40), url: z.string().url().max(600).refine((value) => /^https?:\/\//.test(value), "http/https 링크만 기록해요"), title: z.string().min(1).max(200), price: z.string().max(60).optional(), note: z.string().max(500).default("") }).strict().parse(input);
+      await ownedProject(id, context);
+      const updated = await mutateProject(id, (p) => {
+        const w = workflowFor(p);
+        const now = new Date().toISOString();
+        const sources = (w.partSources ??= {});
+        sources[ref] = [{ url, title, price: price ?? null, checkedAt: now, note }, ...(sources[ref] ?? []).filter((item) => item.url !== url)].slice(0, 5);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "hw", text: `${ref} 출처: ${title}${price ? ` · ${price} (검색 시점)` : ""} · ${url}${note ? ` · ${note}` : ""}`, createdAt: now });
+        p.workflow = w;
+      });
+      return stored(updated, context, `${ref} 출처를 기록했어요. 가격·재고는 구매 전 다시 확인해야 해요.`);
+    }
+  },
+  {
+    name: "set_dev_profile", title: "개발 경험 체크리스트 저장",
+    description: "소프트웨어 작업 전에 사용자의 코딩 경험, 쓸 도구(Claude Code/Codex/미정), 컴퓨터 종류, 설치된 것(Node.js, Git, VS Code, GitHub 계정, Arduino IDE)을 저장한다. 설명 수준과 설치 안내를 맞추는 데 쓴다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "codingExperience", "tool", "os", "installed", "confirmed"], properties: { projectId, codingExperience: { type: "string", enum: ["unanswered", "none", "guided", "independent"], description: "none=처음, guided=따라 하며 실행해봄, independent=직접 가능" }, tool: { type: "string", enum: ["undecided", "claude_code", "codex"] }, os: { type: "string", enum: ["unanswered", "mac", "windows", "linux"] }, installed: { type: "array", items: { type: "string" } }, confirmed: { type: "boolean", description: "사용자가 설치된 것을 직접 확인해줬으면 true" } } },
+    run: async (input, context) => {
+      const { projectId: id, ...profile } = DevProfileInput.parse(input) as DevProfile & { projectId: string };
+      await ownedProject(id, context);
+      const updated = await mutateProject(id, (p) => { const w = workflowFor(p); w.devProfile = profile; p.workflow = w; });
+      const missing = devProfileMissing(profile);
+      return stored(updated, context, missing.length ? `개발 체크리스트를 저장했어요. 아직 필요한 것: ${missing.join(" · ")}` : "개발 체크리스트를 저장했어요.");
+    }
+  },
+  {
+    name: "write_dev_spec", title: "SW 명세서 만들기 (Claude Code·Codex용)",
+    description: "SW 달그락으로서 소프트웨어 명세서를 만든다. 서버가 회로의 보드·핀 정보와 사용자 개발 경험을 붙여 SPEC.md, CLAUDE.md(Claude Code용), AGENTS.md(Codex용)를 작업대에 저장한다. 다시 호출하면 최신 내용으로 바뀐다. learningSteps는 처음 하는 사람도 따라갈 수 있게 쉬운 말로 쓴다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "title", "goal", "whyCode", "pieces", "features", "acceptance", "outOfScope", "dataInterface", "stack", "learningSteps", "recommendedTool"], properties: {
+      projectId, title: { type: "string" }, goal: { type: "string", description: "무엇을 만드는지 쉬운 말로" }, whyCode: { type: "string", description: "왜 코드가 필요한지, 하드웨어만으로는 왜 안 되는지" },
+      pieces: { type: "array", minItems: 1, maxItems: 6, items: { type: "object", additionalProperties: false, required: ["name", "kind", "purpose"], properties: { name: { type: "string" }, kind: { type: "string", enum: ["firmware", "web", "app", "script", "server"] }, purpose: { type: "string" } } } },
+      features: { type: "array", minItems: 1, maxItems: 12, items: { type: "object", additionalProperties: false, required: ["name", "detail"], properties: { name: { type: "string" }, detail: { type: "string" } } } },
+      acceptance: { type: "array", minItems: 1, items: { type: "string" }, description: "완료 기준 (사람이 확인할 수 있는 문장)" },
+      outOfScope: { type: "array", items: { type: "string" } },
+      dataInterface: { type: "object", additionalProperties: false, required: ["transport", "format"], properties: { transport: { type: "string", enum: ["serial", "ble", "wifi_http", "wifi_mqtt", "none"] }, format: { type: "string", description: "주고받는 데이터 형식 예시 (예: 'moisture=512\\n' 10초마다)" } } },
+      stack: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["name", "reason"], properties: { name: { type: "string" }, reason: { type: "string", description: "왜 이걸 고르는지 쉬운 말로" } } } },
+      learningSteps: { type: "array", minItems: 1, maxItems: 12, items: { type: "object", additionalProperties: false, required: ["step", "explain"], properties: { step: { type: "string" }, explain: { type: "string" } } } },
+      recommendedTool: { type: "string", enum: ["claude_code", "codex"] }
+    } },
+    run: async (input, context) => {
+      const { projectId: id, ...spec } = DevSpecSchema.parse(input) as DevSpecInput & { projectId: string };
+      const project = await ownedProject(id, context);
+      const files = buildDevHandoff(project, spec);
+      const updated = await mutateProject(id, (p) => {
+        const w = workflowFor(p);
+        const now = new Date().toISOString();
+        const names = new Set(files.map((file) => file.filename));
+        p.workspaceFiles = [...(p.workspaceFiles ?? []).filter((file) => !(file.agent === "sw" && names.has(file.filename))), ...files.map((file) => ({ ...file, agent: "sw" as const, id: randomUUID(), createdAt: now }))];
+        if (!w.activeAgents.includes("sw")) w.activeAgents = [...w.activeAgents, "sw"];
+        if (w.devProfile && w.devProfile.tool === "undecided") w.devProfile = { ...w.devProfile, tool: spec.recommendedTool };
+        const text = `SW 명세서를 만들었어요: ${spec.title}. 작업대의 SPEC.md·CLAUDE.md·AGENTS.md를 받아 ${spec.recommendedTool === "codex" ? "Codex" : "Claude Code"}에서 구현을 시작할 수 있어요. 왼쪽 아래 '💻 개발 연결'에서 설치와 연결 순서를 확인하세요.`;
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "sw", channel: w.phase === "workshop" ? "sw" : "main", text, createdAt: now, shared: true });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "sw", text: `SW 명세: ${spec.pieces.map((piece) => piece.name).join(", ")} · 통신 ${spec.dataInterface.transport} · 완료 기준 ${spec.acceptance.length}개`, createdAt: now });
+        p.workflow = w;
+      });
+      return stored(updated, context, "SPEC.md, CLAUDE.md, AGENTS.md를 작업대에 저장했어요. 사용자에게 대시보드의 '💻 개발 연결'을 열어 설치·연결 순서를 따라가라고 안내하세요.");
+    }
+  },
+  {
+    name: "log_dev_progress", title: "개발 진행 기록 (Claude Code·Codex에서)",
+    description: "Claude Code나 Codex에서 구현하는 중에 한 일, 다음 할 일, 막힌 점을 SW 달그락 기록으로 남긴다. 하드웨어 확인이 필요하면 hardwareRequests에 구체적으로 적는다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "summary", "done", "next"], properties: { projectId, summary: { type: "string", description: "이번 진행 요약 (600자 이내)" }, done: { type: "array", items: { type: "string" } }, next: { type: "array", items: { type: "string" } }, blockers: { type: "array", items: { type: "string" } }, hardwareRequests: { type: "array", items: { type: "string" }, description: "사람이 하드웨어에서 해줘야 할 확인 (업로드·측정·배선)" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), summary: z.string().min(1).max(600), done: z.array(z.string().max(200)).max(10), next: z.array(z.string().max(200)).max(10), blockers: z.array(z.string().max(200)).max(10).default([]), hardwareRequests: z.array(z.string().max(300)).max(5).default([]) }).strict().parse(input) as { projectId: string; summary: string; done: string[]; next: string[]; blockers: string[]; hardwareRequests: string[] };
+      await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        const w = workflowFor(p);
+        const now = new Date().toISOString();
+        const text = [`[개발 진행] ${parsed.summary}`, parsed.done.length && `한 일: ${parsed.done.join(" / ")}`, parsed.next.length && `다음: ${parsed.next.join(" / ")}`, parsed.blockers.length && `막힌 점: ${parsed.blockers.join(" / ")}`].filter(Boolean).join("\n");
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "sw", channel: w.phase === "workshop" && w.activeAgents.includes("sw") ? "sw" : "main", text, createdAt: now, shared: true });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "sw", text, createdAt: now });
+        for (const plain of parsed.hardwareRequests) p.tasks.push({ id: randomUUID(), kind: "run_firmware", title: "개발 중 하드웨어 확인", plain, status: "ready" });
+        p.workflow = w;
+      });
+      return stored(updated, context, `개발 진행을 기록했어요${parsed.hardwareRequests.length ? ` (사람 확인 ${parsed.hardwareRequests.length}건을 할 일에 추가)` : ""}.`);
+    }
+  }
+);
 
 export async function callTool(name: string, input: unknown, context: ToolContext): Promise<{ content: Array<{ type: "text"; text: string }>; structuredContent?: Record<string, unknown>; isError?: boolean }> {
   const tool = TOOLS.find((item) => item.name === name);

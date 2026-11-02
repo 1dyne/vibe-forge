@@ -6,7 +6,7 @@ import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied } from "../../../../../lib/viewer";
 import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, runBuildPipeline } from "../../../../../lib/build-pipeline";
-import type { MakerProfile } from "../../../../../lib/project-types";
+import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800) }).strict();
 const Input = z.discriminatedUnion("action", [
@@ -16,6 +16,7 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve_mockup") }), z.object({ action: z.literal("enter_workshop") }),
   z.object({ action: z.literal("reopen") }),
   z.object({ action: z.literal("evidence"), taskId: z.string(), text: z.string().trim().min(1).max(3000) }),
+  z.object({ action: z.literal("dev_profile"), devProfile: z.object({ codingExperience: z.enum(["unanswered", "none", "guided", "independent"]), tool: z.enum(["undecided", "claude_code", "codex"]), os: z.enum(["unanswered", "mac", "windows", "linux"]), installed: z.array(z.string().max(40)).max(12), confirmed: z.boolean() }).strict() }),
   z.object({ action: z.literal("purchase"), ref: z.string().max(80), status: z.enum(["needed", "ordered", "received", "problem"]), note: z.string().max(1000).default("") })
 ]);
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         w.profile = input.profile as MakerProfile;
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `제작 프로필을 알려드릴게요.\n핵심 동작: ${w.profile.coreBehavior || "아직 논의 중"}\n보유 도구: ${w.profile.tools.join(", ") || "없음"}\n펌웨어 경험: ${{ unanswered: "아직 답변 안 함", none: "처음이에요", guided: "안내를 보며 해봤어요", independent: "직접 할 수 있어요" }[w.profile.firmwareExperience]}`, createdAt: now });
         announce("제작 프로필을 저장했어요. 목표는 유지하면서 경험에 맞춰 설명할게요. 아이디어를 더 논의하거나, 준비되었다면 계획 시작을 눌러주세요.");
+      } else if (input.action === "dev_profile") {
+        w.devProfile = input.devProfile as DevProfile;
       } else if (input.action === "agents") {
         w.activeAgents = [...new Set(input.agents)];
         announce(`함께할 팀을 ${w.activeAgents.map((a) => a.toUpperCase()).join(" · ")} 달그락으로 변경했어요. 공통 프로젝트 기록을 함께 참고합니다.`);

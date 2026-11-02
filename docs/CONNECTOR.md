@@ -19,6 +19,26 @@
 - 회로가 승인된 뒤에는 Claude가 대화만으로 설계를 바꿀 수 없습니다. 사용자가 대시보드에서 “다시 논의”를 눌러야 합니다.
 - 참여자는 자기 프로젝트만 봅니다. 운영자(비밀번호 로그인)는 전체를 봅니다.
 
+## 작업 중인 프로젝트 고정 (Claude 프로젝트)
+
+claude.ai 커넥터는 계정 단위라서, 어떤 Claude 프로젝트가 어떤 달그락 프로젝트인지는 **Claude 프로젝트 지침**으로 고정합니다.
+
+- 대시보드 왼쪽 아래 **🔗 Claude 연결**에 그 프로젝트용 지침 문구(달그락 프로젝트 ID 포함)가 있습니다. Claude 프로젝트 지침에 붙여넣으면 그 Claude 프로젝트의 모든 대화가 이 달그락 프로젝트에만 쌓입니다.
+- `create_project` 결과에도 같은 문구가 나오고, Claude가 붙여넣으라고 안내합니다.
+- Claude는 ID를 모르면 추측하지 않고 목록을 보여주며 묻고, 요청하지 않으면 새 프로젝트를 만들지 않습니다.
+
+## 검색과 부품 출처
+
+Claude 채팅에서 대화하면 Claude의 웹 검색으로 부품, 데이터시트, 가격을 찾을 수 있습니다. 찾은 것은 `record_part_source`로 부품마다 출처 링크, 가격, 확인 날짜가 남고, 대시보드 부품목록에 함께 보입니다. 가격과 재고는 검색 시점 기준이며 구매 전 확인이 필요합니다. 웹 앱 안의 AI 대화에는 검색이 없습니다.
+
+## 소프트웨어 개발 연결 (Claude Code · Codex)
+
+1. 대시보드 **💻 개발 연결**에서 개발 경험 체크리스트(코딩 경험, 쓸 도구, 컴퓨터, 설치된 것)를 채웁니다. Claude가 대화로 물어보고 `set_dev_profile`로 저장할 수도 있습니다.
+2. Claude에게 “SW 명세서 만들어줘”라고 하면 SW 달그락이 어떤 코드가 왜 필요한지, 어떤 도구를 쓰는지 경험 수준에 맞춰 설명하고 `write_dev_spec`으로 `SPEC.md`, `CLAUDE.md`(Claude Code용), `AGENTS.md`(Codex용)를 만듭니다. 승인된 회로의 보드·핀 정보가 자동으로 들어갑니다.
+3. 💻 개발 연결 화면에 체크리스트에 맞춘 설치 순서, 연결 명령어(Claude Code는 `claude mcp add --transport http dalgeurak <주소>`), 첫 프롬프트가 나옵니다.
+4. Claude Code나 Codex가 연결되면 “Claude Code 연결됨 · 마지막 활동”이 표시되고, 구현 중인 Claude가 `log_dev_progress`로 남긴 진행 상황과 하드웨어 확인 요청이 대시보드에 쌓입니다.
+5. Codex의 원격 MCP 연결은 버전에 따라 다를 수 있습니다. 안 되더라도 `AGENTS.md`만으로 작업은 진행됩니다.
+
 ## 운영자: 참여자 초대
 
 1. 비밀번호로 로그인 → 왼쪽 아래 **참여자 관리** (`/admin`).
@@ -36,6 +56,10 @@
 ## 참여자: Claude Code에서 쓰기
 
 ```bash
+# 가장 간단한 방법
+claude mcp add --transport http dalgeurak "<받은 커넥터 주소>"
+
+# 또는 사용 규칙 스킬까지 함께 (플러그인)
 export DALGEURAK_CONNECTOR_URL="<받은 커넥터 주소>"
 claude
 /plugin marketplace add 1dyne/vibe-forge
@@ -55,10 +79,15 @@ claude
 | `set_team` | 함께할 달그락(HW·SW·ME·ID) |
 | `log_team_turn` | 대장간 팀 대화 한 턴, 작업 파일 저장 |
 | `record_task_result` · `set_purchase_status` | 사용자가 한 측정·실행 결과, 부품 구매 상태 |
+| `record_part_source` | 웹 검색·링크로 찾은 부품 출처, 가격(검색 시점), 확인 날짜 |
+| `set_dev_profile` | 개발 경험 체크리스트 |
+| `write_dev_spec` | SW 명세서 → SPEC.md · CLAUDE.md · AGENTS.md |
+| `log_dev_progress` | Claude Code·Codex에서 구현 진행·막힌 점·하드웨어 확인 요청 |
 
 ## 한계
 
-- 부품 실시간 검색·가격·재고는 없습니다. 사용자가 준 링크와 데이터시트를 근거로 씁니다.
+- 웹 앱 안의 AI 대화에는 검색이 없습니다. 검색은 Claude 채팅에서 하고 출처를 기록합니다.
+- 웹 화면이 사용자 컴퓨터의 Claude Code·Codex를 직접 조종하지는 않습니다. 설치·연결 안내와 명세서를 주고, 연결된 뒤의 진행 기록을 보여줍니다.
 - 3D는 치수 기반 회전 목업(OpenSCAD)이며 정밀 CAD·STL 검증은 별도입니다.
 - 이미지 첨부는 웹 채팅에서만 저장됩니다. Claude에 올린 이미지는 Claude가 읽고 내용을 기록합니다.
 - 저장소는 서버 볼륨의 JSON 파일입니다. 강연 규모(수십 명)는 충분하지만, 대규모 공개 전에는 Postgres 연결이 필요합니다.
