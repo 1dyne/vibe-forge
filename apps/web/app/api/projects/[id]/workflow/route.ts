@@ -5,8 +5,8 @@ import { getProject, mutateProject, saveMakerProfile } from "../../../../../lib/
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied } from "../../../../../lib/viewer";
 import { transition, workflowFor } from "../../../../../lib/workflow";
-import { approvedCad, runBuildPipeline } from "../../../../../lib/build-pipeline";
-import { recordAssembly } from "../../../../../lib/mcp-tools";
+import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
+import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
@@ -21,7 +21,9 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reopen") }),
   z.object({ action: z.literal("evidence"), taskId: z.string(), text: z.string().trim().min(1).max(3000) }),
   z.object({ action: z.literal("dev_profile"), devProfile: z.object({ codingExperience: z.enum(["unanswered", "none", "guided", "independent"]), tool: z.enum(["undecided", "claude_code", "codex"]), os: z.enum(["unanswered", "mac", "windows", "linux"]), installed: z.array(z.string().max(40)).max(12), confirmed: z.boolean() }).strict() }),
-  z.object({ action: z.literal("assembly_report"), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^s\d+-c\d+$/).optional(), text: z.string().trim().min(1).max(1000) }),
+  z.object({ action: z.literal("assembly_report"), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^(s\d+-c\d+|lib:[a-z0-9-]+)$/).optional(), text: z.string().trim().min(1).max(1000), value: z.number().finite().nullable().optional(), yes: z.boolean().nullable().optional() }),
+  z.object({ action: z.literal("detail_request"), step: z.number().int().min(1).max(20), level: z.enum(["beginner", "micro"]) }),
+  z.object({ action: z.literal("reset_stage"), stage: z.enum(["product_form", "plan"]) }),
   z.object({ action: z.literal("purchase"), ref: z.string().max(80), status: z.enum(["needed", "ordered", "received", "problem"]), note: z.string().max(1000).default("") })
 ]);
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -36,6 +38,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     // Approvals and records stay open to everyone; only "plan" calls the in-app AI.
     if (input.action === "plan" && !canUseWebAi(viewer)) return webAiDenied();
     const current = workflowFor(project);
+    // Electrical rules marked blocked hold back approvals and assembly progress.
+    const blocked = blockingChecks(project.build);
+    if (blocked.length && ["approve_circuit", "approve_mockup", "enter_workshop", "assembly_report"].includes(input.action)) {
+      return NextResponse.json({ error: `회로에 꼭 고쳐야 할 문제가 ${blocked.length}건 있어 진행할 수 없어요: ${blocked.map((check) => check.message).join(" / ")} Claude에게 회로를 고쳐 다시 제출해 달라고 해주세요.` }, { status: 409 });
+    }
     let newBuild = null;
     if (input.action === "plan") {
       transition(current, "plan", !!project.build);
@@ -53,7 +60,14 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `제작 프로필을 알려드릴게요.\n핵심 동작: ${w.profile.coreBehavior || "아직 논의 중"}\n보유 도구: ${w.profile.tools.join(", ") || "없음"}\n펌웨어 경험: ${{ unanswered: "아직 답변 안 함", none: "처음이에요", guided: "안내를 보며 해봤어요", independent: "직접 할 수 있어요" }[w.profile.firmwareExperience]}`, createdAt: now });
         announce("제작 프로필을 저장했어요. 목표는 유지하면서 경험에 맞춰 설명할게요. 아이디어를 더 논의하거나, 준비되었다면 계획 시작을 눌러주세요.");
       } else if (input.action === "assembly_report") {
-        recordAssembly(p, input.step, input.cardId ?? null, input.text);
+        recordAssembly(p, input.step, input.cardId ?? null, input.text, { value: input.value ?? null, yes: input.yes ?? null });
+      } else if (input.action === "detail_request") {
+        if (!p.assembly?.steps[input.step - 1]) throw new Error("조립 가이드의 단계를 찾을 수 없어요.");
+        p.assemblyRequests = [...(p.assemblyRequests ?? []).filter((r) => r.step !== input.step || r.doneAt), { step: input.step, level: input.level, requestedAt: now, doneAt: null }];
+        p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `${input.step}단계를 ${input.level === "micro" ? "한 동작 단위로" : "초보자용으로"} 더 잘게 나눠주세요.`, createdAt: now, shared: true });
+        pushActivity(p, { source: "person", title: `${input.step}단계 더 잘게 보기 요청` });
+      } else if (input.action === "reset_stage") {
+        resetStage(p, input.stage);
       } else if (input.action === "dev_profile") {
         w.devProfile = input.devProfile as DevProfile;
       } else if (input.action === "agents") {
@@ -78,6 +92,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         announce("설계 논의를 다시 열었어요. 기존 산출물은 참고용으로 남고, 새 회로와 3D는 다시 승인받습니다.");
       } else {
         Object.assign(w, transition(w, input.action, !!p.build));
+        pushActivity(p, { source: "person", title: { plan: "계획 시작", approve_circuit: "회로 승인", approve_mockup: "3D 승인", enter_workshop: "대장간 입장" }[input.action] });
         const decisions = { plan: "브레인스토밍을 마치고 회로 계획을 시작할게요.", approve_circuit: "회로 방향을 승인합니다. 3D 목업을 만들어주세요.", approve_mockup: "3D 목업 방향을 승인합니다. 다음 작업을 나눠주세요.", enter_workshop: "선택한 달그락 팀과 대장간에서 작업을 시작할게요." };
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: decisions[input.action], createdAt: now, shared: true });
         if (input.action === "plan") {
@@ -85,7 +100,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           p.tasks = p.tasks.map((task) => task.kind === "confirm_spec" ? { ...task, status: "completed" } : task);
           announce("브레인스토밍을 마치고 회로 초안을 준비했어요. 오른쪽 회로 탭에서 연결과 미확정 사항을 확인해주세요. 회로 방향을 승인하면 3D 목업을 만듭니다.");
         } else if (input.action === "approve_circuit") {
-          p.build = approvedCad(p.build!, p.productForm?.shape);
+          p.build = approvedCad(p.build!, p.productForm);
           announce("회로 방향을 승인했어요. 승인된 부품과 치수로 3D 목업을 만들었어요. 드래그해서 돌려보고 형태를 검토해주세요. 이 승인은 실물 전기 검증의 합격과는 별개예요.");
         } else if (input.action === "approve_mockup") {
           announce("3D 목업 방향을 승인했어요. 다음 할 일 탭에서 사람과 AI의 작업을 나누고 BOM의 구매 상태를 확인해주세요.");

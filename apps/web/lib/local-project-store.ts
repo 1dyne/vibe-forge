@@ -179,3 +179,16 @@ export function saveMakerProfile(profile: MakerProfile, ownerId: string | null =
     return profile;
   });
 }
+
+// Side notes (activity, live status, requests) that must not bump the design
+// revision, so they never collide with the person's own edits.
+export function annotateProject(id: string, operation: (project: LocalProject) => void): Promise<LocalProject | null> {
+  return serialized(async () => {
+    const database = await readDatabase();
+    const project = database.projects.find((item) => item.id === id);
+    if (!project) return null;
+    operation(project);
+    await writeDatabase(database);
+    return structuredClone(project);
+  });
+}

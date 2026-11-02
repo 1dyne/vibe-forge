@@ -5,6 +5,7 @@ import { AGENTS, emptyProfile, intakeMissing, TOOL_OPTIONS, workflowFor } from "
 import { workbenchItems } from "../lib/workbench";
 import WorkbenchPanel from "./workbench-panel";
 import ConnectPanel from "./connect-panel";
+import ProgressPanel from "./progress-panel";
 import { CHECKLIST } from "../lib/checklist";
 import { ResizeHandle, useWorkspaceLayout, layoutLimits } from "./workspace-layout";
 import { useWorkspacePreferences } from "./workspace-preferences";
@@ -50,7 +51,9 @@ export default function ProjectWorkspace() {
     if(target){setSelectedId(target.id);expand(target.id);const open=query.get("open");if(open==="profile"){setProfile(workflowFor(target).profile);setShowProfile(true);}else if(open==="claude"||open==="dev")setConnectTab(open);window.history.replaceState(null,"","/");}
   }).catch(e=>setError(e.message)).finally(()=>setLoading(false));},[]);
   // Claude writes to projects from outside this page, so pick up changes while idle.
-  useEffect(()=>{const timer=setInterval(()=>{if(busyRef.current||document.hidden)return;fetch("/api/projects",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(b&&!busyRef.current)setProjects(current=>JSON.stringify(current)===JSON.stringify(b.projects)?current:b.projects);}).catch(()=>{});},8000);return()=>clearInterval(timer);},[]);
+  // Poll every 3s while Claude reports live progress on the open project, else every 8s.
+  const liveRef=useRef(false);liveRef.current=!!project?.liveStatus&&Date.now()-new Date(project.liveStatus.updatedAt).getTime()<120_000;
+  useEffect(()=>{let timer:ReturnType<typeof setTimeout>;let stopped=false;const tick=()=>{timer=setTimeout(()=>{if(stopped)return;if(busyRef.current||document.hidden){tick();return;}fetch("/api/projects",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(b&&!busyRef.current)setProjects(current=>JSON.stringify(current)===JSON.stringify(b.projects)?current:b.projects);}).catch(()=>{}).finally(tick);},liveRef.current?3000:8000);};tick();return()=>{stopped=true;clearTimeout(timer);};},[]);
   useEffect(()=>{end.current?.scrollIntoView({behavior:"smooth",block:"end"});},[project?.messages.length,busy,channel]);
   function accept(p:LocalProject) {
     const before=workbenchItems(projects.find(x=>x.id===p.id)??null);
@@ -90,7 +93,8 @@ export default function ProjectWorkspace() {
     <ResizeHandle className="sidebar-resizer" controls="project-sidebar" label="프로젝트 영역 크기 조절" axis={layout.mobile?"y":"x"} value={layout.mobile?layout.sizes.sidebarHeight:layout.sizes.sidebar} min={layout.mobile?120:160} max={480} onResize={v=>resize(layout.mobile?"sidebarHeight":"sidebar",v)} onReset={()=>resize(layout.mobile?"sidebarHeight":"sidebar",layout.mobile?210:240)}/>
     <section className="chat-panel" id="chat-panel" aria-label="대화">
       <header className="chat-header"><div><span className="breadcrumb">내 대장간 / {project?.name??"새로운 아이디어"}</span><h1>{workshop?(channel==="main"?"메인 대장간":AGENTS[channel].name+" 작업실"):phaseNames[phase]}</h1></div>{items.length>0&&<button className="workbench-toggle" aria-expanded={showArtifacts} aria-controls="workbench-panel" onClick={()=>project&&setWorkbench(project.id,!showArtifacts,selectedItem.id)}>▥ 작업대 <span>{items.length}</span></button>}</header>
-      <div className="phase-strip"><span className={phase==="brainstorm"?"current":"done"}>01 아이디어</span><i/><span className={phase!=="brainstorm"&&!workshop?"current":workshop?"done":""}>02 계획</span><i/><span className={workshop?"current":""}>03 대장간</span></div>
+      {project&&<ProgressPanel project={project}/>}
+      <div className="phase-strip" hidden={!!project}><span className={phase==="brainstorm"?"current":"done"}>01 아이디어</span><i/><span className={phase!=="brainstorm"&&!workshop?"current":workshop?"done":""}>02 계획</span><i/><span className={workshop?"current":""}>03 대장간</span></div>
       {workshop&&<div className="team-strip"><span>함께 일할 팀</span>{(["hw","sw","me","id"] as AgentId[]).map(a=><label key={a} className={workflow!.activeAgents.includes(a)?"on":""}><input type="checkbox" checked={workflow!.activeAgents.includes(a)} disabled={!!busy} onChange={()=>toggleAgent(a)}/>{a.toUpperCase()}</label>)}<select aria-label="에이전트 모드" value={mode} onChange={e=>setMode(e.target.value as "work"|"evaluate")}><option value="work">작업 모드</option><option value="evaluate">Evaluator 모드</option></select></div>}
       <div className="chat-scroll" role="log" aria-label="프로젝트 대화" aria-live="polite">
         {!project&&<div className="welcome"><Avatar large/><p className="eyebrow">YOUR IDEA, OUR NEXT PROJECT</p><h2>무엇을 만들어볼까요?</h2>{connectorOnly?<p>대화는 내 Claude에서 이어가요.<br/>Claude에게 아이디어를 말하고 “달그락 대장간에 프로젝트로 만들어줘”라고 하면 여기에 폴더가 생겨요.</p>:<p>아직 다 정해지지 않아도 괜찮아요.<br/>대장 달그락과 이야기하며 첫 설계를 시작해보세요.</p>}{!connectorOnly&&<div className="idea-prompts">{["내 팔에 앉는 부엉이 반려 로봇","식물의 상태를 알려주는 화분","책상 위 작은 집중 타이머"].map(s=><button key={s} onClick={()=>setText(s)}>{s} ↗</button>)}</div>}</div>}

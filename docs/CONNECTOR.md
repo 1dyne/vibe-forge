@@ -39,6 +39,17 @@ Claude 채팅에서 대화하면 Claude의 웹 검색으로 부품, 데이터시
 4. Claude Code나 Codex가 연결되면 “Claude Code 연결됨 · 마지막 활동”이 표시되고, 구현 중인 Claude가 `log_dev_progress`로 남긴 진행 상황과 하드웨어 확인 요청이 대시보드에 쌓입니다.
 5. Codex의 원격 MCP 연결은 버전에 따라 다를 수 있습니다. 안 되더라도 `AGENTS.md`만으로 작업은 진행됩니다.
 
+## 부품 카드 · 규칙 검사 · 조립도 (v0.3)
+
+- **부품 카드** (`apps/web/lib/parts/catalog.ts`): 보드와 부품의 전압, 로직 전압, 인터페이스, I2C 주소, 핀(이름·역할·위치), 치수, 경고, 출처, 확인 날짜. 확인하지 못한 값은 `null`(확인 필요)로 둔다. Claude는 `find_part_cards`로 찾아 `catalogId`를 쓴다.
+- **규칙 엔진** (`apps/web/lib/parts/rules.ts`): 서버 코드가 공급 전압·신호 전압 불일치, 전류 합계, 모터의 보드 전원 직결, 핀 중복·역할 오류, I2C 주소 충돌, GND 미연결, LED 직렬 저항 누락, 카드에 없는 부품을 판정한다. `blocked`는 회로·3D 승인, 대장간 입장, 조립 진행을 막는다.
+- **문제 카드** (`apps/web/lib/parts/trouble-cards.ts`): 부품·보드 조건으로 단계에 자동으로 붙는다. 정상 범위는 출처가 있을 때만 숫자로 두고, 대시보드에서 측정값을 넣으면 바로 정상/범위 밖을 판정해 결과를 보낸다.
+- **실제 부품 조립도**: Wokwi Elements(MIT)로 UNO, Nano, ESP32 DevKit V1, LED, 저항, 버튼, SG90, SSD1306, 부저, 가변저항을 실제 모양으로 그리고, 카드의 핀 위치에 선을 잇는다. 전원은 빨강, GND는 검정. 렌더러가 없는 부품(XIAO, Pico, NU40 DK, FSR, Round Display)은 사각형 "대체 표시"와 안내가 나온다.
+- **더 잘게 보기** (`expand_assembly_step`): beginner/micro 세부 단계. 회로에 없는 부품·핀·연결, 회로에 없는 저항값, 계산되지 않은 선 길이는 저장하지 않는다. 회로나 단계가 바뀌면 stale로 표시된다. 대시보드에서 요청하면 `pendingRequests`로 Claude에게 간다.
+- **진행 단계와 실시간 작업**: 대시보드에 8단계 진행 체크리스트(설계도 안에 보드 선택 STEP 0~5)와, Claude가 `report_progress`로 보내는 현재 작업 계획·생각 요약, 최근 활동이 보인다.
+- **플랫폼**: 라즈베리파이(리눅스)는 .ino 대신 Python(gpiozero) `main.py`, 피코는 MicroPython `main.py`(요청 시 Arduino).
+- **단계 되돌리기** (`reset_project_stage`): 완성품 형태부터 또는 설계도부터 다시.
+
 ## 운영자: 참여자 초대
 
 1. 비밀번호로 로그인 → 왼쪽 아래 **참여자 관리** (`/admin`).

@@ -14,8 +14,8 @@ function escapeHtml(value: string) {
 }
 
 const won = (value: number | null | undefined) => value == null ? "가격 미정" : `${value.toLocaleString("ko-KR")}원`;
-const BOARD: Record<BuildPlan["board"]["choice"], string> = { arduino: "아두이노", raspberry_pi: "라즈베리파이", pico: "라즈베리파이 피코", esp32: "ESP32", nuboard: "Nu보드", other: "기타" };
-const CONNECTION: Record<BuildPlan["connection"]["method"], string> = { solder: "납땜", qwiic: "Qwiic", grove: "Grove", breadboard: "브레드보드·점퍼선", socket: "소켓·끼우기", mixed: "혼합" };
+const BOARD: Record<BuildPlan["board"]["choice"], string> = { arduino: "아두이노", raspberry_pi: "라즈베리파이", pico: "라즈베리파이 피코", esp32: "ESP32", nuboard: "Nu보드", nu40: "누코드 NU40 DK", nu87: "누코드 NU87 Tiny DK", other: "기타" };
+const CONNECTION: Record<BuildPlan["connection"]["method"], string> = { solder: "납땜", qwiic: "Qwiic", grove: "Grove", breadboard: "브레드보드·점퍼선 (연습)", perfboard: "퍼프보드 납땜 (실사용)", pcb: "PCB/PCBA (소형화·양산)", socket: "소켓·끼우기", mixed: "혼합" };
 const VERDICT: Record<BuildPlan["cost"]["verdict"], string> = { within: "예산 안", tight: "예산 빠듯함", over: "예산 초과", unknown: "예산 미정" };
 
 function planDocument(name: string, plan: BuildPlan): string {

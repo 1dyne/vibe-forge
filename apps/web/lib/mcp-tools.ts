@@ -6,7 +6,13 @@ import { applyAgentPlan, createProject, getProject, listProjects, mutateProject,
 import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile } from "./project-types";
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
-import { approvedCad } from "./build-pipeline";
+import { approvedCad, blockingChecks } from "./build-pipeline";
+import { annotateProject } from "./local-project-store";
+import { PART_CARDS, cardSummary, findCard } from "./parts/catalog";
+import { resolvePin } from "./parts/rules";
+import { judgeReading, libraryCardsForStep, parseOhms } from "./parts/trouble-cards";
+import { stepBasis, wireLengths } from "./assembly-utils";
+import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
 import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
@@ -49,28 +55,59 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 ## 대장 달그락의 첫 임무: 전체 설계도 (set_build_plan)
 회로를 그리기 전에, 대장은 전체 프로젝트를 듣고 필요한 구조와 연결 단계를 먼저 정의한다. 브레인스토밍 1~3턴 안에 사용자가 묻지 않아도 설계도를 제안하고 set_build_plan으로 저장한다. 설계도가 없으면 submit_circuit은 거절된다. 결정이 바뀌면 설계도를 다시 저장한다.
 
-설계도는 아래 구상 가이드 순서로 만든다.
+설계도는 아래 보드 선택 알고리즘 순서로 만든다. 입문자가 지금 어느 STEP인지 알 수 있게, 보드 이름보다 사용자의 상황을 먼저 말한다. 사실이 불확실하면 추측하지 말고 공식 문서를 확인한다.
 
-### A/B. 무엇을 만드는가
-- A. 컴퓨터·앱 안에서만 돌아가면 된다 → 소프트웨어 개발 (바이브 코딩). track=software. SW 달그락 흐름으로 간다.
-- B. 실제 세계에서 쓰거나 물리적인 장치가 필요하다 → 하드웨어 개발 (메이커). track=hardware. 앱도 필요하면 both.
+### STEP 0. 하드웨어가 필요한지
+- 컴퓨터·앱 안에서만 동작하면 된다 → 소프트웨어 개발(track=software). SW 달그락 흐름으로 간다.
+- 실제 세계에서 쓰거나 물리적인 장치가 필요하다 → track=hardware (앱도 필요하면 both).
 
-### (1) 뇌·메인 보드
-- B-1. 장치가 움직이기만 하면 된다 (버튼·LED·모터·센서 반응) → 아두이노 (Uno, Nano).
-- B-2. 장치가 생각해야 한다 (영상 처리, 음성 인식·AI 대화, 리눅스 프로그램) → 라즈베리파이 (Zero 2 W, 4, 5).
-  - 파이썬처럼 쓰되 가볍게 제어만 하면 된다 → 라즈베리파이 피코 (MicroPython).
-- B-3. 움직이면서 Wi-Fi·블루투스가 필요하다 → ESP32 (XIAO ESP32S3, ESP32-C3 등).
-- B-4. 아두이노처럼 쓰고 싶은데 납땜이 귀찮다 → Nu보드 (Nu40, Nu-dk).
-- 왜 이 보드인지, 다른 후보와 무엇을 포기하는지를 사용자의 핵심 동작에 비추어 쉬운 말로 설명한다.
+### STEP 1. 입력과 출력 (plan.io)
+- 무엇을 감지하나 (소리, 빛, 움직임, 버튼, 압력 등) / 무엇을 하나 (LED, 소리, 화면, 모터 등) / 무선이 필요한가 (없음, 블루투스, 와이파이).
 
-### (2) 연결 방식
-- B-a. 납땜에 익숙하거나 납땜으로만 연결되는 부품이다 → 인두와 납을 준비해 납땜한다.
-- B-b. 납땜과 전선 꼬임이 귀찮다 → Qwiic / Grove 커넥터 모듈, 핀 납땜 완료 보드, 브레드보드와 점퍼선.
-- 체크리스트의 납땜 경험이 "없음"이면 납땜 없는 조합을 먼저 제안하고, 납땜이 꼭 필요하면 prerequisites에 연습 단계를 넣는다.
+### STEP 2. 보드 후보 (plan.board)
+- 작은 컴퓨터처럼 복잡한 일을 직접 처리해야 한다(영상 처리, 리눅스 프로그램) → 라즈베리파이 (choice=raspberry_pi).
+- 와이파이가 필요하다 → ESP32 (esp32) 또는 누코드 NU87 Tiny DK (nu87).
+- 블루투스가 필요하고 납땜은 피하고 싶다 → 누코드 NU40 DK (nu40).
+- 입문 자료가 많은 보드로 기본 동작(간단한 동작을 반복)을 배우고 싶다 → 아두이노 UNO (arduino).
+- 저렴한 보드로 간단한 제어를 하고 싶다 → 라즈베리파이 피코 (pico). 피코는 리눅스 컴퓨터가 아니라 마이크로컨트롤러이고 3.3V 기준이다.
+- 정확한 모델명과 버전을 쓰고, find_part_cards로 카드가 있으면 board.catalogId를 넣는다.
 
-### (3) 추가 재료·확장
-- 필요한 기능마다 모듈을 붙인다: 들어야 하면 마이크 모듈, 소리를 내야 하면 부저 또는 DAC/앰프+스피커, 봐야 하면 카메라, 글자·그림을 띄우려면 디스플레이, 움직이려면 서보·모터+드라이버, 감지하려면 해당 센서.
-- 부품은 보드에 연결해 제어하거나 장치 안에 넣을 수 있는 모듈로 제안한다. 완제품 소비자 기기(액션캠, 스마트폰, 블루투스 스피커 등)는 장치에 통합되지 않으므로 기본 제안으로 쓰지 않는다. 쓸 경우 "완제품 대안 · 장치에 통합 안 됨"이라고 분명히 표시하고, 왜 그게 더 나은지 사용자가 판단할 수 있게 비교한다.
+| 보드 | 이런 상황에 | 알아둘 점 | 찾아볼 곳 |
+|---|---|---|---|
+| 아두이노 UNO | 입문 자료가 많은 보드로 시작 | 모델마다 기능이 다름, UNO R3는 무선 없음 | https://docs.arduino.cc/ |
+| 라즈베리파이 피코 | 저렴한 제어용 보드 | 리눅스 컴퓨터가 아님, 3.3V 기준 | https://www.raspberrypi.com/documentation/ |
+| ESP32 | 와이파이/블루투스가 필요할 때 | 모델별 기능 차이가 큼, 3.3V 기준 | https://docs.espressif.com/ |
+| 라즈베리파이 | 작은 컴퓨터가 필요할 때 | OS 설치, microSD, 전원 준비 필요 | https://www.raspberrypi.com/documentation/ |
+| 누코드 NU40 DK | 납땜 없이 BLE를 시험할 때 | 아두이노 UNO와 다른 보드, 버전별 패키지 확인 필요 | https://nucode.gitbook.io/nuserie |
+| 누코드 NU87 Tiny DK | 누코드 환경에서 와이파이도 필요할 때 | 사기 전에 지원 기능과 예제 확인 | https://nuworks.io/ |
+
+### STEP 3. 사기 전에 찾아보기 (plan.preBuyChecks)
+- 검색어: "[정확한 보드 모델명] pinout", "[모델명] getting started", "[모델명] [센서명] example".
+- 확인할 곳: 보드 제조사 공식 문서 → 제품 판매 페이지 → 같은 보드와 부품을 쓴 예제.
+- 확인할 것: 정확한 모델명과 버전, 동작 전압(3.3V/5V), 와이파이/블루투스 지원, 핀 헤더 납땜 여부와 커넥터 종류, USB 포트 종류, 함께 쓸 부품의 예제·라이브러리.
+- 확인 못 한 항목은 status=unknown으로 두고, 전압·커넥터·예제 중 unknown이 있으면 구매 전에 다른 보드나 부품과 비교하자고 안내한다.
+
+### STEP 4. 개발 환경 준비 (조립 가이드 1단계에 넣는다)
+- 라즈베리파이: microSD 카드와 전용 전원 준비, Raspberry Pi Imager로 OS 설치. 코드는 Python(서버가 .ino 대신 main.py 생성).
+- 그 외: 노트북에 Arduino IDE 2.x 설치(IDE는 노트북에, 보드는 업로드된 코드를 실행), 보드 패키지 설치, 데이터 전송되는 USB 케이블. 피코는 MicroPython(main.py)이 기본이고 Arduino로 하려면 submit_circuit의 platform=arduino.
+
+### STEP 5. 첫 동작 확인 (조립 가이드 1~2단계)
+- 보드를 노트북에 연결 → 공식 예제나 LED 깜빡이기 업로드 → 보드 동작과 시리얼 모니터 확인.
+- 정상이면 센서나 출력 부품을 하나씩 추가한다. 아니면 USB 케이블 → 보드 선택 → 포트 → 드라이버 → 보드 패키지 순서로 확인한다.
+
+### 연결 방식 (plan.connection) — 단계별로 다르다
+- 브레드보드·점퍼선: 연습 단계. 납땜 없이 바꿔 꽂으며 배운다.
+- Qwiic/Grove 커넥터, 핀 헤더가 납땜된 보드, 소켓형 모듈: 납땜·전선 꼬임을 피하고 싶을 때.
+- 퍼프보드 납땜: 실제로 들고 쓰는 단계. 체크리스트의 납땜 경험이 없으면 prerequisites에 납땜 연습을 넣는다.
+- PCB/PCBA: 소형화·양산 단계.
+
+### 추가 재료·확장
+- 필요한 기능마다 모듈을 붙인다: 들어야 하면 마이크 모듈, 소리를 내야 하면 부저 또는 DAC/앰프+스피커, 봐야 하면 카메라, 글자·그림은 디스플레이, 움직임은 서보·모터+드라이버, 감지는 해당 센서.
+- 부품은 보드에 연결해 제어하거나 장치 안에 넣을 수 있는 모듈로 제안한다. 완제품 소비자 기기(액션캠, 스마트폰, 블루투스 스피커 등)는 장치에 통합되지 않으므로 기본 제안으로 쓰지 않는다. 쓸 경우 "완제품 대안 · 장치에 통합 안 됨"이라고 분명히 표시한다.
+
+### 부품 카드와 규칙 검사
+- 회로·조립 가이드에 넣을 부품은 먼저 find_part_cards로 찾아 catalogId를 쓴다. 카드의 전압·핀·치수가 사실의 기준이다. 카드에 없거나 '확인 필요'인 값은 지어내지 않고, 공식 문서를 검색해 사용자에게 확인을 안내한다.
+- 전압 불일치, 신호 전압 불일치, 전류 초과, 모터의 보드 전원 직결, 핀 중복·역할 오류, I2C 주소 충돌, GND 미연결, LED 직렬 저항 누락은 서버가 판정한다(blocked/warning/info). blocked가 있으면 승인과 조립이 막히니 회로를 고쳐 다시 제출한다.
 
 ### 기능 요구를 구체화한 뒤 부품을 고른다
 - 부품을 고르기 전에 그 기능의 조건을 먼저 확인한다. 카메라라면: 누구의 시점인가(로봇 눈 위치의 1인칭 POV인지, 로봇을 찍는 3인칭인지), 세로 9:16 릴스용인지, 해상도·프레임, 녹화인지 실시간 전송인지, 저장 위치, 흔들림. "로봇의 눈으로 찍는다"는 눈 위치에 넣는 초소형 카메라 모듈(POV)이 기본이다.
@@ -95,6 +132,7 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 
 ## 완성품 미리보기를 먼저 (set_product_form)
 대장 달그락이 보여주는 3D는 최종 완성품의 모습이다. 사용자가 자기가 생각한 제품의 완성 모양을 먼저 보고 동의해야 회로로 간다. 형태가 정해지지 않으면 submit_circuit은 거절된다.
+- 겉 기능 중 안의 부품과 맞닿아야 하는 것(충전 단자 ↔ 배터리·보드의 USB 포트, 카메라 구멍 ↔ 카메라, 버튼 ↔ 스위치)은 features[].linkedRef로 연결한다. 서버가 그 부품의 해당 면과 실제로 맞닿는지 검사하고, 출력용 파일에는 그 자리에 구멍이 뚫린다.
 - 형태 질문을 먼저 한다(선택지가 있으면 선택지로): 전체 크기(손바닥·컵·책 크기 등 비유와 mm), 손에 드는지·책상에 세우는지·몸에 거는지, 사용자가 보는 면(앞면)에 무엇이 있는지, 화면·카메라·버튼·스피커·충전 포트 위치, 재질·마감·색, 사용 자세와 환경. 이미지가 있으면 보이는 구조를 도형으로 나눠 설명하고 맞는지 묻는다(예: 머리=타원구, 귀=원뿔 2개, 몸=원기둥, 눈=카메라 위치). 알기 어려운 부분은 질문한다.
 - shape는 외형, features는 겉에 보이는 화면·카메라 구멍·버튼 등(어느 면을 향하는지), internals는 안에 들어갈 실제 부품을 데이터시트 기준 실제 치수로 넣는다(예: XIAO ESP32S3 21×17.8×3.5mm, 보조배터리 실제 크기). 서버가 부품이 외형 밖으로 나가는지 확인한다.
 - 사용자가 대시보드에서 돌려보고 "속 보기"로 부품 자리를 확인한 뒤 바꾸고 싶은 곳을 말하면 다시 저장한다. 회로 승인 후 OpenSCAD 외형도 이 모양을 따른다.
@@ -102,10 +140,19 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 
 ## 조립 가이드 (set_assembly_guide)
 회로 다음에는 사용자가 실제로 따라 만들 수 있는 조립 가이드를 만든다. 3D 승인 뒤(handoff) 설계도 1단계부터 만든다.
-- base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기와 위치, 핀 위치(데이터시트 핀 배치 기준)다.
+- base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기와 위치다. 부품 카드가 있으면 parts[].catalogId를 넣는다: 실제 부품 모양으로 그려지고 카드의 핀 위치에 선이 정확히 이어진다. 카드가 없는 부품은 pins를 데이터시트 기준으로 넣고, 대시보드에 "대체 표시"로 나온다.
+- 전선은 회로(submit_circuit)의 같은 net에 있는 두 핀만 이을 수 있다. 회로에 없는 연결이면 저장되지 않는다. 전원은 빨강, GND는 검정으로 표시된다.
+- 부품 카드에서 조건에 맞는 예상 문제 카드(측정 방법·정상 범위·출처)가 단계에 자동으로 붙는다. 직접 쓰는 cards는 그 외의 문제만 넣고, 정상 범위를 지어내지 않는다(모르면 "확인 필요").
 - steps는 하나씩 할 동작이다: 어떤 부품을 어느 방향으로 어디에 놓는지, 어떤 선을 어느 핀에서 어느 핀으로 잇는지(빨강=전원, 검정=GND), 마치면 무엇을 확인하는지. 대시보드에서 단계별 애니메이션으로 재생된다.
 - 단계마다 예상 문제 카드를 미리 넣는다: 증상 → 확인 방법(멀티미터 모드·측정 위치까지, 예: "DC 20V 모드로 빨간 리드를 5V 핀, 검은 리드를 GND에") → 정상값 → 아니면 할 일.
 - 사용자가 카드 결과를 보내면 assemblyReports로 돌아온다. 기대값과 비교해 원인을 좁히고, 필요하면 가이드를 고쳐 다시 저장한다. 채팅으로 말해준 결과는 record_assembly_result로 남긴다.
+
+## 진행 상황 보여주기 (report_progress)
+- 설계도·회로·조립 가이드처럼 여러 단계가 걸리는 작업을 시작할 때 report_progress로 제목, 계획 체크리스트(done/doing/todo), 생각 요약(지금 무엇을 왜 고민하는지 2~3문장)을 보낸다. 단계가 바뀔 때마다 갱신하고, 끝나면 모두 done으로 보낸다. 사용자는 대시보드에서 이 진행을 실시간으로 본다.
+
+## 더 잘게 보기 (expand_assembly_step)
+- 사용자가 요청하거나 pendingRequests에 요청이 있으면 그 단계를 beginner(도구·확인 포함) 또는 micro(한 동작 단위)로 나눈다. 납땜·측정 경험이 없으면 beginner를 추천한다.
+- 기존 부품·핀·연결만 쓴다. 저항값은 회로의 값만, 선 길이는 get_project의 assembly.steps[].wireLengths 값만 쓴다. 계산된 길이가 없으면 "필요한 선 길이를 자로 재세요" 단계를 넣는다. 반복 작업은 repeatCount로 쓴다. 납땜 단계에는 서버가 부품 카드의 열 경고를 붙인다.
 
 ## 단계 (phase)
 1. brainstorm: 체크리스트 → 아이디어 구체화(질문 2개 이하씩, record_brainstorm으로 매 턴 기록) → 형태 질문과 완성품 미리보기(set_product_form) → 대장의 설계도(set_build_plan). 슬롯(power, wireless, sensing, actuation, data_sink, form, runtime, fab)은 사용자가 말한 사실만 filled, 합리적 임시값은 assumed. 핵심 동작·보유 도구·펌웨어 경험이 있어야 회로로 넘어간다.
@@ -163,8 +210,9 @@ const blueprintJsonSchema = {
     loopSteps: { type: "array", minItems: 1, maxItems: 4, items: { type: "string" } },
     assumptions: { type: "array", maxItems: 4, items: { type: "string" } },
     humanChecks: { type: "array", maxItems: 4, items: { type: "string" } },
-    components: { type: "array", maxItems: 16, description: "실제 부품 목록. 쓰면 기본 템플릿 대신 이대로 회로를 만든다 (nets와 함께). 보드 내장 기능은 builtin, 끼우는 보드·화면은 socket.", items: { type: "object", additionalProperties: false, required: ["ref", "type", "valueOrModel", "reason", "connection"], properties: { ref: { type: "string", description: "U1, MIC1, CAM1, DISP1, SPK1, AMP1, BAT1 등" }, type: { type: "string" }, valueOrModel: { type: "string", description: "구체적인 모델명" }, reason: { type: "string" }, connection: { type: "string", enum: ["builtin", "socket", "qwiic", "grove", "breadboard", "solder"] } } } },
+    components: { type: "array", maxItems: 16, description: "실제 부품 목록. 쓰면 기본 템플릿 대신 이대로 회로를 만든다 (nets와 함께). 보드 내장 기능은 builtin, 끼우는 보드·화면은 socket.", items: { type: "object", additionalProperties: false, required: ["ref", "type", "valueOrModel", "reason", "connection"], properties: { ref: { type: "string", description: "U1, MIC1, CAM1, DISP1, SPK1, AMP1, BAT1 등" }, type: { type: "string" }, valueOrModel: { type: "string", description: "구체적인 모델명 (저항은 값 포함, 예: 220Ω)" }, reason: { type: "string" }, connection: { type: "string", enum: ["builtin", "socket", "qwiic", "grove", "breadboard", "solder"] }, catalogId: { type: "string", description: "find_part_cards로 찾은 부품 카드 id. 카드가 있으면 꼭 넣는다 (전압·핀 규칙 검사와 실제 모양 조립도에 쓰임)" } } } },
     nets: { type: "array", maxItems: 24, description: "배선. 전원·GND·신호 net마다 연결되는 단자 'REF.PIN' 목록 (예: VBUS: [U1.5V, AMP1.VIN])", items: { type: "object", additionalProperties: false, required: ["name", "kind", "members"], properties: { name: { type: "string" }, kind: { type: "string", enum: ["power", "ground", "signal"] }, members: { type: "array", minItems: 2, items: { type: "string" } } } } },
+    platform: { type: "string", enum: ["arduino", "micropython", "linux"], description: "코드 종류. 생략하면 보드 이름으로 정한다: 라즈베리파이(리눅스)=linux(Python), 피코=micropython, 나머지=arduino(.ino)" },
     shape: { type: "array", maxItems: 16, description: "3D 목업 외형. 이미지·설명의 구조를 기본 도형으로 (mm, 바닥 중심 원점, position은 도형 바닥 중심)", items: { type: "object", additionalProperties: false, required: ["name", "primitive", "size", "position"], properties: { name: { type: "string", description: "예: 머리, 왼쪽 귀, 몸통, 눈(카메라)" }, primitive: { type: "string", enum: ["box", "sphere", "cylinder", "cone"] }, size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "[폭 x, 깊이 y, 높이 z]" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "[x, y, z] z는 바닥에서 높이" }, color: { type: "string", description: "#RRGGBB" } } } }
   }
 };
@@ -175,8 +223,10 @@ const buildPlanJsonSchema = {
   properties: {
     track: { type: "string", enum: ["software", "hardware", "both"], description: "A=software(컴퓨터·앱 안에서만), B=hardware(물리 장치), 둘 다면 both" },
     summary: { type: "string", description: "전체 구조를 초보자가 이해할 수 있게 한 문단으로" },
-    board: { type: "object", additionalProperties: false, required: ["choice", "model", "why", "alternatives"], properties: { choice: { type: "string", enum: ["arduino", "raspberry_pi", "pico", "esp32", "nuboard", "other"] }, model: { type: "string" }, why: { type: "string", description: "구상 가이드 B-1~B-4 중 어디에 해당하고 왜인지" }, alternatives: { type: "string", description: "다른 후보와 포기하는 점" } } },
-    connection: { type: "object", additionalProperties: false, required: ["method", "why"], properties: { method: { type: "string", enum: ["solder", "qwiic", "grove", "breadboard", "socket", "mixed"] }, why: { type: "string" } } },
+    board: { type: "object", additionalProperties: false, required: ["choice", "model", "why", "alternatives"], properties: { choice: { type: "string", enum: ["arduino", "raspberry_pi", "pico", "esp32", "nu40", "nu87", "nuboard", "other"] }, model: { type: "string", description: "정확한 모델명과 버전 (예: Arduino UNO R3, NUCODE NU40 DK)" }, why: { type: "string", description: "보드 선택 알고리즘 STEP 2의 어느 조건에 해당하고 왜인지" }, alternatives: { type: "string", description: "다른 후보와 포기하는 점" }, catalogId: { type: "string", description: "부품 카드 id (있으면)" } } },
+    connection: { type: "object", additionalProperties: false, required: ["method", "why"], properties: { method: { type: "string", enum: ["breadboard", "socket", "qwiic", "grove", "perfboard", "solder", "pcb", "mixed"], description: "브레드보드=연습, 퍼프보드·납땜=실사용, PCB/PCBA=소형화·양산" }, why: { type: "string" } } },
+    io: { type: "object", additionalProperties: false, required: ["inputs", "outputs", "wireless"], description: "STEP 1: 무엇을 감지하고 무엇을 하는지, 무선", properties: { inputs: { type: "array", items: { type: "string" } }, outputs: { type: "array", items: { type: "string" } }, wireless: { type: "string", enum: ["none", "bluetooth", "wifi", "both"] } } },
+    preBuyChecks: { type: "array", description: "STEP 3: 사기 전에 확인할 것 (정확한 모델·버전, 동작 전압, 무선 지원, 핀 헤더 납땜 여부·커넥터, USB 포트, 함께 쓸 부품 예제·라이브러리). 확인 못 했으면 unknown", items: { type: "object", additionalProperties: false, required: ["item", "status", "source"], properties: { item: { type: "string" }, status: { type: "string", enum: ["confirmed", "unknown"] }, source: { type: "string", description: "확인한 공식 문서·판매 페이지 URL, 없으면 빈 문자열" } } } },
     modules: { type: "array", minItems: 1, maxItems: 16, items: { type: "object", additionalProperties: false, required: ["function", "part", "why", "connection", "whereToBuy", "searchKeyword", "estPriceKRW", "difficulty"], properties: { function: { type: "string", description: "예: 듣기, 소리 내기, 시점 촬영" }, part: { type: "string", description: "보드에 연결하는 모듈의 구체적인 모델 (완제품 기기 아님)" }, why: { type: "string" }, connection: { type: "string", description: "어떻게 연결하는지 (소켓·Qwiic·브레드보드·납땜)" }, whereToBuy: { type: "string", description: "국내 쇼핑몰 등" }, searchKeyword: { type: "string" }, estPriceKRW: { type: ["number", "null"], description: "예상 금액(원). 모르면 null" }, difficulty: { type: "string", enum: ["쉬움", "보통", "어려움"] } } } },
     structure: { type: "array", minItems: 1, maxItems: 12, description: "하위 시스템과 연결 관계", items: { type: "object", additionalProperties: false, required: ["name", "role", "connectsTo"], properties: { name: { type: "string" }, role: { type: "string" }, connectsTo: { type: "string" } } } },
     stages: { type: "array", minItems: 1, maxItems: 10, description: "부품 하나씩 단독 동작 → 합치기 순서", items: { type: "object", additionalProperties: false, required: ["title", "goal", "learn", "practice", "doneWhen", "parts"], properties: { title: { type: "string" }, goal: { type: "string" }, learn: { type: "string" }, practice: { type: "string" }, doneWhen: { type: "string" }, parts: { type: "array", items: { type: "string" } } } } },
@@ -229,8 +279,13 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     productForm: project.productForm ?? null,
-    assembly: project.assembly ? { stage: project.assembly.stage, base: project.assembly.base, steps: project.assembly.steps.map((step, index) => ({ index, title: step.title, cards: step.cards.map((card) => ({ id: card.id, symptom: card.symptom })) })) } : null,
+    assembly: project.assembly ? { stage: project.assembly.stage, base: project.assembly.base, steps: project.assembly.steps.map((step, index) => ({ step: index + 1, title: step.title, cards: step.cards.map((card) => ({ id: card.id, symptom: card.symptom })), wireLengths: wireLengths(project, index) })) } : null,
+    liveStatus: project.liveStatus ?? null,
     assemblyReports: (project.assemblyReports ?? []).slice(-10),
+    assemblyLibraryCards: project.assembly ? project.assembly.steps.map((_, index) => ({ step: index + 1, cards: libraryCardsForStep(project, index).map((c) => ({ id: c.libId, symptom: c.symptom, expected: c.resolvedRange })) })).filter((s) => s.cards.length) : [],
+    assemblyDetails: (project.assemblyDetails ?? []).map((d) => ({ step: d.step, level: d.level, stale: d.basis !== stepBasis(project, d.step - 1), substeps: d.substeps.length })),
+    pendingRequests: (project.assemblyRequests ?? []).filter((r) => !r.doneAt),
+    blockedChecks: blockingChecks(project.build).map((c) => c.message),
     team: workflow.activeAgents,
     slots: project.slots.map(({ key, label, status, valueText, assumption, acknowledged }) => ({ key, label, status, valueText, assumption, acknowledged })),
     openTasks: project.tasks.filter((task) => task.status === "ready").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
@@ -286,8 +341,10 @@ const TeamTurnInput = z.object({
 const BuildPlanSchema = z.object({
   track: z.enum(["software", "hardware", "both"]),
   summary: z.string().min(1).max(1200),
-  board: z.object({ choice: z.enum(["arduino", "raspberry_pi", "pico", "esp32", "nuboard", "other"]), model: z.string().min(1).max(100), why: z.string().min(1).max(600), alternatives: z.string().max(600) }).strict(),
-  connection: z.object({ method: z.enum(["solder", "qwiic", "grove", "breadboard", "socket", "mixed"]), why: z.string().min(1).max(600) }).strict(),
+  board: z.object({ choice: z.enum(["arduino", "raspberry_pi", "pico", "esp32", "nu40", "nu87", "nuboard", "other"]), model: z.string().min(1).max(100), why: z.string().min(1).max(600), alternatives: z.string().max(600), catalogId: z.string().max(60).optional() }).strict(),
+  connection: z.object({ method: z.enum(["breadboard", "socket", "qwiic", "grove", "perfboard", "solder", "pcb", "mixed"]), why: z.string().min(1).max(600) }).strict(),
+  io: z.object({ inputs: z.array(z.string().max(80)).max(10), outputs: z.array(z.string().max(80)).max(10), wireless: z.enum(["none", "bluetooth", "wifi", "both"]) }).strict().optional(),
+  preBuyChecks: z.array(z.object({ item: z.string().min(1).max(120), status: z.enum(["confirmed", "unknown"]), source: z.string().max(400) }).strict()).max(12).optional(),
   modules: z.array(z.object({ function: z.string().min(1).max(60), part: z.string().min(1).max(120), why: z.string().min(1).max(400), connection: z.string().min(1).max(200), whereToBuy: z.string().min(1).max(200), searchKeyword: z.string().min(1).max(120), estPriceKRW: z.number().int().min(0).max(10_000_000).nullable(), difficulty: z.enum(["쉬움", "보통", "어려움"]) }).strict()).min(1).max(16),
   structure: z.array(z.object({ name: z.string().min(1).max(60), role: z.string().min(1).max(300), connectsTo: z.string().min(1).max(200) }).strict()).min(1).max(12),
   stages: z.array(z.object({ title: z.string().min(1).max(80), goal: z.string().min(1).max(400), learn: z.string().min(1).max(400), practice: z.string().min(1).max(400), doneWhen: z.string().min(1).max(300), parts: z.array(z.string().max(80)).max(12) }).strict()).min(1).max(10),
@@ -303,16 +360,16 @@ const ProductFormSchema = z.object({
   summary: z.string().min(1).max(800),
   answers: z.array(z.object({ question: z.string().min(1).max(200), answer: z.string().min(1).max(400) }).strict()).min(1).max(12),
   shape: z.array(z.object({ name: z.string().min(1).max(60), primitive: z.enum(["box", "sphere", "cylinder", "cone"]), size: Size3, position: z.tuple([z.number().min(-400).max(400), z.number().min(-400).max(400), z.number().min(0).max(400)]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }).strict()).min(1).max(16),
-  features: z.array(z.object({ name: z.string().min(1).max(60), kind: z.enum(["screen", "camera", "button", "speaker", "mic", "port", "light", "other"]), facing: z.enum(["front", "back", "top", "bottom", "left", "right"]), position: Vec3, size: z.tuple([z.number().min(0.5).max(300), z.number().min(0.5).max(300)]) }).strict()).max(16),
+  features: z.array(z.object({ name: z.string().min(1).max(60), kind: z.enum(["screen", "camera", "button", "speaker", "mic", "port", "light", "other"]), facing: z.enum(["front", "back", "top", "bottom", "left", "right"]), position: Vec3, size: z.tuple([z.number().min(0.5).max(300), z.number().min(0.5).max(300)]), linkedRef: z.string().max(16).optional() }).strict()).max(16),
   internals: z.array(z.object({ ref: z.string().min(1).max(16), label: z.string().min(1).max(80), size: Size3, position: Vec3 }).strict()).max(16),
   material: z.string().min(1).max(200)
 }).strict();
 
-const PIN_REF = /^[A-Za-z][A-Za-z0-9_]{0,15}\.[A-Za-z0-9_+\-/]{1,20}$/;
+const PIN_REF = /^[A-Za-z][A-Za-z0-9_]{0,15}\.[A-Za-z0-9_+\-/.()]{1,20}$/;
 const AssemblySchema = z.object({
   stage: z.string().min(1).max(120),
   base: z.object({ name: z.string().min(1).max(80), kind: z.enum(["breadboard", "board", "stack", "perfboard"]), width: z.number().min(10).max(400), height: z.number().min(10).max(400) }).strict(),
-  parts: z.array(z.object({ ref: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,15}$/), label: z.string().min(1).max(80), x: z.number().min(-50).max(450), y: z.number().min(-50).max(450), width: z.number().min(1).max(300), height: z.number().min(1).max(300), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), pins: z.array(z.object({ name: z.string().regex(/^[A-Za-z0-9_+\-/]{1,20}$/), x: z.number().min(0).max(300), y: z.number().min(0).max(300) }).strict()).max(40).optional() }).strict()).min(1).max(20),
+  parts: z.array(z.object({ ref: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,15}$/), label: z.string().min(1).max(80), x: z.number().min(-50).max(450), y: z.number().min(-50).max(450), width: z.number().min(1).max(300), height: z.number().min(1).max(300), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), catalogId: z.string().max(60).optional(), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(), pins: z.array(z.object({ name: z.string().regex(/^[A-Za-z0-9_+\-/.()]{1,20}$/), x: z.number().min(0).max(300), y: z.number().min(0).max(300) }).strict()).max(40).optional() }).strict()).min(1).max(20),
   steps: z.array(z.object({
     title: z.string().min(1).max(80), action: z.string().min(1).max(600), place: z.array(z.string()).max(8),
     wires: z.array(z.object({ from: z.string().regex(PIN_REF), to: z.string().regex(PIN_REF), color: z.string().regex(/^#[0-9a-fA-F]{6}$/), label: z.string().max(40).optional() }).strict()).max(12),
@@ -624,7 +681,7 @@ TOOLS.push(
       summary: { type: "string", description: "완성품이 어떻게 생겼고 어떻게 쓰는지 한 문단" },
       answers: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["question", "answer"], properties: { question: { type: "string" }, answer: { type: "string" } } } },
       shape: blueprintJsonSchema.properties.shape,
-      features: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "kind", "facing", "position", "size"], properties: { name: { type: "string" }, kind: { type: "string", enum: ["screen", "camera", "button", "speaker", "mic", "port", "light", "other"] }, facing: { type: "string", enum: ["front", "back", "top", "bottom", "left", "right"], description: "front=+y 방향" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "표면 위 중심 [x,y,z] mm" }, size: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" }, description: "[가로, 세로] mm" } } } },
+      features: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "kind", "facing", "position", "size"], properties: { linkedRef: { type: "string", description: "이 겉 기능과 맞닿아야 하는 내부 부품 ref (예: 충전 단자 → BAT1). 서버가 위치가 맞는지 검사한다" }, name: { type: "string" }, kind: { type: "string", enum: ["screen", "camera", "button", "speaker", "mic", "port", "light", "other"] }, facing: { type: "string", enum: ["front", "back", "top", "bottom", "left", "right"], description: "front=+y 방향" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "표면 위 중심 [x,y,z] mm" }, size: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" }, description: "[가로, 세로] mm" } } } },
       internals: { type: "array", items: { type: "object", additionalProperties: false, required: ["ref", "label", "size", "position"], properties: { ref: { type: "string" }, label: { type: "string" }, size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "실제 부품 치수 [x,y,z] mm (데이터시트 기준)" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "바닥 중심 [x,y,z]" } } } },
       material: { type: "string", description: "재질·마감·색 (예: PLA 출력 후 퍼 원단 감싸기)" }
     } } } },
@@ -637,14 +694,25 @@ TOOLS.push(
         const now = saved.updatedAt;
         p.productForm = saved;
         // An approved circuit already has CAD; refresh it to the new outer form.
-        if (p.build && w.circuitApprovedAt) p.build = approvedCad(p.build, saved.shape);
+        if (p.build && w.circuitApprovedAt) p.build = approvedCad(p.build, saved);
         const text = `완성품 미리보기를 만들었어요. ${saved.summary}\n작업대의 '완성품 미리보기'에서 돌려보고 '속 보기'로 안에 들어갈 부품 자리도 확인해주세요. 바꾸고 싶은 곳을 말해주면 다시 만들게요.`;
         p.messages.push({ id: randomUUID(), role: "assistant", agent: "id", channel: "main", text, createdAt: now, shared: true });
         w.sharedUpdates.push({ id: randomUUID(), agent: "id", text: `완성품 형태: ${saved.shape.map((part) => part.name).join(" · ")} / 겉 기능 ${saved.features.map((f) => f.name).join(" · ") || "없음"} / 내부 ${saved.internals.map((i) => i.ref).join(" · ") || "없음"}`, createdAt: now });
         p.workflow = w;
       });
       const overlap = saved.internals.filter((part) => !saved.shape.some((s) => Math.abs(part.position[0]) + part.size[0] / 2 <= Math.abs(s.position[0]) + s.size[0] / 2 + 1 && Math.abs(part.position[1]) + part.size[1] / 2 <= Math.abs(s.position[1]) + s.size[1] / 2 + 1 && part.position[2] + part.size[2] <= s.position[2] + s.size[2] + 1));
-      return stored(updated, context, `완성품 미리보기를 저장했어요.${overlap.length ? ` 확인 필요: ${overlap.map((p) => p.ref).join(", ")}이(가) 외형 밖으로 나갈 수 있어요. 외형 크기나 부품 배치를 조정하세요.` : ""} 사용자에게 대시보드에서 돌려보고 마음에 드는지 물어보세요.`);
+      // A linked feature must sit on the face of its internal part that points the same way.
+      const misaligned = saved.features.filter((f) => f.linkedRef).flatMap((f) => {
+        const part = saved.internals.find((i) => i.ref === f.linkedRef);
+        if (!part) return [`${f.name}: 내부 부품 ${f.linkedRef}가 internals에 없어요`];
+        const [px, py, pz] = part.position; const [sx, sy, sz] = part.size; const [fx, fy, fz] = f.position;
+        const face = { front: py + sy / 2, back: py - sy / 2, right: px + sx / 2, left: px - sx / 2, top: pz + sz, bottom: pz }[f.facing];
+        const along = { front: fy, back: fy, right: fx, left: fx, top: fz, bottom: fz }[f.facing];
+        const lateral = f.facing === "front" || f.facing === "back" ? [Math.abs(fx - px) <= sx / 2, fz >= pz && fz <= pz + sz] : f.facing === "left" || f.facing === "right" ? [Math.abs(fy - py) <= sy / 2, fz >= pz && fz <= pz + sz] : [Math.abs(fx - px) <= sx / 2, Math.abs(fy - py) <= sy / 2];
+        const gap = Math.abs(along - face);
+        return gap > 6 || !lateral.every(Boolean) ? [`${f.name}가 ${f.linkedRef}의 ${f.facing} 면과 맞지 않아요 (면까지 ${gap.toFixed(1)}mm${lateral.every(Boolean) ? "" : ", 옆으로 벗어남"})`] : [];
+      });
+      return stored(updated, context, `완성품 미리보기를 저장했어요.${overlap.length ? ` 확인 필요: ${overlap.map((p) => p.ref).join(", ")}이(가) 외형 밖으로 나갈 수 있어요. 외형 크기나 부품 배치를 조정하세요.` : ""}${misaligned.length ? ` 위치 불일치: ${misaligned.join(" / ")}. 부품 위치나 기능 위치를 고쳐 다시 저장하세요.` : ""} 사용자에게 대시보드에서 돌려보고 마음에 드는지 물어보세요.`);
     }
   },
   {
@@ -653,7 +721,7 @@ TOOLS.push(
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "guide"], properties: { projectId, guide: { type: "object", additionalProperties: false, required: ["stage", "base", "parts", "steps"], properties: {
       stage: { type: "string", description: "설계도의 어느 단계인지" },
       base: { type: "object", additionalProperties: false, required: ["name", "kind", "width", "height"], properties: { name: { type: "string", description: "예: 하프 브레드보드 400홀" }, kind: { type: "string", enum: ["breadboard", "board", "stack", "perfboard"] }, width: { type: "number", description: "실제 가로 mm (하프 브레드보드 약 82)" }, height: { type: "number", description: "실제 세로 mm (하프 브레드보드 약 55)" } } },
-      parts: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["ref", "label", "x", "y", "width", "height"], properties: { ref: { type: "string" }, label: { type: "string" }, x: { type: "number", description: "base 왼쪽 위 기준 부품 왼쪽 위 mm" }, y: { type: "number" }, width: { type: "number", description: "실제 부품 가로 mm (예: XIAO 21)" }, height: { type: "number", description: "실제 부품 세로 mm (예: XIAO 17.8)" }, color: { type: "string" }, pins: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "x", "y"], properties: { name: { type: "string" }, x: { type: "number", description: "부품 왼쪽 위 기준 mm" }, y: { type: "number" } } } } } } },
+      parts: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["ref", "label", "x", "y", "width", "height"], properties: { catalogId: { type: "string", description: "부품 카드 id. 넣으면 실제 부품 모양과 카드의 핀 위치를 쓴다 (pins 생략 가능)" }, rotation: { type: "integer", enum: [0, 90, 180, 270] }, ref: { type: "string", description: "회로(submit_circuit)의 부품 ref와 같게" }, label: { type: "string" }, x: { type: "number", description: "base 왼쪽 위 기준 부품 왼쪽 위 mm" }, y: { type: "number" }, width: { type: "number", description: "실제 부품 가로 mm (예: XIAO 21)" }, height: { type: "number", description: "실제 부품 세로 mm (예: XIAO 17.8)" }, color: { type: "string" }, pins: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "x", "y"], properties: { name: { type: "string" }, x: { type: "number", description: "부품 왼쪽 위 기준 mm" }, y: { type: "number" } } } } } } },
       steps: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["title", "action", "place", "wires", "check", "cards"], properties: {
         title: { type: "string" }, action: { type: "string", description: "초보자가 따라 할 동작 (방향·핀 이름까지)" }, place: { type: "array", items: { type: "string" }, description: "이 단계에서 놓는 부품 ref" },
         wires: { type: "array", items: { type: "object", additionalProperties: false, required: ["from", "to", "color"], properties: { from: { type: "string", description: "REF.PIN (parts의 pins에 있어야 함)" }, to: { type: "string" }, color: { type: "string", description: "빨강=전원 #d64545, 검정=GND #333333 등" }, label: { type: "string" } } } },
@@ -663,15 +731,30 @@ TOOLS.push(
     } } } },
     run: async (input, context) => {
       const { projectId: id, guide } = z.object({ projectId: z.string().uuid(), guide: AssemblySchema }).strict().parse(input) as { projectId: string; guide: Omit<AssemblyGuide, "updatedAt" | "steps"> & { steps: Array<Omit<AssemblyGuide["steps"][number], "cards"> & { cards: Array<Omit<AssemblyGuide["steps"][number]["cards"][number], "id">> }> } };
-      await ownedProject(id, context);
-      const refs = new Map(guide.parts.map((part) => [part.ref, new Set((part.pins ?? []).map((pin) => pin.name))]));
+      const project = await ownedProject(id, context);
+      const blocked = blockingChecks(project.build);
+      if (blocked.length) throw new ToolError(`회로에 꼭 고쳐야 할 문제가 있어 조립 가이드를 만들 수 없어요: ${blocked.map((c) => c.message).join(" / ")} 회로를 고쳐 submit_circuit으로 다시 제출하세요.`);
+      const circuitParts = project.build?.blueprint.components ?? [];
+      const circuitNets = project.build?.blueprint.nets ?? [];
+      const cardFor = (part: (typeof guide.parts)[number]) => findCard(part.catalogId ?? circuitParts.find((c) => c.ref === part.ref)?.catalogId);
       const problems: string[] = [];
-      if (refs.size !== guide.parts.length) problems.push("parts의 ref가 중복돼요");
+      if (new Set(guide.parts.map((p) => p.ref)).size !== guide.parts.length) problems.push("parts의 ref가 중복돼요");
+      const hasPin = (ref: string, pin: string) => {
+        const part = guide.parts.find((p) => p.ref === ref);
+        if (!part) return false;
+        const card = cardFor(part);
+        return card?.pins.length ? !!resolvePin(card, pin) : !!part.pins?.some((p) => p.name === pin);
+      };
+      const sameNet = (a: string, b: string) => circuitNets.some((net) => net.members.includes(a) && net.members.includes(b));
       guide.steps.forEach((step, index) => {
-        for (const ref of step.place) if (!refs.has(ref)) problems.push(`${index + 1}단계 place의 ${ref}가 parts에 없어요`);
-        for (const wire of step.wires) for (const end of [wire.from, wire.to]) {
-          const [ref, pin] = end.split(".");
-          if (!refs.get(ref)?.has(pin)) problems.push(`${index + 1}단계 전선 끝 ${end}의 핀이 parts.pins에 없어요`);
+        for (const ref of step.place) if (!guide.parts.some((p) => p.ref === ref)) problems.push(`${index + 1}단계 place의 ${ref}가 parts에 없어요`);
+        for (const wire of step.wires) {
+          for (const end of [wire.from, wire.to]) {
+            const [ref, ...rest] = end.split(".");
+            const pin = rest.join(".");
+            if (!hasPin(ref, pin)) problems.push(`${index + 1}단계 전선 끝 ${end}의 핀이 부품 카드나 parts.pins에 없어요`);
+          }
+          if (circuitNets.length && !sameNet(wire.from, wire.to)) problems.push(`${index + 1}단계 전선 ${wire.from}→${wire.to}는 회로에 없는 연결이에요`);
         }
       });
       if (problems.length) throw new ToolError(`조립 가이드를 저장하지 못했어요: ${problems.slice(0, 6).join(" / ")}`);
@@ -686,18 +769,107 @@ TOOLS.push(
         w.sharedUpdates.push({ id: randomUUID(), agent: "hw", text: `조립 가이드: ${saved.stage} · ${saved.steps.map((s) => s.title).join(" → ")}`, createdAt: now });
         p.workflow = w;
       });
-      return stored(updated, context, "조립 가이드를 저장했어요. 사용자에게 대시보드 작업대의 '조립 가이드'를 열어 1단계부터 따라 하라고 안내하세요.");
+      const fallback = guide.parts.filter((part) => cardFor(part)?.renderer.type !== "wokwi").map((part) => part.ref);
+      const library = saved.steps.map((_, index) => libraryCardsForStep({ ...project, assembly: saved }, index).length).reduce((a, b) => a + b, 0);
+      return stored(updated, context, `조립 가이드를 저장했어요. 부품 카드 기반 예상 문제 카드 ${library}개가 단계에 붙었어요.${fallback.length ? ` 실제 모양이 아직 없어 대체 표시되는 부품: ${fallback.join(", ")}.` : ""} 사용자에게 대시보드 작업대의 '조립 가이드'를 열어 1단계부터 따라 하라고 안내하세요. 더 잘게 나눠 달라고 하면 expand_assembly_step을 쓰세요.`);
     }
   },
   {
     name: "record_assembly_result", title: "조립 단계·문제 카드 결과 기록",
     description: "사용자가 채팅으로 말해준 조립 단계 완료나 문제 카드 확인 결과(측정값 등)를 기록한다. 대시보드에서 보낸 결과는 이미 assemblyReports에 있다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "step", "text"], properties: { projectId, step: { type: "integer", description: "1부터 시작하는 단계 번호" }, cardId: { type: "string", description: "예: s2-c1. 단계 완료 보고면 생략" }, text: { type: "string" } } },
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "step", "text"], properties: { projectId, step: { type: "integer", description: "1부터 시작하는 단계 번호" }, cardId: { type: "string", description: "예: s2-c1 또는 부품 카드 문제 lib:usb-5v-rail. 단계 완료 보고면 생략" }, text: { type: "string" } } },
     run: async (input, context) => {
-      const { projectId: id, step, cardId, text } = z.object({ projectId: z.string().uuid(), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^s\d+-c\d+$/).optional(), text: z.string().trim().min(1).max(1000) }).strict().parse(input);
+      const { projectId: id, step, cardId, text } = z.object({ projectId: z.string().uuid(), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^(s\d+-c\d+|lib:[a-z0-9-]+)$/).optional(), text: z.string().trim().min(1).max(1000) }).strict().parse(input);
       await ownedProject(id, context);
       const updated = await mutateProject(id, (p) => recordAssembly(p, step, cardId ?? null, text));
       return stored(updated, context, "조립 결과를 기록했어요. 측정값이 기대값과 다르면 카드의 '아니면' 안내부터 함께 확인하세요.");
+    }
+  },
+  {
+    name: "find_part_cards", title: "부품 카드 찾기",
+    description: "달그락 부품 카드(출처가 있는 사양: 전압, 로직 전압, 인터페이스, I2C 주소, 핀, 치수, 경고)를 찾는다. 회로와 조립 가이드에 부품을 넣기 전에 찾아서 catalogId를 쓴다. 카드에 없는 부품은 사양을 추정하지 말고 '확인 필요'로 다룬다. 값이 '확인 필요'인 항목은 공식 문서를 검색해 사용자에게 확인을 안내한다.",
+    inputSchema: { type: "object", additionalProperties: false, properties: { query: { type: "string", description: "모델명·별칭·종류 (예: SG90, OLED, ESP32). 비우면 전체 목록" } } },
+    annotations: { readOnlyHint: true },
+    run: async (input) => {
+      const { query } = z.object({ query: z.string().max(80).optional() }).strict().parse(input ?? {});
+      const q = (query ?? "").toLowerCase();
+      const hits = PART_CARDS.filter((card) => !q || [card.id, card.model, card.type, ...card.aliases].some((t) => t.toLowerCase().includes(q)));
+      return { text: hits.length ? hits.map((c) => `- ${c.id}: ${c.model} (${c.renderer.type === "wokwi" ? "실제 모양" : "대체 표시"})`).join("\n") : "맞는 부품 카드가 없어요. 이 부품은 사양을 추정하지 말고 catalogId 없이 넣으면 서버가 '카드에 없는 부품'으로 표시해요.", data: { cards: hits.map(cardSummary) } };
+    }
+  },
+  {
+    name: "report_progress", title: "진행 상황·생각 요약 알리기",
+    description: "여러 단계가 걸리는 작업을 시작할 때와 단계가 바뀔 때 호출해, 대시보드에 지금 하는 일(계획 체크리스트)과 생각 요약을 실시간으로 보여준다. 예: '설계도 작성 중' 계획 [보드 후보 비교(진행 중), 부품 카드 확인(대기), 예산 계산(대기)]. thinking에는 지금 무엇을 왜 고민하는지 2~3문장으로 쉽게 쓴다. 작업이 끝나면 모든 항목을 done으로 한 번 더 보낸다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "title", "plan", "thinking"], properties: { projectId, title: { type: "string" }, plan: { type: "array", maxItems: 10, items: { type: "object", additionalProperties: false, required: ["label", "status"], properties: { label: { type: "string" }, status: { type: "string", enum: ["done", "doing", "todo"] } } } }, thinking: { type: "string", description: "생각 요약 (300자 이내)" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), title: z.string().min(1).max(80), plan: z.array(z.object({ label: z.string().min(1).max(80), status: z.enum(["done", "doing", "todo"]) }).strict()).max(10), thinking: z.string().max(400) }).strict().parse(input) as { projectId: string } & Omit<LiveStatus, "updatedAt">;
+      await ownedProject(parsed.projectId, context);
+      const now = new Date().toISOString();
+      await annotateProject(parsed.projectId, (p) => {
+        p.liveStatus = { title: parsed.title, plan: parsed.plan, thinking: parsed.thinking, updatedAt: now };
+        pushActivity(p, { source: "claude", title: parsed.title, detail: parsed.plan.find((item) => item.status === "doing")?.label });
+      });
+      return { text: "대시보드에 진행 상황을 표시했어요." };
+    }
+  },
+  {
+    name: "expand_assembly_step", title: "조립 단계를 더 잘게 나누기",
+    description: "조립 가이드의 한 단계를 초보자용(beginner: 도구·확인 포함) 또는 한 동작 단위(micro)로 나눈다. 납땜·측정 경험이 없으면 beginner를 추천하고, 사용자가 원하면 micro로 한다. 기존 부품·핀·연결만 쓴다(새 부품·핀·연결이면 거절). 저항값은 회로 데이터의 값만 쓴다. 선 길이는 결과의 wireLengths(실제 치수에서 계산) 값만 쓰고, 없으면 '선 길이를 재세요' 단계를 넣는다. 반복 작업은 repeatCount로. 대시보드의 '더 잘게 보기' 요청은 pendingRequests에 있다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "step", "level", "substeps"], properties: {
+      projectId, step: { type: "integer", description: "1부터 시작하는 단계 번호" }, level: { type: "string", enum: ["normal", "beginner", "micro"] },
+      substeps: { type: "array", minItems: 1, maxItems: 30, items: { type: "object", additionalProperties: false, required: ["action", "materials", "tools", "repeatCount", "targetRefs", "targetPins", "caution", "doneWhen", "checkMethod"], properties: {
+        action: { type: "string" }, materials: { type: "array", items: { type: "string" } }, tools: { type: "array", items: { type: "string" } }, quantity: { type: ["integer", "null"] }, repeatCount: { type: "integer", minimum: 1, maximum: 20 },
+        targetRefs: { type: "array", items: { type: "string" }, description: "이 단계의 부품 ref만" }, targetPins: { type: "array", items: { type: "string" }, description: "REF.PIN, 이 단계 전선의 핀만" }, caution: { type: "string" }, doneWhen: { type: "string" }, checkMethod: { type: "string" }
+      } } }
+    } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), step: z.number().int().min(1).max(20), level: z.enum(["normal", "beginner", "micro"]), substeps: z.array(z.object({ action: z.string().min(1).max(400), materials: z.array(z.string().max(80)).max(10), tools: z.array(z.string().max(60)).max(10), quantity: z.number().int().min(1).max(100).nullable().optional(), repeatCount: z.number().int().min(1).max(20), targetRefs: z.array(z.string().max(16)).max(8), targetPins: z.array(z.string().max(40)).max(12), caution: z.string().max(300), doneWhen: z.string().min(1).max(200), checkMethod: z.string().max(300) }).strict()).min(1).max(30) }).strict().parse(input) as { projectId: string; step: number; level: AssemblyDetail["level"]; substeps: Array<Omit<AssemblySubstep, "id" | "order" | "quantity"> & { quantity?: number | null }> };
+      const project = await ownedProject(parsed.projectId, context);
+      const guide = project.assembly;
+      if (!guide || parsed.step > guide.steps.length) throw new ToolError("조립 가이드의 단계를 찾을 수 없어요.");
+      const step = guide.steps[parsed.step - 1];
+      const stepRefs = new Set([...step.place, ...step.wires.flatMap((w) => [w.from.split(".")[0], w.to.split(".")[0]])]);
+      const stepPins = new Set(step.wires.flatMap((w) => [w.from, w.to]));
+      const lengths = wireLengths(project, parsed.step - 1);
+      const resistorValues = (project.build?.blueprint.components ?? []).map((c) => parseOhms(c.valueOrModel)).filter((v): v is number => v != null);
+      const problems: string[] = [];
+      parsed.substeps.forEach((sub, i) => {
+        const at = `세부 ${i + 1}`;
+        for (const ref of sub.targetRefs) if (!stepRefs.has(ref)) problems.push(`${at}: ${ref}는 이 단계의 부품이 아니에요`);
+        for (const pin of sub.targetPins) if (!stepPins.has(pin) && !step.place.some((ref) => pin.startsWith(`${ref}.`))) problems.push(`${at}: ${pin}은 이 단계의 연결에 없는 핀이에요`);
+        const text = [sub.action, sub.caution, sub.doneWhen, sub.checkMethod, ...sub.materials].join(" ");
+        for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(k|K|M)?\s*(Ω|옴|ohm)/gi)) {
+          const value = Number(m[1]) * (m[2] === "M" ? 1e6 : m[2] ? 1000 : 1);
+          if (!resistorValues.includes(value)) problems.push(`${at}: 저항값 ${m[0]}은 회로에 없는 값이에요`);
+        }
+        for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(mm|cm)(?![a-z])/gi)) {
+          const mm = Number(m[1]) * (m[2].toLowerCase() === "cm" ? 10 : 1);
+          if (!lengths.some((l) => Math.abs(l.suggestedMm - mm) <= Math.max(5, l.suggestedMm * 0.15))) problems.push(`${at}: 길이 ${m[0]}은 계산된 선 길이가 아니에요. 길이를 지어내지 말고 '선 길이를 재세요' 단계를 넣으세요`);
+        }
+      });
+      if (problems.length) throw new ToolError(`세부 단계를 저장하지 않았어요: ${problems.slice(0, 6).join(" / ")}`);
+      // Soldering steps carry the part card's heat warnings.
+      const substeps: AssemblySubstep[] = parsed.substeps.map((sub, i) => {
+        const heat = /납땜/.test(sub.action) ? sub.targetRefs.flatMap((ref) => findCard(guide.parts.find((p) => p.ref === ref)?.catalogId ?? project.build?.blueprint.components.find((c) => c.ref === ref)?.catalogId)?.warnings.filter((w) => /열|납땜/.test(w)) ?? []) : [];
+        return { ...sub, quantity: sub.quantity ?? null, caution: [sub.caution, ...heat.filter((w) => !sub.caution.includes(w))].filter(Boolean).join(" "), id: `s${parsed.step}-d${i + 1}`, order: i + 1 };
+      });
+      const detail: AssemblyDetail = { step: parsed.step, level: parsed.level, basis: stepBasis(project, parsed.step - 1), substeps, createdAt: new Date().toISOString() };
+      const updated = await mutateProject(project.id, (p) => {
+        p.assemblyDetails = [...(p.assemblyDetails ?? []).filter((d) => d.step !== parsed.step), detail];
+        p.assemblyRequests = (p.assemblyRequests ?? []).map((r) => r.step === parsed.step && !r.doneAt ? { ...r, doneAt: detail.createdAt } : r);
+      });
+      return stored(updated, context, `${parsed.step}단계를 ${substeps.length}개 세부 단계(${parsed.level})로 나눴어요. 대시보드 조립 가이드의 '더 잘게 보기'에 표시돼요.`);
+    }
+  },
+  {
+    name: "reset_project_stage", title: "단계 되돌리기",
+    description: "사용자가 다시 만들고 싶다고 할 때 프로젝트를 앞 단계로 되돌린다. product_form: 체크리스트·설계도는 두고 완성품 형태·회로·3D·조립 가이드와 승인을 지운다. plan: 설계도까지 지운다. 지운 것은 되살릴 수 없으니 사용자가 원할 때만 쓴다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "stage"], properties: { projectId, stage: { type: "string", enum: ["product_form", "plan"] } } },
+    run: async (input, context) => {
+      const { projectId: id, stage } = z.object({ projectId: z.string().uuid(), stage: z.enum(["product_form", "plan"]) }).strict().parse(input);
+      await ownedProject(id, context);
+      const updated = await mutateProject(id, (p) => resetStage(p, stage));
+      return stored(updated, context, stage === "plan" ? "설계도부터 다시 만들 수 있게 되돌렸어요." : "완성품 형태부터 다시 만들 수 있게 되돌렸어요.");
     }
   },
   {
@@ -784,15 +956,38 @@ TOOLS.push(
   }
 );
 
+export function resetStage(p: LocalProject, stage: "product_form" | "plan") {
+  const w = workflowFor(p);
+  const now = new Date().toISOString();
+  delete p.productForm; delete p.assembly; delete p.assemblyReports; delete p.assemblyDetails; delete p.assemblyRequests; delete p.liveStatus;
+  if (stage === "plan") delete p.buildPlan;
+  p.build = null;
+  p.stage = "idea";
+  p.tasks = p.tasks.filter((task) => !["measure", "run_firmware"].includes(task.kind));
+  Object.assign(w, { phase: "brainstorm", circuitApprovedAt: null, mockupApprovedAt: null, purchases: {} });
+  const text = stage === "plan" ? "설계도부터 다시 만들기로 했어요. 체크리스트는 그대로예요. 완성품 형태 → 설계도 → 회로 순서로 다시 진행해요." : "완성품 형태부터 다시 만들기로 했어요. 체크리스트와 설계도는 그대로예요. 완성품 형태 → 회로 → 3D → 조립 가이드 순서로 다시 진행해요.";
+  p.messages.push({ id: randomUUID(), role: "assistant", agent: "chief", channel: "main", text, createdAt: now, shared: true });
+  w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text, createdAt: now });
+  p.workflow = w;
+  pushActivity(p, { source: "person", title: stage === "plan" ? "설계도부터 다시" : "완성품 형태부터 다시" });
+}
+
+export function pushActivity(p: LocalProject, entry: Omit<ActivityEntry, "id" | "at">) {
+  p.activity = [...(p.activity ?? []), { ...entry, id: randomUUID(), at: new Date().toISOString() }].slice(-40);
+}
+
 // Shared by the tool above and the dashboard's "결과 보내기".
-export function recordAssembly(p: LocalProject, step: number, cardId: string | null, text: string) {
+export function recordAssembly(p: LocalProject, step: number, cardId: string | null, text: string, reading?: { value: number | null; yes: boolean | null }) {
   const guide = p.assembly;
   if (!guide || step < 1 || step > guide.steps.length) throw new ToolError("조립 가이드의 단계를 찾을 수 없어요.");
-  const card = cardId ? guide.steps[step - 1].cards.find((item) => item.id === cardId) : null;
-  if (cardId && !card) throw new ToolError("문제 카드를 찾을 수 없어요.");
+  const library = cardId?.startsWith("lib:") ? libraryCardsForStep(p, step - 1).find((item) => item.libId === cardId) : null;
+  const card = cardId && !library ? guide.steps[step - 1].cards.find((item) => item.id === cardId) : null;
+  if (cardId && !card && !library) throw new ToolError("문제 카드를 찾을 수 없어요.");
   const now = new Date().toISOString();
-  p.assemblyReports = [...(p.assemblyReports ?? []), { step, cardId, text, createdAt: now }].slice(-50);
-  const label = card ? `[${step}단계 · ${card.symptom}] 확인 결과: ${text} (기대값: ${card.expected})` : `[${step}단계 · ${guide.steps[step - 1].title}] ${text}`;
+  const judgement = library ? judgeReading(library.resolvedRange, reading?.value ?? null, reading?.yes ?? null) : undefined;
+  const rangeText = library?.resolvedRange ? library.resolvedRange.kind === "number" ? `${library.resolvedRange.min ?? "…"}~${library.resolvedRange.max ?? "…"}${library.resolvedRange.unit}` : library.resolvedRange.kind === "boolean" ? library.resolvedRange.expect : "" : "정상 범위 확인 필요";
+  p.assemblyReports = [...(p.assemblyReports ?? []), { step, cardId, text, createdAt: now, ...(judgement ? { judgement } : {}) }].slice(-50);
+  const label = library ? `[${step}단계 · ${library.symptom}] ${library.checkMethod.split(".")[0]} → ${text} (정상: ${rangeText}${judgement ? ` · 판정: ${{ normal: "정상", abnormal: "범위 밖", unknown: "판정 불가" }[judgement]}` : ""})` : card ? `[${step}단계 · ${card.symptom}] 확인 결과: ${text} (기대값: ${card.expected})` : `[${step}단계 · ${guide.steps[step - 1].title}] ${text}`;
   p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: label, shared: true, createdAt: now });
   const w = workflowFor(p);
   w.sharedUpdates.push({ id: randomUUID(), agent: "hw", text: `사용자 관측 ${label} (검증 합격 아님)`, createdAt: now });
@@ -804,6 +999,10 @@ export async function callTool(name: string, input: unknown, context: ToolContex
   if (!tool) return { content: [{ type: "text", text: `알 수 없는 도구: ${name}` }], isError: true };
   try {
     const result = await tool.run(input ?? {}, context);
+    const projectRef = (input as { projectId?: unknown } | null)?.projectId;
+    if (typeof projectRef === "string" && !tool.annotations?.readOnlyHint && tool.name !== "report_progress") {
+      await annotateProject(projectRef, (p) => { if (p.ownerId === context.user.id) pushActivity(p, { source: "tool", title: tool.title, detail: result.text.split("\n")[0].slice(0, 160) }); }).catch(() => {});
+    }
     const text = result.data === undefined ? result.text : `${result.text}\n\n${JSON.stringify(result.data, null, 2)}`;
     return { content: [{ type: "text", text }], ...(result.data && typeof result.data === "object" ? { structuredContent: result.data as Record<string, unknown> } : {}) };
   } catch (error) {

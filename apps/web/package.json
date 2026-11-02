@@ -9,6 +9,7 @@
   "dependencies": {
     "@dalgeurak/agents": "*",
     "@dalgeurak/domain": "*",
+    "@wokwi/elements": "1.9.2",
     "next": "^16.3.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

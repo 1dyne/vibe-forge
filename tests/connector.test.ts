@@ -238,7 +238,7 @@ describe("Claude connector", () => {
     expect(outside.content[0].text).toContain("BAT1");
     const formed = await tool(token, "set_product_form", { projectId: id, form: productForm });
     expect(formed.structuredContent!.files.map((f: { kind: string }) => f.kind)).toContain("product");
-    await tool(token, "submit_circuit", { projectId: id, blueprint: { ...blueprint, components: [{ ref: "U1", type: "controller", valueOrModel: "Arduino Nano", reason: "제어", connection: "breadboard" }, { ref: "SW1", type: "switch", valueOrModel: "택트 스위치", reason: "입력", connection: "breadboard" }], nets: [{ name: "5V", kind: "power", members: ["U1.5V", "SW1.A"] }, { name: "GND", kind: "ground", members: ["U1.GND", "SW1.B"] }] }, review });
+    await tool(token, "submit_circuit", { projectId: id, blueprint: { ...blueprint, components: [{ ref: "U1", type: "controller", valueOrModel: "Arduino Nano", reason: "제어", connection: "breadboard" }, { ref: "SW1", type: "switch", valueOrModel: "택트 스위치", reason: "입력", connection: "breadboard" }], nets: [{ name: "5V", kind: "power", members: ["U1.5V", "SW1.A"] }, { name: "GND", kind: "ground", members: ["U1.GND", "SW1.B"] }, { name: "BTN", kind: "signal", members: ["U1.D2", "SW1.A"] }] }, review });
 
     const cookie = "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, user.id);
     const act = async (body: unknown) => (await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) })).json();
