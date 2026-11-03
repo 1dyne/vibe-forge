@@ -29,6 +29,7 @@ type ToolResult = { text: string; data?: unknown };
 type ToolDefinition = { name: string; title: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, boolean>; run: (input: unknown, context: ToolContext) => Promise<ToolResult> };
 
 export const SERVER_INSTRUCTIONS = [
+  "대화는 사용자의 Claude에서만 한다. 대화 원문을 달그락에 기록하지 않는다. 설계에 필요한 사실만 저장하고, 이름·연락처·회사명·고객 정보는 도구 입력에서 뺀다.",
   "달그락 대장간: 하드웨어 경험이 없는 사람도 저전력 장치를 만들 수 있게, 아이디어를 설계도로 바꾸고 하나씩 구현하도록 돕는 제작 프로젝트 도구다. 대화와 설계는 너(사용자의 Claude)가 하고, 결과는 이 도구로 달그락 대장간에 누적 기록한다. 사용자는 웹 대시보드에서 설계도·회로·3D 목업·부품목록·할 일을 보고 승인한다.",
   "처음 쓰거나 규칙이 헷갈리면 dalgeurak_guide를 먼저 호출한다. 기존 프로젝트를 이어갈 때는 get_project로 현재 단계와 다음에 할 일을 읽고 시작한다.",
   "작업 중인 프로젝트를 고정한다: Claude 프로젝트 지침이나 대화에 '달그락 프로젝트 ID'가 있으면 그 ID에만 기록한다. ID를 모르면 추측하지 말고 list_projects를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 새 프로젝트를 만들지 않는다.",
@@ -166,11 +167,11 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 기존 부품·핀·연결만 쓴다. 저항값은 회로의 값만, 선 길이는 get_project의 assembly.steps[].wireLengths 값만 쓴다. 계산된 길이가 없으면 "필요한 선 길이를 자로 재세요" 단계를 넣는다. 반복 작업은 repeatCount로 쓴다. 납땜 단계에는 서버가 부품 카드의 열 경고를 붙인다.
 
 ## 단계 (phase)
-1. brainstorm: 체크리스트 → 아이디어 구체화(질문 2개 이하씩, record_brainstorm으로 매 턴 기록) → 형태 질문과 완성품 미리보기(set_product_form) → 대장의 설계도(set_build_plan). 슬롯(power, wireless, sensing, actuation, data_sink, form, runtime, fab)은 사용자가 말한 사실만 filled, 합리적 임시값은 assumed. 핵심 동작·보유 도구·펌웨어 경험이 있어야 회로로 넘어간다.
+1. brainstorm: 체크리스트 → 아이디어 구체화(질문 2개 이하씩, 정해진 설계 사실을 record_brainstorm으로 기록) → 형태 질문과 완성품 미리보기(set_product_form) → 대장의 설계도(set_build_plan). 슬롯(power, wireless, sensing, actuation, data_sink, form, runtime, fab)은 사용자가 말한 사실만 filled, 합리적 임시값은 assumed. 핵심 동작·보유 도구·펌웨어 경험이 있어야 회로로 넘어간다.
 2. circuit: 설계도의 1단계에 해당하는 첫 목업 회로를 submit_circuit으로 제출한다. 실제 부품 목록과 배선을 components/nets에 직접 쓴다(쓰지 않으면 기본 템플릿이 쓰이고 불필요한 LED·전원 부품이 붙을 수 있다). 보드 내장 기능은 connection=builtin, 끼우는 보드는 socket. Evaluator 관점의 검토(review)를 함께 낸다. 그 다음 사람이 대시보드에서 승인한다.
 3. mockup: 사람이 회로를 승인하면 완성품 형태를 따른 3D 외형(OpenSCAD)이 만들어진다. 사용자가 확인하고 승인한다.
 4. handoff: 설계도 1단계의 조립 가이드(set_assembly_guide)를 만들고, set_team으로 팀을 정한 뒤 사람이 대시보드에서 대장간에 입장한다.
-5. workshop: 사용자는 조립 가이드를 따라 만들고 문제 카드 결과를 보낸다. 분야별 달그락 팀으로 답하고 매 턴을 log_team_turn으로 남긴다. 다음 단계 가이드도 이어서 만든다.
+5. workshop: 사용자는 조립 가이드를 따라 만들고 문제 카드 결과를 보낸다. 분야별 달그락 팀으로 답하고 설계 변경과 미검증 사항만 log_team_turn으로 남긴다. 다음 단계 가이드도 이어서 만든다.
 
 ## 회로 제약 (submit_circuit)
 - 3.3~12V 저전압만. AC 전원, 리튬 셀 직접 충전, 고전압·고전류 금지. 배터리는 보호회로가 있는 충전 모듈이나 USB 보조배터리를 쓴다.
@@ -349,8 +350,9 @@ const TeamTurnInput = z.object({
   projectId: z.string().uuid(),
   channel: z.enum(["main", ...AgentIds]),
   mode: z.enum(["work", "evaluate"]),
-  userMessage: z.string().trim().min(1).max(4000),
-  replies: z.array(z.object({ agent: z.enum(AgentIds), text: z.string().min(1).max(1800) }).strict()).min(1).max(5),
+  // Older Claude sessions may still send these. They are accepted and never stored.
+  userMessage: z.string().optional(),
+  replies: z.array(z.object({ agent: z.enum(AgentIds), text: z.string().max(1800) }).strict()).max(5).default([]),
   sharedSummary: z.string().min(1).max(1000),
   files: z.array(z.object({ agent: z.enum(["hw", "sw", "me", "id"]), filename: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/), content: z.string().min(1).max(14000) }).strict()).max(2).default([])
 }).strict();
@@ -399,7 +401,7 @@ const AssemblySchema = z.object({
 
 // Spelled out because the Next build compiles Zod with settings that can make
 // parsed properties look optional (see build-pipeline.ts).
-type TeamTurn = { projectId: string; channel: "main" | AgentId; mode: "work" | "evaluate"; userMessage: string; replies: Array<{ agent: AgentId; text: string }>; sharedSummary: string; files: Array<{ agent: Exclude<AgentId, "chief">; filename: string; content: string }> };
+type TeamTurn = { projectId: string; channel: "main" | AgentId; mode: "work" | "evaluate"; userMessage?: string; replies: Array<{ agent: AgentId; text: string }>; sharedSummary: string; files: Array<{ agent: Exclude<AgentId, "chief">; filename: string; content: string }> };
 
 export const TOOLS: ToolDefinition[] = [
   {
@@ -443,13 +445,13 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "record_brainstorm", title: "브레인스토밍 턴 기록",
-    description: "brainstorm 단계에서 한 턴의 대화를 기록한다. userMessage는 사용자의 말, plan은 이번 턴에 바뀐 슬롯·할 일과 대장 달그락의 답변이다. 바뀐 슬롯만 slotUpdates에 넣는다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "userMessage", "plan"], properties: { projectId, userMessage: { type: "string", description: "사용자가 이번 턴에 한 말 (4000자 이내)" }, plan: planJsonSchema } },
+    description: "brainstorm 단계에서 이번 턴에 정해진 설계 사실을 기록한다. 대화 원문은 보내지 않는다. plan에는 바뀐 슬롯·할 일만 넣고, 이름·연락처·회사명·고객 정보는 쓰지 않는다. 바뀐 슬롯만 slotUpdates에 넣는다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "plan"], properties: { projectId, plan: planJsonSchema } },
     run: async (input, context) => {
-      const { projectId: id, userMessage, plan } = z.object({ projectId: z.string().uuid(), userMessage: z.string().trim().min(1).max(4000), plan: PlanSchema }).strict().parse(input);
+      const { projectId: id, plan } = z.object({ projectId: z.string().uuid(), userMessage: z.string().optional(), plan: PlanSchema }).strict().parse(input);
       const project = await ownedProject(id, context);
       if (workflowFor(project).phase !== "brainstorm") throw new ToolError("브레인스토밍 단계가 끝났어요. 지금은 log_team_turn으로 기록하세요. 설계를 다시 논의하려면 사용자가 대시보드에서 '설계 다시 논의'를 눌러야 해요.");
-      const updated = await applyAgentPlan(id, userMessage, plan as AgentPlan, "live");
+      const updated = await applyAgentPlan(id, null, plan as AgentPlan, "live");
       return stored(updated!, context, "브레인스토밍 내용을 기록했어요.");
     }
   },
@@ -603,13 +605,11 @@ export const TOOLS: ToolDefinition[] = [
     }
   },
   {
-    name: "log_team_turn", title: "대장간 대화 턴 기록",
-    description: "회로 제출 이후 단계에서 한 턴의 팀 대화를 기록한다. workshop 전에는 channel을 chief로 쓴다. main이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다. evaluate 모드에서는 files를 비운다. files는 승인된 회로를 덮어쓰지 않는 작업 초안으로 저장된다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "channel", "mode", "userMessage", "replies", "sharedSummary"], properties: {
+    name: "log_team_turn", title: "대장간 설계 기록",
+    description: "회로 제출 이후 단계에서 설계 변경과 미검증 사항을 sharedSummary로 기록한다. 대화 원문은 보내지 않는다. workshop 전에는 channel을 chief로 쓴다. main이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다. evaluate 모드에서는 files를 비운다. files는 승인된 회로를 덮어쓰지 않는 작업 초안으로 저장된다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "channel", "mode", "sharedSummary"], properties: {
       projectId, channel: { type: "string", enum: ["main", ...AgentIds] }, mode: { type: "string", enum: ["work", "evaluate"], description: "기본은 work. 사용자가 '검토해줘·평가해줘·맞는지 봐줘'처럼 평가를 요청할 때만 evaluate. 보여 달라·만들어 달라·고쳐 달라는 요청은 항상 work" },
-      userMessage: { type: "string", description: "사용자가 이번 턴에 한 말" },
-      replies: { type: "array", minItems: 1, maxItems: 5, items: { type: "object", additionalProperties: false, required: ["agent", "text"], properties: { agent: { type: "string", enum: AgentIds }, text: { type: "string", description: "1800자 이내" } } } },
-      sharedSummary: { type: "string", description: "팀 공통 기록: 변경 제안 / 사용자 관측 / 해결 / 미검증을 구분 (1000자 이내)" },
+      sharedSummary: { type: "string", description: "팀 공통 기록: 변경 제안 / 사용자 관측 / 해결 / 미검증을 구분 (1000자 이내). 대화 원문, 이름, 연락처, 회사명, 고객 정보는 쓰지 않는다." },
       files: { type: "array", maxItems: 2, items: { type: "object", additionalProperties: false, required: ["agent", "filename", "content"], properties: { agent: { type: "string", enum: ["hw", "sw", "me", "id"] }, filename: { type: "string", description: "영문·숫자·._- 만 (예: button_test.scad)" }, content: { type: "string", description: "완결된 내용 (14000자 이내)" } } } }
     } },
     run: async (input, context) => {
@@ -625,15 +625,13 @@ export const TOOLS: ToolDefinition[] = [
       if (turn.files.some((file) => !speakers.includes(file.agent))) throw new ToolError("이 채널에 없는 역할의 파일입니다.");
       const updated = await mutateProject(project.id, (p) => {
         const now = new Date().toISOString();
-        p.messages.push({ id: randomUUID(), role: "user", channel, mode: turn.mode, text: turn.userMessage, createdAt: now });
-        for (const reply of turn.replies) p.messages.push({ id: randomUUID(), role: "assistant", agent: reply.agent, channel, mode: turn.mode, text: reply.text, createdAt: now, shared: true });
         p.workspaceFiles ??= [];
         for (const file of turn.files) p.workspaceFiles.push({ ...file, id: randomUUID(), createdAt: now });
         const w = workflowFor(p);
         w.sharedUpdates.push({ id: randomUUID(), agent: channel === "main" ? "chief" : channel, text: turn.sharedSummary, createdAt: now });
         p.workflow = w;
       });
-      return stored(updated, context, `대화를 기록했어요${turn.files.length ? ` (파일 ${turn.files.map((f) => f.filename).join(", ")} 저장)` : ""}.`);
+      return stored(updated, context, `설계 기록을 저장했어요${turn.files.length ? ` (파일 ${turn.files.map((f) => f.filename).join(", ")} 저장)` : ""}.`);
     }
   },
   {

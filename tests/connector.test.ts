@@ -315,3 +315,22 @@ describe("operator privacy", () => {
     expect((await listUsers()).some((item) => item.id === user.id)).toBe(true);
   });
 });
+
+describe("conversation privacy", () => {
+  it("keeps connector conversations out of the record", async () => {
+    const { user, token } = await createUser("대화 비공개", false);
+    const made = await tool(token, "create_project", { idea: "버튼 램프", plan });
+    const id = made.structuredContent!.id as string;
+    await tool(token, "record_brainstorm", { projectId: id, userMessage: "저는 홍길동이고 010-1234-5678입니다", plan: { ...plan, reply: "홍길동님 안녕하세요", slotUpdates: [], tasks: [] } });
+    await tool(token, "record_brainstorm", { projectId: id, plan: { ...plan, reply: "기록", slotUpdates: [], tasks: [] } });
+    const raw = JSON.stringify(await listProjects(user.id));
+    expect(raw).not.toContain("홍길동");
+    expect(raw).not.toContain("010-1234-5678");
+    const tools = (await rpc(token, "tools/list")).body.result.tools as Array<{ name: string; inputSchema: { required: string[]; properties: Record<string, unknown> } }>;
+    for (const name of ["record_brainstorm", "log_team_turn"]) {
+      const schema = tools.find((item) => item.name === name)!.inputSchema;
+      expect(schema.required).not.toContain("userMessage");
+      expect(schema.properties).not.toHaveProperty("userMessage");
+    }
+  });
+});

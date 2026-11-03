@@ -129,7 +129,9 @@ export function applyBuildResult(id: string, build: BuildResult): Promise<LocalP
   });
 }
 
-export function applyAgentPlan(id: string, userText: string, plan: AgentPlan, mode: LocalProject["lastAgentMode"], attachments: ImageAttachment[] = []): Promise<LocalProject | null> {
+// userText null keeps the conversation out of the record: connector users talk
+// in their own Claude, and only the design facts in the plan are stored here.
+export function applyAgentPlan(id: string, userText: string | null, plan: AgentPlan, mode: LocalProject["lastAgentMode"], attachments: ImageAttachment[] = []): Promise<LocalProject | null> {
   return serialized(async () => {
     const database = await readDatabase();
     const project = database.projects.find((item) => item.id === id);
@@ -140,7 +142,7 @@ export function applyAgentPlan(id: string, userText: string, plan: AgentPlan, mo
     project.name = plan.projectName || project.name;
     project.oneLiner = plan.oneLiner || project.oneLiner;
     project.tasks.push(...plan.tasks.map((task) => ({ ...task, id: randomUUID(), status: "ready" as const })));
-    project.messages.push(
+    if (userText !== null) project.messages.push(
       { id: randomUUID(), role: "user", text: userText, createdAt: now, channel: "main", attachments },
       { id: randomUUID(), role: "assistant", text: plan.reply, createdAt: now, agent: "chief", channel: "main" }
     );
