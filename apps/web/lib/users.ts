@@ -122,6 +122,16 @@ export function updateUser(id: string, change: { webAi?: boolean; revoke?: boole
   });
 }
 
+// Permanently forgets a participant. Their link stops working at once.
+export function deleteUser(id: string): Promise<void> {
+  return serialized(async () => {
+    const database = await readUsers();
+    const users = database.users.filter((item) => item.id !== id);
+    if (users.length === database.users.length) throw new Error("사용자를 찾을 수 없습니다.");
+    await writeUsers({ ...database, users });
+  });
+}
+
 export async function revealToken(id: string): Promise<string | null> {
   await queue;
   const user = (await readUsers()).users.find((item) => item.id === id && !item.revokedAt);

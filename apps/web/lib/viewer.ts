@@ -4,9 +4,9 @@ import { readSession } from "./session";
 import { getActiveUser, type PublicUser } from "./users";
 import type { LocalProject } from "./project-types";
 
-// Who is looking: the operator (password login) sees every project and runs
-// the in-app AI; an invited user sees only their own projects and runs the
-// in-app AI only when the operator allowed it.
+// Who is looking: the operator (password login) sees only the projects made
+// with that login, never a participant's; an invited user sees only their own.
+// The operator runs the in-app AI; an invited user runs it only when allowed.
 export type Viewer = { kind: "operator" } | { kind: "user"; user: PublicUser };
 
 export async function getViewer(request: NextRequest): Promise<Viewer | null> {
@@ -23,7 +23,7 @@ export function ownerIdOf(viewer: Viewer): string | null {
 
 export function canAccess(viewer: Viewer, project: Pick<LocalProject, "ownerId"> | null | undefined): boolean {
   if (!project) return false;
-  return viewer.kind === "operator" || project.ownerId === viewer.user.id;
+  return viewer.kind === "operator" ? !project.ownerId : project.ownerId === viewer.user.id;
 }
 
 export function canUseWebAi(viewer: Viewer): boolean {

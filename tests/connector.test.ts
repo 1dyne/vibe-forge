@@ -10,6 +10,10 @@ import { POST as messagePost } from "../apps/web/app/api/projects/[id]/messages/
 import { POST as workflowPost } from "../apps/web/app/api/projects/[id]/workflow/route";
 import { createUser, updateUser } from "../apps/web/lib/users";
 import { GET as meRoute } from "../apps/web/app/api/me/route";
+import { DELETE as deleteUserRoute } from "../apps/web/app/api/admin/users/[id]/route";
+import { GET as projectFile } from "../apps/web/app/api/projects/[id]/files/[fileId]/route";
+import { listUsers } from "../apps/web/lib/users";
+import { getProject, listProjects } from "../apps/web/lib/local-project-store";
 import { signSession } from "../apps/web/lib/session";
 import { workflowFor } from "../apps/web/lib/workflow";
 
@@ -116,7 +120,7 @@ describe("Claude connector", () => {
     const listAs = async (cookie: string) => (await (await listRoute(new NextRequest("http://localhost:3000/api/projects", { headers: { cookie } }))).json()).projects as Array<{ id: string }>;
     expect((await listAs(await cookieFor(a.user.id))).map((p) => p.id)).toContain(id);
     expect((await listAs(await cookieFor(b.user.id))).map((p) => p.id)).not.toContain(id);
-    expect((await listAs(await cookieFor())).map((p) => p.id)).toContain(id);
+    expect((await listAs(await cookieFor())).map((p) => p.id)).not.toContain(id);
 
     const post = (cookie: string, suffix: string, body: unknown) => new NextRequest(`http://localhost:3000/api/projects/${id}/${suffix}`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) });
     expect((await messagePost(post(await cookieFor(a.user.id), "messages", { text: "안녕" }), { params: Promise.resolve({ id }) })).status).toBe(403);
@@ -274,5 +278,40 @@ describe("Claude connector", () => {
     expect(reply.isError).toBeFalsy();
     await tool(token, "record_assembly_result", { projectId: id, step: 1, cardId: "s1-c1", text: "케이블 바꾸니 5.0V" });
     expect((await tool(token, "get_project", { projectId: id })).structuredContent!.assemblyReports).toHaveLength(2);
+  });
+});
+
+describe("operator privacy", () => {
+  const operatorCookie = async () => `dalgeurak_session=${await signSession(Date.now() + 60_000, SECRET)}`;
+  const operatorRequest = async (url: string, method = "GET") => new NextRequest(url, { method, headers: { cookie: await operatorCookie(), origin: "https://forge.example" } });
+
+  it("hides participant projects from the operator", async () => {
+    const { user, token } = await createUser("참여자 비공개", false);
+    const created = await tool(token, "create_project", { idea: "운영자에게 보이면 안 되는 아이디어", plan });
+    const id = created.structuredContent?.id as string;
+    expect(await getProject(id)).not.toBeNull();
+    const listed = await (await listRoute(await operatorRequest("http://localhost:3000/api/projects"))).json();
+    expect(listed.projects.some((project: { id: string }) => project.id === id)).toBe(false);
+    const file = await projectFile(await operatorRequest(`http://localhost:3000/api/projects/${id}/files/none`), { params: Promise.resolve({ id, fileId: "none" }) });
+    expect(file.status).toBe(404);
+    expect((await listProjects(user.id)).some((project) => project.id === id)).toBe(true);
+  });
+
+  it("erases a participant and everything they left", async () => {
+    const { user, token } = await createUser("삭제 대상", false);
+    const created = await tool(token, "create_project", { idea: "삭제될 아이디어", plan });
+    const id = created.structuredContent?.id as string;
+    const response = await deleteUserRoute(await operatorRequest(`http://localhost:3000/api/admin/users/${user.id}`, "DELETE"), { params: Promise.resolve({ id: user.id }) });
+    expect(await response.json()).toEqual({ removedProjects: 1 });
+    expect(await getProject(id)).toBeNull();
+    expect((await listUsers()).some((item) => item.id === user.id)).toBe(false);
+    expect((await rpc(token, "ping")).status).toBe(404);
+  });
+
+  it("refuses erasing without the operator session", async () => {
+    const { user } = await createUser("보호 대상", false);
+    const response = await deleteUserRoute(new NextRequest(`http://localhost:3000/api/admin/users/${user.id}`, { method: "DELETE", headers: { origin: "https://forge.example" } }), { params: Promise.resolve({ id: user.id }) });
+    expect(response.status).toBe(403);
+    expect((await listUsers()).some((item) => item.id === user.id)).toBe(true);
   });
 });

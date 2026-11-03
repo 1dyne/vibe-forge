@@ -31,6 +31,13 @@ export default function AdminPage() {
     const r = await fetch(`/api/admin/users/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const b = await r.json(); if (!r.ok) setError(b.error); else await load();
   }
+  async function erase(user: User) {
+    if (!confirm(`${user.name}님의 링크와 모든 프로젝트 기록을 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setError("");
+    const r = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
+    const b = await r.json();
+    if (!r.ok) setError(b.error); else await load();
+  }
   return <main className="admin-shell">
     <header><h1>참여자 관리</h1><a href="/">← 대장간으로</a></header>
     {error && <div role="alert" className="error-banner">{error}</div>}
@@ -63,7 +70,7 @@ export default function AdminPage() {
           <td className={u.revokedAt ? "revoked" : ""}>{u.name}</td>
           <td><label><input type="checkbox" checked={u.webAi} disabled={!!u.revokedAt} onChange={(e) => void patch(u.id, { webAi: e.target.checked })} /> 허용</label></td>
           <td>{new Date(u.createdAt).toLocaleDateString("ko-KR")}</td>
-          <td>{u.revokedAt ? <small>중지됨</small> : <button onClick={() => { if (confirm(`${u.name}님의 커넥터와 대시보드 링크를 중지할까요? 되돌릴 수 없어요.`)) void patch(u.id, { revoke: true }); }}>링크 중지</button>}</td>
+          <td>{u.revokedAt ? <small>중지됨</small> : <button onClick={() => { if (confirm(`${u.name}님의 커넥터와 대시보드 링크를 중지할까요? 되돌릴 수 없어요.`)) void patch(u.id, { revoke: true }); }}>링크 중지</button>} <button onClick={() => void erase(u)}>기록 삭제</button></td>
         </tr>)}
         {!users.length && <tr><td colSpan={4} className="muted">아직 초대한 참여자가 없어요.</td></tr>}
       </tbody></table>

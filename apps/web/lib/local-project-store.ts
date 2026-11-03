@@ -51,10 +51,10 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
   return next;
 }
 
-// ownerId null lists every project (operator); a user id lists only theirs.
+// ownerId null lists the operator's own projects; a user id lists only theirs.
 export async function listProjects(ownerId: string | null = null): Promise<LocalProject[]> {
   await queue;
-  return (await readDatabase()).projects.filter((project) => ownerId === null || project.ownerId === ownerId).toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return (await readDatabase()).projects.filter((project) => (ownerId === null ? !project.ownerId : project.ownerId === ownerId)).toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export async function getProject(id: string): Promise<LocalProject | null> {
@@ -177,6 +177,19 @@ export function saveMakerProfile(profile: MakerProfile, ownerId: string | null =
     else database.profile = profile;
     await writeDatabase(database);
     return profile;
+  });
+}
+
+// Permanently removes everything a participant left: projects and maker profile.
+export function deleteOwnerData(ownerId: string): Promise<number> {
+  return serialized(async () => {
+    const database = await readDatabase();
+    const kept = database.projects.filter((project) => project.ownerId !== ownerId);
+    const removed = database.projects.length - kept.length;
+    database.projects = kept;
+    if (database.profiles) delete database.profiles[ownerId];
+    await writeDatabase(database);
+    return removed;
   });
 }
 
