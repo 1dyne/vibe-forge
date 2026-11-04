@@ -34,6 +34,8 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [resetText, setResetText] = useState("");
+  const [newName, setNewName] = useState("");
   const [connections, setConnections] = useState<Connection[]>([]);
   const [recovery, setRecovery] = useState("");
   const [form, setForm] = useState({ email: "", password: "", confirm: "", current: "", next: "", recoveryPassword: "" });
@@ -69,6 +71,15 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
   const disconnect = (id: string) => void run(async () => {
     const r = await fetch("/api/me/connections", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
     if (!r.ok) throw new Error((await r.json()).error); await loadConnections();
+  });
+  const rename = (event: FormEvent) => { event.preventDefault(); void run(async () => {
+    const b = await post({ action: "rename", name: newName.trim() });
+    setMe((m) => m && { ...m, name: b.name }); setNewName(""); setNotice("별명을 바꿨어요.");
+  }); };
+  const resetRecords = () => void run(async () => {
+    const b = await post({ action: "reset_records", confirm: resetText });
+    setResetText("");
+    setNotice(`프로젝트 ${b.removedProjects}개와 제작 프로필을 지웠어요. 화면을 새로고침하면 새로 시작할 수 있어요.`);
   });
   const leave = () => void run(async () => {
     const r = await fetch("/api/me", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: confirmText }) });
@@ -124,6 +135,15 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
           {me.legacyConnectorUrl && <><small>로그인을 못 쓰는 도구용 커넥터 주소 (비밀 · 접속 기록에 남을 수 있음)</small><div className="copy-row"><code>{me.legacyConnectorUrl}</code><Copy value={me.legacyConnectorUrl} /></div></>}
           <button disabled={busy} onClick={rotate}>링크가 노출된 것 같아요 · 새 링크 만들기</button>
         </details>}
+
+        <form className="account-form" onSubmit={rename}>
+          <h3>별명 바꾸기</h3>
+          <div className="copy-row"><input aria-label="새 별명" placeholder={me.name} maxLength={30} value={newName} onChange={(e) => setNewName(e.target.value)} /><button disabled={busy || !newName.trim()}>바꾸기</button></div>
+        </form>
+
+        <h3>기록 모두 지우고 새로 시작</h3>
+        <p>모든 프로젝트(설계·회로·파일·대화 요약)와 제작 프로필이 지워지고 되돌릴 수 없어요. 계정, 로그인, Claude 커넥터 연결은 그대로 남아요. Claude 앱에 남은 대화와 Claude 프로젝트 지침은 Claude에서 직접 지워주세요.</p>
+        <div className="copy-row"><input aria-label="초기화 확인 문구" placeholder="‘초기화’라고 입력" value={resetText} onChange={(e) => setResetText(e.target.value)} /><button className="danger" disabled={busy || resetText !== "초기화"} onClick={resetRecords}>모두 지우기</button></div>
 
         <h3>내 기록 내려받기</h3>
         <p>모든 프로젝트와 제작 프로필을 JSON 파일 하나로 받아요.</p>

@@ -86,3 +86,19 @@ describe("abuse limits", () => {
     expect((await attempt()).headers.get("location")).toContain("error=slow");
   });
 });
+
+describe("starting over", () => {
+  it("renames and clears every project and the maker profile but keeps the link", async () => {
+    const { token, cookie } = await linkAccount("가짜 이름");
+    const made = await call(token, "create_project", { idea: "지우고 다시 할 아이디어", plan });
+    const id = made.body.result.structuredContent.id;
+    await call(token, "set_maker_profile", { projectId: id, coreBehavior: "가짜 정보", tools: [], toolsConfirmed: true, firmwareExperience: "none" });
+    expect((await rotate(json(`${ORIGIN}/api/me`, { action: "reset_records", confirm: "네" }, cookie))).status).toBe(400);
+    expect(await (await rotate(json(`${ORIGIN}/api/me`, { action: "reset_records", confirm: "초기화" }, cookie))).json()).toEqual({ removedProjects: 1 });
+    expect((await rotate(json(`${ORIGIN}/api/me`, { action: "rename", name: "진짜 별명" }, cookie))).status).toBe(200);
+    expect((await call(token, "list_projects", {})).body.result.structuredContent.projects).toEqual([]);
+    const fresh = await call(token, "create_project", { idea: "새 아이디어", plan });
+    expect(fresh.body.result.structuredContent.profileMissing ?? []).not.toContain("가짜 정보");
+    expect((await listUsers()).find((u) => u.id && u.name === "진짜 별명")).toBeTruthy();
+  });
+});

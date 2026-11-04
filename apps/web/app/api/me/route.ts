@@ -11,7 +11,7 @@ import { revokeUserGrants } from "../../../lib/oauth";
 import { clientIp, hit, tooMany } from "../../../lib/rate-limit";
 import { hasValidOrigin } from "../../../lib/request-security";
 import { userSessionValue } from "../../../lib/session";
-import { deleteUser, replaceToken, updateUser } from "../../../lib/users";
+import { changeAccount, deleteUser, replaceToken, updateUser } from "../../../lib/users";
 import { vaultFor } from "../../../lib/vault";
 import { getViewer, unauthorized } from "../../../lib/viewer";
 
@@ -38,7 +38,9 @@ const Action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("rotate_link") }).strict(),
   z.object({ action: z.literal("set_password"), password: z.string().max(200), email: z.string().trim().max(254).optional() }).strict(),
   z.object({ action: z.literal("change_password"), current: z.string().max(200), next: z.string().max(200) }).strict(),
-  z.object({ action: z.literal("new_recovery"), password: z.string().max(200) }).strict()
+  z.object({ action: z.literal("new_recovery"), password: z.string().max(200) }).strict(),
+  z.object({ action: z.literal("rename"), name: z.string().trim().min(1).max(30) }).strict(),
+  z.object({ action: z.literal("reset_records"), confirm: z.literal("초기화") }).strict()
 ]);
 
 export async function POST(request: NextRequest) {
@@ -77,6 +79,17 @@ export async function POST(request: NextRequest) {
     if (input.action === "change_password") {
       await changePassword({ user: viewer.user, dataKey: viewer.vault.key, current: input.current, next: input.next, keepSession: viewer.via === "session" ? viewer.sessionSecret : undefined });
       return NextResponse.json({ ok: true }, { headers: noStore });
+    }
+    if (input.action === "rename") {
+      const user = await changeAccount(viewer.user.id, (record) => { record.name = input.name; });
+      return NextResponse.json({ name: user.name }, { headers: noStore });
+    }
+    if (input.action === "reset_records") {
+      // Starts over in the same account: every project and the maker profile
+      // go; sign-in, links and connected apps stay.
+      const removedProjects = await deleteOwnerData(viewer.user.id);
+      await audit("records_reset", { userId: viewer.user.id });
+      return NextResponse.json({ removedProjects }, { headers: noStore });
     }
     return NextResponse.json({ recoveryCode: await newRecovery({ user: viewer.user, dataKey: viewer.vault.key, password: input.password }) }, { headers: noStore });
   } catch (error) {
