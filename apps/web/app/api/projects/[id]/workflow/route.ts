@@ -118,6 +118,10 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ project: updated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "요청에 실패했습니다.";
+    if (message.includes("max_tokens") || message.startsWith("MODEL_OUTPUT_INVALID")) {
+      console.error("model response incomplete", message);
+      return NextResponse.json({ error: "AI 설계 응답이 길어서 중간에 끊겼어요. 저장된 것은 없어요. 한 번 더 눌러보고, 같은 문제가 반복되면 Claude 커넥터 대화에서 “회로 제출해줘”로 진행해주세요." }, { status: 502 });
+    }
     return NextResponse.json({ error: message.includes("BUDGET") ? "설정된 API 비용 한도에 도달했습니다. 한도를 확인해주세요." : error instanceof z.ZodError ? "입력값을 확인해주세요." : message }, { status: 409 });
   }
 }

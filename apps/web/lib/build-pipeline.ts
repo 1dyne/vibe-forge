@@ -292,7 +292,10 @@ function generateCircuitMarkdown(blueprint: BuildBlueprint, checks: RuleCheck[])
 
 async function callBlueprint(project: LocalProject): Promise<BuildBlueprint> {
   const adapter = new AnthropicModelAdapter(process.env.ANTHROPIC_MODEL_SMALL ?? "");
-  const maximumUsd = 0.02;
+  // Korean blueprints with parts, nets and an enclosure ran past 1,200
+  // tokens and were cut off; 3,500 leaves room while staying under the
+  // 0.05 USD per-turn floor at the assumed 2/10 USD per million price.
+  const maximumUsd = 0.05;
   const turnLimit = Number(process.env.LLM_COST_LIMIT_PER_TURN_USD ?? 0);
   const dailyLimit = Number(process.env.LLM_COST_LIMIT_PER_DAY_USD ?? 0);
   if (turnLimit < 0.05 || dailyLimit < maximumUsd) throw new Error("LIVE_BUDGET_BLOCKED");
@@ -301,7 +304,7 @@ async function callBlueprint(project: LocalProject): Promise<BuildBlueprint> {
       role: "domain_hw",
       schemaName: "build_blueprint",
       schema: blueprintJsonSchema as unknown as Record<string, unknown>,
-      maxOutputTokens: 1200,
+      maxOutputTokens: 3500,
       effort: "low",
       instructions: [
         "달그락 대장간의 회로·기구·펌웨어 설계자다.",
@@ -339,14 +342,14 @@ function expandEvaluator(compact: EvaluatorCompact, checks: RuleCheck[], bluepri
 
 async function callEvaluator(project: LocalProject, blueprint: BuildBlueprint, checks: RuleCheck[], firmware: string): Promise<EvaluatorReport> {
   const adapter = new AnthropicModelAdapter(process.env.ANTHROPIC_MODEL_LARGE ?? "");
-  const maximumUsd = 0.03;
+  const maximumUsd = 0.07;
   const dailyLimit = Number(process.env.LLM_COST_LIMIT_PER_DAY_USD ?? 0);
   return withLocalCostReservation(maximumUsd, dailyLimit, async () => {
     const result = await adapter.call({
       role: "evaluator_hw_sw",
       schemaName: "evaluator_report",
       schema: evaluatorJsonSchema as unknown as Record<string, unknown>,
-      maxOutputTokens: 1000,
+      maxOutputTokens: 2400,
       effort: "low",
       instructions: [
         "당신은 설계자와 독립된 달그락 대장간 HW/SW Evaluator다.",
