@@ -1,7 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 
-type User = { id: string; name: string; webAi: boolean; createdAt: string; revokedAt: string | null; source?: "operator" | "signup" };
+type User = { id: string; name: string; webAi: boolean; createdAt: string; revokedAt: string | null; source?: "operator" | "signup"; auth?: "password" | "google" | "link"; email?: string; emailVerifiedAt?: string | null; lock?: "password" | "server" | "link" };
 type Invite = { id: string; label: string; maxUses: number; used: number; expiresAt: string | null; createdAt: string; disabledAt: string | null };
 type InviteState = { mode: "closed" | "invite" | "open"; joinUrl: string; invites: Invite[] };
 type Issued = { name: string; connectorUrl: string; dashboardUrl: string };
@@ -102,7 +102,7 @@ export default function AdminPage() {
       <p className="muted">참여자의 프로젝트는 각자의 링크로만 열리게 암호화돼 있어 여기서도, 서버에서도 볼 수 없어요. 링크를 잃어버린 참여자의 기록은 복구할 수 없고, 삭제만 할 수 있어요.</p>
       <table className="user-table"><thead><tr><th>이름</th><th>웹 AI</th><th>만든 날</th><th></th></tr></thead><tbody>
         {users.map((u) => <tr key={u.id}>
-          <td className={u.revokedAt ? "revoked" : ""}>{u.name}{u.source === "signup" && <small> · 직접 가입</small>}</td>
+          <td className={u.revokedAt ? "revoked" : ""}>{u.name}<br /><small>{u.email ?? "개인 링크"}{u.auth === "google" ? " · 구글" : u.auth === "password" ? " · 이메일" : ""}{u.email && !u.emailVerifiedAt ? " · 인증 대기" : ""}{u.lock === "server" ? " · 서버 보관 잠금" : u.lock === "password" ? " · 비밀번호 잠금" : ""}</small></td>
           <td><label><input type="checkbox" checked={u.webAi} disabled={!!u.revokedAt} onChange={(e) => void patch(u.id, { webAi: e.target.checked })} /> 허용</label></td>
           <td>{new Date(u.createdAt).toLocaleDateString("ko-KR")}</td>
           <td>{u.revokedAt ? <small>중지됨</small> : <button onClick={() => { if (confirm(`${u.name}님의 커넥터와 대시보드 링크를 중지할까요? 되돌릴 수 없어요.`)) void patch(u.id, { revoke: true }); }}>링크 중지</button>} <button onClick={() => void erase(u)}>기록 삭제</button></td>

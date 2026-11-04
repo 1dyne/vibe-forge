@@ -3,7 +3,6 @@ import { z } from "zod";
 import { audit } from "../../../../lib/audit";
 import { createCode, getClient } from "../../../../lib/oauth";
 import { hasValidOrigin } from "../../../../lib/request-security";
-import { vaultFor } from "../../../../lib/vault";
 import { getViewer } from "../../../../lib/viewer";
 
 const Decision = z.object({
@@ -30,7 +29,7 @@ export async function POST(request: NextRequest) {
     target.searchParams.set("error", "access_denied");
     return NextResponse.json({ redirect: target.toString() });
   }
-  const code = await createCode({ clientId: client.id, userId: viewer.user.id, redirectUri: parsed.data.redirect_uri, challenge: parsed.data.code_challenge, dataKey: vaultFor(viewer.token, viewer.user.id).key });
+  const code = await createCode({ clientId: client.id, userId: viewer.user.id, redirectUri: parsed.data.redirect_uri, challenge: parsed.data.code_challenge, dataKey: viewer.vault.key });
   await audit("app_connected", { userId: viewer.user.id, note: client.name.slice(0, 40) });
   target.searchParams.set("code", code);
   return NextResponse.json({ redirect: target.toString() }, { headers: { "cache-control": "no-store" } });

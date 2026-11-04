@@ -10,10 +10,27 @@ import { timingSafeEqualText } from "./session";
 // field: links issued before sealing kept a recoverable copy, which the
 // project store uses once to seal those records and then deletes.
 export type ConnectedClient = { name: string; version: string; lastSeenAt: string };
+// Accounts sign in one of three ways:
+// - "password": email + password. The data key is sealed under a key derived
+//   from the password (and a second copy under the recovery code), so only the
+//   person can open their records.
+// - "google": Google sign-in. With keys.server the data key is sealed under the
+//   server's VAULT_MASTER_KEY (the person agreed to this lower lock); once they
+//   set a password, keys.server is removed and Google only identifies them.
+// - "link": the older secret-link accounts (data key derived from the link).
+export type AuthKind = "password" | "google" | "link";
+export type KeyEnvelopes = { password?: { salt: string; sealed: string }; recovery?: string; server?: string };
 export type ForgeUser = {
   id: string;
   name: string;
-  tokenHash: string;
+  auth?: AuthKind;
+  email?: string;
+  emailVerifiedAt?: string | null;
+  googleSub?: string;
+  passwordHash?: string;
+  keys?: KeyEnvelopes;
+  googleConsent?: { version: string; agreedAt: string };
+  tokenHash?: string;
   tokenSealed?: string;
   clients?: ConnectedClient[];
   webAi: boolean;
@@ -24,7 +41,7 @@ export type ForgeUser = {
   consent?: Consent;
 };
 export type Consent = { termsVersion: string; privacyVersion: string; ageConfirmed: true; agreedAt: string };
-export type PublicUser = Omit<ForgeUser, "tokenHash" | "tokenSealed">;
+export type PublicUser = Omit<ForgeUser, "tokenHash" | "tokenSealed" | "passwordHash" | "keys" | "googleSub"> & { passwordSet: boolean; lock: "password" | "server" | "link" };
 
 // Sign-up codes the operator hands out. Only the code's hash is stored.
 export type Invite = { id: string; label: string; codeHash: string; maxUses: number; used: number; expiresAt: string | null; createdAt: string; disabledAt: string | null };
@@ -66,7 +83,8 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
-const toPublic = ({ tokenHash: _hash, tokenSealed: _sealed, ...user }: ForgeUser): PublicUser => user;
+export const lockOf = (user: Pick<ForgeUser, "keys" | "auth">): PublicUser["lock"] => user.keys?.password ? "password" : user.keys?.server ? "server" : "link";
+const toPublic = ({ tokenHash: _hash, tokenSealed: _sealed, passwordHash: _password, keys, googleSub: _sub, ...user }: ForgeUser): PublicUser => ({ ...user, auth: user.auth ?? "link", passwordSet: Boolean(keys?.password), lock: lockOf({ keys, auth: user.auth }) });
 const legacySealingKey = () => createHash("sha256").update(`dalgeurak-token:${process.env.SESSION_SECRET ?? ""}`).digest();
 
 function unsealLegacyToken(sealed: string | undefined): string | null {
@@ -97,8 +115,69 @@ export async function findUserByToken(token: string): Promise<PublicUser | null>
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
   await queue;
   const hash = hashToken(token);
-  const user = (await readUsers()).users.find((item) => !item.revokedAt && timingSafeEqualText(item.tokenHash, hash));
+  const user = (await readUsers()).users.find((item) => !item.revokedAt && item.tokenHash && timingSafeEqualText(item.tokenHash, hash));
   return user ? toPublic(user) : null;
+}
+
+export const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+// Full records for the sign-in code only; never send these to a browser.
+export async function accountByEmail(email: string): Promise<ForgeUser | null> {
+  await queue;
+  const wanted = normalizeEmail(email);
+  return (await readUsers()).users.find((item) => !item.revokedAt && item.email === wanted) ?? null;
+}
+export async function accountByGoogle(sub: string): Promise<ForgeUser | null> {
+  await queue;
+  return (await readUsers()).users.find((item) => !item.revokedAt && item.googleSub === sub) ?? null;
+}
+export async function accountById(id: string): Promise<ForgeUser | null> {
+  await queue;
+  return (await readUsers()).users.find((item) => item.id === id && !item.revokedAt) ?? null;
+}
+
+export function toPublicUser(user: ForgeUser): PublicUser { return toPublic(user); }
+
+// Creates an email or Google account (self sign-up rules apply).
+export function createAccount(input: { id?: string; name: string; email: string; auth: "password" | "google"; emailVerified: boolean; passwordHash?: string; keys: KeyEnvelopes; googleSub?: string; consent: Consent; googleConsent?: ForgeUser["googleConsent"]; inviteCode?: string }): Promise<PublicUser> {
+  return serialized(async () => {
+    const database = await readUsers();
+    admitSignup(database, input.inviteCode);
+    const email = normalizeEmail(input.email);
+    if (database.users.some((item) => !item.revokedAt && item.email === email)) throw new SignupError(input.auth === "google" ? "이미 이메일로 가입된 주소예요. 이메일과 비밀번호로 로그인해주세요." : "이미 가입된 이메일이에요. 로그인하거나 비밀번호 찾기를 이용해주세요.");
+    const now = new Date().toISOString();
+    const user: ForgeUser = {
+      id: input.id ?? randomUUID(), name: input.name, auth: input.auth, email, emailVerifiedAt: input.emailVerified ? now : null,
+      ...(input.googleSub ? { googleSub: input.googleSub } : {}), ...(input.passwordHash ? { passwordHash: input.passwordHash } : {}),
+      keys: input.keys, webAi: false, createdAt: now, revokedAt: null, source: "signup", consent: input.consent,
+      ...(input.googleConsent ? { googleConsent: input.googleConsent } : {})
+    };
+    database.users.push(user);
+    await writeUsers(database);
+    return toPublic(user);
+  });
+}
+
+// Generic serialized change to one account (password, keys, email, link).
+export function changeAccount(id: string, change: (user: ForgeUser) => void): Promise<PublicUser> {
+  return serialized(async () => {
+    const database = await readUsers();
+    const user = database.users.find((item) => item.id === id && !item.revokedAt);
+    if (!user) throw new Error("계정을 찾을 수 없습니다.");
+    change(user);
+    if (user.email && database.users.some((item) => item !== user && !item.revokedAt && item.email === user.email)) throw new SignupError("이미 다른 계정에서 쓰는 이메일이에요.");
+    await writeUsers(database);
+    return toPublic(user);
+  });
+}
+
+function admitSignup(database: UserDatabase, inviteCode: string | undefined) {
+  if (database.users.filter((item) => !item.revokedAt).length >= MAX_USERS()) throw new SignupError("지금은 정원이 찼어요. 운영자에게 문의해주세요.");
+  if (inviteCode === undefined) return;
+  const hash = hashToken(inviteCode.trim().toUpperCase());
+  const invite = (database.invites ?? []).find((item) => timingSafeEqualText(item.codeHash, hash));
+  if (!invite || invite.disabledAt || invite.used >= invite.maxUses || (invite.expiresAt && invite.expiresAt <= new Date().toISOString())) throw new SignupError("초대 코드가 올바르지 않거나 만료됐어요.");
+  invite.used += 1;
 }
 
 export const MAX_USERS = () => Number(process.env.SIGNUP_MAX_USERS ?? 500);
@@ -106,17 +185,9 @@ export const MAX_USERS = () => Number(process.env.SIGNUP_MAX_USERS ?? 500);
 export function createUser(name: string, webAi: boolean, extra: { source?: ForgeUser["source"]; consent?: Consent; inviteCode?: string } = {}): Promise<{ user: PublicUser; token: string }> {
   return serialized(async () => {
     const database = await readUsers();
-    if (extra.source === "signup") {
-      if (database.users.filter((item) => !item.revokedAt).length >= MAX_USERS()) throw new SignupError("지금은 정원이 찼어요. 운영자에게 문의해주세요.");
-      if (extra.inviteCode !== undefined) {
-        const hash = hashToken(extra.inviteCode.trim().toUpperCase());
-        const invite = (database.invites ?? []).find((item) => timingSafeEqualText(item.codeHash, hash));
-        if (!invite || invite.disabledAt || invite.used >= invite.maxUses || (invite.expiresAt && invite.expiresAt <= new Date().toISOString())) throw new SignupError("초대 코드가 올바르지 않거나 만료됐어요.");
-        invite.used += 1;
-      }
-    }
+    if (extra.source === "signup") admitSignup(database, extra.inviteCode);
     const token = randomBytes(24).toString("base64url");
-    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null, source: extra.source ?? "operator", ...(extra.consent ? { consent: extra.consent } : {}) };
+    const user: ForgeUser = { id: randomUUID(), name, auth: "link", tokenHash: hashToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null, source: extra.source ?? "operator", ...(extra.consent ? { consent: extra.consent } : {}) };
     database.users.push(user);
     await writeUsers(database);
     return { user: toPublic(user), token };
@@ -131,7 +202,7 @@ export function replaceToken(id: string, oldToken: string, newToken: string): Pr
   return serialized(async () => {
     const database = await readUsers();
     const user = database.users.find((item) => item.id === id && !item.revokedAt);
-    if (!user || !timingSafeEqualText(user.tokenHash, hashToken(oldToken))) throw new Error("링크를 다시 확인해주세요.");
+    if (!user?.tokenHash || !timingSafeEqualText(user.tokenHash, hashToken(oldToken))) throw new Error("링크를 다시 확인해주세요.");
     user.tokenHash = hashToken(newToken);
     delete user.tokenSealed;
     user.clients = [];
@@ -194,7 +265,7 @@ export async function takeLegacyTokens(): Promise<Array<{ id: string; token: str
   await queue;
   return (await readUsers()).users.flatMap((user) => {
     const token = unsealLegacyToken(user.tokenSealed);
-    return token && timingSafeEqualText(hashToken(token), user.tokenHash) ? [{ id: user.id, token }] : [];
+    return token && user.tokenHash && timingSafeEqualText(hashToken(token), user.tokenHash) ? [{ id: user.id, token }] : [];
   });
 }
 

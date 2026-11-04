@@ -10,7 +10,7 @@ function tokenFrom(text: string): string {
   return match?.[1] ?? "";
 }
 
-export default function Consent({ signedInAs, clientName, redirectHost, request }: { signedInAs: string | null; clientName: string; redirectHost: string; request: AuthorizeRequest }) {
+export default function Consent({ signedInAs, operator, loginUrl, clientName, redirectHost, request }: { signedInAs: string | null; operator: boolean; loginUrl: string; clientName: string; redirectHost: string; request: AuthorizeRequest }) {
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,12 +37,15 @@ export default function Consent({ signedInAs, clientName, redirectHost, request 
   }
 
   if (!signedInAs) return <div className="join-form">
-    <p>연결하려면 먼저 내 대장간에 로그인해주세요. 가입할 때 받은 <b>대시보드 링크</b>를 붙여넣으면 돼요.</p>
-    <label htmlFor="link">내 대시보드 링크</label>
-    <input id="link" value={link} autoComplete="off" onChange={(e) => setLink(e.target.value)} placeholder="https://…/u#…" />
-    {error && <p className="login-error" role="alert">{error}</p>}
-    <button disabled={busy || !link.trim()} onClick={() => void signIn()}>로그인</button>
+    <p>{operator ? "운영자 계정은 커넥터를 연결할 수 없어요. 참여자 계정으로 로그인해주세요." : "연결하려면 먼저 내 대장간에 로그인해주세요."}</p>
+    <a className="join-continue" href={loginUrl}>로그인하고 계속</a>
     <p className="login-links">아직 계정이 없나요? <a href="/join" target="_blank">가입하기</a></p>
+    <details><summary>예전 개인 링크로 가입한 계정이에요</summary>
+      <label htmlFor="link">내 대시보드 링크</label>
+      <input id="link" value={link} autoComplete="off" onChange={(e) => setLink(e.target.value)} placeholder="https://…/u#…" />
+      {error && <p className="login-error" role="alert">{error}</p>}
+      <button disabled={busy || !link.trim()} onClick={() => void signIn()}>링크로 로그인</button>
+    </details>
   </div>;
 
   return <div className="join-form">

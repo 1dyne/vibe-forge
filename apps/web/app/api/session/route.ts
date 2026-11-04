@@ -3,11 +3,15 @@ import { signSession, timingSafeEqualText } from "../../../lib/session";
 import { hasValidOrigin, publicUrl } from "../../../lib/request-security";
 import { audit } from "../../../lib/audit";
 import { clientIp, hit } from "../../../lib/rate-limit";
+import { endSession } from "../../../lib/auth-store";
+import { sessionSecretFrom } from "../../../lib/session";
 
 export async function POST(request: NextRequest) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   const form = await request.formData();
   if (form.get("intent") === "logout") {
+    const secret = sessionSecretFrom(request.cookies.get("dalgeurak_session")?.value);
+    if (secret) await endSession(secret);
     const response = NextResponse.redirect(publicUrl(request, "/login"), 303);
     response.cookies.set("dalgeurak_session", "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 0 });
     return response;

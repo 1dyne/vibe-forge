@@ -1,25 +1,39 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { readSession, userTokenFrom } from "./session";
-import { findUserByToken, type PublicUser } from "./users";
-import { vaultFor, withVault } from "./vault";
+import { openSession } from "./auth-store";
+import { readSession, sessionSecretFrom, userTokenFrom } from "./session";
+import { findUserByToken, getActiveUser, type PublicUser } from "./users";
+import { vaultFor, withVault, type Vault } from "./vault";
 import type { LocalProject } from "./project-types";
 
 // Who is looking: the operator (password login) sees only the projects made
-// with that login, never a participant's; an invited user sees only their own.
-// The operator runs the in-app AI; an invited user runs it only when allowed.
-export type Viewer = { kind: "operator" } | { kind: "user"; user: PublicUser; token: string };
+// with that login, never a participant's; a participant sees only their own.
+// A participant arrives with either their old secret link ("link") or an
+// email/Google session ("session"); both carry the key to their records.
+export type Viewer =
+  | { kind: "operator" }
+  | { kind: "user"; user: PublicUser; vault: Vault; via: "link"; token: string }
+  | { kind: "user"; user: PublicUser; vault: Vault; via: "session"; sessionSecret: string };
 
-const SESSION_COOKIE = "dalgeurak_session";
+export const SESSION_COOKIE = "dalgeurak_session";
 
-export async function getViewer(request: NextRequest): Promise<Viewer | null> {
-  const cookie = request.cookies.get(SESSION_COOKIE)?.value;
+export async function viewerFromCookie(cookie: string | undefined): Promise<Viewer | null> {
   const token = userTokenFrom(cookie);
   if (token) {
     const user = await findUserByToken(token);
-    return user ? { kind: "user", user, token } : null;
+    return user ? { kind: "user", user, vault: vaultFor(token, user.id), via: "link", token } : null;
+  }
+  const secret = sessionSecretFrom(cookie);
+  if (secret) {
+    const session = await openSession(secret);
+    const user = session ? await getActiveUser(session.userId) : null;
+    return session && user ? { kind: "user", user, vault: { ownerId: user.id, key: session.dataKey }, via: "session", sessionSecret: secret } : null;
   }
   return (await readSession(cookie, process.env.SESSION_SECRET)) ? { kind: "operator" } : null;
+}
+
+export async function getViewer(request: NextRequest): Promise<Viewer | null> {
+  return viewerFromCookie(request.cookies.get(SESSION_COOKIE)?.value);
 }
 
 // Wraps a route handler so the store can open the signed-in participant's
@@ -28,8 +42,7 @@ export async function getViewer(request: NextRequest): Promise<Viewer | null> {
 export function withViewerVault<A extends unknown[]>(handler: (request: NextRequest, ...rest: A) => Promise<Response>) {
   return async (request: NextRequest, ...rest: A): Promise<Response> => {
     const viewer = await getViewer(request);
-    const vault = viewer?.kind === "user" ? vaultFor(viewer.token, viewer.user.id) : null;
-    return withVault(vault, () => handler(request, ...rest));
+    return withVault(viewer?.kind === "user" ? viewer.vault : null, () => handler(request, ...rest));
   };
 }
 

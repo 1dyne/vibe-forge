@@ -23,6 +23,13 @@ export function userTokenFrom(cookie: string | undefined): string | null {
   return cookie?.match(USER_COOKIE)?.[1] ?? null;
 }
 
+// Email/Google sign-ins carry "s.<secret>", a server session (auth-store.ts).
+const SESSION_COOKIE = /^s\.([A-Za-z0-9_-]{40,60})$/;
+export const accountSessionValue = (secret: string) => `s.${secret}`;
+export function sessionSecretFrom(cookie: string | undefined): string | null {
+  return cookie?.match(SESSION_COOKIE)?.[1] ?? null;
+}
+
 export async function readSession(token: string | undefined, secret: string | undefined): Promise<{ operator: true } | null> {
   if (!token || !secret) return null;
   const [payload, supplied] = token.split(".");

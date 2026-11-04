@@ -14,6 +14,10 @@ export const RATE_LIMITS = {
   linkFailure: { limit: 20, windowMs: 15 * 60_000 },
   mcp: { limit: 180, windowMs: 60_000 },
   oauthRegister: { limit: 30, windowMs: 60 * 60_000 },
+  passwordIp: { limit: 30, windowMs: 15 * 60_000 },
+  passwordEmail: { limit: 8, windowMs: 15 * 60_000 },
+  mailIp: { limit: 20, windowMs: 60 * 60_000 },
+  mailEmail: { limit: 4, windowMs: 60 * 60_000 },
   account: { limit: 10, windowMs: 60 * 60_000 }
 } as const;
 
