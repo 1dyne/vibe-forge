@@ -7,7 +7,8 @@ import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile } from 
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
 import { approvedCad, blockingChecks } from "./build-pipeline";
-import { annotateProject } from "./local-project-store";
+import { QuotaError, annotateProject } from "./local-project-store";
+import { withLinkParams } from "./links";
 import { PART_CARDS, cardSummary, findCard } from "./parts/catalog";
 import { resolvePin } from "./parts/rules";
 import { judgeReading, libraryCardsForStep, parseOhms } from "./parts/trouble-cards";
@@ -323,7 +324,7 @@ function summarize(project: LocalProject, context: ToolContext) {
   };
 }
 
-const checklistUrl = (project: LocalProject, context: ToolContext) => `${context.dashboardUrl}?p=${project.id}&open=profile`;
+const checklistUrl = (project: LocalProject, context: ToolContext) => withLinkParams(context.dashboardUrl, { p: project.id, open: "profile" });
 
 const stored = (project: LocalProject, context: ToolContext, message: string): ToolResult => ({
   text: `${message}\n다음: ${PHASE_NEXT[workflowFor(project).phase]}\n대시보드: ${context.dashboardUrl}`,
@@ -1035,7 +1036,7 @@ export async function callTool(name: string, input: unknown, context: ToolContex
     return { content: [{ type: "text", text }], ...(result.data && typeof result.data === "object" ? { structuredContent: result.data as Record<string, unknown> } : {}) };
   } catch (error) {
     if (error instanceof z.ZodError) return { content: [{ type: "text", text: `입력 형식이 맞지 않아요: ${error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`).join("; ")}` }], isError: true };
-    if (error instanceof ToolError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error instanceof ToolError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
     console.error("mcp tool failed", name, error instanceof Error ? error.message : "unknown error");
     return { content: [{ type: "text", text: "도구 실행 중 오류가 났어요. 잠시 후 다시 시도해주세요." }], isError: true };
   }

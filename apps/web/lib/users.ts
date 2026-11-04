@@ -19,10 +19,18 @@ export type ForgeUser = {
   webAi: boolean;
   createdAt: string;
   revokedAt: string | null;
+  // How the account was made and what the person agreed to (self sign-up).
+  source?: "operator" | "signup";
+  consent?: Consent;
 };
+export type Consent = { termsVersion: string; privacyVersion: string; ageConfirmed: true; agreedAt: string };
 export type PublicUser = Omit<ForgeUser, "tokenHash" | "tokenSealed">;
 
-type UserDatabase = { version: 1; users: ForgeUser[] };
+// Sign-up codes the operator hands out. Only the code's hash is stored.
+export type Invite = { id: string; label: string; codeHash: string; maxUses: number; used: number; expiresAt: string | null; createdAt: string; disabledAt: string | null };
+export type PublicInvite = Omit<Invite, "codeHash">;
+
+type UserDatabase = { version: 1; users: ForgeUser[]; invites?: Invite[] };
 let queue: Promise<unknown> = Promise.resolve();
 
 function dataFile() {
@@ -93,14 +101,69 @@ export async function findUserByToken(token: string): Promise<PublicUser | null>
   return user ? toPublic(user) : null;
 }
 
-export function createUser(name: string, webAi: boolean): Promise<{ user: PublicUser; token: string }> {
+export const MAX_USERS = () => Number(process.env.SIGNUP_MAX_USERS ?? 500);
+
+export function createUser(name: string, webAi: boolean, extra: { source?: ForgeUser["source"]; consent?: Consent; inviteCode?: string } = {}): Promise<{ user: PublicUser; token: string }> {
   return serialized(async () => {
     const database = await readUsers();
+    if (extra.source === "signup") {
+      if (database.users.filter((item) => !item.revokedAt).length >= MAX_USERS()) throw new SignupError("지금은 정원이 찼어요. 운영자에게 문의해주세요.");
+      if (extra.inviteCode !== undefined) {
+        const hash = hashToken(extra.inviteCode.trim().toUpperCase());
+        const invite = (database.invites ?? []).find((item) => timingSafeEqualText(item.codeHash, hash));
+        if (!invite || invite.disabledAt || invite.used >= invite.maxUses || (invite.expiresAt && invite.expiresAt <= new Date().toISOString())) throw new SignupError("초대 코드가 올바르지 않거나 만료됐어요.");
+        invite.used += 1;
+      }
+    }
     const token = randomBytes(24).toString("base64url");
-    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null };
+    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null, source: extra.source ?? "operator", ...(extra.consent ? { consent: extra.consent } : {}) };
     database.users.push(user);
     await writeUsers(database);
     return { user: toPublic(user), token };
+  });
+}
+
+export class SignupError extends Error {}
+
+// Issues a new link for the same account. The caller re-seals the person's
+// records with the new token before calling this (see rotateParticipantLink).
+export function replaceToken(id: string, oldToken: string, newToken: string): Promise<void> {
+  return serialized(async () => {
+    const database = await readUsers();
+    const user = database.users.find((item) => item.id === id && !item.revokedAt);
+    if (!user || !timingSafeEqualText(user.tokenHash, hashToken(oldToken))) throw new Error("링크를 다시 확인해주세요.");
+    user.tokenHash = hashToken(newToken);
+    delete user.tokenSealed;
+    user.clients = [];
+    await writeUsers(database);
+  });
+}
+
+export async function listInvites(): Promise<PublicInvite[]> {
+  await queue;
+  return ((await readUsers()).invites ?? []).map(({ codeHash: _hash, ...invite }) => invite);
+}
+
+export function createInvite(label: string, maxUses: number, expiresAt: string | null): Promise<{ invite: PublicInvite; code: string }> {
+  return serialized(async () => {
+    const database = await readUsers();
+    // Short enough to read aloud at a talk, long enough not to guess (≈ 60 bits).
+    const code = randomBytes(8).toString("base64url").replace(/[-_]/g, "x").slice(0, 10).toUpperCase();
+    const invite: Invite = { id: randomUUID(), label, codeHash: hashToken(code), maxUses, used: 0, expiresAt, createdAt: new Date().toISOString(), disabledAt: null };
+    database.invites = [...(database.invites ?? []), invite];
+    await writeUsers(database);
+    const { codeHash: _hash, ...visible } = invite;
+    return { invite: visible, code };
+  });
+}
+
+export function disableInvite(id: string): Promise<void> {
+  return serialized(async () => {
+    const database = await readUsers();
+    const invite = (database.invites ?? []).find((item) => item.id === id);
+    if (!invite) throw new Error("초대 코드를 찾을 수 없습니다.");
+    invite.disabledAt ??= new Date().toISOString();
+    await writeUsers(database);
   });
 }
 

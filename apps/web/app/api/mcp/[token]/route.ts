@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SERVER_INSTRUCTIONS, TOOLS, callTool } from "../../../../lib/mcp-tools";
-import { publicUrl } from "../../../../lib/request-security";
+import { dashboardLink } from "../../../../lib/links";
 import { findUserByToken, recordClient } from "../../../../lib/users";
 import { vaultFor, withVault } from "../../../../lib/vault";
+import { clientIp, exhausted, hit } from "../../../../lib/rate-limit";
 
 // MCP Streamable HTTP endpoint, stateless with plain JSON responses. The
 // secret token in the path identifies the invited user, so the URL works as a
@@ -14,7 +15,11 @@ const rpcError = (id: RpcRequest["id"], code: number, message: string) => ({ jso
 
 export async function POST(request: NextRequest, context: { params: Promise<{ token: string }> }) {
   const { token } = await context.params;
+  const ip = clientIp(request);
+  if (exhausted("linkFailure", ip)) return NextResponse.json(rpcError(null, -32002, "요청이 너무 많아요. 잠시 후 다시 시도해주세요."), { status: 429 });
   const user = await findUserByToken(token);
+  if (!user) hit("linkFailure", ip);
+  if (user && !hit("mcp", user.id).ok) return NextResponse.json(rpcError(null, -32002, "요청이 너무 많아요. 1분 뒤 다시 시도해주세요."), { status: 429, headers: { "retry-after": "60" } });
   if (!user) return NextResponse.json(rpcError(null, -32001, "커넥터 주소가 올바르지 않거나 사용이 중지됐어요. 운영자에게 새 주소를 받아주세요."), { status: 404 });
   let message: RpcRequest;
   try {
@@ -28,7 +33,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ to
   // Notifications and responses carry no id and get no body back.
   if (message.id === undefined || message.id === null) return new Response(null, { status: 202 });
 
-  const dashboardUrl = publicUrl(request, `/u/${token}`).toString();
+  const dashboardUrl = dashboardLink(request, token);
   const reply = (result: unknown) => NextResponse.json({ jsonrpc: "2.0", id: message.id, result });
   switch (message.method) {
     case "initialize": {

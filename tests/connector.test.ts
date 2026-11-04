@@ -53,7 +53,7 @@ describe("Claude connector", () => {
     const { token } = await createUser("주최측", false);
     const init = await rpc(token, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });
     expect(init.body.result.protocolVersion).toBe("2025-06-18");
-    expect(init.body.result.instructions).toContain(`https://forge.example/u/${token}`);
+    expect(init.body.result.instructions).toContain(`https://forge.example/u#${token}`);
     const listed = await rpc(token, "tools/list");
     const names = listed.body.result.tools.map((t: { name: string }) => t.name);
     expect(names).toContain("submit_circuit");
@@ -187,7 +187,7 @@ describe("Claude connector", () => {
     const id = created.structuredContent!.id as string;
     const checklist = await tool(token, "get_checklist", { projectId: id });
     expect(checklist.content[0].text).toContain("① 해본 적 없어요");
-    expect(checklist.structuredContent!.checklistUrl).toBe(`https://forge.example/u/${token}?p=${id}&open=profile`);
+    expect(checklist.structuredContent!.checklistUrl).toBe(`https://forge.example/u?p=${id}&open=profile#${token}`);
     expect(checklist.structuredContent!.missing.recommended).toContain("납땜 경험");
 
     await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "말하면 눈을 깜빡인다", tools: [], toolsConfirmed: true, firmwareExperience: "none", solderingSkill: "none", printerAccess: "makerspace", region: "서울 마포구", budgetKRW: 150000, purpose: "personal" });

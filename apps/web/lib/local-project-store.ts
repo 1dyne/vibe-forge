@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AgentPlan, BuildResult, DesignSlot, ImageAttachment, LocalProject, MakerProfile } from "./project-types";
 import { workflowFor } from "./workflow";
 import { forgetLegacyTokens, takeLegacyTokens } from "./users";
-import { currentVault, open, seal, vaultFor, type Vault } from "./vault";
+import { currentVault, open, seal, vaultFor, withVault, type Vault } from "./vault";
 
 const labels: Array<[DesignSlot["key"], string]> = [
   ["power", "전원"],
@@ -101,8 +101,18 @@ async function readDatabase(): Promise<Database> {
   return database;
 }
 
+// Per-participant storage limits keep one account from filling the volume.
+export const limits = {
+  projectsPerUser: () => Number(process.env.LIMIT_PROJECTS_PER_USER ?? 20),
+  projectBytes: () => Number(process.env.LIMIT_PROJECT_BYTES ?? 8_000_000)
+};
+export class QuotaError extends Error {}
+
 async function writeDatabase(database: Database) {
   const { hidden, ...visible } = database;
+  for (const project of visible.projects) {
+    if (project.ownerId && Buffer.byteLength(JSON.stringify(project)) > limits.projectBytes()) throw new QuotaError("이 프로젝트의 저장 용량 한도를 넘었어요. 첨부 이미지나 오래된 파일을 줄여주세요.");
+  }
   let stored: StoredDatabase = { ...visible, projects: [...visible.projects, ...hidden.projects], profiles: { ...visible.profiles, ...hidden.profiles } };
   const vault = currentVault();
   if (vault) stored = sealOwned(stored, vault);
@@ -129,6 +139,10 @@ export async function getProject(id: string): Promise<LocalProject | null> {
 export function createProject(idea: string, plan: AgentPlan, mode: LocalProject["lastAgentMode"], attachments: ImageAttachment[] = [], owner: { ownerId?: string; origin?: LocalProject["origin"] } = {}): Promise<LocalProject> {
   return serialized(async () => {
     const database = await readDatabase();
+    if (owner.ownerId) {
+      const owned = database.projects.filter((item) => item.ownerId === owner.ownerId).length + database.hidden.projects.filter((item) => item.ownerId === owner.ownerId).length;
+      if (owned >= limits.projectsPerUser()) throw new QuotaError(`프로젝트는 한 사람당 ${limits.projectsPerUser()}개까지 만들 수 있어요. 끝난 프로젝트를 정리한 뒤 다시 시도해주세요.`);
+    }
     const now = new Date().toISOString();
     const updates = new Map(plan.slotUpdates.map((slot) => [slot.key, slot]));
     const project: LocalProject = {
@@ -273,4 +287,37 @@ export function annotateProject(id: string, operation: (project: LocalProject) =
     await writeDatabase(database);
     return structuredClone(project);
   });
+}
+
+// Re-seals everything a participant owns under a new link token. Runs inside
+// the store queue so no write can land between opening and re-sealing.
+export function rekeyOwnerData(from: Vault, to: Vault, commit: () => Promise<void>): Promise<number> {
+  return serialized(async () => {
+    if (from.ownerId !== to.ownerId) throw new Error("다른 사람의 기록은 옮길 수 없습니다.");
+    const database = await withVault(from, () => readDatabase());
+    const owned = database.projects.filter((project) => project.ownerId === from.ownerId).length;
+    if (database.hidden.projects.some((project) => project.ownerId === from.ownerId)) throw new Error("열 수 없는 기록이 있어 링크를 바꾸지 않았어요.");
+    const previous = await readStored();
+    await withVault(to, () => writeDatabase(database));
+    try {
+      await commit();
+    } catch (error) {
+      await writeStored(previous);
+      throw error;
+    }
+    return owned;
+  });
+}
+
+// Everything this participant can open, for their own download.
+export async function exportOwnerData(ownerId: string): Promise<{ projects: LocalProject[]; profile: MakerProfile | null }> {
+  await queue;
+  const database = await readDatabase();
+  return { projects: database.projects.filter((project) => project.ownerId === ownerId), profile: profileFor(database, ownerId) };
+}
+
+export async function countOwnerProjects(ownerId: string): Promise<number> {
+  await queue;
+  const stored = await readStored();
+  return stored.projects.filter((project) => project.ownerId === ownerId).length;
 }
