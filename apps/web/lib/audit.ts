@@ -7,7 +7,7 @@ export type AuditEvent =
   | "operator_login" | "operator_login_failed"
   | "user_invited" | "user_signed_up" | "user_revoked" | "user_erased_by_operator" | "user_erased_self"
   | "web_ai_changed" | "link_rotated" | "data_exported"
-  | "invite_created" | "invite_disabled";
+  | "invite_created" | "invite_disabled" | "project_deleted" | "app_connected" | "app_disconnected";
 
 function auditFile() {
   if (process.env.FORGE_TEST_AUDIT_FILE && process.env.NODE_ENV === "test") return process.env.FORGE_TEST_AUDIT_FILE;

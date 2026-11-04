@@ -5,6 +5,7 @@ import { deleteOwnerData } from "../../../../../lib/local-project-store";
 import { deleteUser, updateUser } from "../../../../../lib/users";
 import { getViewer } from "../../../../../lib/viewer";
 import { audit } from "../../../../../lib/audit";
+import { revokeUserGrants } from "../../../../../lib/oauth";
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
@@ -14,7 +15,10 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
   try {
     const { id } = await context.params;
     const user = await updateUser(id, parsed.data);
-    if (parsed.data.revoke) await audit("user_revoked", { userId: id });
+    if (parsed.data.revoke) {
+      await revokeUserGrants(id);
+      await audit("user_revoked", { userId: id });
+    }
     if (parsed.data.webAi !== undefined) await audit("web_ai_changed", { userId: id, note: String(parsed.data.webAi) });
     return NextResponse.json({ user });
   } catch (error) {
@@ -30,6 +34,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   try {
     const { id } = await context.params;
     await updateUser(id, { revoke: true });
+    await revokeUserGrants(id);
     const removedProjects = await deleteOwnerData(id);
     await deleteUser(id);
     await audit("user_erased_by_operator", { userId: id });

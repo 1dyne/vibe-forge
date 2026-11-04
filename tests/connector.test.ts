@@ -177,7 +177,8 @@ describe("Claude connector", () => {
     expect(progress.structuredContent!.openTasks.some((t: { title: string }) => t.title === "개발 중 하드웨어 확인")).toBe(true);
 
     const me = await (await meRoute(new NextRequest("http://localhost:3000/api/me", { headers: { cookie: "dalgeurak_session=" + userSessionValue(token) } }))).json();
-    expect(me.connectorUrl).toBe(`https://forge.example/api/mcp/${token}`);
+    expect(me.connectorUrl).toBe("https://forge.example/api/mcp");
+    expect(me.legacyConnectorUrl).toBe(`https://forge.example/api/mcp/${token}`);
     expect(me.clients[0].name).toBe("claude-code");
   });
 

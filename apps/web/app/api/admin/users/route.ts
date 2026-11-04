@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { hasValidOrigin } from "../../../../lib/request-security";
-import { connectorLink, dashboardLink } from "../../../../lib/links";
+import { dashboardLink, mcpResource } from "../../../../lib/links";
 import { createUser, listUsers } from "../../../../lib/users";
 import { getViewer } from "../../../../lib/viewer";
 import { audit } from "../../../../lib/audit";
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   await audit("user_invited", { userId: user.id });
   return NextResponse.json({
     user,
-    connectorUrl: connectorLink(request, token),
+    connectorUrl: mcpResource(request),
     dashboardUrl: dashboardLink(request, token)
   }, { status: 201 });
 }

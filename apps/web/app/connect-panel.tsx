@@ -54,7 +54,7 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
         <p>Claude 채팅에서 대화하고, 정리된 내용은 이 프로젝트에 쌓여요. Claude는 웹 검색으로 부품과 데이터시트를 찾고 출처를 함께 남겨요.</p>
         <ol className="connect-steps">
           <li><strong>커넥터 추가 (처음 한 번)</strong>
-            {me?.connectorUrl ? <><p>claude.ai → 설정 → 커넥터 → 커스텀 커넥터 추가에 붙여넣어요.</p><div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div></>
+            {me?.connectorUrl ? <><p>claude.ai → 설정 → 커넥터 → 커스텀 커넥터 추가에 붙여넣고 <b>연결</b>을 눌러요. 뜨는 창에서 <b>허용</b>하면 끝이에요. 이 주소는 모두 같아서 남에게 보여도 괜찮아요.</p><div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div></>
               : <p>{me?.kind === "operator" ? "운영자 계정에는 커넥터 주소가 없어요. 참여자 관리에서 본인 이름으로 링크를 만들어 쓰세요." : "커넥터 주소를 불러오지 못했어요. 운영자에게 받은 주소를 사용해주세요."}</p>}
           </li>
           <li><strong>Claude 프로젝트 만들고 지침에 붙여넣기</strong>

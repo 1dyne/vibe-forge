@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type Me = { kind: "user"; name: string; connectorUrl: string; dashboardUrl: string; createdAt: string; consent: { termsVersion: string; privacyVersion: string; agreedAt: string } | null };
+type Connection = { id: string; clientName: string; createdAt: string; lastUsedAt: string };
+type Me = { kind: "user"; name: string; connectorUrl: string; legacyConnectorUrl: string; dashboardUrl: string; createdAt: string; consent: { termsVersion: string; privacyVersion: string; agreedAt: string } | null };
 
 function Copy({ value }: { value: string }) {
   const [done, setDone] = useState(false);
@@ -16,16 +17,24 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const loadConnections = () => fetch("/api/me/connections", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((b) => b && setConnections(b.connections)).catch(() => {});
+  useEffect(() => { void loadConnections(); }, []);
+  async function disconnect(id: string) {
+    const r = await fetch("/api/me/connections", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+    if (r.ok) await loadConnections(); else setError((await r.json()).error);
+  }
   useEffect(() => { fetch("/api/me", { cache: "no-store" }).then((r) => r.json()).then((b) => b.kind === "user" ? setMe(b) : setError("운영자 계정에는 개인 링크가 없어요.")).catch(() => setError("계정 정보를 불러오지 못했어요.")); }, []);
 
   async function rotate() {
-    if (!confirm("새 링크를 만들까요? 예전 커넥터 주소와 대시보드 링크는 바로 막히고, claude.ai 커넥터 설정의 주소도 새로 바꿔야 해요.")) return;
+    if (!confirm("새 링크를 만들까요? 예전 대시보드 링크는 바로 막히고, 연결된 앱(claude.ai, Claude Code 등)도 모두 끊겨서 커넥터에서 다시 ‘연결’을 눌러 허용해야 해요.")) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const r = await fetch("/api/me", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "rotate_link" }) });
       const b = await r.json(); if (!r.ok) throw new Error(b.error);
-      setMe((current) => current && { ...current, connectorUrl: b.connectorUrl, dashboardUrl: b.dashboardUrl });
-      setNotice("새 링크를 만들었어요. 지금 저장하고, claude.ai → 설정 → 커넥터에서 달그락 대장간 주소를 새 커넥터 주소로 바꿔주세요.");
+      setMe((current) => current && { ...current, connectorUrl: b.connectorUrl, legacyConnectorUrl: b.legacyConnectorUrl, dashboardUrl: b.dashboardUrl });
+      setConnections([]);
+      setNotice("새 링크를 만들었어요. 새 대시보드 링크를 지금 저장하고, claude.ai → 설정 → 커넥터 → 달그락 대장간에서 다시 ‘연결’을 눌러 허용해주세요.");
     } catch (err) { setError(err instanceof Error ? err.message : "링크를 바꾸지 못했어요."); } finally { setBusy(false); }
   }
   async function leave() {
@@ -43,12 +52,15 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
       {error && <p className="login-error" role="alert">{error}</p>}
       {notice && <p className="notice" role="status">{notice}</p>}
       {me && <>
-        <p>아래 두 주소가 내 열쇠예요. 내 기록은 이 열쇠로만 열리게 암호화돼 있어서 운영자도 볼 수 없고, <b>잃어버리면 되찾을 수 없어요.</b></p>
+        <p>대시보드 링크가 내 열쇠예요. 내 기록은 이 열쇠로만 열리게 암호화돼 있어서 운영자도 볼 수 없고, <b>잃어버리면 되찾을 수 없어요.</b></p>
         <h3>내 링크</h3>
-        <small>Claude 커넥터 주소</small><div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div>
-        <small>대시보드 링크</small><div className="copy-row"><code>{me.dashboardUrl}</code><Copy value={me.dashboardUrl} /></div>
+        <small>대시보드 링크 (비밀)</small><div className="copy-row"><code>{me.dashboardUrl}</code><Copy value={me.dashboardUrl} /></div>
+        <small>Claude 커넥터 주소 (공개 · 추가 후 ‘연결’ → 허용)</small><div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div>
+        <details><summary>로그인(OAuth)을 못 쓰는 도구용 주소</summary><p className="danger-notice">이 주소에는 열쇠가 들어 있어 대시보드 링크만큼 비밀이에요. 접속 기록에도 남을 수 있으니, 위의 공개 주소가 안 될 때만 쓰세요.</p><div className="copy-row"><code>{me.legacyConnectorUrl}</code><Copy value={me.legacyConnectorUrl} /></div></details>
+        <h3>연결된 앱</h3>
+        {connections.length ? <ul className="connection-list">{connections.map((c) => <li key={c.id}><span><b>{c.clientName}</b> <small>· 연결 {new Date(c.createdAt).toLocaleDateString("ko-KR")} · 마지막 사용 {new Date(c.lastUsedAt).toLocaleString("ko-KR")}</small></span><button onClick={() => void disconnect(c.id)}>연결 끊기</button></li>)}</ul> : <p className="muted">아직 로그인으로 연결한 앱이 없어요.</p>}
         <h3>링크가 노출된 것 같아요</h3>
-        <p>새 링크를 만들면 예전 링크는 바로 막혀요. 기록은 새 열쇠로 다시 암호화돼 그대로 남아요.</p>
+        <p>새 링크를 만들면 예전 링크와 연결된 앱이 바로 막혀요. 기록은 새 열쇠로 다시 암호화돼 그대로 남아요.</p>
         <button disabled={busy} onClick={() => void rotate()}>새 링크 만들기</button>
         <h3>내 기록 내려받기</h3>
         <p>모든 프로젝트와 제작 프로필을 JSON 파일 하나로 받아요.</p>

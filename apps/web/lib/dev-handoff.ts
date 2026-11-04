@@ -145,8 +145,8 @@ export function devSetupSteps(profile: DevProfile, project: Pick<LocalProject, "
   steps.push({ title: "작업 폴더 만들기", detail: beginner ? "코드를 모아둘 폴더를 만들고 그 안으로 들어가요. cd는 '폴더로 이동'이라는 뜻이에요." : "작업 폴더를 만들어요.", command: "mkdir dalgeurak-sw\ncd dalgeurak-sw" });
   steps.push({ title: "명세서 넣기", detail: "작업대에서 SPEC.md, CLAUDE.md, AGENTS.md를 내려받아 방금 만든 dalgeurak-sw 폴더에 넣어요. 아직 없다면 Claude에게 'SW 명세서 만들어줘'라고 말해요." });
   if (connectorUrl) {
-    if (tool === "claude_code") steps.push({ title: "달그락 대장간 연결", detail: "Claude Code가 이 프로젝트의 회로와 결정 사항을 읽고, 진행 상황을 대시보드에 남길 수 있게 해요.", command: `claude mcp add --transport http dalgeurak ${connectorUrl}` });
-    else steps.push({ title: "달그락 대장간 연결 (선택)", detail: "~/.codex/config.toml 파일 맨 아래에 붙여넣어요. Codex 버전에 따라 원격 연결을 지원하지 않을 수 있어요. 안 되더라도 AGENTS.md만으로 작업은 진행돼요.", command: `[mcp_servers.dalgeurak]\nurl = "${connectorUrl}"` });
+    if (tool === "claude_code") steps.push({ title: "달그락 대장간 연결", detail: "Claude Code가 이 프로젝트의 회로와 결정 사항을 읽고, 진행 상황을 대시보드에 남길 수 있게 해요. 추가한 뒤 Claude Code에서 /mcp → dalgeurak → 로그인(Authenticate)을 고르면 브라우저에서 허용 창이 떠요.", command: `claude mcp add --transport http dalgeurak ${connectorUrl}` });
+    else steps.push({ title: "달그락 대장간 연결 (선택)", detail: "~/.codex/config.toml 파일 맨 아래에 붙여넣고, 터미널에서 codex mcp login dalgeurak으로 허용해요. 로그인을 지원하지 않는 버전이면 내 계정 → ‘로그인을 못 쓰는 도구용 주소’를 대신 쓰세요. 안 되더라도 AGENTS.md만으로 작업은 진행돼요.", command: `[mcp_servers.dalgeurak]\nurl = "${connectorUrl}"` });
   }
   const prompt = `SPEC.md를 읽고 내 경험 수준에 맞춰 첫 단계부터 같이 진행해줘. 달그락 대장간 프로젝트 ID는 ${project.id}야.${connectorUrl ? " 시작할 때 get_project로 최신 상태를 확인하고, 진행할 때마다 log_dev_progress로 남겨줘." : ""}`;
   steps.push({ title: `${tool === "codex" ? "Codex" : "Claude Code"} 시작`, detail: "아래 명령으로 실행한 뒤, 첫 메시지로 다음 문장을 붙여넣어요.\n" + prompt, command: tool === "codex" ? "codex" : "claude" });

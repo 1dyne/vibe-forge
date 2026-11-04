@@ -5,10 +5,11 @@ import { audit } from "../../../lib/audit";
 import { deleteOwnerData, rekeyOwnerData } from "../../../lib/local-project-store";
 import { clientIp, hit, tooMany } from "../../../lib/rate-limit";
 import { hasValidOrigin } from "../../../lib/request-security";
-import { connectorLink, dashboardLink } from "../../../lib/links";
+import { dashboardLink, legacyConnectorLink, mcpResource } from "../../../lib/links";
 import { userSessionValue } from "../../../lib/session";
 import { deleteUser, replaceToken, updateUser } from "../../../lib/users";
 import { vaultFor } from "../../../lib/vault";
+import { revokeUserGrants } from "../../../lib/oauth";
 import { getViewer, unauthorized } from "../../../lib/viewer";
 
 const noStore = { "cache-control": "private, no-store" };
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest) {
   if (viewer.kind === "operator") return NextResponse.json({ kind: "operator", connectorUrl: null, clients: [] }, { headers: noStore });
   return NextResponse.json({
     kind: "user", name: viewer.user.name,
-    connectorUrl: connectorLink(request, viewer.token),
+    connectorUrl: mcpResource(request),
+    legacyConnectorUrl: legacyConnectorLink(request, viewer.token),
     dashboardUrl: dashboardLink(request, viewer.token),
     clients: viewer.user.clients ?? [],
     createdAt: viewer.user.createdAt,
@@ -45,9 +47,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "링크를 바꾸지 못했어요." }, { status: 409 });
   }
+  // Connected apps hold the old data key; they reconnect with the new link.
+  await revokeUserGrants(viewer.user.id);
   await audit("link_rotated", { userId: viewer.user.id });
   const response = NextResponse.json({
-    connectorUrl: connectorLink(request, token),
+    connectorUrl: mcpResource(request),
+    legacyConnectorUrl: legacyConnectorLink(request, token),
     dashboardUrl: dashboardLink(request, token)
   }, { headers: noStore });
   response.cookies.set("dalgeurak_session", userSessionValue(token), { ...cookieOptions, maxAge: 60 * 60 * 24 * 30 });
@@ -64,6 +69,7 @@ export async function DELETE(request: NextRequest) {
   const parsed = z.object({ confirm: z.literal("탈퇴") }).strict().safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "확인 문구로 ‘탈퇴’를 입력해주세요." }, { status: 400 });
   await updateUser(viewer.user.id, { revoke: true });
+  await revokeUserGrants(viewer.user.id);
   const removedProjects = await deleteOwnerData(viewer.user.id);
   await deleteUser(viewer.user.id);
   await audit("user_erased_self", { userId: viewer.user.id });

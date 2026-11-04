@@ -6,12 +6,13 @@ import { workbenchItems } from "../lib/workbench";
 import WorkbenchPanel from "./workbench-panel";
 import ConnectPanel from "./connect-panel";
 import AccountPanel from "./account-panel";
+import DeleteProjectDialog from "./delete-project-dialog";
 import ProgressPanel from "./progress-panel";
 import { CHECKLIST } from "../lib/checklist";
 import { ResizeHandle, useWorkspaceLayout, layoutLimits } from "./workspace-layout";
 import { useWorkspacePreferences } from "./workspace-preferences";
 
-type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean };
+type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean; projectLimit?: number };
 const phaseNames = {brainstorm:"아이디어",circuit:"계획 · 회로",mockup:"계획 · 3D",handoff:"계획 · 작업 준비",workshop:"대장간"};
 function Avatar({ agent="chief", busy=false, large=false }: {agent?:AgentId;busy?:boolean;large?:boolean}) {
   return <span className={["avatar",large?"large":"","avatar-"+agent].join(" ")}><img src="/characters/idle.png" alt={AGENTS[agent].name+" 캐릭터"} className={busy?"hidden":""}/>{busy&&<><img className="thinking first" src="/characters/thinking_1.png" alt="생각하는 달그락"/><img className="thinking second" src="/characters/thinking_2.png" alt=""/></>}<b>{agent==="chief"?"대장":agent.toUpperCase()}</b></span>;
@@ -33,6 +34,7 @@ export default function ProjectWorkspace() {
   const [connectTab,setConnectTab]=useState<"claude"|"dev"|null>(null);
   const [makerHelp,setMakerHelp]=useState(false);
   const [showAccount,setShowAccount]=useState(false);
+  const [deleting,setDeleting]=useState<LocalProject|null>(null);
   const {preferences,setWorkbench,expand,toggleProjects,toggleFolder}=useWorkspacePreferences();
   const end=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
@@ -83,11 +85,11 @@ export default function ProjectWorkspace() {
     <aside className="sidebar" id="project-sidebar" aria-label="프로젝트 탐색">
       <button className="brand" onClick={()=>switchProject(null)} disabled={!!busy} aria-label="달그락 대장간 · 새로운 아이디어로 이동"><img src="/characters/idle.png" alt=""/><span>달그락 대장간<small>생각을 손에 잡히게.</small></span></button>
       <button className="new-project" onClick={()=>switchProject(null)} disabled={!!busy}>＋ 새로운 아이디어</button>
-      <button className="nav-caption projects-toggle" aria-expanded={preferences.projectsOpen} aria-controls="project-folders" onClick={toggleProjects}><span>{preferences.projectsOpen?"⌄":"›"} 프로젝트</span><span>{projects.length}</span></button>
+      <button className="nav-caption projects-toggle" aria-expanded={preferences.projectsOpen} aria-controls="project-folders" onClick={toggleProjects}><span>{preferences.projectsOpen?"⌄":"›"} 프로젝트</span><span>{projects.length}{viewer.kind==="user"&&viewer.projectLimit?`/${viewer.projectLimit}`:""}</span></button>
       {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" aria-label="프로젝트 목록">{projects.map(p=>{
         const w=workflowFor(p);const expanded=preferences.expanded.includes(p.id);const active=p.id===selectedId;
         return <section className={"project-folder "+(active?"active-folder":"")} key={p.id}>
-          <div className="folder-heading"><button className="folder-toggle" aria-label={p.name+" 작업실 "+(expanded?"접기":"펼치기")} aria-expanded={expanded} aria-controls={"rooms-"+p.id} onClick={()=>toggleFolder(p.id)}>{expanded?"⌄":"›"}</button><button className="folder-name" aria-current={active?"page":undefined} disabled={!!busy} title={p.name} onClick={()=>switchProject(p.id)}><span aria-hidden="true">▱</span><span>{p.name}<small>{phaseNames[w.phase]}</small></span></button></div>
+          <div className="folder-heading"><button className="folder-toggle" aria-label={p.name+" 작업실 "+(expanded?"접기":"펼치기")} aria-expanded={expanded} aria-controls={"rooms-"+p.id} onClick={()=>toggleFolder(p.id)}>{expanded?"⌄":"›"}</button><button className="folder-name" aria-current={active?"page":undefined} disabled={!!busy} title={p.name} onClick={()=>switchProject(p.id)}><span aria-hidden="true">▱</span><span>{p.name}<small>{phaseNames[w.phase]}</small></span></button><button className="folder-delete" aria-label={p.name+" 삭제"} title="프로젝트 삭제" disabled={!!busy} onClick={()=>setDeleting(p)}>🗑</button></div>
           {expanded&&<nav className="rooms project-rooms" id={"rooms-"+p.id} aria-label={p.name+" 작업실"}><button disabled={!!busy} className={active&&channel==="main"?"selected":""} aria-current={active&&channel==="main"?"page":undefined} onClick={()=>switchProject(p.id,"main")}>⌂ {w.phase==="workshop"?"메인 대장간":"대장과 아이디어 나누기"}</button>{w.phase==="workshop"&&Array.from(new Set<AgentId>(["chief",...w.activeAgents])).map(a=><button key={a} disabled={!!busy} className={active&&channel===a?"selected":""} aria-current={active&&channel===a?"page":undefined} onClick={()=>switchProject(p.id,a)}><span className={"agent-dot dot-"+a}/>{AGENTS[a].name}<small>작업실</small></button>)}</nav>}
         </section>;
       })}{!projects.length&&!loading&&<p className="muted empty-projects">첫 아이디어를 이야기하면 프로젝트 폴더가 생겨요.</p>}</nav>}
@@ -128,6 +130,7 @@ export default function ProjectWorkspace() {
       <h3>이렇게 찾아보세요</h3><ul className="maker-tips"><li><b>메이크올(makeall.com)</b>에서 지역으로 메이커스페이스와 보유 장비를 검색해요.</li><li>검색어: “[내 지역] 메이커스페이스 3D 프린터 예약”, “[내 지역] 팹랩”, “[내 지역] 무한상상실”.</li><li>공간 소개에서 보유 프린터를 확인해요. 흔한 예: 뱀부랩(Bambu Lab), 큐비콘(Cubicon), 신도리코(Sindoh), 크리얼리티(Creality), 프루사(Prusa). 같은 이름으로 “[프린터 이름] 사용법”을 검색하면 출력 준비에 도움이 돼요.</li><li>이용 조건(기본 교육 이수, 예약 방법, 재료비)과 운영 시간은 방문 전에 공식 페이지에서 꼭 확인하세요.</li></ul>
       <button className="primary" onClick={()=>setMakerHelp(false)}>확인</button></section></div>}
     {showAccount&&<AccountPanel onClose={()=>setShowAccount(false)}/>}
+    {deleting&&<DeleteProjectDialog project={deleting} used={projects.length} limit={viewer.kind==="user"?viewer.projectLimit??null:null} onClose={()=>setDeleting(null)} onDeleted={id=>{setDeleting(null);setProjects(ps=>ps.filter(x=>x.id!==id));if(selectedId===id)switchProject(null);}}/>}
     {connectTab&&project&&<ConnectPanel key={project.id} project={project} tab={connectTab} busy={!!busy} onTab={setConnectTab} onClose={()=>setConnectTab(null)} onAction={action}/>}
     {showProfile&&<div className="modal-backdrop" onClick={()=>setShowProfile(false)}><section className="profile-modal" role="dialog" aria-modal="true" aria-label="제작 프로필" onClick={e=>e.stopPropagation()}><header><h2>함께 만들기 전에</h2><button aria-label="프로필 닫기" onClick={()=>setShowProfile(false)}>×</button></header><p>목표를 작게 만들기 위한 질문이 아니에요.<br/>설명과 확인 방법을 나에게 맞추기 위한 준비예요.</p><label>핵심 동작<textarea aria-label="핵심 동작" placeholder="무엇을 감지하고, 어떻게 반응하면 좋을까요?" value={profile.coreBehavior} onChange={e=>setProfile({...profile,coreBehavior:e.target.value})}/></label><fieldset><legend>사용할 수 있는 제작 도구</legend><div className="tool-checks">{TOOL_OPTIONS.map(t=><label key={t}><input type="checkbox" checked={profile.tools.includes(t)} onChange={e=>setProfile({...profile,toolsConfirmed:true,tools:e.target.checked?[...profile.tools,t]:profile.tools.filter(x=>x!==t)})}/>{t}</label>)}</div><label className="none-check"><input type="checkbox" checked={profile.toolsConfirmed&&!profile.tools.length} onChange={e=>setProfile({...profile,tools:[],toolsConfirmed:e.target.checked})}/>아직 보유한 도구가 없어요</label></fieldset><fieldset><legend>펌웨어 설치·업로드 경험</legend>{([["none","처음이에요 · 단계마다 안내가 필요해요"],["guided","안내를 보면서 해본 적 있어요"],["independent","보드 설정과 업로드를 직접 할 수 있어요"]] as const).map(([v,label])=><label className="radio-option" key={v}><input type="radio" name="experience" value={v} checked={profile.firmwareExperience===v} onChange={()=>setProfile({...profile,firmwareExperience:v})}/>{label}</label>)}</fieldset>{CHECKLIST.filter(q=>q.key==="solderingSkill"||q.key==="printerAccess"||q.key==="travelRange"||q.key==="purpose").map(q=><fieldset key={q.key}><legend>{q.question}</legend>{q.options!.map(o=><label className="radio-option" key={o.value}><input type="radio" name={q.key} checked={profile[q.key]===o.value} onChange={()=>setProfile({...profile,[q.key]:o.value})}/>{o.label}</label>)}</fieldset>)}
       {profile.purpose==="sell"&&<label>목표 판매가 (원)<input className="profile-input" type="number" min={0} step={1000} value={profile.targetPriceKRW??""} onChange={e=>setProfile({...profile,targetPriceKRW:e.target.value===""?null:Number(e.target.value)})}/></label>}

@@ -36,11 +36,11 @@ export default function JoinForm({ needsCode }: { needsCode: boolean }) {
   }
 
   if (issued) return <div className="join-issued">
-    <p><strong>{issued.name}</strong>님, 환영해요! 아래 두 주소가 <b>비밀번호이자 열쇠</b>예요.</p>
-    <p className="login-error" role="note">지금 꼭 저장해두세요. 내 기록은 이 주소로만 열리게 암호화돼 있어서, <b>잃어버리면 운영자도 되찾아 줄 수 없어요.</b> 다른 사람에게 보여주지 마세요.</p>
-    <CopyRow label="① Claude 커넥터 주소 — claude.ai 설정 → 커넥터 → 커스텀 커넥터 추가" value={issued.connectorUrl} />
-    <CopyRow label="② 내 대시보드 링크 — 북마크해두면 다음부터 바로 들어와요" value={issued.dashboardUrl} />
-    <label className="remember-session"><input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />두 주소를 안전한 곳(비밀번호 관리자, 나에게 보낸 메모 등)에 저장했어요</label>
+    <p><strong>{issued.name}</strong>님, 환영해요! 아래 <b>대시보드 링크가 비밀번호이자 열쇠</b>예요.</p>
+    <p className="login-error" role="note">지금 꼭 저장해두세요. 내 기록은 이 링크로만 열리게 암호화돼 있어서, <b>잃어버리면 운영자도 되찾아 줄 수 없어요.</b> 다른 사람에게 보여주지 마세요.</p>
+    <CopyRow label="① 내 대시보드 링크 (비밀) — 북마크하거나 비밀번호 관리자에 저장해요" value={issued.dashboardUrl} />
+    <CopyRow label="② Claude 커넥터 주소 (공개) — claude.ai 설정 → 커넥터 → 커스텀 커넥터 추가 → 연결을 누르면 허용 창이 떠요" value={issued.connectorUrl} />
+    <label className="remember-session"><input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />대시보드 링크를 안전한 곳(비밀번호 관리자, 나에게 보낸 메모 등)에 저장했어요</label>
     <a className={`join-continue${saved ? "" : " disabled"}`} aria-disabled={!saved} href={saved ? "/" : undefined}>내 대장간으로 들어가기</a>
   </div>;
 

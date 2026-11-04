@@ -34,7 +34,7 @@ beforeEach(() => resetRateLimits());
 const json = (url: string, body: unknown, cookie?: string, method = "POST") => new NextRequest(url, { method, headers: { "content-type": "application/json", origin: ORIGIN, ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body) });
 const consent = { agreeTerms: true, agreePrivacy: true, age14: true };
 const cookieFrom = (response: Response) => response.headers.get("set-cookie")!.split(";")[0];
-const tokenFrom = (connectorUrl: string) => connectorUrl.split("/api/mcp/")[1];
+const tokenFrom = (dashboardUrl: string) => dashboardUrl.split("#")[1];
 async function call(token: string, name: string, args: Record<string, unknown>) {
   const response = await mcpPost(new NextRequest(`http://localhost/api/mcp/${token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) }), { params: Promise.resolve({ token }) });
   return { status: response.status, body: await response.json() };
@@ -63,13 +63,13 @@ describe("sign-up", () => {
     expect(ok.status).toBe(201);
     const issued = await ok.json();
     expect(issued.dashboardUrl).toMatch(/^https:\/\/forge\.example\/u#[A-Za-z0-9_-]{32}$/);
-    expect(cookieFrom(ok)).toBe(`dalgeurak_session=u.${tokenFrom(issued.connectorUrl)}`);
+    expect(cookieFrom(ok)).toBe(`dalgeurak_session=u.${tokenFrom(issued.dashboardUrl)}`);
     expect((await join(json(`${ORIGIN}/api/join`, { name: "두번째", inviteCode: made.code, ...consent }))).status).toBe(403);
     const user = (await listUsers()).find((item) => item.name === "강연 참여자")!;
     expect(user).toMatchObject({ source: "signup", webAi: false, consent: { ageConfirmed: true } });
     const auditLog = await readFile(path.join(folder, "audit.jsonl"), "utf8");
     expect(auditLog).toContain("user_signed_up");
-    expect(auditLog).not.toContain(tokenFrom(issued.connectorUrl));
+    expect(auditLog).not.toContain(tokenFrom(issued.dashboardUrl));
   });
 });
 
@@ -77,12 +77,12 @@ describe("participant self-service", () => {
   it("rotates the link, keeps records readable and stops the old link", async () => {
     vi.stubEnv("SIGNUP_MODE", "open");
     const joined = await join(json(`${ORIGIN}/api/join`, { name: "링크 교체", ...consent }));
-    const oldToken = tokenFrom((await joined.json()).connectorUrl);
+    const oldToken = tokenFrom((await joined.json()).dashboardUrl);
     const made = await call(oldToken, "create_project", { idea: "링크를 바꿔도 남아야 하는 아이디어", plan });
     const id = made.body.result.structuredContent.id;
     const rotated = await rotate(json(`${ORIGIN}/api/me`, { action: "rotate_link" }, cookieFrom(joined)));
     expect(rotated.status).toBe(200);
-    const newToken = tokenFrom((await rotated.json()).connectorUrl);
+    const newToken = tokenFrom((await rotated.json()).dashboardUrl);
     expect(newToken).not.toBe(oldToken);
     expect((await call(oldToken, "list_projects", {})).status).toBe(404);
     expect((await call(newToken, "get_project", { projectId: id })).body.result.isError).toBeFalsy();
@@ -96,7 +96,7 @@ describe("participant self-service", () => {
   it("leaves with everything erased after typing the confirmation", async () => {
     vi.stubEnv("SIGNUP_MODE", "open");
     const joined = await join(json(`${ORIGIN}/api/join`, { name: "탈퇴 예정", ...consent }));
-    const token = tokenFrom((await joined.json()).connectorUrl);
+    const token = tokenFrom((await joined.json()).dashboardUrl);
     await call(token, "create_project", { idea: "지워질 아이디어", plan });
     expect((await leave(json(`${ORIGIN}/api/me`, { confirm: "네" }, cookieFrom(joined), "DELETE"))).status).toBe(400);
     const gone = await leave(json(`${ORIGIN}/api/me`, { confirm: "탈퇴" }, cookieFrom(joined), "DELETE"));
@@ -110,7 +110,7 @@ describe("abuse limits", () => {
   it("signs in from a #token link and slows down link guessing from one address", async () => {
     vi.stubEnv("SIGNUP_MODE", "open");
     const joined = await join(json(`${ORIGIN}/api/join`, { name: "링크 로그인", ...consent }));
-    const token = tokenFrom((await joined.json()).connectorUrl);
+    const token = tokenFrom((await joined.json()).dashboardUrl);
     const ok = await linkRoute(json(`${ORIGIN}/api/link`, { token, open: "account" }));
     expect(await ok.json()).toEqual({ next: "/?open=account" });
     for (let i = 0; i < 20; i += 1) expect((await linkRoute(json(`${ORIGIN}/api/link`, { token: `guess${"x".repeat(20)}${i}` }))).status).toBe(404);

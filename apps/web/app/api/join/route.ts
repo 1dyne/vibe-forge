@@ -4,7 +4,7 @@ import { audit } from "../../../lib/audit";
 import { PRIVACY_VERSION, TERMS_VERSION, signupMode } from "../../../lib/policies";
 import { clientIp, hit, tooMany } from "../../../lib/rate-limit";
 import { hasValidOrigin } from "../../../lib/request-security";
-import { connectorLink, dashboardLink } from "../../../lib/links";
+import { dashboardLink, mcpResource } from "../../../lib/links";
 import { userSessionValue } from "../../../lib/session";
 import { SignupError, createUser } from "../../../lib/users";
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     await audit("user_signed_up", { userId: user.id, note: mode });
     const response = NextResponse.json({
       name: user.name,
-      connectorUrl: connectorLink(request, token),
+      connectorUrl: mcpResource(request),
       dashboardUrl: dashboardLink(request, token)
     }, { status: 201, headers: { "cache-control": "no-store" } });
     response.cookies.set("dalgeurak_session", userSessionValue(token), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 });

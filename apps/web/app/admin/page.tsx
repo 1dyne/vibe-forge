@@ -70,8 +70,8 @@ export default function AdminPage() {
       </form>
       {issued && <div className="issued">
         <p><strong>{issued.name}</strong>님 링크예요. 이 화면을 벗어나면 다시 볼 수 없으니 지금 전달해주세요.</p>
-        <CopyRow label="① Claude 커넥터 주소 — claude.ai 설정 → 커넥터 → 커스텀 커넥터 추가" value={issued.connectorUrl} />
-        <CopyRow label="② 내 대시보드 링크 — 휴대폰·PC에서 열면 바로 로그인돼요" value={issued.dashboardUrl} />
+        <CopyRow label="① 대시보드 링크 (비밀, 본인에게만) — 열면 바로 로그인되고, 기록을 여는 열쇠예요" value={issued.dashboardUrl} />
+        <CopyRow label="② Claude 커넥터 주소 (공개) — claude.ai 설정 → 커넥터 → 커스텀 커넥터 추가 → 연결 → 허용" value={issued.connectorUrl} />
       </div>}
     </section>
     <section className="admin-card">
@@ -91,10 +91,10 @@ export default function AdminPage() {
     <section className="admin-card">
       <h2>참여자에게 보낼 안내</h2>
       <ol className="admin-steps">
-        <li>claude.ai → 설정 → 커넥터 → <b>커스텀 커넥터 추가</b>에서 ① 주소를 붙여넣고 이름을 “달그락 대장간”으로 저장해요.</li>
+        <li>claude.ai → 설정 → 커넥터 → <b>커스텀 커넥터 추가</b>에서 ② 주소를 붙여넣고 이름을 “달그락 대장간”으로 저장한 뒤 <b>연결</b>을 눌러요. 뜨는 창에 ① 링크를 붙여넣어 로그인하고 <b>허용</b>해요.</li>
         <li>새 대화에서 + 버튼 → 커넥터 목록에서 달그락 대장간을 켜요.</li>
         <li>“달그락 대장간으로 ○○ 만들고 싶어. 프로젝트로 시작해줘”라고 말해요.</li>
-        <li>② 링크로 대시보드를 열어두면 Claude가 정리한 설계·회로·할 일이 자동으로 쌓여요. 회로와 3D 승인은 대시보드에서 직접 눌러요.</li>
+        <li>① 링크로 대시보드를 열어두면 Claude가 정리한 설계·회로·할 일이 자동으로 쌓여요. 회로와 3D 승인은 대시보드에서 직접 눌러요.</li>
       </ol>
     </section>
     <section className="admin-card">

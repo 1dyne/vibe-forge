@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runDesignAgent } from "../../../lib/design-agent";
-import { QuotaError, createProject, getMakerProfile, listProjects } from "../../../lib/local-project-store";
+import { QuotaError, createProject, getMakerProfile, limits, listProjects } from "../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../lib/request-security";
 import { canUseWebAi, getViewer, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../lib/viewer";
 import { AttachmentsSchema } from "../../../lib/attachments";
@@ -12,7 +12,7 @@ const CreateProject = z.object({ idea: z.string().trim().min(3).max(4000), attac
 async function handleGET(request: NextRequest) {
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
-  return NextResponse.json({ projects: await listProjects(ownerIdOf(viewer)), viewer: viewer.kind === "operator" ? { kind: "operator" } : { kind: "user", name: viewer.user.name, webAi: viewer.user.webAi } });
+  return NextResponse.json({ projects: await listProjects(ownerIdOf(viewer)), viewer: viewer.kind === "operator" ? { kind: "operator" } : { kind: "user", name: viewer.user.name, webAi: viewer.user.webAi, projectLimit: limits.projectsPerUser() } });
 }
 
 async function handlePOST(request: NextRequest) {

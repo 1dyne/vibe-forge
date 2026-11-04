@@ -13,6 +13,7 @@ export const RATE_LIMITS = {
   signup: { limit: Number(process.env.RATE_SIGNUP_PER_IP_HOUR ?? 40), windowMs: 60 * 60_000 },
   linkFailure: { limit: 20, windowMs: 15 * 60_000 },
   mcp: { limit: 180, windowMs: 60_000 },
+  oauthRegister: { limit: 30, windowMs: 60 * 60_000 },
   account: { limit: 10, windowMs: 60 * 60_000 }
 } as const;
 

@@ -17,4 +17,9 @@ export function withLinkParams(dashboardUrl: string, params: Record<string, stri
   return url.toString();
 }
 
-export const connectorLink = (request: NextRequest, token: string) => publicUrl(request, `/api/mcp/${token}`).toString();
+// Token-in-path connector for tools without OAuth (lands in access logs).
+export const legacyConnectorLink = (request: NextRequest, token: string) => publicUrl(request, `/api/mcp/${token}`).toString();
+
+// The OAuth connector address: the same for everyone, safe to show anywhere.
+export const mcpResource = (request: NextRequest) => publicUrl(request, "/api/mcp").toString();
+export const issuer = (request: NextRequest) => publicUrl(request, "/").origin;

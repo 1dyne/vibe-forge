@@ -321,3 +321,16 @@ export async function countOwnerProjects(ownerId: string): Promise<number> {
   const stored = await readStored();
   return stored.projects.filter((project) => project.ownerId === ownerId).length;
 }
+
+// Permanently removes one project. The owner check runs here too, so a caller
+// that skipped canAccess still cannot delete someone else's project.
+export function deleteProject(id: string, ownerId: string | null): Promise<boolean> {
+  return serialized(async () => {
+    const database = await readDatabase();
+    const project = database.projects.find((item) => item.id === id);
+    if (!project || (ownerId === null ? Boolean(project.ownerId) : project.ownerId !== ownerId)) return false;
+    database.projects = database.projects.filter((item) => item.id !== id);
+    await writeDatabase(database);
+    return true;
+  });
+}
