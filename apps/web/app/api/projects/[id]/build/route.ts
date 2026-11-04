@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { applyBuildResult, getProject } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
-import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied } from "../../../../../lib/viewer";
+import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
 import { intakeMissing, workflowFor } from "../../../../../lib/workflow";
 
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
@@ -27,3 +27,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: "제작 초안 생성 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
+
+export const POST = withViewerVault(handlePOST);

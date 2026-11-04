@@ -1,12 +1,14 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
+import { createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { timingSafeEqualText } from "./session";
 
 // People the operator invites. Each gets one secret token that works both as
-// their Claude connector URL and as their dashboard sign-in link. Lookups use
-// the token's hash; a copy sealed with SESSION_SECRET lets the person's own
-// dashboard show their connector address again.
+// their Claude connector URL and as their dashboard sign-in link. Only the
+// token's hash is stored, so nobody holding the server's secrets can rebuild
+// the token or the key it derives (see vault.ts). tokenSealed is a legacy
+// field: links issued before sealing kept a recoverable copy, which the
+// project store uses once to seal those records and then deletes.
 export type ConnectedClient = { name: string; version: string; lastSeenAt: string };
 export type ForgeUser = {
   id: string;
@@ -45,7 +47,7 @@ async function writeUsers(database: UserDatabase) {
   const file = dataFile();
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;
-  await writeFile(temporary, JSON.stringify(database, null, 2), "utf8");
+  await writeFile(temporary, JSON.stringify(database, null, 2), { encoding: "utf8", mode: 0o600 });
   await rename(temporary, file);
 }
 
@@ -57,21 +59,13 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const toPublic = ({ tokenHash: _hash, tokenSealed: _sealed, ...user }: ForgeUser): PublicUser => user;
-const sealingKey = () => createHash("sha256").update(`dalgeurak-token:${process.env.SESSION_SECRET ?? ""}`).digest();
+const legacySealingKey = () => createHash("sha256").update(`dalgeurak-token:${process.env.SESSION_SECRET ?? ""}`).digest();
 
-function sealToken(token: string): string | undefined {
-  if (!process.env.SESSION_SECRET) return undefined;
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", sealingKey(), iv);
-  const body = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
-  return [iv, cipher.getAuthTag(), body].map((part) => part.toString("base64url")).join(".");
-}
-
-function unsealToken(sealed: string | undefined): string | null {
+function unsealLegacyToken(sealed: string | undefined): string | null {
   if (!sealed || !process.env.SESSION_SECRET) return null;
   try {
     const [iv, tag, body] = sealed.split(".").map((part) => Buffer.from(part, "base64url"));
-    const decipher = createDecipheriv("aes-256-gcm", sealingKey(), iv);
+    const decipher = createDecipheriv("aes-256-gcm", legacySealingKey(), iv);
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(body), decipher.final()]).toString("utf8");
   } catch {
@@ -103,7 +97,7 @@ export function createUser(name: string, webAi: boolean): Promise<{ user: Public
   return serialized(async () => {
     const database = await readUsers();
     const token = randomBytes(24).toString("base64url");
-    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), tokenSealed: sealToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null };
+    const user: ForgeUser = { id: randomUUID(), name, tokenHash: hashToken(token), webAi, createdAt: new Date().toISOString(), revokedAt: null };
     database.users.push(user);
     await writeUsers(database);
     return { user: toPublic(user), token };
@@ -132,10 +126,21 @@ export function deleteUser(id: string): Promise<void> {
   });
 }
 
-export async function revealToken(id: string): Promise<string | null> {
+// Legacy links whose token can still be recovered with SESSION_SECRET.
+export async function takeLegacyTokens(): Promise<Array<{ id: string; token: string }>> {
   await queue;
-  const user = (await readUsers()).users.find((item) => item.id === id && !item.revokedAt);
-  return unsealToken(user?.tokenSealed);
+  return (await readUsers()).users.flatMap((user) => {
+    const token = unsealLegacyToken(user.tokenSealed);
+    return token && timingSafeEqualText(hashToken(token), user.tokenHash) ? [{ id: user.id, token }] : [];
+  });
+}
+
+export function forgetLegacyTokens(ids: string[]): Promise<void> {
+  return serialized(async () => {
+    const database = await readUsers();
+    for (const user of database.users) if (ids.includes(user.id)) delete user.tokenSealed;
+    await writeUsers(database);
+  });
 }
 
 // Remembers which MCP clients (claude.ai, Claude Code, Codex…) have connected.

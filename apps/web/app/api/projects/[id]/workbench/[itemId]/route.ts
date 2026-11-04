@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
-import { canAccess, getViewer } from "../../../../../../lib/viewer";
+import { canAccess, getViewer, withViewerVault } from "../../../../../../lib/viewer";
 import { getProject } from "../../../../../../lib/local-project-store";
 import { workbenchItems } from "../../../../../../lib/workbench";
 
-export async function GET(request: NextRequest, context: { params: Promise<{ id: string; itemId: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ id: string; itemId: string }> }) {
   const { id, itemId } = await context.params;
   const viewer = await getViewer(request);
   const found = await getProject(id);
@@ -17,3 +17,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     "x-content-type-options": "nosniff"
   } });
 }
+
+export const GET = withViewerVault(handleGET);

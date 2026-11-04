@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { reevaluateBuild } from "../../../../../lib/build-pipeline";
 import { applyBuildResult, getProject } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
-import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied } from "../../../../../lib/viewer";
+import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
 
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
@@ -23,3 +23,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: "Evaluator 재검토 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
+
+export const POST = withViewerVault(handlePOST);

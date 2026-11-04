@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import { canAccess, getViewer } from "../../../../../../lib/viewer";
+import { canAccess, getViewer, withViewerVault } from "../../../../../../lib/viewer";
 import { getProject } from "../../../../../../lib/local-project-store";
 import { workflowFor } from "../../../../../../lib/workflow";
 
-export async function GET(request: NextRequest, context: { params: Promise<{ id: string; artifactId: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ id: string; artifactId: string }> }) {
   const { id, artifactId } = await context.params;
   const viewer = await getViewer(request);
   const found = await getProject(id);
@@ -21,3 +21,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     }
   });
 }
+
+export const GET = withViewerVault(handleGET);

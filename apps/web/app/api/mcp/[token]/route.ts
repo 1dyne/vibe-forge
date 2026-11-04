@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SERVER_INSTRUCTIONS, TOOLS, callTool } from "../../../../lib/mcp-tools";
 import { publicUrl } from "../../../../lib/request-security";
 import { findUserByToken, recordClient } from "../../../../lib/users";
+import { vaultFor, withVault } from "../../../../lib/vault";
 
 // MCP Streamable HTTP endpoint, stateless with plain JSON responses. The
 // secret token in the path identifies the invited user, so the URL works as a
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ to
       return reply({ tools: TOOLS.map(({ name, title, description, inputSchema, annotations }) => ({ name, title, description, inputSchema, ...(annotations ? { annotations } : {}) })) });
     case "tools/call": {
       const name = String(message.params?.name ?? "");
-      return reply(await callTool(name, message.params?.arguments, { user, dashboardUrl }));
+      // The token in this URL is the only thing that opens this person's sealed records.
+      return reply(await withVault(vaultFor(token, user.id), () => callTool(name, message.params?.arguments, { user, dashboardUrl })));
     }
     default:
       return NextResponse.json(rpcError(message.id, -32601, `Method not found: ${message.method}`));

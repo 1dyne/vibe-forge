@@ -3,6 +3,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentPlan, BuildResult, DesignSlot, ImageAttachment, LocalProject, MakerProfile } from "./project-types";
 import { workflowFor } from "./workflow";
+import { forgetLegacyTokens, takeLegacyTokens } from "./users";
+import { currentVault, open, seal, vaultFor, type Vault } from "./vault";
 
 const labels: Array<[DesignSlot["key"], string]> = [
   ["power", "전원"],
@@ -15,8 +17,14 @@ const labels: Array<[DesignSlot["key"], string]> = [
   ["fab", "제작 방식"]
 ];
 
-type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile> };
+type SealedProject = { id: string; ownerId: string; updatedAt: string; sealed: string };
+type SealedProfile = { sealed: string };
+type StoredDatabase = { version: 1; projects: Array<LocalProject | SealedProject>; profile?: MakerProfile; profiles?: Record<string, MakerProfile | SealedProfile> };
+// In memory: the operator's projects and the current participant's opened
+// records are plain; every other participant's records stay sealed in hidden.
+type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile>; hidden: { projects: SealedProject[]; profiles: Record<string, SealedProfile> } };
 let queue: Promise<unknown> = Promise.resolve();
+let migration: Promise<void> | null = null;
 
 function dataFile() {
   if (process.env.FORGE_TEST_DATA_FILE && process.env.NODE_ENV === "test") return process.env.FORGE_TEST_DATA_FILE;
@@ -25,11 +33,14 @@ function dataFile() {
   return path.join(workspace, ".data", "local-projects.json");
 }
 
-async function readDatabase(): Promise<Database> {
+const isSealed = (value: unknown): value is { sealed: string } => typeof (value as { sealed?: unknown })?.sealed === "string";
+const projectLabel = (id: string, ownerId: string) => `project:${id}:${ownerId}`;
+const profileLabel = (ownerId: string) => `profile:${ownerId}`;
+
+async function readStored(): Promise<StoredDatabase> {
   try {
-    const parsed = JSON.parse(await readFile(/* turbopackIgnore: true */ dataFile(), "utf8")) as Database;
+    const parsed = JSON.parse(await readFile(/* turbopackIgnore: true */ dataFile(), "utf8")) as StoredDatabase;
     if (parsed.version !== 1 || !Array.isArray(parsed.projects)) throw new Error("저장된 프로젝트 형식을 읽을 수 없습니다.");
-    for (const project of parsed.projects) project.workflow = workflowFor(project);
     return parsed;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { version: 1, projects: [] };
@@ -37,12 +48,65 @@ async function readDatabase(): Promise<Database> {
   }
 }
 
-async function writeDatabase(database: Database) {
+async function writeStored(database: StoredDatabase) {
   const file = dataFile();
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;
-  await writeFile(temporary, JSON.stringify(database, null, 2), "utf8");
+  await writeFile(temporary, JSON.stringify(database, null, 2), { encoding: "utf8", mode: 0o600 });
   await rename(temporary, file);
+}
+
+function sealOwned(database: StoredDatabase, vault: Vault): StoredDatabase {
+  const projects = database.projects.map((project) => !isSealed(project) && project.ownerId === vault.ownerId
+    ? { id: project.id, ownerId: vault.ownerId, updatedAt: project.updatedAt, sealed: seal(project, vault.key, projectLabel(project.id, vault.ownerId)) }
+    : project);
+  const profiles = { ...database.profiles };
+  const profile = profiles[vault.ownerId];
+  if (profile && !isSealed(profile)) profiles[vault.ownerId] = { sealed: seal(profile, vault.key, profileLabel(vault.ownerId)) };
+  return { ...database, projects, ...(database.profiles ? { profiles } : {}) };
+}
+
+// Records written before sealing existed were plain JSON. The tokens those
+// participants were issued are still recoverable once, so seal their records
+// now and then forget the recoverable copy of each token.
+function migrateLegacy(): Promise<void> {
+  migration ??= (async () => {
+    const legacy = await takeLegacyTokens();
+    if (!legacy.length) return;
+    let stored = await readStored();
+    for (const { id, token } of legacy) stored = sealOwned(stored, vaultFor(token, id));
+    await writeStored(stored);
+    await forgetLegacyTokens(legacy.map(({ id }) => id));
+  })().catch((error) => { migration = null; throw error; });
+  return migration;
+}
+
+async function readDatabase(): Promise<Database> {
+  await migrateLegacy();
+  const stored = await readStored();
+  const vault = currentVault();
+  const database: Database = { version: 1, projects: [], ...(stored.profile ? { profile: stored.profile } : {}), hidden: { projects: [], profiles: {} } };
+  for (const item of stored.projects) {
+    if (!isSealed(item)) { database.projects.push(item); continue; }
+    const opened = vault && item.ownerId === vault.ownerId ? open<LocalProject>(item.sealed, vault.key, projectLabel(item.id, item.ownerId)) : null;
+    if (opened) database.projects.push(opened);
+    else database.hidden.projects.push(item);
+  }
+  for (const project of database.projects) project.workflow = workflowFor(project);
+  for (const [ownerId, profile] of Object.entries(stored.profiles ?? {})) {
+    const opened = isSealed(profile) ? (vault?.ownerId === ownerId ? open<MakerProfile>(profile.sealed, vault.key, profileLabel(ownerId)) : null) : profile;
+    if (opened) (database.profiles ??= {})[ownerId] = opened;
+    else if (isSealed(profile)) database.hidden.profiles[ownerId] = profile;
+  }
+  return database;
+}
+
+async function writeDatabase(database: Database) {
+  const { hidden, ...visible } = database;
+  let stored: StoredDatabase = { ...visible, projects: [...visible.projects, ...hidden.projects], profiles: { ...visible.profiles, ...hidden.profiles } };
+  const vault = currentVault();
+  if (vault) stored = sealOwned(stored, vault);
+  await writeStored(stored);
 }
 
 function serialized<T>(operation: () => Promise<T>): Promise<T> {
@@ -187,9 +251,12 @@ export function deleteOwnerData(ownerId: string): Promise<number> {
   return serialized(async () => {
     const database = await readDatabase();
     const kept = database.projects.filter((project) => project.ownerId !== ownerId);
-    const removed = database.projects.length - kept.length;
+    const keptHidden = database.hidden.projects.filter((project) => project.ownerId !== ownerId);
+    const removed = database.projects.length - kept.length + database.hidden.projects.length - keptHidden.length;
     database.projects = kept;
+    database.hidden.projects = keptHidden;
     if (database.profiles) delete database.profiles[ownerId];
+    delete database.hidden.profiles[ownerId];
     await writeDatabase(database);
     return removed;
   });

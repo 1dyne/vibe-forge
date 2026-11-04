@@ -14,7 +14,8 @@ import { DELETE as deleteUserRoute } from "../apps/web/app/api/admin/users/[id]/
 import { GET as projectFile } from "../apps/web/app/api/projects/[id]/files/[fileId]/route";
 import { listUsers } from "../apps/web/lib/users";
 import { getProject, listProjects } from "../apps/web/lib/local-project-store";
-import { signSession } from "../apps/web/lib/session";
+import { signSession, userSessionValue } from "../apps/web/lib/session";
+import { vaultFor, withVault } from "../apps/web/lib/vault";
 import { workflowFor } from "../apps/web/lib/workflow";
 
 const SECRET = "test-secret-for-connector-routes-0123456789";
@@ -96,8 +97,7 @@ describe("Claude connector", () => {
     expect(evalFiles.isError).toBe(true);
 
     // The person approves on the dashboard; afterwards the circuit is locked against chat changes.
-    const owner = (await import("../apps/web/lib/users")).listUsers().then((users) => users.find((u) => u.name === "주최측")!.id);
-    const cookie = "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, await owner);
+    const cookie = "dalgeurak_session=" + userSessionValue(token);
     const approve = await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify({ action: "approve_circuit" }) }), { params: Promise.resolve({ id }) });
     expect(approve.status).toBe(200);
     const after = await tool(token, "get_project", { projectId: id });
@@ -116,16 +116,16 @@ describe("Claude connector", () => {
     expect((await tool(b.token, "get_project", { projectId: id })).isError).toBe(true);
     expect((await tool(b.token, "list_projects", {})).structuredContent!.projects).toEqual([]);
 
-    const cookieFor = async (userId?: string) => "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, userId);
+    const cookieFor = async (userToken?: string) => "dalgeurak_session=" + (userToken ? userSessionValue(userToken) : await signSession(Date.now() + 3_600_000, SECRET));
     const listAs = async (cookie: string) => (await (await listRoute(new NextRequest("http://localhost:3000/api/projects", { headers: { cookie } }))).json()).projects as Array<{ id: string }>;
-    expect((await listAs(await cookieFor(a.user.id))).map((p) => p.id)).toContain(id);
-    expect((await listAs(await cookieFor(b.user.id))).map((p) => p.id)).not.toContain(id);
+    expect((await listAs(await cookieFor(a.token))).map((p) => p.id)).toContain(id);
+    expect((await listAs(await cookieFor(b.token))).map((p) => p.id)).not.toContain(id);
     expect((await listAs(await cookieFor())).map((p) => p.id)).not.toContain(id);
 
     const post = (cookie: string, suffix: string, body: unknown) => new NextRequest(`http://localhost:3000/api/projects/${id}/${suffix}`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) });
-    expect((await messagePost(post(await cookieFor(a.user.id), "messages", { text: "안녕" }), { params: Promise.resolve({ id }) })).status).toBe(403);
-    expect((await messagePost(post(await cookieFor(b.user.id), "messages", { text: "안녕" }), { params: Promise.resolve({ id }) })).status).toBe(404);
-    const profile = await workflowPost(post(await cookieFor(a.user.id), "workflow", { action: "profile", profile: { coreBehavior: "흙이 마르면 LED", tools: [], toolsConfirmed: true, firmwareExperience: "none" } }), { params: Promise.resolve({ id }) });
+    expect((await messagePost(post(await cookieFor(a.token), "messages", { text: "안녕" }), { params: Promise.resolve({ id }) })).status).toBe(403);
+    expect((await messagePost(post(await cookieFor(b.token), "messages", { text: "안녕" }), { params: Promise.resolve({ id }) })).status).toBe(404);
+    const profile = await workflowPost(post(await cookieFor(a.token), "workflow", { action: "profile", profile: { coreBehavior: "흙이 마르면 LED", tools: [], toolsConfirmed: true, firmwareExperience: "none" } }), { params: Promise.resolve({ id }) });
     expect(profile.status).toBe(200);
   });
 
@@ -134,7 +134,7 @@ describe("Claude connector", () => {
     const response = await signIn(new NextRequest(`http://localhost:3000/u/${token}`), { params: Promise.resolve({ token }) });
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://forge.example/");
-    expect(response.headers.get("set-cookie")).toContain(`~${user.id}.`);
+    expect(response.headers.get("set-cookie")).toContain(`dalgeurak_session=${userSessionValue(token)}`);
     await updateUser(user.id, { revoke: true });
     expect((await rpc(token, "tools/list")).status).toBe(404);
     const after = await signIn(new NextRequest(`http://localhost:3000/u/${token}`), { params: Promise.resolve({ token }) });
@@ -176,13 +176,13 @@ describe("Claude connector", () => {
     const progress = await tool(token, "log_dev_progress", { projectId: id, summary: "시리얼 읽기 완성", done: ["포트 열기"], next: ["화면 표시"], hardwareRequests: ["보드를 USB로 연결하고 시리얼 모니터에 state=1이 찍히는지 알려주세요."] });
     expect(progress.structuredContent!.openTasks.some((t: { title: string }) => t.title === "개발 중 하드웨어 확인")).toBe(true);
 
-    const me = await (await meRoute(new NextRequest("http://localhost:3000/api/me", { headers: { cookie: "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, user.id) } }))).json();
+    const me = await (await meRoute(new NextRequest("http://localhost:3000/api/me", { headers: { cookie: "dalgeurak_session=" + userSessionValue(token) } }))).json();
     expect(me.connectorUrl).toBe(`https://forge.example/api/mcp/${token}`);
     expect(me.clients[0].name).toBe("claude-code");
   });
 
   it("asks the checklist as choices and builds the circuit and form Claude describes", async () => {
-    const { token } = await createUser("참여자 E", false);
+    const { user: userE, token } = await createUser("참여자 E", false);
     const created = await tool(token, "create_project", { idea: "말하면 눈을 깜빡이는 털복숭이 반려 로봇", plan });
     const id = created.structuredContent!.id as string;
     const checklist = await tool(token, "get_checklist", { projectId: id });
@@ -222,7 +222,7 @@ describe("Claude connector", () => {
 
     const { getProject } = await import("../apps/web/lib/local-project-store");
     const { approvedCad } = await import("../apps/web/lib/build-pipeline");
-    const stored = await getProject(id);
+    const stored = await withVault(vaultFor(token, userE.id), () => getProject(id));
     expect(stored!.build!.blueprint.shape).toHaveLength(3);
     const cad = approvedCad(stored!.build!).artifacts.find((a) => a.kind === "cad")!.content;
     expect(cad).toContain("sphere(d=1)");
@@ -244,7 +244,7 @@ describe("Claude connector", () => {
     expect(formed.structuredContent!.files.map((f: { kind: string }) => f.kind)).toContain("product");
     await tool(token, "submit_circuit", { projectId: id, blueprint: { ...blueprint, components: [{ ref: "U1", type: "controller", valueOrModel: "Arduino Nano", reason: "제어", connection: "breadboard" }, { ref: "SW1", type: "switch", valueOrModel: "택트 스위치", reason: "입력", connection: "breadboard" }], nets: [{ name: "5V", kind: "power", members: ["U1.5V", "SW1.A"] }, { name: "GND", kind: "ground", members: ["U1.GND", "SW1.B"] }, { name: "BTN", kind: "signal", members: ["U1.D2", "SW1.A"] }] }, review });
 
-    const cookie = "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, user.id);
+    const cookie = "dalgeurak_session=" + userSessionValue(token);
     const act = async (body: unknown) => (await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) })).json();
     const approved = await act({ action: "approve_circuit" });
     const cad = approved.project.build.artifacts.find((a: { kind: string }) => a.kind === "cad").content as string;
@@ -289,12 +289,13 @@ describe("operator privacy", () => {
     const { user, token } = await createUser("참여자 비공개", false);
     const created = await tool(token, "create_project", { idea: "운영자에게 보이면 안 되는 아이디어", plan });
     const id = created.structuredContent?.id as string;
-    expect(await getProject(id)).not.toBeNull();
+    expect(await withVault(vaultFor(token, user.id), () => getProject(id))).not.toBeNull();
+    expect(await getProject(id)).toBeNull();
     const listed = await (await listRoute(await operatorRequest("http://localhost:3000/api/projects"))).json();
     expect(listed.projects.some((project: { id: string }) => project.id === id)).toBe(false);
     const file = await projectFile(await operatorRequest(`http://localhost:3000/api/projects/${id}/files/none`), { params: Promise.resolve({ id, fileId: "none" }) });
     expect(file.status).toBe(404);
-    expect((await listProjects(user.id)).some((project) => project.id === id)).toBe(true);
+    expect((await withVault(vaultFor(token, user.id), () => listProjects(user.id))).some((project) => project.id === id)).toBe(true);
   });
 
   it("erases a participant and everything they left", async () => {
@@ -323,7 +324,7 @@ describe("conversation privacy", () => {
     const id = made.structuredContent!.id as string;
     await tool(token, "record_brainstorm", { projectId: id, userMessage: "저는 홍길동이고 010-1234-5678입니다", plan: { ...plan, reply: "홍길동님 안녕하세요", slotUpdates: [], tasks: [] } });
     await tool(token, "record_brainstorm", { projectId: id, plan: { ...plan, reply: "기록", slotUpdates: [], tasks: [] } });
-    const raw = JSON.stringify(await listProjects(user.id));
+    const raw = JSON.stringify(await withVault(vaultFor(token, user.id), () => listProjects(user.id)));
     expect(raw).not.toContain("홍길동");
     expect(raw).not.toContain("010-1234-5678");
     const tools = (await rpc(token, "tools/list")).body.result.tools as Array<{ name: string; inputSchema: { required: string[]; properties: Record<string, unknown> } }>;

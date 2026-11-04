@@ -10,7 +10,7 @@ import { PART_CARDS } from "../apps/web/lib/parts/catalog";
 import { POST as mcpPost } from "../apps/web/app/api/mcp/[token]/route";
 import { POST as workflowPost } from "../apps/web/app/api/projects/[id]/workflow/route";
 import { createUser } from "../apps/web/lib/users";
-import { signSession } from "../apps/web/lib/session";
+import { userSessionValue } from "../apps/web/lib/session";
 import type { CircuitComponent, CircuitNet } from "../apps/web/lib/project-types";
 
 const SECRET = "test-secret-for-parts-routes-0123456789";
@@ -142,7 +142,7 @@ describe("assembly guide on real parts", () => {
     expect(good.isError).toBeFalsy();
     expect(good.structuredContent!.assemblyDetails[0]).toMatchObject({ step: 2, level: "micro", stale: false, substeps: 2 });
 
-    const cookie = "dalgeurak_session=" + await signSession(Date.now() + 3_600_000, SECRET, user.id);
+    const cookie = "dalgeurak_session=" + userSessionValue(token);
     const act = async (body: unknown) => (await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) })).json();
     const reported = await act({ action: "assembly_report", step: 1, cardId: "lib:usb-5v-rail", text: "4.1V", value: 4.1 });
     expect(reported.project.assemblyReports.at(-1)).toMatchObject({ cardId: "lib:usb-5v-rail", judgement: "abnormal" });

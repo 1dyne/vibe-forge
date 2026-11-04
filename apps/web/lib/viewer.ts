@@ -1,20 +1,36 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { readSession } from "./session";
-import { getActiveUser, type PublicUser } from "./users";
+import { readSession, userTokenFrom } from "./session";
+import { findUserByToken, type PublicUser } from "./users";
+import { vaultFor, withVault } from "./vault";
 import type { LocalProject } from "./project-types";
 
 // Who is looking: the operator (password login) sees only the projects made
 // with that login, never a participant's; an invited user sees only their own.
 // The operator runs the in-app AI; an invited user runs it only when allowed.
-export type Viewer = { kind: "operator" } | { kind: "user"; user: PublicUser };
+export type Viewer = { kind: "operator" } | { kind: "user"; user: PublicUser; token: string };
+
+const SESSION_COOKIE = "dalgeurak_session";
 
 export async function getViewer(request: NextRequest): Promise<Viewer | null> {
-  const session = await readSession(request.cookies.get("dalgeurak_session")?.value, process.env.SESSION_SECRET);
-  if (!session) return null;
-  if (!session.userId) return { kind: "operator" };
-  const user = await getActiveUser(session.userId);
-  return user ? { kind: "user", user } : null;
+  const cookie = request.cookies.get(SESSION_COOKIE)?.value;
+  const token = userTokenFrom(cookie);
+  if (token) {
+    const user = await findUserByToken(token);
+    return user ? { kind: "user", user, token } : null;
+  }
+  return (await readSession(cookie, process.env.SESSION_SECRET)) ? { kind: "operator" } : null;
+}
+
+// Wraps a route handler so the store can open the signed-in participant's
+// sealed records for this request, and only theirs. Operator requests and
+// anonymous requests run with no key.
+export function withViewerVault<A extends unknown[]>(handler: (request: NextRequest, ...rest: A) => Promise<Response>) {
+  return async (request: NextRequest, ...rest: A): Promise<Response> => {
+    const viewer = await getViewer(request);
+    const vault = viewer?.kind === "user" ? vaultFor(viewer.token, viewer.user.id) : null;
+    return withVault(vault, () => handler(request, ...rest));
+  };
 }
 
 export function ownerIdOf(viewer: Viewer): string | null {

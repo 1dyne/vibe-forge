@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
-import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied } from "../../../../../lib/viewer";
+import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
 import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
@@ -27,7 +27,7 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset_stage"), stage: z.enum(["product_form", "plan"]) }),
   z.object({ action: z.literal("purchase"), ref: z.string().max(80), status: z.enum(["needed", "ordered", "received", "problem"]), note: z.string().max(1000).default("") })
 ]);
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   try {
     const input = Input.parse(await request.json());
@@ -121,3 +121,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: message.includes("BUDGET") ? "설정된 API 비용 한도에 도달했습니다. 한도를 확인해주세요." : error instanceof z.ZodError ? "입력값을 확인해주세요." : message }, { status: 409 });
   }
 }
+
+export const POST = withViewerVault(handlePOST);

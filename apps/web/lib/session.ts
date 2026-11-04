@@ -5,25 +5,32 @@ function toBase64Url(bytes: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-// Payload is "<expiresAt>" for the operator or "<expiresAt>~<userId>" for an
-// invited user.
-export async function signSession(expiresAt: number, secret: string, userId?: string): Promise<string> {
-  const payload = userId ? `${expiresAt}~${userId}` : String(expiresAt);
+// Operator sessions: "<expiresAt>.<hmac>" signed with SESSION_SECRET.
+export async function signSession(expiresAt: number, secret: string): Promise<string> {
+  const payload = String(expiresAt);
   const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
   return `${payload}.${toBase64Url(signature)}`;
 }
 
-export async function readSession(token: string | undefined, secret: string | undefined): Promise<{ userId: string | null } | null> {
+// Participant sessions carry the participant's own link token ("u.<token>"),
+// checked against its stored hash on every request. They are not signed with
+// SESSION_SECRET on purpose: whoever holds that secret must not be able to
+// mint a participant session, and the token is what opens their sealed records.
+const USER_COOKIE = /^u\.([A-Za-z0-9_-]{20,100})$/;
+export const userSessionValue = (token: string) => `u.${token}`;
+export function userTokenFrom(cookie: string | undefined): string | null {
+  return cookie?.match(USER_COOKIE)?.[1] ?? null;
+}
+
+export async function readSession(token: string | undefined, secret: string | undefined): Promise<{ operator: true } | null> {
   if (!token || !secret) return null;
   const [payload, supplied] = token.split(".");
-  if (!payload || !supplied) return null;
-  const [expiresRaw, userId] = payload.split("~");
-  const expiresAt = Number(expiresRaw);
+  if (!payload || !supplied || !/^\d+$/.test(payload)) return null;
+  const expiresAt = Number(payload);
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
-  if (userId !== undefined && !/^[0-9a-f-]{36}$/.test(userId)) return null;
-  const expected = await signSession(expiresAt, secret, userId);
-  return timingSafeEqualText(expected, token) ? { userId: userId ?? null } : null;
+  const expected = await signSession(expiresAt, secret);
+  return timingSafeEqualText(expected, token) ? { operator: true } : null;
 }
 
 export async function verifySession(token: string | undefined, secret: string | undefined): Promise<boolean> {

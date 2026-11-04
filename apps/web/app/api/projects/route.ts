@@ -3,19 +3,19 @@ import { z } from "zod";
 import { runDesignAgent } from "../../../lib/design-agent";
 import { createProject, getMakerProfile, listProjects } from "../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../lib/request-security";
-import { canUseWebAi, getViewer, ownerIdOf, unauthorized, webAiDenied } from "../../../lib/viewer";
+import { canUseWebAi, getViewer, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../lib/viewer";
 import { AttachmentsSchema } from "../../../lib/attachments";
 import type { ImageAttachment } from "../../../lib/project-types";
 
 const CreateProject = z.object({ idea: z.string().trim().min(3).max(4000), attachments: AttachmentsSchema }).strict();
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
   return NextResponse.json({ projects: await listProjects(ownerIdOf(viewer)), viewer: viewer.kind === "operator" ? { kind: "operator" } : { kind: "user", name: viewer.user.name, webAi: viewer.user.webAi } });
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
@@ -35,3 +35,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "프로젝트를 만들지 못했습니다." }, { status: 500 });
   }
 }
+
+export const GET = withViewerVault(handleGET);
+export const POST = withViewerVault(handlePOST);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySession } from "./lib/session";
+import { userTokenFrom, verifySession } from "./lib/session";
 import { publicUrl } from "./lib/request-security";
 
 const publicPaths = new Set(["/login", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
@@ -14,7 +14,9 @@ export async function proxy(request: NextRequest) {
     if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "로그인 설정이 필요합니다." }, { status: 503 });
     return NextResponse.redirect(publicUrl(request, "/login?setup=required"));
   }
-  const valid = await verifySession(request.cookies.get("dalgeurak_session")?.value, process.env.SESSION_SECRET);
+  // Participant cookies are checked against the stored token hash by each route.
+  const cookie = request.cookies.get("dalgeurak_session")?.value;
+  const valid = userTokenFrom(cookie) !== null || await verifySession(cookie, process.env.SESSION_SECRET);
   if (valid) return NextResponse.next();
   if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "다시 로그인해주세요." }, { status: 401 });
   return NextResponse.redirect(publicUrl(request, "/login"));
