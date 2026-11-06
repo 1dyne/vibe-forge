@@ -21,6 +21,7 @@ import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow
 import { workbenchItems } from "./workbench";
 import { CoordinationError, PURCHASE_LABEL, answerTaskQuestion, boardSummary, buildForm, closeConflict, raiseConflict, recordPurchase, setTaskStatus, upsertTask } from "./coordination";
 import { INFO_FORMATS } from "./info-formats";
+import { notifyPerson, noticesBetween } from "./notify";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
 // the thinking on the person's subscription; the server stores the result and
@@ -1158,8 +1159,15 @@ export async function callTool(name: string, input: unknown, context: ToolContex
   const tool = TOOLS.find((item) => item.name === name);
   if (!tool) return { content: [{ type: "text", text: `알 수 없는 도구: ${name}` }], isError: true };
   try {
-    const result = await tool.run(input ?? {}, context);
     const projectRef = (input as { projectId?: unknown } | null)?.projectId;
+    // Snapshot before a change so the person hears about what needs them.
+    const watched = typeof projectRef === "string" && !tool.annotations?.readOnlyHint && tool.name !== "report_progress";
+    const before = watched ? await getProject(projectRef).catch(() => null) : null;
+    const result = await tool.run(input ?? {}, context);
+    if (watched && before?.ownerId === context.user.id) {
+      const after = await getProject(projectRef).catch(() => null);
+      if (after) await notifyPerson(context.user.id, after.id, after.name, noticesBetween(before, after, context.dashboardUrl)).catch((e) => console.error("notify failed", e instanceof Error ? e.message : "unknown"));
+    }
     if (typeof projectRef === "string" && !tool.annotations?.readOnlyHint && tool.name !== "report_progress") {
       await annotateProject(projectRef, (p) => { if (p.ownerId === context.user.id) pushActivity(p, { source: "tool", title: tool.title, detail: result.text.split("\n")[0].slice(0, 160) }); }).catch(() => {});
     }

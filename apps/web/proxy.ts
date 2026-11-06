@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sessionSecretFrom, userTokenFrom, verifySession } from "./lib/session";
 import { publicUrl } from "./lib/request-security";
 
-const publicPaths = new Set(["/login", "/join", "/terms", "/privacy", "/api/link", "/u", "/auth/verify", "/auth/reset", "/api/mcp", "/oauth/authorize", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
+const publicPaths = new Set(["/login", "/join", "/terms", "/privacy", "/api/link", "/u", "/auth/verify", "/auth/reset", "/api/mcp", "/oauth/authorize", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png", "/sw.js"]);
 // The install prompt fetches the manifest and icons before anyone logs in.
 // /api/mcp/ authenticates with the participant token in its path; /u/<token>
 // is the older dashboard link form (new links use /u#<token>).

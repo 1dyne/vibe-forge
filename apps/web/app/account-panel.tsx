@@ -1,4 +1,5 @@
 "use client";
+import NotifySettings from "./notify-settings";
 import { FormEvent, useEffect, useState } from "react";
 import RecoveryCode from "./recovery-code";
 
@@ -121,6 +122,8 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
             <button disabled={busy}>새 복구 코드 받기</button>
           </form>
         </>}
+
+        <NotifySettings />
 
         <h3>Claude 커넥터 주소</h3>
         <p className="muted"><small>claude.ai → 설정 → 커넥터 → 커스텀 커넥터 추가 → 연결 → 허용. 모두에게 같은 주소라 보여도 괜찮아요.</small></p>

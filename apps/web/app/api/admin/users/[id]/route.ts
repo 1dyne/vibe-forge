@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { forgetUser } from "../../../../../lib/notify";
 import { z } from "zod";
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { deleteOwnerData } from "../../../../../lib/local-project-store";
@@ -40,6 +41,7 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     await endUserSessions(id);
     const removedProjects = await deleteOwnerData(id);
     await deleteUser(id);
+    await forgetUser(id).catch(() => {});
     await audit("user_erased_by_operator", { userId: id });
     return NextResponse.json({ removedProjects });
   } catch (error) {

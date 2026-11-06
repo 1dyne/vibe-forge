@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { forgetUser } from "../../../lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { changePassword, newRecovery, setPassword } from "../../../lib/account-service";
@@ -111,6 +112,7 @@ export async function DELETE(request: NextRequest) {
   await endUserSessions(viewer.user.id);
   const removedProjects = await deleteOwnerData(viewer.user.id);
   await deleteUser(viewer.user.id);
+  await forgetUser(viewer.user.id).catch(() => {});
   await audit("user_erased_self", { userId: viewer.user.id });
   const response = NextResponse.json({ removedProjects }, { headers: noStore });
   response.cookies.set("dalgeurak_session", "", { ...cookieOptions, maxAge: 0 });
