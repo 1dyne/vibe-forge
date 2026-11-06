@@ -70,6 +70,9 @@ interface Backend {
   join(input: Omit<WaitlistRecord, "id" | "referralCode" | "couponSentAt" | "createdAt" | "consentedAt">): Promise<{ record: WaitlistRecord; alreadyJoined: boolean }>;
   allWaitlist(): Promise<WaitlistRecord[]>;
   markCoupon(id: string, sent: boolean): Promise<void>;
+  /** 대기 신청 한 건과 그 사람이 만든 도깨비불을 지운다(삭제 요청·테스트 정리). */
+  removeEntry(id: string): Promise<boolean>;
+  clearEvents(): Promise<number>;
   event(e: EventRecord): Promise<void>;
   eventCounts(): Promise<Record<string, number>>;
 }
@@ -120,6 +123,16 @@ const fileBackend: Backend = {
   }),
   allWaitlist: () => serial(async () => (await readData()).waitlist),
   markCoupon: (id, sent) => serial(async () => { const d = await readData(); const w = d.waitlist.find((x) => x.id === id); if (w) w.couponSentAt = sent ? new Date().toISOString() : null; await writeData(d); }),
+  removeEntry: (id) => serial(async () => {
+    const d = await readData();
+    const w = d.waitlist.find((x) => x.id === id);
+    if (!w) return false;
+    d.waitlist = d.waitlist.filter((x) => x.id !== id);
+    if (w.fireId) d.fires = d.fires.filter((f) => f.id !== w.fireId);
+    await writeData(d);
+    return true;
+  }),
+  clearEvents: () => serial(async () => { const d = await readData(); const n = d.events.length; d.events = []; await writeData(d); return n; }),
   event: (e) => serial(async () => { const d = await readData(); d.events.push(e); if (d.events.length > 50000) d.events.splice(0, d.events.length - 50000); await writeData(d); }),
   eventCounts: () => serial(async () => { const counts: Record<string, number> = {}; for (const e of (await readData()).events) counts[e.name] = (counts[e.name] ?? 0) + 1; return counts; })
 };
@@ -194,6 +207,16 @@ const pgBackend: Backend = {
   async markCoupon(id, sent) {
     await (await db()).query("UPDATE find_waitlist SET coupon_sent_at = $2 WHERE id = $1", [id, sent ? new Date() : null]);
   },
+  async removeEntry(id) {
+    const pool = await db();
+    const { rows } = await pool.query("DELETE FROM find_waitlist WHERE id = $1 RETURNING fire_id", [id]);
+    if (!rows[0]) return false;
+    if (rows[0].fire_id) await pool.query("DELETE FROM find_fires WHERE id = $1", [rows[0].fire_id]);
+    return true;
+  },
+  async clearEvents() {
+    return (await (await db()).query("DELETE FROM find_events")).rowCount ?? 0;
+  },
   async event(e) {
     await (await db()).query("INSERT INTO find_events (name, session, props, created_at) VALUES ($1,$2,$3,$4)", [e.name, e.session, JSON.stringify(e.props), e.createdAt]);
   },
@@ -216,6 +239,8 @@ export const recordEvent = (e: EventRecord) => backend().event(e);
 export const eventCounts = () => backend().eventCounts();
 export const allWaitlist = () => backend().allWaitlist();
 export const markCoupon = (id: string, sent: boolean) => backend().markCoupon(id, sent);
+export const removeEntry = (id: string) => backend().removeEntry(id);
+export const clearEvents = () => backend().clearEvents();
 
 export async function joinWaitlist(input: Parameters<Backend["join"]>[0]): Promise<Standing> {
   const b = backend();

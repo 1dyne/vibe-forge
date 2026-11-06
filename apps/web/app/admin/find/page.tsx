@@ -1,6 +1,7 @@
 import { isOperator } from "../../../lib/find/admin-auth";
 import { allWaitlist, eventCounts, storageKind } from "../../../lib/find/store";
 import { notFound } from "next/navigation";
+import { ClearEvents, DeleteEntry } from "./admin-actions";
 import CouponToggle from "./coupon-toggle";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function FindAdmin() {
       <h2 style={{ fontSize: 16 }}>대기 명단 ({waitlist.length})</h2>
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", background: "white" }}>
-          <thead><tr>{["신청", "이메일", "처음 문장", "화력", "초대 코드", "추천인", "소식 동의", "쿠폰"].map((h) => <th key={h} style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: 6 }}>{h}</th>)}</tr></thead>
+          <thead><tr>{["신청", "이메일", "처음 문장", "화력", "초대 코드", "추천인", "소식 동의", "쿠폰", ""].map((h) => <th key={h} style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: 6 }}>{h}</th>)}</tr></thead>
           <tbody>
             {waitlist.slice().reverse().map((w) => (
               <tr key={w.id}>
@@ -48,12 +49,14 @@ export default async function FindAdmin() {
                 <td style={{ padding: 6 }}>{w.referredBy ?? "-"}</td>
                 <td style={{ padding: 6 }}>{w.marketingConsent ? "예" : "아니오"}</td>
                 <td style={{ padding: 6 }}><CouponToggle id={w.id} sentAt={w.couponSentAt} /></td>
+                <td style={{ padding: 6 }}><DeleteEntry id={w.id} email={w.email} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <h2 style={{ fontSize: 16, marginTop: 24 }}>이벤트 수</h2>
+      <p><ClearEvents /></p>
       <p className="muted">{Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ") || "아직 없음"}</p>
     </main>
   );
