@@ -41,7 +41,8 @@ export const INFO_FORMATS: Record<string, InfoForm & { title: string }> = {
     fields: [
       { key: "value", label: "측정값", type: "number", required: true },
       { key: "power", label: "전원 상태", type: "choice", choices: ["켜진 상태", "꺼진 상태"], required: true, help: "전압은 켜진 상태, 저항·연결(통전)은 꺼진 상태에서 재요." },
-      { key: "where", label: "잰 위치와 모드", type: "text", required: false, help: "예: 빨간 리드 5V 핀, 검은 리드 GND, DC 20V 모드" }
+      { key: "where", label: "잰 위치와 모드", type: "text", required: false, help: "예: 빨간 리드 5V 핀, 검은 리드 GND, DC 20V 모드" },
+      { key: "firmware", label: "올라가 있는 펌웨어", type: "text", required: false, help: "시리얼 모니터 첫 줄의 버전이나 마지막으로 올린 파일 이름. 어떤 코드에서 잰 값인지 알아야 원인을 좁힐 수 있어요." }
     ]
   },
   error_log: {

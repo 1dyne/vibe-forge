@@ -45,6 +45,10 @@ export type ProjectTask = {
   questions?: TaskQuestion[];
   // Set when the task was handed to a coding agent through a routine.
   dispatch?: { at: string; ok: boolean; status: number | null; sessionUrl?: string };
+  // HW/SW tasks remember the agreement version they were made against.
+  contractVersion?: number;
+  // A person's question about one decision (see the decision tree).
+  topic?: string;
 };
 
 // A design choice the person settles: stock ran out, two decisions clash, or
@@ -170,6 +174,9 @@ export type MakerProfile = {
   targetPriceKRW?: number | null;
   travelRange?: "unanswered" | "walk" | "transit30" | "transit60" | "car";
   timelineWeeks?: number | null;
+  // How many units: one prototype, a handful (class kits), dozens, or more
+  // (where a PCB becomes the better proposal).
+  quantity?: "unanswered" | "one" | "few" | "dozens" | "many";
 };
 
 // What the finished product looks like, settled before any circuit: the
@@ -232,6 +239,8 @@ export type BuildPlan = {
   setupItems?: Array<{ item: string; why: string; estPriceKRW: number | null }>;
   timeline?: { stages: Array<{ title: string; weeks: number }>; reason: string; totalWeeks: number; targetWeeks: number | null; feasibility: "likely" | "stretch" | "unlikely" | "unknown" };
   fabrication: { needs3DPrint: boolean; plan: string };
+  // Low-power budget: current per mode and hours per day → battery days.
+  power?: { source: string; capacityMah: number | null; modes: Array<{ name: string; currentMa: number; hoursPerDay: number }>; measured: boolean; averageMa?: number; estimatedDays?: number | null };
   risks: string[];
   updatedAt: string;
 };
@@ -248,6 +257,32 @@ export type LinkKind = "claude_project" | "claude_chat" | "code_cloud" | "code_c
 export type WorkspaceLink = { id: string; role: AgentId; kind: LinkKind; label: string; url: string; registeredBy: "human" | AgentId; at: string };
 export type WakeMode = "manual" | "schedule" | "event";
 export type WakeConfig = { mode: WakeMode; reason: string; setBy: AgentId | "human"; at: string; deadlineMinutes: number; fireUrl?: string; token?: string; lastFire?: { at: string; ok: boolean; status: number | null; sessionUrl?: string } };
+
+// The HW↔SW agreement both sides build against: how the device talks to
+// the app, the data it sends, how Wi-Fi is set up and how firmware updates.
+// A draft becomes current only when the person approves it.
+export type InterfaceContract = {
+  version: number;
+  transport: "wifi_sta" | "wifi_ap" | "ble" | "usb_serial" | "none";
+  summary: string;
+  endpoints: string[];
+  payload: Array<{ field: string; type: string; unit?: string; example: string }>;
+  ble?: { service: string; characteristics: Array<{ uuid: string; name: string; props: string }> };
+  auth: string;
+  provisioning: string;
+  reconnect: string;
+  updates: string;
+  by: AgentId;
+  at: string;
+  approvedAt: string | null;
+};
+export type ContractState = { current: InterfaceContract | null; draft: InterfaceContract | null; history: InterfaceContract[] };
+
+// Design: reference cards the ID/ME agents propose, the person's picks, and
+// the brief that fixes the direction before any modeling.
+export type DesignReference = { id: string; title: string; url: string; imageUrl?: string; takeaways: string[]; avoid: string[]; by: AgentId; at: string };
+export type DesignBrief = { keywords: string[]; proportions: string; cmf: string; must: string[]; never: string[]; approach: "parametric" | "loft" | "organic"; approachWhy: string; by: AgentId; at: string; approvedAt: string | null };
+export type DesignState = { refs: DesignReference[]; chosen: string[]; brief: DesignBrief | null };
 
 // "available" = the person checked a seller has enough in stock to order.
 export type PurchaseStatus = "needed" | "available" | "ordered" | "received" | "problem";
@@ -271,6 +306,8 @@ export type Workflow = {
   // The routine token is the person's secret: it stays in the sealed record
   // and is stripped from every response (see publicProject).
   wake?: WakeConfig;
+  contract?: ContractState;
+  design?: DesignState;
 };
 
 export type AgentPlan = {

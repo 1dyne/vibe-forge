@@ -100,7 +100,7 @@ describe("information requests", () => {
   it("builds a form from a ready-made format plus extra fields and judges readings against the expected range", () => {
     const p = handoffProject();
     const form = buildForm("measurement", [{ key: "photo_note", label: "보드 LED 색", type: "text", required: false }], "USB 포트 전압이에요.", { value: { min: 4.75, max: 5.25 } });
-    expect(form!.fields.map((f) => f.key)).toEqual(["value", "power", "where", "photo_note"]);
+    expect(form!.fields.map((f) => f.key)).toEqual(["value", "power", "where", "firmware", "photo_note"]);
     expect(form!.help).toContain("USB 포트 전압");
     expect(() => buildForm("nope", undefined, undefined)).toThrow("없는 포맷");
     const { task } = upsertTask(p, { assignee: "human", kind: "measure", title: "5V 확인", plain: "포트 전압", form, howTo: ["멀티미터를 DC 20V로", "빨간 리드 5V, 검은 리드 GND"] }, "hw");

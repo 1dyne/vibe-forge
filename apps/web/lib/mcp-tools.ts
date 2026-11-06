@@ -3,7 +3,7 @@ import { z } from "zod";
 import { buildFromSubmission } from "./build-pipeline";
 import { PlanSchema } from "./design-agent";
 import { applyAgentPlan, createProject, getProject, listProjects, mutateProject, saveMakerProfile } from "./local-project-store";
-import type { AgentId, AgentPlan, DevProfile, FormField, LocalProject, MakerProfile, ProjectTask } from "./project-types";
+import type { AgentId, AgentPlan, DevProfile, FormField, InterfaceContract, LocalProject, MakerProfile, ProjectTask } from "./project-types";
 type ProjectTaskKind = ProjectTask["kind"];
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
@@ -22,6 +22,7 @@ import { workbenchItems } from "./workbench";
 import { CoordinationError, PURCHASE_LABEL, answerTaskQuestion, boardSummary, buildForm, closeConflict, raiseConflict, recordPurchase, setTaskStatus, upsertTask } from "./coordination";
 import { INFO_FORMATS } from "./info-formats";
 import { addDeadline, clearDeadline, notifyPerson, noticesBetween } from "./notify";
+import { AgreementError, addReferences, contractNeeded, powerBudget, proposeBrief, proposeContract, staleForContract } from "./agreements";
 import { CODING_ROLES, LINK_LABEL, LOCAL_KINDS, WorkspaceError, addLink, cliLink, firePayload, fireRoutine, routinePrompt, setWake, wakeView } from "./workspaces";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
@@ -187,6 +188,27 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 사람의 할 일 상태는 사람이 대시보드에서 바꾼다(하는 중·완료·막힘·못 함). 사람이 채팅으로 결과를 말하면 record_task_result로 기록한다. 사람이 '막힘'이나 '못 함'을 고르면 note의 이유를 읽고 측정 방법을 풀어 설명하거나 다른 방법을 다시 제안한다.
 - 사람에게 할 일·충돌 카드를 만들었으면 답변 끝에 결과의 openUrl로 [달그락에서 열기](openUrl) 링크를 붙인다.
 
+## HW↔SW 연결 약속 (propose_interface_contract)
+- 하드웨어와 앱·서버가 함께 있는 프로젝트(track=both)는 연결 약속이 있어야 최종 설계를 확정할 수 있다. 무선 방식(Wi-Fi 접속/기기 자체 Wi-Fi/BLE/USB), 주소, 주고받는 데이터(필드·형식·단위·예시), BLE UUID, 인증, 와이파이 첫 설정 방법, 끊김·재연결, 펌웨어 업데이트(USB/OTA)를 정해 제안하고 사람의 승인을 받는다.
+- HW 펌웨어와 SW 앱은 contract.current만 기준으로 만든다. 바꿔야 하면 바로 고치지 말고 새 버전을 제안한다. 승인되면 이전 버전으로 만든 할 일이 contract.staleTasks에 나오니, 그 담당이 새 버전에 맞춘다.
+- 부품을 기다리는 동안 SW는 약속의 예시 데이터로 가짜 기기(mock)를 만들어 먼저 개발하고, HW는 시뮬레이터(Wokwi 등, 보드가 지원하면)로 펌웨어를 먼저 돌려본다.
+
+## 디자인: 레퍼런스 → 선택 → 방향 → 모델링 (ID·ME)
+- 최종 설계가 확정되면 ME는 먼저 승인된 부품 치수와 포트 위치로 내부 공간을 정한다(CadQuery). 이 공간은 ID가 바꿀 수 없다.
+- ID는 웹 검색으로 참고할 실제 제품·작품을 찾아 add_design_references로 3~6개 올리고, 사람이 고르면 set_design_brief로 방향(키워드·비율·CMF·지킬 것·피할 것·모델링 방법)을 정리해 승인을 받는다. 승인 전에는 겉모양을 모델링하지 않는다.
+- 모델링 방법: 치수 중심 케이스는 parametric(CadQuery), 둥근 곡면은 loft(정면·측면 실루엣 SVG를 먼저 사람에게 보여준 뒤 build123d loft), 털·생물 같은 형태는 organic(SDF 라이브러리 또는 Blender — Blender MCP는 데스크톱 앱·Claude Code에서만). 이미지로 3D를 만드는 생성 모델은 콘셉트 확인용으로만 쓴다. 겉껍질에서 ME의 내부 공간을 빼고 벽 두께·포트 위치·출력 가능성을 검사한다.
+- 3D 출력 전에는 맞춤 시험 조각(포트 구멍·고정 기둥 부분만)을 먼저 출력해 실측(format=dimension)하고 공차를 맞춘다. 메이커스페이스 예약 시간도 일정에 넣는다.
+
+## 결정에 대한 질문
+- 사람이 결정 트리에서 '질문하기'를 누르면 assignee=chief, createdBy=human인 할 일(title이 '질문 · …')이 생긴다. 대장은 대화를 시작할 때 board.agentTasks에서 이것부터 확인하고, update_task(completed, note=답)로 답한다. 답은 결정 트리의 그 항목 아래에 보인다.
+
+## 빠뜨리기 쉬운 하드웨어 단계 (대장이 설계도·할 일에 넣는다)
+- 전력 예산: 저전력 장치면 set_build_plan의 power에 동작 모드별 전류(mA)와 하루 시간을 넣는다. 서버가 평균 전류와 배터리 날수를 계산한다. 데이터시트 값이면 measured=false로 두고, 실측 요청(µA는 일반 멀티미터로 어려우니 전류계 모드·측정 방법을 howTo로)을 만든다. 보조배터리는 전류가 낮으면 저절로 꺼질 수 있어 시험한다.
+- 수량: 체크리스트의 수량이 2~10대면 수량×부품·예비 부품·1인 키트 구성을, 11대 이상이면 퍼프보드나 PCB를 비교해 제안한다. 50대 이상이나 판매면 PCB/PCBA와, 무선 기기 판매에 필요한 KC 전파 인증(인증받은 모듈 사용 여부)을 확인한다.
+- 첫 전원 넣기: 연결 전 단락 확인(통전 모드) → 전원만 먼저 → 전압 확인 → 부품 하나씩 연결. 조립 가이드 1~2단계와 문제 카드에 넣는다.
+- 보정과 합격 시험: 센서 보정 절차(예: 저울 영점·단위 무게)와 완료 기준을 측정 요청(format=measurement, expected)으로 만들어 기록을 남긴다. 측정 요청에는 어떤 펌웨어에서 쟀는지(firmware 칸)를 받는다.
+- 마무리: 다 만들면 최종 회로·부품목록과 구매처·펌웨어·3D 파일·조립 가이드를 정리하고, 다음 프로젝트에 쓸 회고(잘된 것, 막힌 곳, 다시 산 부품)를 log_team_turn에 남긴다.
+
 ## 작업 공간과 코딩 에이전트 깨우기
 - 대장(Claude 채팅)은 전체 진행과 사람과의 대화를 맡는다. HW 펌웨어 작성·컴파일, SW, ME·ID 모델링은 Claude Code나 Codex 세션이 맡는 것이 기본이다. 그 일은 upsert_task(assignee=hw/sw/me/id)로 보드에 올린다.
 - 대장은 set_wake_mode로 넘기는 방식을 고른다: 사람이 곧 그 세션을 열 상황이면 manual, 몇 시간 단위로 묶어 처리해도 되면 schedule, 사람이 기다리고 있어 바로 시작해야 하면 event. 이유를 짧게 남긴다.
@@ -280,6 +302,7 @@ const buildPlanJsonSchema = {
     timeline: { type: "object", additionalProperties: false, required: ["stages", "reason"], description: "사용자 실력 기준 단계별 예상 주 수. 서버가 원하는 기간과 비교한다", properties: { stages: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "weeks"], properties: { title: { type: "string" }, weeks: { type: "number" } } } }, reason: { type: "string", description: "왜 이만큼 걸리는지: 먼저 익힐 기술과 진행 순서" } } },
     cost: { type: "object", additionalProperties: false, required: ["options", "marginNote"], properties: { options: { type: "array", items: { type: "string" }, description: "예산 초과·빠듯할 때 숫자가 들어간 병목 제안 (예산 상향, 단계 개발, 대체 부품)" }, marginNote: { type: "string", description: "판매 목적이면 판매가 대비 원가·마진, 아니면 빈 문자열" } } },
     fabrication: { type: "object", additionalProperties: false, required: ["needs3DPrint", "plan"], properties: { needs3DPrint: { type: "boolean" }, plan: { type: "string", description: "외형 제작 방법. 프린터가 없으면 지역 메이커스페이스·출력 대행 안내" } } },
+    power: { type: "object", additionalProperties: false, required: ["source", "capacityMah", "modes", "measured"], description: "저전력 예산: 전원과 동작 모드별 전류(mA)·하루 사용 시간. 서버가 평균 전류와 배터리로 버티는 날수를 계산한다(손실 30% 반영). 실측 전이면 measured=false", properties: { source: { type: "string", description: "예: 보조배터리 10000mAh, 18650 + 보호회로 충전 모듈, USB 상시 전원" }, capacityMah: { type: ["number", "null"] }, modes: { type: "array", maxItems: 6, items: { type: "object", additionalProperties: false, required: ["name", "currentMa", "hoursPerDay"], properties: { name: { type: "string", description: "예: 측정·전송, 대기(라이트 슬립), 깊은 절전" }, currentMa: { type: "number", description: "데이터시트 기준 또는 실측 mA" }, hoursPerDay: { type: "number" } } } }, measured: { type: "boolean" } } },
     risks: { type: "array", maxItems: 6, items: { type: "string" } }
   }
 };
@@ -337,6 +360,8 @@ function summarize(project: LocalProject, context: ToolContext) {
     slots: project.slots.map(({ key, label, status, valueText, assumption, acknowledged }) => ({ key, label, status, valueText, assumption, acknowledged })),
     openTasks: project.tasks.filter((task) => task.status === "ready" && (task.assignee ?? "human") === "human").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
     board: boardSummary(project, (kind, itemId) => itemUrl(context, project.id, kind, itemId)),
+    contract: { needed: contractNeeded(project), current: workflow.contract?.current ?? null, draft: workflow.contract?.draft ?? null, staleTasks: staleForContract(project) },
+    design: workflow.design ? { refs: workflow.design.refs, chosen: workflow.design.chosen, brief: workflow.design.brief } : null,
     workspaces: { links: (workflow.links ?? []).map(({ role, kind, label, url }) => ({ role, kind, label, url, local: LOCAL_KINDS.includes(kind) })), wake: wakeView(project), routinePrompt: routinePrompt(project) },
     circuit: project.build ? {
       status: project.build.status, board: project.build.blueprint.board, supplyVoltage: project.build.blueprint.supplyVoltage,
@@ -376,6 +401,7 @@ const ProfileInput = z.object({
   region: z.string().trim().max(60).optional(),
   budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(),
+  quantity: z.enum(["unanswered", "one", "few", "dozens", "many"]).optional(),
   targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
   timelineWeeks: z.number().min(0.5).max(104).nullable().optional()
@@ -407,6 +433,7 @@ const BuildPlanSchema = z.object({
   setupItems: z.array(z.object({ item: z.string().min(1).max(80), why: z.string().min(1).max(200), estPriceKRW: z.number().int().min(0).max(1_000_000).nullable() }).strict()).max(8).optional(),
   timeline: z.object({ stages: z.array(z.object({ title: z.string().min(1).max(80), weeks: z.number().min(0.1).max(52) }).strict()).min(1).max(12), reason: z.string().max(600) }).strict().optional(),
   fabrication: z.object({ needs3DPrint: z.boolean(), plan: z.string().min(1).max(600) }).strict(),
+  power: z.object({ source: z.string().min(1).max(120), capacityMah: z.number().min(0).max(1_000_000).nullable(), modes: z.array(z.object({ name: z.string().min(1).max(60), currentMa: z.number().min(0).max(10_000), hoursPerDay: z.number().min(0).max(24) }).strict()).max(6), measured: z.boolean() }).strict().optional(),
   risks: z.array(z.string().min(1).max(300)).max(6)
 }).strict();
 
@@ -498,7 +525,7 @@ export const TOOLS: ToolDefinition[] = [
       firmwareExperience: { type: "string", enum: ["unanswered", "none", "guided", "independent"], description: "none=처음, guided=안내 보며 해봄, independent=직접 가능" },
       solderingSkill: { type: "string", enum: ["unanswered", "none", "tried", "comfortable"] }, printerAccess: { type: "string", enum: ["unanswered", "own", "makerspace", "service", "none"] },
       region: { type: "string", description: "시·구 (메이커스페이스 안내용)" }, budgetKRW: { type: ["integer", "null"], description: "부품 총 예산 상한(원)" },
-      purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" },
+      purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, quantity: { type: "string", enum: ["unanswered", "one", "few", "dozens", "many"], description: "만들 수량: 1대 / 2~10대 / 11~50대 / 50대 이상·판매" }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" },
       travelRange: { type: "string", enum: ["unanswered", "walk", "transit30", "transit60", "car"], description: "메이커스페이스까지 이동 가능 범위" }, timelineWeeks: { type: ["number", "null"], description: "원하는 완성 기간(주). 선택" }
     } },
     run: async (input, context) => {
@@ -519,7 +546,8 @@ export const TOOLS: ToolDefinition[] = [
           profile.budgetKRW != null && `예산: ${profile.budgetKRW.toLocaleString("ko-KR")}원 이하`,
           profile.timelineWeeks != null && `원하는 기간: ${profile.timelineWeeks}주`,
           profile.travelRange && profile.travelRange !== "unanswered" && `이동 범위: ${{ walk: "도보", transit30: "대중교통 30분", transit60: "대중교통 1시간", car: "차량" }[profile.travelRange]}`,
-          profile.purpose && profile.purpose !== "unanswered" && `목적: ${{ personal: "개인용", gift: "선물", sell: "판매", lecture: "수업·강연" }[profile.purpose]}${profile.targetPriceKRW != null ? ` (판매가 ${profile.targetPriceKRW.toLocaleString("ko-KR")}원)` : ""}`
+          profile.purpose && profile.purpose !== "unanswered" && `목적: ${{ personal: "개인용", gift: "선물", sell: "판매", lecture: "수업·강연" }[profile.purpose]}${profile.targetPriceKRW != null ? ` (판매가 ${profile.targetPriceKRW.toLocaleString("ko-KR")}원)` : ""}`,
+          profile.quantity && profile.quantity !== "unanswered" && `수량: ${{ one: "1대", few: "2~10대", dozens: "11~50대", many: "50대 이상·판매" }[profile.quantity]}`
         ].filter(Boolean);
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `제작 체크리스트\n${lines.join("\n")}`, createdAt: now });
         p.workflow = w;
@@ -563,7 +591,7 @@ export const TOOLS: ToolDefinition[] = [
       const totalWeeks = plan.timeline ? Number(plan.timeline.stages.reduce((sum, stage) => sum + stage.weeks, 0).toFixed(1)) : 0;
       const targetWeeks = profile.timelineWeeks ?? null;
       const timeline = plan.timeline ? { ...plan.timeline, totalWeeks, targetWeeks, feasibility: (targetWeeks == null ? "unknown" : totalWeeks <= targetWeeks ? "likely" : totalWeeks <= targetWeeks * 1.5 ? "stretch" : "unlikely") as NonNullable<BuildPlan["timeline"]>["feasibility"] } : undefined;
-      const saved: BuildPlan = { ...plan, timeline, cost: { totalKRW, partsKRW, setupKRW, budgetKRW, verdict, options: plan.cost.options, marginNote: plan.cost.marginNote }, updatedAt: new Date().toISOString() };
+      const saved: BuildPlan = { ...plan, ...(plan.power ? { power: powerBudget(plan.power) } : {}), timeline, cost: { totalKRW, partsKRW, setupKRW, budgetKRW, verdict, options: plan.cost.options, marginNote: plan.cost.marginNote }, updatedAt: new Date().toISOString() };
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = saved.updatedAt;
@@ -1056,6 +1084,7 @@ TOOLS.push(
         if ((parsed.format || parsed.fields) && parsed.assignee !== "human") throw new ToolError("입력 양식은 사람에게 부탁하는 할 일(assignee=human)에만 붙여요.");
         const form = buildForm(parsed.format, parsed.fields, parsed.formHelp, parsed.expected);
         const { task, created } = upsertTask(p, { assignee: parsed.assignee, kind: parsed.kind, title: parsed.title, plain: parsed.plain, doneWhen: parsed.doneWhen, dependsOn: parsed.dependsOn, form, howTo: parsed.howTo }, parsed.by, parsed.taskId);
+        if ((parsed.assignee === "hw" || parsed.assignee === "sw") && p.workflow?.contract?.current) task.contractVersion = p.workflow.contract.current.version;
         result = { id: task.id, created };
       });
       const openUrl = itemUrl(context, parsed.projectId, "task", result.id);
@@ -1119,6 +1148,47 @@ TOOLS.push(
       const view = wakeView(updated);
       const setup = parsed.mode === "manual" ? "사람이 대시보드의 세션 버튼으로 열어 '달그락 할 일 확인해'라고 말하면 돼요." : `사람에게 안내하세요: claude.ai/code/routines에서 예약 작업을 만들고(달그락 커넥터 포함), 프롬프트에 routinePrompt를 붙여넣기.${parsed.mode === "schedule" ? " 반복 주기를 고르기(클라우드는 최소 1시간)." : " 트리거에 API를 추가하고, 호출 주소와 토큰을 대시보드의 작업 공간 → 이벤트 연결에 등록하기."}${view.eventReady || parsed.mode === "schedule" ? "" : " 아직 호출 주소·토큰이 등록되지 않았어요."}`;
       return { text: `깨우는 방식을 정했어요. ${setup}`, data: { wake: view, routinePrompt: routinePrompt(updated) } };
+    }
+  },
+  {
+    name: "propose_interface_contract", title: "HW↔SW 연결 약속 제안",
+    description: "펌웨어(HW)와 앱·서버(SW)가 함께 지킬 연결 약속을 제안한다: 연결 방식(Wi-Fi 접속/기기 자체 Wi-Fi/BLE/USB), 주소, 보내는 데이터(필드·형식·단위·예시), BLE 서비스·특성 UUID, 인증, 와이파이 첫 설정 방법(provisioning), 끊김·재연결, 펌웨어 업데이트(OTA 여부). 사람이 대시보드에서 승인해야 현재 약속이 되고, 그때 설계 슬롯(무선·데이터 행선지)도 이 약속으로 바뀐다. HW와 SW는 승인된 약속(get_project의 contract.current)만 기준으로 만들고, 바꿔야 하면 새 버전을 제안한다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "transport", "summary", "endpoints", "payload", "auth", "provisioning", "reconnect", "updates"], properties: { projectId, by: roleProp, transport: { type: "string", enum: ["wifi_sta", "wifi_ap", "ble", "usb_serial", "none"] }, summary: { type: "string", description: "한두 문장 요약" }, endpoints: { type: "array", items: { type: "string" }, description: "예: POST https://<서버>/api/readings, http://192.168.4.1/setup" }, payload: { type: "array", items: { type: "object", additionalProperties: false, required: ["field", "type", "example"], properties: { field: { type: "string" }, type: { type: "string" }, unit: { type: "string" }, example: { type: "string" } } } }, ble: { type: "object", additionalProperties: false, required: ["service", "characteristics"], properties: { service: { type: "string" }, characteristics: { type: "array", items: { type: "object", additionalProperties: false, required: ["uuid", "name", "props"], properties: { uuid: { type: "string" }, name: { type: "string" }, props: { type: "string", description: "read/write/notify" } } } } } }, auth: { type: "string" }, provisioning: { type: "string", description: "와이파이 이름·비밀번호를 기기에 넣는 방법" }, reconnect: { type: "string" }, updates: { type: "string", description: "펌웨어 업데이트 방법 (USB만 / OTA)" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), by: AgentRole, transport: z.enum(["wifi_sta", "wifi_ap", "ble", "usb_serial", "none"]), summary: z.string().trim().min(1).max(400), endpoints: z.array(z.string().max(200)).max(10), payload: z.array(z.object({ field: z.string().min(1).max(60), type: z.string().min(1).max(40), unit: z.string().max(20).optional(), example: z.string().max(120) }).strict()).max(20), ble: z.object({ service: z.string().max(60), characteristics: z.array(z.object({ uuid: z.string().max(60), name: z.string().max(60), props: z.string().max(40) }).strict()).max(10) }).strict().optional(), auth: z.string().max(300), provisioning: z.string().max(300), reconnect: z.string().max(300), updates: z.string().max(300) }).strict().parse(input) as Omit<InterfaceContract, "version" | "at" | "approvedAt" | "by"> & { projectId: string; by: Role };
+      await ownedProject(parsed.projectId, context);
+      const { projectId: id, ...draft } = parsed;
+      let version = 0;
+      await mutateProject(id, (p) => {
+        version = proposeContract(p, draft).version;
+        const w = workflowFor(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: parsed.by, text: `연결 약속 v${version} 제안: ${parsed.summary} (사람의 승인 대기)`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+      });
+      return { text: `연결 약속 v${version}을 제안했어요. 사람에게 대시보드의 결정 트리에서 승인해 달라고 안내하세요.`, data: { version, openUrl: withLinkParams(context.dashboardUrl, { p: id, open: "decisions" }) } };
+    }
+  },
+  {
+    name: "add_design_references", title: "디자인 레퍼런스 카드 올리기 (ID·ME)",
+    description: "모델링 전에 참고할 디자인을 카드로 올린다. 웹 검색으로 찾은 실제 제품·작품의 링크, 이미지 주소(https, 있으면), 가져올 점(비율·곡률·재질·마감·색), 따라 하지 말 점을 쓴다. 3~6개를 올리고 사람에게 대시보드에서 고르게 한다. replace=true면 고르지 않은 기존 카드를 지운다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "refs"], properties: { projectId, by: roleProp, replace: { type: "boolean" }, refs: { type: "array", minItems: 1, maxItems: 8, items: { type: "object", additionalProperties: false, required: ["title", "url", "takeaways", "avoid"], properties: { title: { type: "string" }, url: { type: "string" }, imageUrl: { type: "string" }, takeaways: { type: "array", items: { type: "string" } }, avoid: { type: "array", items: { type: "string" } } } } } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), by: AgentRole, replace: z.boolean().default(false), refs: z.array(z.object({ title: z.string().trim().min(1).max(80), url: z.string().max(500), imageUrl: z.string().max(500).optional(), takeaways: z.array(z.string().max(120)).min(1).max(5), avoid: z.array(z.string().max(120)).max(5) }).strict()).min(1).max(8) }).strict().parse(input) as { projectId: string; by: Role; replace: boolean; refs: Array<{ title: string; url: string; imageUrl?: string; takeaways: string[]; avoid: string[] }> };
+      await ownedProject(parsed.projectId, context);
+      await mutateProject(parsed.projectId, (p) => { addReferences(p, parsed.refs, parsed.by, parsed.replace); });
+      return { text: `레퍼런스 ${parsed.refs.length}개를 올렸어요. 사람에게 대시보드의 결정 트리에서 마음에 드는 것을 골라 달라고 안내하세요.`, data: { openUrl: withLinkParams(context.dashboardUrl, { p: parsed.projectId, open: "decisions" }) } };
+    }
+  },
+  {
+    name: "set_design_brief", title: "디자인 방향 정하기 (ID·ME)",
+    description: "사람이 고른 레퍼런스(get_project의 design.chosen)를 바탕으로 디자인 방향을 정리한다: 키워드, 비율, 재질·마감·색(CMF), 꼭 지킬 것, 하지 말 것, 모델링 방법. approach: parametric=치수 중심 케이스(CadQuery), loft=부드러운 곡면(정면·측면 실루엣을 build123d loft로), organic=털·생물 같은 유기적 형태(SDF 또는 Blender). 사람이 승인하면 그 방향으로 모델링한다. ME의 내부 공간(부품 치수·포트 위치)은 항상 지킨다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "keywords", "proportions", "cmf", "must", "never", "approach", "approachWhy"], properties: { projectId, by: roleProp, keywords: { type: "array", items: { type: "string" } }, proportions: { type: "string" }, cmf: { type: "string", description: "재질·마감·색" }, must: { type: "array", items: { type: "string" } }, never: { type: "array", items: { type: "string" } }, approach: { type: "string", enum: ["parametric", "loft", "organic"] }, approachWhy: { type: "string" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), by: AgentRole, keywords: z.array(z.string().max(30)).min(1).max(8), proportions: z.string().max(300), cmf: z.string().max(300), must: z.array(z.string().max(120)).max(6), never: z.array(z.string().max(120)).max(6), approach: z.enum(["parametric", "loft", "organic"]), approachWhy: z.string().max(300) }).strict().parse(input) as { projectId: string; by: Role; keywords: string[]; proportions: string; cmf: string; must: string[]; never: string[]; approach: "parametric" | "loft" | "organic"; approachWhy: string };
+      await ownedProject(parsed.projectId, context);
+      const { projectId: id, by, ...brief } = parsed;
+      await mutateProject(id, (p) => { proposeBrief(p, brief, by); });
+      return { text: "디자인 방향을 정리했어요. 사람에게 대시보드의 결정 트리에서 승인해 달라고 안내하세요.", data: { openUrl: withLinkParams(context.dashboardUrl, { p: id, open: "decisions" }) } };
     }
   },
   {
@@ -1241,7 +1311,7 @@ export async function callTool(name: string, input: unknown, context: ToolContex
     return { content: [{ type: "text", text }], ...(result.data && typeof result.data === "object" ? { structuredContent: result.data as Record<string, unknown> } : {}) };
   } catch (error) {
     if (error instanceof z.ZodError) return { content: [{ type: "text", text: `입력 형식이 맞지 않아요: ${error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`).join("; ")}` }], isError: true };
-    if (error instanceof ToolError || error instanceof CoordinationError || error instanceof WorkspaceError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error instanceof ToolError || error instanceof CoordinationError || error instanceof WorkspaceError || error instanceof AgreementError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
     console.error("mcp tool failed", name, error instanceof Error ? error.message : "unknown error");
     return { content: [{ type: "text", text: "도구 실행 중 오류가 났어요. 잠시 후 다시 시도해주세요." }], isError: true };
   }

@@ -9,13 +9,15 @@ import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
+import { AgreementError, approveBrief, approveContract, pickReferences, rejectContract } from "../../../../../lib/agreements";
 import { WorkspaceError, addLink, fireRoutine, removeLink, setWake } from "../../../../../lib/workspaces";
+import { upsertTask } from "../../../../../lib/coordination";
 import { CoordinationError, askAboutTask, finalizeBlockers, questionOwner, recordPurchase, resolveConflictByPerson, setTaskStatus, submitTaskForm } from "../../../../../lib/coordination";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
   solderingSkill: z.enum(["unanswered", "none", "tried", "comfortable"]).optional(), printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
   region: z.string().max(60).optional(), budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
-  purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(), targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(), quantity: z.enum(["unanswered", "one", "few", "dozens", "many"]).optional(), targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(), timelineWeeks: z.number().min(0.5).max(104).nullable().optional() }).strict();
 const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("profile"), profile: ProfileSchema }),
@@ -30,6 +32,9 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("link_remove"), id: z.string().uuid() }),
   z.object({ action: z.literal("wake_connect"), fireUrl: z.string().trim().max(300).optional(), token: z.string().trim().max(400).optional(), deadlineMinutes: z.number().int().min(10).max(1440).optional() }),
   z.object({ action: z.literal("wake_test") }),
+  z.object({ action: z.literal("contract_approve") }), z.object({ action: z.literal("contract_reject"), note: z.string().trim().max(600).optional() }),
+  z.object({ action: z.literal("design_pick"), refIds: z.array(z.string().uuid()).max(8) }), z.object({ action: z.literal("brief_approve") }),
+  z.object({ action: z.literal("decision_question"), topic: z.string().regex(/^[a-z_]{2,30}$/), label: z.string().trim().min(1).max(60), text: z.string().trim().min(1).max(800) }),
   z.object({ action: z.literal("task_question"), taskId: z.string().uuid(), text: z.string().trim().min(1).max(800) }),
   z.object({ action: z.literal("resolve_conflict"), conflictId: z.string().uuid(), optionId: z.string().max(8).optional(), proposal: z.string().trim().max(1500).optional() }),
   z.object({ action: z.literal("reopen") }),
@@ -131,6 +136,31 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         p.workflow = w;
         setWake(p, { mode: w.wake?.mode ?? "event", reason: w.wake?.reason || "사람이 이벤트 연결을 등록했어요.", setBy: w.wake?.setBy ?? "human", fireUrl: input.fireUrl, token: input.token, deadlineMinutes: input.deadlineMinutes });
         pushActivity(p, { source: "person", title: "코딩 에이전트 이벤트 연결 등록" });
+      } else if (input.action === "contract_approve") {
+        p.workflow = w;
+        const c = approveContract(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `사람이 연결 약속 v${c.version}을 승인했어요: ${c.summary}. HW·SW는 이 약속을 기준으로 만들어요.`, createdAt: now });
+        pushActivity(p, { source: "person", title: `연결 약속 v${c.version} 승인` });
+      } else if (input.action === "contract_reject") {
+        p.workflow = w;
+        rejectContract(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `사람이 연결 약속 초안을 돌려보냈어요${input.note ? `: ${input.note}` : ""}. 대장이 다시 정리해야 해요.`, createdAt: now });
+      } else if (input.action === "design_pick") {
+        p.workflow = w;
+        pickReferences(p, input.refIds);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "id", text: `사람이 레퍼런스 ${input.refIds.length}개를 골랐어요. ID가 set_design_brief로 디자인 방향을 정리해요.`, createdAt: now });
+        pushActivity(p, { source: "person", title: "레퍼런스 선택" });
+      } else if (input.action === "brief_approve") {
+        p.workflow = w;
+        approveBrief(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "id", text: "사람이 디자인 방향을 승인했어요. ID·ME가 이 방향으로 모델링해요.", createdAt: now });
+        pushActivity(p, { source: "person", title: "디자인 방향 승인" });
+      } else if (input.action === "decision_question") {
+        // A question about one decision goes to the chief as a task.
+        const { task } = upsertTask(p, { assignee: "chief", kind: "review", title: `질문 · ${input.label}`, plain: input.text }, "human");
+        task.topic = input.topic;
+        p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${input.label}] 질문: ${input.text}`, shared: true, createdAt: now });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `사람의 질문 [${input.label}]: ${input.text} (대장이 update_task completed와 note로 답해요)`, createdAt: now });
       } else if (input.action === "wake_test") {
         if (w.wake) w.wake.lastFire = { at: now, ...fired! };
         if (!fired?.ok) throw new WorkspaceError(fired?.status ? `예약 작업이 응답 ${fired.status}을(를) 돌려줬어요. 토큰과 주소를 확인해 주세요.` : "예약 작업에 연결하지 못했어요. 호출 주소와 토큰을 등록했는지 확인해 주세요.");

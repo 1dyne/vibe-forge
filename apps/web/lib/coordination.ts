@@ -216,6 +216,7 @@ export function finalizeBlockers(p: LocalProject): string[] {
   if (!w.activeAgents.length) blockers.push("함께 일할 팀을 하나 이상 골라주세요.");
   const blockedRules = (p.build?.checks ?? []).filter((c) => c.severity === "blocked" && c.verdict === "fail");
   if (blockedRules.length) blockers.push(`회로에 꼭 고쳐야 할 문제 ${blockedRules.length}건이 남아 있어요.`);
+  if (p.buildPlan?.track === "both" && !w.contract?.current) blockers.push(w.contract?.draft ? `HW↔SW 연결 약속 v${w.contract.draft.version}을 결정 트리에서 승인해 주세요.` : "HW↔SW 연결 약속이 아직 없어요. 대장·HW·SW가 연결 방식과 주고받을 데이터를 정해 올리면 승인해 주세요.");
   const review = p.build?.evaluator;
   if (review && (review.hw.verdict === "fail" || review.sw.verdict === "fail")) blockers.push("구매 전 교차 검토에서 실패(fail) 판정이 있어요. 회로를 고쳐 다시 검토받아주세요.");
   return blockers;

@@ -169,6 +169,17 @@ export function noticesBetween(before: LocalProject | null, after: LocalProject,
     const prev = prevConflicts.get(c.id);
     if (!prev || prev.updatedAt !== c.updatedAt) notices.push({ title: `${c.afterFinal ? "변경 제안" : "결정해 주세요"}: ${c.title}`, url: url(`conflict:${c.id}`) });
   }
+  const bw = before ? workflowFor(before) : null;
+  const aw = workflowFor(after);
+  if (aw.contract?.draft && aw.contract.draft.at !== bw?.contract?.draft?.at) notices.push({ title: `연결 약속 v${aw.contract.draft.version}을 확인해 주세요`, url: url("decisions") });
+  const newRefs = (aw.design?.refs ?? []).filter((r) => !(bw?.design?.refs ?? []).some((x) => x.id === r.id));
+  if (newRefs.length) notices.push({ title: `디자인 레퍼런스 ${newRefs.length}개를 골라 주세요`, url: url("decisions") });
+  if (aw.design?.brief && !aw.design.brief.approvedAt && aw.design.brief.at !== bw?.design?.brief?.at) notices.push({ title: "디자인 방향을 확인해 주세요", url: url("decisions") });
+  for (const t of after.tasks) {
+    if (t.assignee !== "chief" || t.createdBy !== "human" || t.status !== "completed") continue;
+    const prev = prevTasks.get(t.id);
+    if (prev && prev.status !== "completed") notices.push({ title: `질문에 답이 왔어요: ${t.title.replace(/^질문 · /, "")}`, url: url("decisions") });
+  }
   const was = before ? workflowFor(before).phase : null;
   const now = workflowFor(after).phase;
   if (now === "circuit" && after.build && (was !== "circuit" || before?.build?.createdAt !== after.build.createdAt)) notices.push({ title: "회로를 확인하고 승인해 주세요", url: url() });

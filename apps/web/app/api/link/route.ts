@@ -8,7 +8,7 @@ import { findUserByToken } from "../../../lib/users";
 const Body = z.object({
   token: z.string().regex(/^[A-Za-z0-9_-]{20,100}$/),
   p: z.string().regex(/^[0-9a-f-]{36}$/).optional(),
-  open: z.union([z.enum(["profile", "claude", "dev", "account"]), z.string().regex(/^(task|conflict):[0-9a-f-]{36}$/)]).optional()
+  open: z.union([z.enum(["profile", "claude", "dev", "account", "decisions"]), z.string().regex(/^(task|conflict):[0-9a-f-]{36}$/)]).optional()
 }).strict();
 
 // Signs a participant in from a /u#<token> dashboard link for 30 days.

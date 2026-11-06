@@ -4,7 +4,7 @@ import { workflowFor } from "./workflow";
 export type WorkbenchItem = {
   id: string;
   filename: string;
-  kind: "product" | "assembly" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
+  kind: "product" | "assembly" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record" | "decisions";
   mimeType: string;
   content: string;
 };
@@ -48,6 +48,10 @@ export function workbenchItems(project: LocalProject | null): WorkbenchItem[] {
   if (project.assembly) {
     const g = project.assembly;
     items.push({ id: "document:assembly", filename: `${stem}-조립가이드.md`, kind: "assembly", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 조립 가이드\n\n${g.stage} · ${g.base.name} (${g.base.width}×${g.base.height}mm)\n\n${g.steps.map((s, i) => `## ${i + 1}. ${s.title}\n\n${s.action}\n\n${s.wires.map(w => `- ${w.from} → ${w.to}${w.label ? ` (${w.label})` : ""}`).join("\n")}\n\n확인: ${s.check}\n\n${s.cards.map(c => `> ⚠ ${c.symptom}\n> 확인: ${c.check}\n> 정상: ${c.expected}\n> 아니면: ${c.ifNot}`).join("\n\n")}`).join("\n\n")}\n` });
+  }
+  if (project.buildPlan || workflow.contract || workflow.design) {
+    const c = workflow.contract?.current;
+    items.push({ id: "document:decisions", filename: `${stem}-결정트리.md`, kind: "decisions", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 결정 트리\n\n${project.buildPlan ? `- 보드: ${project.buildPlan.board.model} — ${project.buildPlan.board.why}\n- 연결: ${project.buildPlan.connection.method} — ${project.buildPlan.connection.why}\n` : ""}${c ? `- 연결 약속 v${c.version}: ${c.summary}\n${c.endpoints.map(e => `  - ${e}`).join("\n")}\n` : ""}${project.buildPlan?.power ? `- 전력: 평균 ${project.buildPlan.power.averageMa ?? "?"}mA, 약 ${project.buildPlan.power.estimatedDays ?? "?"}일\n` : ""}${workflow.design?.brief ? `- 디자인: ${workflow.design.brief.keywords.join(", ")} (${workflow.design.brief.approach})\n` : ""}` });
   }
   if (project.buildPlan) items.push(...[{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan) }] as WorkbenchItem[]);
   items.push(...(project.build?.artifacts ?? [])
