@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import pg from "pg";
+import type { FireCard, Rarity } from "./card";
 
 // 도깨비불 결과 · 대기열 · 이벤트 저장소.
 // DATABASE_URL_WEB 또는 DATABASE_URL이 있으면 Postgres(Railway), 없으면 .data/find.json (로컬·테스트).
@@ -17,6 +18,8 @@ export type FireRecord = {
   reactKind: string;
   name: string;
   matches: Array<{ id: string; match: number }>;
+  comboKey: string;
+  card: FireCard | null;
   createdAt: string;
 };
 
@@ -66,6 +69,8 @@ function rank(entries: Array<{ id: string; referralCode: string; referredBy: str
 
 interface Backend {
   saveFire(fire: FireRecord): Promise<void>;
+  /** 지금까지 쌓인 도깨비불 중 같은 조합 수와 화력이 더 센 불의 수 (등급 계산용) */
+  rarity(comboKey: string, peak: number): Promise<Rarity>;
   getFire(id: string): Promise<FireRecord | null>;
   join(input: Omit<WaitlistRecord, "id" | "referralCode" | "couponSentAt" | "createdAt" | "consentedAt">): Promise<{ record: WaitlistRecord; alreadyJoined: boolean }>;
   allWaitlist(): Promise<WaitlistRecord[]>;
@@ -110,6 +115,10 @@ async function writeData(data: FileData) {
 const fileBackend: Backend = {
   saveFire: (fire) => serial(async () => { const d = await readData(); d.fires.push(fire); await writeData(d); }),
   getFire: (id) => serial(async () => (await readData()).fires.find((f) => f.id === id) ?? null),
+  rarity: (key, peak) => serial(async () => {
+    const fires = (await readData()).fires;
+    return { total: fires.length, sameCombo: fires.filter((f) => f.comboKey === key).length, higherPeak: fires.filter((f) => f.peak > peak).length };
+  }),
   join: (input) => serial(async () => {
     const d = await readData();
     const existing = d.waitlist.find((w) => w.email === input.email);
@@ -154,6 +163,9 @@ CREATE TABLE IF NOT EXISTS find_events (
   id bigserial PRIMARY KEY, name text NOT NULL, session text, props jsonb NOT NULL DEFAULT '{}', created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS find_events_name ON find_events(name);
+ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS combo_key text;
+ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS card jsonb;
+CREATE INDEX IF NOT EXISTS find_fires_combo ON find_fires(combo_key);
 `;
 
 let pool: pg.Pool | null = null;
@@ -168,12 +180,16 @@ async function db() {
   return pool;
 }
 
-const rowToFire = (r: Record<string, unknown>): FireRecord => ({ id: r.id as string, idea: r.idea as string, sentence: r.sentence as string, picked: r.picked as string[], labels: r.labels as string[], peak: r.peak as number, color: r.color as string, reactKind: r.react_kind as string, name: r.name as string, matches: r.matches as FireRecord["matches"], createdAt: new Date(r.created_at as string).toISOString() });
+const rowToFire = (r: Record<string, unknown>): FireRecord => ({ id: r.id as string, idea: r.idea as string, sentence: r.sentence as string, picked: r.picked as string[], labels: r.labels as string[], peak: r.peak as number, color: r.color as string, reactKind: r.react_kind as string, name: r.name as string, matches: r.matches as FireRecord["matches"], comboKey: (r.combo_key as string) ?? "", card: (r.card as FireCard) ?? null, createdAt: new Date(r.created_at as string).toISOString() });
 const rowToWait = (r: Record<string, unknown>): WaitlistRecord => ({ id: r.id as string, email: r.email as string, fireId: (r.fire_id as string) ?? null, idea: (r.idea as string) ?? null, sentence: (r.sentence as string) ?? null, picked: (r.picked as string[]) ?? [], peakFire: (r.peak_fire as number) ?? null, fireColor: (r.fire_color as string) ?? null, referralCode: r.referral_code as string, referredBy: (r.referred_by as string) ?? null, consentedAt: new Date(r.consented_at as string).toISOString(), marketingConsent: Boolean(r.marketing_consent), couponSentAt: r.coupon_sent_at ? new Date(r.coupon_sent_at as string).toISOString() : null, createdAt: new Date(r.created_at as string).toISOString() });
 
 const pgBackend: Backend = {
   async saveFire(f) {
-    await (await db()).query("INSERT INTO find_fires (id, idea, sentence, picked, labels, peak, color, react_kind, name, matches, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", [f.id, f.idea, f.sentence, JSON.stringify(f.picked), JSON.stringify(f.labels), f.peak, f.color, f.reactKind, f.name, JSON.stringify(f.matches), f.createdAt]);
+    await (await db()).query("INSERT INTO find_fires (id, idea, sentence, picked, labels, peak, color, react_kind, name, matches, combo_key, card, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", [f.id, f.idea, f.sentence, JSON.stringify(f.picked), JSON.stringify(f.labels), f.peak, f.color, f.reactKind, f.name, JSON.stringify(f.matches), f.comboKey, f.card ? JSON.stringify(f.card) : null, f.createdAt]);
+  },
+  async rarity(key, peak) {
+    const { rows } = await (await db()).query("SELECT count(*)::int AS total, count(*) FILTER (WHERE combo_key = $1)::int AS same, count(*) FILTER (WHERE peak > $2)::int AS higher FROM find_fires", [key, peak]);
+    return { total: rows[0].total, sameCombo: rows[0].same, higherPeak: rows[0].higher };
   },
   async getFire(id) {
     const { rows } = await (await db()).query("SELECT * FROM find_fires WHERE id = $1", [id]);
@@ -234,6 +250,7 @@ export function storageKind(): "postgres" | "file" {
 }
 
 export const saveFire = (fire: FireRecord) => backend().saveFire(fire);
+export const fireRarity = (comboKey: string, peak: number) => backend().rarity(comboKey, peak);
 export const getFire = (id: string) => (/^[A-Za-z0-9]{4,16}$/.test(id) ? backend().getFire(id) : Promise.resolve(null));
 export const recordEvent = (e: EventRecord) => backend().event(e);
 export const eventCounts = () => backend().eventCounts();
