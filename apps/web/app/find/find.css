@@ -1,0 +1,137 @@
+/* 내 도깨비불 찾기 (/find, /f/:id). 토큰은 docs/FIND-HANDOFF.md §10, 화면 규칙은 docs/find-prototype.html 기준. */
+body:has(.find){background:#fff}
+.find{
+  --bg:#FFFFFF; --surface:#F6F5F1; --surface-2:#EEECE5; --line:#E3E0D7;
+  --ink:#1E1F24; --muted:#62656F; --outline:#232323;
+  --teal:#9ED3CB; --teal-ink:#2C7A70;
+  --cat-form:#9ED3CB; --cat-react:#FFC48A; --cat-sense:#CDBDFF; --cat-who:#F7C1D4;
+  --radius:16px;
+  --font-display:"Jua",sans-serif; --font-body:"IBM Plex Sans KR",system-ui,sans-serif;
+  max-width:430px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;
+  background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased
+}
+.find *{box-sizing:border-box}
+.find button,.find input,.find textarea{font-family:inherit}
+.find .top{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 6px}
+.find .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);text-decoration:none}
+.find .step{font-size:12px;color:var(--muted)}
+.find .screen{flex:1;display:flex;flex-direction:column;gap:16px;padding:8px 20px 28px;animation:fd-in .35s ease-out}
+.find .screen.center{align-items:center;justify-content:center;gap:22px;text-align:center}
+@keyframes fd-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.find h1,.find h2,.find .display{font-family:var(--font-display);font-weight:400;margin:0;line-height:1.3}
+.find h1{font-size:30px}.find h2{font-size:27px}
+.find .muted{color:var(--muted)}.find .ink{color:var(--ink)}
+.find .small{font-size:13px}.find .tiny{font-size:12px}
+.find .body{font-size:14px;line-height:1.6;color:#3A3D45}
+.find .lead{margin:0;font-size:15px;line-height:1.6;color:#3A3D45}
+.find .spacer{flex:1}
+.find .error{color:#B3402F;font-size:13px;margin:0}
+
+.find .btn{min-height:56px;width:100%;border:none;border-radius:var(--radius);font-family:var(--font-display);font-size:20px;cursor:pointer;background:var(--ink);color:#fff;transition:transform .1s,opacity .2s;padding:0 16px}
+.find .btn:active{transform:scale(.98)}
+.find .btn:disabled{background:var(--surface-2);color:#8C8F98;cursor:default}
+.find .btn-fire{background:var(--fire);color:var(--ink)}
+.find .btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink);font-family:var(--font-body);font-size:14px;min-height:50px}
+.find .link{background:none;border:none;color:var(--muted);text-decoration:underline;min-height:44px;font-size:14px;cursor:pointer}
+.find .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.find .chips{display:flex;flex-wrap:wrap;gap:8px}
+.find .chip{min-height:44px;padding:0 14px 0 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:transform .12s,background .2s;animation:fd-in .3s ease-out}
+.find .chip:active{transform:scale(.94)}
+.find .chip .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;color:var(--ink)}
+.find .chip.example{padding:0 14px;color:#3A3D45}
+.find .chip.dice{border:1.5px dashed var(--teal-ink);color:var(--teal-ink)}
+.find .field{display:flex;flex-direction:column;gap:8px}
+.find textarea,.find input[type=email]{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:14px;font-size:16px;color:var(--ink);background:#fff;outline:none}
+.find textarea:focus,.find input:focus{border-color:var(--ink)}
+.find textarea{resize:none;line-height:1.5}
+.find label{font-size:13px;color:var(--muted)}
+.find .intro-head{display:flex;align-items:flex-end;gap:10px;margin-top:6px}
+.find .bubble{background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 18px 4px;padding:13px 15px;font-size:15px;line-height:1.55;margin-bottom:34px}
+
+/* 캐릭터: 다인의 스프라이트(256px × 25프레임 가로 스트립)를 steps로 재생 */
+.find .dk{position:relative;display:flex;justify-content:center;align-items:center}
+.find .dk .aura{position:absolute;width:var(--aura);height:var(--aura);border-radius:50%;background:var(--fire);filter:blur(34px);opacity:var(--aura-o);transition:width .25s,height .25s,opacity .25s}
+.find .dk-body{position:relative;animation:fd-bob 2.6s ease-in-out infinite}
+.find .dk.gulp .dk-body{animation:fd-gulp .35s ease-out}
+.find .dk-sprite{width:var(--w);height:var(--w);background-repeat:no-repeat;background-size:calc(var(--w) * 25) var(--w);background-position:0 0;filter:hue-rotate(var(--hue));animation-name:fd-play;animation-duration:var(--dur);animation-timing-function:steps(25,jump-end);animation-iteration-count:var(--iter);animation-fill-mode:none;transition:width .25s,height .25s}
+.find .dk-sprite.hold{animation-name:fd-hold;animation-timing-function:steps(24,jump-end);animation-fill-mode:forwards}
+.find .m-idle{background-image:url(/find/sprites/idle.webp)}
+.find .m-tilt{background-image:url(/find/sprites/tilt.webp)}
+.find .m-stoke{background-image:url(/find/sprites/stoke.webp)}
+.find .m-blaze{background-image:url(/find/sprites/blaze.webp)}
+.find .m-fallen{background-image:url(/find/sprites/fallen.webp)}
+@keyframes fd-hold{from{background-position-x:0}to{background-position-x:calc(var(--w) * -24)}}
+@keyframes fd-play{from{background-position-x:0}to{background-position-x:calc(var(--w) * -25)}}
+@keyframes fd-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes fd-gulp{0%{transform:scale(1)}40%{transform:scale(1.08,.92)}100%{transform:scale(1)}}
+/* 장작이 많아져도 캐릭터·화력은 위에, 확정 버튼은 아래에 붙어 있게 */
+.find .stoke-top{position:sticky;top:0;z-index:2;background:#fff;box-shadow:0 8px 10px -8px rgba(30,31,36,.12);margin:0 -20px;padding:0 20px 12px;display:flex;flex-direction:column;gap:10px}
+.find .lock{position:sticky;bottom:12px;z-index:2;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+@media (max-height:740px){.find .stage{height:190px!important}}
+.find .stage{height:230px;display:flex;align-items:center;justify-content:center;position:relative}
+.find .embers{position:absolute;inset:0;pointer-events:none}
+.find .ember{position:absolute;top:62%;width:9px;height:9px;border-radius:50%;background:var(--fire);animation:fd-rise 1.1s ease-out forwards}
+@keyframes fd-rise{from{opacity:.95;transform:translate(0,0) scale(1)}to{opacity:0;transform:translate(var(--dx),-90px) scale(.3)}}
+
+/* 장작 화면 */
+.find .meter{display:flex;flex-direction:column;gap:6px}
+.find .meter-row{display:flex;justify-content:space-between;align-items:baseline}
+.find .fire-label{font-family:var(--font-display);font-size:20px}
+.find .fire-num{font-family:var(--font-display);font-size:22px;color:var(--ink)}
+.find .bar{height:10px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.find .bar>i{display:block;height:100%;background:var(--fire);border-radius:999px;transition:width .1s linear}
+.find .scroll{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;min-height:92px}
+.find .scroll-head{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}
+.find .scroll-text,.find .sentence{font-size:15px;line-height:1.7;white-space:pre-wrap;word-break:keep-all}
+.find .caret{display:inline-block;width:2px;height:1.1em;background:var(--ink);vertical-align:-3px;margin-left:1px;animation:fd-caret 1s steps(1) infinite}
+@keyframes fd-caret{50%{opacity:0}}
+
+/* 공개 · 대장간 */
+.find .card{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.find .trio{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.find .trio>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:3px}
+.find .trio small{font-size:11px;color:var(--muted)}.find .trio b{font-size:13px;word-break:keep-all}
+.find .rail-head{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.find .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:20px;margin:0 -20px;padding:2px 20px 6px;scrollbar-width:none}
+.find .rail::-webkit-scrollbar{display:none}
+.find .proj{flex:0 0 78%;scroll-snap-align:start;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff;color:var(--ink);text-decoration:none}
+.find .proj .img{aspect-ratio:16/10;background:repeating-linear-gradient(45deg,var(--surface) 0 10px,#fff 10px 20px);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)}
+.find .proj .img img{width:100%;height:100%;object-fit:cover;display:block}
+.find .proj .meta{display:flex;align-items:center;gap:12px;padding:12px 14px 6px}
+.find .proj-title{font-size:15px;font-weight:700;line-height:1.35}
+.find .proj .pct{font-family:var(--font-display);font-size:24px}
+.find .proj .credit{font-size:11px;color:#8C8F98;padding:0 14px 12px}
+.find .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.find .note{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.find .note.row{flex-direction:row;align-items:center;gap:12px;margin-top:6px}
+.find .steps{margin:0;padding-left:18px;font-size:14px;line-height:1.65;color:#3A3D45}
+.find .prompt{margin:4px 0;white-space:pre-wrap;word-break:break-word;font-family:var(--font-body);font-size:13px;line-height:1.6;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+.find .finger-step{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.find .finger-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--muted);flex-shrink:0}
+.find .finger-step.on{border-color:var(--fire)}
+.find .finger-step.on .dot{background:var(--fire);color:var(--ink);box-shadow:0 0 0 4px color-mix(in srgb,var(--fire) 25%,transparent)}
+.find .step-title{font-size:15px;font-weight:700}
+.find .pitch{border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:8px}
+.find .queue{border:1.5px solid var(--ink);border-radius:18px;padding:18px;text-align:center}
+.find .queue b{font-family:var(--font-display);font-size:40px;font-weight:400;display:block}
+.find .join{display:flex;flex-direction:column;gap:10px}
+.find .join input[type=email]{min-height:52px}
+.find .check{display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--ink);line-height:1.5}
+.find .check input{width:18px;height:18px;margin-top:2px;accent-color:var(--ink);flex-shrink:0}
+.find .fine{margin:-4px 0 0 26px;font-size:11.5px;line-height:1.55;color:#8C8F98}
+.find .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+
+/* 공유 시트 */
+.find .overlay{position:fixed;inset:0;background:rgba(20,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fd-in .2s}
+.find .sheet{width:min(360px,100%);max-height:calc(100dvh - 40px);overflow:auto;background:#fff;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.find .share-img{width:100%;aspect-ratio:9/16;border-radius:14px;border:1px solid var(--line);background:var(--surface);object-fit:cover}
+
+/* 공유 링크로 들어온 화면 */
+.find .shared-card{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:24px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.find .shared-chips{justify-content:center}
+.find .shared-chips span{min-height:30px;font-size:12px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:#fff;display:inline-flex;align-items:center}
+
+@media (prefers-reduced-motion: reduce){
+  .find *{animation:none!important;transition:none!important}
+  .find .dk-sprite{background-position:0 0}
+}

@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 도깨비불 찾기 — 달그락 대장간</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ───────── 토큰 ───────── */
+:root{
+  --bg:#FFFFFF; --surface:#F6F5F1; --surface-2:#EEECE5; --line:#E3E0D7;
+  --ink:#1E1F24; --muted:#62656F; --outline:#232323;
+  --teal:#9ED3CB; --teal-ink:#2C7A70;
+  --cat-form:#9ED3CB; --cat-react:#FFC48A; --cat-sense:#CDBDFF; --cat-who:#F7C1D4;
+  --fire:#4FB3A6;               /* 반응 갈래가 바꾸는 불 색 */
+  --radius:16px;
+  --font-display:'Jua',sans-serif; --font-body:'Noto Sans KR',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+.app{max-width:430px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 6px}
+.brand{font-family:var(--font-display);font-size:18px}
+.step{font-size:12px;color:var(--muted)}
+.screen{flex:1;display:flex;flex-direction:column;gap:16px;padding:8px 20px 28px;animation:in .35s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+h1,h2{font-family:var(--font-display);font-weight:400;margin:0;line-height:1.3}
+h1{font-size:30px} h2{font-size:27px}
+.muted{color:var(--muted)}
+.spacer{flex:1}
+
+.btn{min-height:56px;border:none;border-radius:var(--radius);font-family:var(--font-display);font-size:20px;cursor:pointer;background:var(--ink);color:#fff;transition:transform .1s, opacity .2s}
+.btn:active{transform:scale(.98)}
+.btn:disabled{background:var(--surface-2);color:#8C8F98;cursor:default}
+.btn-fire{background:var(--fire);color:var(--ink)}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink);font-family:var(--font-body);font-size:14px;min-height:50px}
+.chip{min-height:44px;padding:0 14px 0 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:transform .12s, background .2s;animation:in .3s ease-out}
+.chip:active{transform:scale(.94)}
+.chip .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;color:var(--ink)}
+.chip.example{padding:0 14px;color:#3A3D45}
+.chip.dice{border:1.5px dashed var(--teal-ink);color:var(--teal-ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+textarea,input[type=email]{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:14px;font:inherit;font-size:16px;color:var(--ink);background:#fff;outline:none}
+textarea:focus,input:focus{border-color:var(--ink)}
+textarea{resize:none;line-height:1.5}
+label{font-size:13px;color:var(--muted)}
+
+/* ───────── 캐릭터 ───────── */
+.dk{position:relative;display:flex;justify-content:center;align-items:center}
+.dk .aura{position:absolute;border-radius:50%;background:var(--fire);filter:blur(34px);opacity:.18;transition:width .25s,height .25s,opacity .25s}
+/* 캐릭터 이미지 자리: 실서비스에서 다인의 스프라이트 시트로 채운다 (HANDOFF.md §9) */
+.dk-slot{position:relative;aspect-ratio:1/1;border:1.5px dashed #C9C5BA;border-radius:20px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:12px;line-height:1.4;background:rgba(255,255,255,.6);animation:bob 2.6s ease-in-out infinite;transition:width .25s}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.dk.gulp .dk-slot{animation:gulp .35s ease-out}
+@keyframes gulp{0%{transform:scale(1)}40%{transform:scale(1.08,.92)}100%{transform:scale(1)}}
+.dk.think .dk-slot{animation:tilt .9s ease-in-out infinite}
+@keyframes tilt{0%,100%{transform:rotate(-7deg)}50%{transform:rotate(7deg)}}
+.ember{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--fire);pointer-events:none;animation:rise 1.1s ease-out forwards}
+@keyframes rise{from{opacity:.95;transform:translate(0,0) scale(1)}to{opacity:0;transform:translate(var(--dx),-90px) scale(.3)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ───────── 장작 화면 ───────── */
+.meter{display:flex;flex-direction:column;gap:6px}
+.meter-row{display:flex;justify-content:space-between;align-items:baseline}
+.fire-label{font-family:var(--font-display);font-size:20px}
+.fire-num{font-family:var(--font-display);font-size:22px}
+.bar{height:10px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--fire);border-radius:999px;transition:width .1s linear}
+.scroll{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;min-height:92px}
+.scroll-head{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between}
+.scroll-text{font-size:15px;line-height:1.7;white-space:pre-wrap;word-break:keep-all}
+.caret{display:inline-block;width:2px;height:1.1em;background:var(--ink);vertical-align:-3px;margin-left:1px;animation:caret 1s steps(1) infinite}
+@keyframes caret{50%{opacity:0}}
+
+/* ───────── 공개/대장간 ───────── */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:22px 20px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.trio{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.trio>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:3px}
+.trio b{word-break:keep-all}
+.trio small{font-size:11px;color:var(--muted)} .trio b{font-size:13px}
+.rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:20px;margin:0 -20px;padding:2px 20px 6px;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.proj{flex:0 0 78%;scroll-snap-align:start;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
+.proj .img{aspect-ratio:16/10;background:repeating-linear-gradient(45deg,var(--surface) 0 10px,#fff 10px 20px);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)}
+.proj .img img{width:100%;height:100%;object-fit:cover}
+.proj .meta{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.proj .pct{font-family:var(--font-display);font-size:24px;color:var(--ink)}
+.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.note{background:var(--surface);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.finger-step{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.finger-step .dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--muted);flex-shrink:0}
+.finger-step.on{border-color:var(--fire)} .finger-step.on .dot{background:var(--fire);color:var(--ink);box-shadow:0 0 0 4px color-mix(in srgb,var(--fire) 25%,transparent)}
+.queue{border:1.5px solid var(--ink);border-radius:18px;padding:18px;text-align:center}
+.queue b{font-family:var(--font-display);font-size:40px;font-weight:400;display:block}
+
+/* 공유 카드 미리보기 */
+.overlay{position:fixed;inset:0;background:rgba(20,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:in .2s}
+.share{width:min(340px,100%);aspect-ratio:9/16;background:#fff;border-radius:22px;padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;overflow:hidden}
+</style>
+</head>
+<body>
+
+<main class="app">
+  <header class="top"><div class="brand">달그락 대장간</div><div class="step" id="step"></div></header>
+  <div id="root" style="flex:1;display:flex;flex-direction:column"></div>
+</main>
+
+<script>
+/* ═════════════════ 1. 데이터 (실서비스: 첫 입력 때 AI 한 번 호출로 받아옴 — HANDOFF.md §4) ═════════════════ */
+const CAT_COLOR = { '형태':'var(--cat-form)', '반응':'var(--cat-react)', '감지':'var(--cat-sense)', '누구':'var(--cat-who)' };
+// say = 문장 조각. 고르는 순서와 상관없이 compose()가 '형태 → 감지 → 반응 → 누구' 순서로 자연스러운 문장을 만든다.
+const ROOT = [
+  { id:'f_desk', cat:'형태', label:'책상 위에 두는', say:'책상 위에 두는' },
+  { id:'r_light',cat:'반응', label:'빛으로 알려줘',  say:'빛으로 알려줘' },
+  { id:'s_time', cat:'감지', label:'시간마다',       say:'정해진 시간마다' },
+  { id:'w_me',   cat:'누구', label:'나를 위해',      say:'나를 위해' },
+  { id:'f_hand', cat:'형태', label:'들고 다니는',    say:'들고 다니는' },
+  { id:'r_sound',cat:'반응', label:'소리로 알려줘',  say:'소리로 알려줘' },
+  { id:'s_dist', cat:'감지', label:'가까이 오면',    say:'누가 가까이 오면' },
+  { id:'w_pet',  cat:'누구', label:'반려동물을 위해', say:'반려동물을 위해' },
+  { id:'f_wall', cat:'형태', label:'벽에 붙는',      say:'벽에 붙는' },
+  { id:'r_move', cat:'반응', label:'움직여',         say:'직접 움직여서 알려줘' },
+];
+// 후속 키워드: 반응 갈래의 후속은 동사 앞에 붙는 꾸밈말(pre), tail은 문장 끝에 따로 붙는 한 마디
+const FOLLOW = {
+  r_light:[{id:'r_blink',cat:'반응',label:'깜빡깜빡',say:'깜빡깜빡',pre:true},{id:'r_color',cat:'반응',label:'색이 바뀌게',say:'색을 바꿔가며',pre:true}],
+  r_sound:[{id:'r_melody',cat:'반응',label:'짧은 멜로디',say:'짧은 멜로디로',pre:true},{id:'r_buzz',cat:'반응',label:'진동도 같이',say:'진동이랑 같이',pre:true}],
+  r_move:[{id:'r_wave',cat:'반응',label:'손 흔들기',say:'손을 흔들며',pre:true},{id:'r_walk',cat:'반응',label:'걸어오기',say:'나한테 걸어와서',pre:true}],
+  s_time:[{id:'s_weight',cat:'감지',label:'컵 무게 재기',say:'컵 무게로 마셨는지 확인해서'},{id:'s_tilt',cat:'감지',label:'기울이면 리셋',say:'기울이면 처음부터 다시 세고'}],
+  s_dist:[{id:'s_temp',cat:'감지',label:'온도도 재기',say:'온도도 같이 재서'},{id:'s_btn',cat:'감지',label:'버튼 하나로 끄기',say:'버튼 하나로 끌 수 있어.',tail:true}],
+  f_desk:[{id:'f_tiny',cat:'형태',label:'손바닥만 하게',say:'손바닥만 한'}],
+  f_hand:[{id:'f_key',cat:'형태',label:'키링 크기',say:'키링만 한'}],
+  f_wall:[{id:'f_mag',cat:'형태',label:'자석으로 붙이기',say:'자석으로 착 붙는'}],
+  w_pet:[{id:'w_cat',cat:'누구',label:'고양이',say:'우리 고양이를 위해',replaces:'w_pet'}],
+  w_me:[{id:'w_fam',cat:'누구',label:'가족도 같이',say:'가족도 같이 쓸 수 있게'}],
+};
+const EXAMPLES = ['물 마시는 걸 자꾸 까먹어','고양이가 밥 먹었는지 모르겠어','책상에서 집중 시간을 재고 싶어'];
+const DICE = ['현관문 잠갔는지 매번 불안해','화분에 물 줄 때를 모르겠어','밤에 불 끄러 일어나기 귀찮아','택배 왔는지 자꾸 나가봐','스트레칭을 자꾸 까먹어','방이 건조한지 모르겠어'];
+const REACT_FIRE = { light:'#9B7BFF', sound:'#FF8F3F', move:'#3FBF6E', none:'#4FB3A6' };
+const SW_PATTERN = /앱|웹|사이트|홈페이지|챗봇|프로그램|엑셀|노션|자동화/;   // 실서비스: AI 판별로 교체
+// 실서비스: 큐레이션한 메이커 프로젝트 DB와 매칭 (HANDOFF.md §5). image 에 회로도/작품 사진 URL.
+const MOCK_SIMILAR = [
+  { name:'물 마시기 알림 LED 코스터', why:'시간마다 빛으로 알림', match:72, image:null, imageLabel:'작품 사진' },
+  { name:'ESP32 책상 포모도로 타이머', why:'책상 위 · 시간 감지', match:58, image:null, imageLabel:'회로도' },
+  { name:'초음파 근접 알림등', why:'가까이 오면 반응', match:41, image:null, imageLabel:'회로도' },
+];
+
+/* ═════════════════ 2. 불 규칙 (튜닝 값은 여기만) ═════════════════ */
+const FIRE = {
+  start: 20, floor: 8, max: 100,
+  tickMs: 100, decayPerTick: 0.18,   // ≈ 초당 1.8 → 가득 찬 불이 꺼지기까지 약 50초
+  perChip: 6, newCategoryBonus: 10, followUpBonus: 5,
+  typeMs: 38,                        // 받아 적기 타자 속도 (글자당)
+};
+const ALL = [...ROOT, ...Object.values(FOLLOW).flat()];
+const byId = id => ALL.find(c => c.id === id);
+const fireLabel = v => v < 30 ? '불씨' : v < 55 ? '모닥불' : v < 80 ? '활활' : '도깨비불 만개';
+
+/* ═════════════════ 3. 상태 ═════════════════ */
+const S = { screen:'intro', idea:'', picked:[], fire:FIRE.start, peak:FIRE.start, shown:'', email:'', joined:false, share:false };
+const root = document.getElementById('root');
+const stepEl = document.getElementById('step');
+
+function cats(picked = S.picked){ const o={}; picked.forEach(id=>{const c=byId(id);(o[c.cat] ||= []).push(c);}); return o; }
+function reactKind(){ const p=S.picked.join(); return /r_light|r_blink|r_color/.test(p)?'light':/r_sound|r_melody|r_buzz/.test(p)?'sound':/r_move|r_wave|r_walk/.test(p)?'move':'none'; }
+function fireColor(){ return REACT_FIRE[reactKind()]; }
+// 고른 키워드 → 한 문단. 고를 때마다 문장이 다시 짜이고, 받아 적기 칸은 바뀐 부분부터 지우고 다시 쓴다.
+function compose(){
+  const c = cats(), of = k => (c[k]||[]).filter(x=>!x.tail);
+  const parts = [];
+  const form = of('형태').map(x=>x.say);
+  if(form.length) parts.push(form.join(', ') + ' 물건이야.');
+  const sense = of('감지').map(x=>x.say);
+  const react = of('반응'); const pre = react.filter(x=>x.pre).map(x=>x.say), verb = react.filter(x=>!x.pre).map(x=>x.say);
+  const reactTxt = [...pre, verb.join(' 또는 ')].filter(Boolean).join(' ');
+  if(sense.length || reactTxt) parts.push([sense.join(', '), reactTxt || '알려줘'].filter(Boolean).join(' ') + '.');
+  (c['감지']||[]).filter(x=>x.tail).forEach(x=>parts.push(x.say));
+  const who = of('누구'); const replaced = who.map(x=>x.replaces).filter(Boolean);
+  const whoTxt = who.filter(x=>!replaced.includes(x.id)).map(x=>x.say);
+  if(whoTxt.length) parts.push(whoTxt.join(', ') + ' 만들 거야.');
+  return parts.join(' ');
+}
+function scrollText(){ const body = compose(); return '“' + S.idea.trim() + '”' + (body ? '\n' + body : ''); }
+function fireName(){
+  const adj = {light:'깜빡이는',sound:'노래하는',move:'꼼지락대는',none:'조용한'}[reactKind()];
+  const place = S.picked.includes('f_desk')?'책상':S.picked.includes('f_hand')?'주머니':S.picked.includes('f_wall')?'벽걸이':S.picked.includes('w_pet')?'집사':'방구석';
+  return `${adj} ${place} 도깨비불`;
+}
+
+/* ═════════════════ 4. 캐릭터 자리 ═════════════════
+   캐릭터 이미지는 여기서 만들지 않는다. 자리(.dk-slot)와 화력에 따른 크기·기운만 남김.
+   실서비스: .dk-slot 안에 다인의 스프라이트(25프레임 · 80ms)를 재생하고, 화력은 재생 속도·크기·기운으로 표현 (HANDOFF.md §9). */
+function dk(cls=''){ return `<div class="dk ${cls}"><div class="aura"></div><div class="dk-slot">[캐릭터<br>스프라이트]</div></div>`; }
+function applyFire(dkEl, v, width){
+  if(!dkEl) return;
+  const w = width ?? Math.round(130 + v * 0.9);
+  dkEl.querySelector('.dk-slot').style.width = w + 'px';
+  dkEl.style.setProperty('--fire-level', v);   // 스프라이트 재생 속도 등에 쓸 값
+  const a = dkEl.querySelector('.aura'); if(a){ const s = Math.round(w*0.7 + v*1.2); a.style.width=a.style.height=s+'px'; a.style.opacity=(0.08+v/450).toFixed(2); }
+}
+function emberBurst(){
+  const host = root.querySelector('.dk'); if(!host) return;
+  host.classList.remove('gulp'); void host.offsetWidth; host.classList.add('gulp');
+  const svg = host.querySelector('.dk-slot').getBoundingClientRect(), hb = host.getBoundingClientRect();
+  for(let i=0;i<4;i++){
+    const e=document.createElement('i'); e.className='ember';
+    e.style.left = (svg.left - hb.left + svg.width*0.5 + (Math.random()*30-15)) + 'px';
+    e.style.top  = (svg.top - hb.top + svg.height*0.62) + 'px';
+    e.style.setProperty('--dx', (Math.random()*80-40)+'px'); e.style.animationDelay = (i*60)+'ms';
+    host.appendChild(e); setTimeout(()=>e.remove(), 1300);
+  }
+}
+
+/* ═════════════════ 5. 화면 ═════════════════ */
+const STEP = {intro:'1 / 4',thinking:'1 / 4',software:'1 / 4',stoke:'2 / 4',reveal:'3 / 4',forge:'4 / 4'};
+function go(screen){ S.screen = screen; render(); window.scrollTo(0,0); track('screen_view',{screen}); }
+
+function render(){
+  document.documentElement.style.setProperty('--fire', fireColor());
+  stepEl.textContent = STEP[S.screen];
+  root.innerHTML = VIEWS[S.screen]();
+  BIND[S.screen]?.();
+}
+
+const VIEWS = {
+  intro: () => `<section class="screen">
+    <div style="display:flex;align-items:flex-end;gap:10px;margin-top:6px">
+      ${dk()}
+      <div style="background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 18px 4px;padding:13px 15px;font-size:15px;line-height:1.55;margin-bottom:34px">배고파…<br>만들고 싶은 거, 아니면<br>요즘 귀찮은 거 하나만 줘봐.</div>
+    </div>
+    <h1>내 도깨비불 찾기</h1>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label for="idea">뭘 만들고 싶어?</label>
+      <textarea id="idea" rows="3" placeholder="예: 물 마시는 걸 자꾸 까먹어">${esc(S.idea)}</textarea>
+    </div>
+    <div class="chips">
+      ${EXAMPLES.map((t,i)=>`<button class="chip example" data-ex="${i}">${t}</button>`).join('')}
+      <button class="chip dice" id="dice"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/></svg>아무거나 던져줘</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="go" ${S.idea.trim()?'':'disabled'}>나와라, 뚝딱!</button>
+  </section>`,
+
+  thinking: () => `<section class="screen" style="align-items:center;justify-content:center;gap:22px">
+    ${dk('think')}
+    <h2 style="font-size:23px">음… 손이 가는 일인가?</h2>
+    <div class="muted" style="font-size:13px">달그락 달그락</div>
+  </section>`,
+
+  software: () => `<section class="screen" style="padding-top:12px">
+    <div class="muted" style="font-size:13px">“${esc(S.idea)}”</div>
+    <h2>이건 손 안 대도<br>되는 거야.</h2>
+    <p style="margin:0;font-size:15px;line-height:1.6;color:#3A3D45">앱이나 웹으로 충분해 보여. 이럴 땐 바이브코딩이 제일 빨라.</p>
+    <a class="btn btn-ghost" href="#" style="display:flex;align-items:center;justify-content:center;text-decoration:none">바이브코딩 시작 가이드 [링크]</a>
+    <div class="note" style="flex-direction:row;align-items:center;gap:12px;margin-top:6px">
+      <div style="width:70px;flex-shrink:0">${dk()}</div>
+      <div><div style="font-family:var(--font-display);font-size:18px">근데 손을 대면?</div>
+      <div style="font-size:13px;line-height:1.55;color:#3A3D45;margin-top:4px">책상 위에 버튼 하나, 불빛 하나로 만들면 화면을 안 봐도 돼.</div></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="tohw">하드웨어로 바꿔보기</button>
+  </section>`,
+
+  stoke: () => `<section class="screen" style="gap:14px">
+    <div style="height:250px;display:flex;align-items:center;justify-content:center;position:relative">${dk()}</div>
+    <div class="meter">
+      <div class="meter-row"><div class="fire-label" id="flabel"></div><div class="muted" style="font-size:13px">화력 <span class="fire-num" id="fnum"></span></div></div>
+      <div class="bar"><i id="fbar"></i></div>
+      <div class="muted" style="font-size:12px">가만두면 불이 줄어. 장작을 넣어! · 채운 갈래 <b id="fcats">0</b>/4</div>
+    </div>
+    <div class="scroll" aria-live="polite">
+      <div class="scroll-head"><span>도깨비가 받아 적는 중</span><span id="fcount">장작 0개</span></div>
+      <div class="scroll-text"><span id="typed"></span><span class="caret"></span></div>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="spacer"></div>
+    <button class="btn btn-fire" id="lock" disabled>이 불로 할래!</button>
+  </section>`,
+
+  reveal: () => { const c = cats(); const val = k => c[k] ? c[k].map(x=>x.label).join(' · ') : '아직 몰라';
+    const uniq = S.picked.filter(id=>!ROOT.some(r=>r.id===id)).map(id=>byId(id).label);
+    return `<section class="screen">
+    <div class="muted" style="font-size:13px;text-align:center">네 도깨비불이야</div>
+    <div class="card">
+      ${dk()}
+      <div style="font-family:var(--font-display);font-size:26px;text-align:center">${fireName()}</div>
+      <div class="muted" style="font-size:14px">최고 화력 <span style="font-family:var(--font-display);font-size:20px;color:var(--ink)">${Math.round(S.peak)}</span> · ${fireLabel(S.peak)}</div>
+      <div class="trio"><div><small>형태</small><b>${val('형태')}</b></div><div><small>반응</small><b>${val('반응')}</b></div><div><small>감지</small><b>${val('감지')}</b></div></div>
+    </div>
+    <div class="note"><div style="font-size:12px;color:var(--muted)">도깨비가 받아 적은 설계 한 줄</div><div style="font-size:15px;line-height:1.7;white-space:pre-wrap;word-break:keep-all">${esc(scrollText())}</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><div style="font-family:var(--font-display);font-size:19px">닮은 메이커 프로젝트</div><span class="badge">예시 데이터</span></div>
+    <div class="rail" aria-label="닮은 프로젝트 목록">${MOCK_SIMILAR.map(p=>`<article class="proj">
+      <div class="img">${p.image?`<img src="${p.image}" alt="${p.name} ${p.imageLabel}">`:`[${p.imageLabel} 이미지]`}</div>
+      <div class="meta"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700">${p.name}</div><div class="muted" style="font-size:12px;margin-top:3px">닮은 점: ${p.why}</div></div><div class="pct">${p.match}%</div></div>
+    </article>`).join('')}</div>
+    <div class="note">
+      <div style="font-size:13px;font-weight:700;color:#B5591A">네 아이디어에만 있는 것</div>
+      <div style="font-size:14px;line-height:1.6">${uniq.length?uniq.join(', '):'장작을 한 단계 더 넣으면 여기에 네 것만의 특징이 나타나'}</div>
+      <div class="muted" style="font-size:12px;line-height:1.5">→ 이 부분은 닮은 프로젝트에 없어서 추가 설계가 필요해. 달그락이 같이 그려줄게.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <button class="btn btn-ghost" id="sharebtn">카드 저장·공유</button>
+      <button class="btn btn-ghost" id="again">다시 피우기</button>
+    </div>
+    <button class="btn btn-fire" id="toforge">내 도깨비 만들러 가기</button>
+  </section>`; },
+
+  forge: () => `<section class="screen">
+    <h2>불은 찾았어.<br>이제 몸을 만들어줄 차례야.</h2>
+    ${[['아이디어','도깨비불 찾기 완료'],['부품','실제로 살 수 있는 부품 추천'],['회로','회로도와 연결 순서'],['하우징','케이스 설계와 대안'],['조립','레고 설명서처럼 단계별로']].map((f,i)=>`
+      <div class="finger-step ${i===0?'on':''}"><div class="dot">${i+1}</div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:700;${i?'color:var(--muted)':''}">${f[0]}</div><div class="muted" style="font-size:12px">${f[1]}</div></div>
+      <div style="font-size:12px;${i?'color:#8C8F98':'font-weight:700'}">${i?'오픈하면 켜져':'불 켜짐'}</div></div>`).join('')}
+    <div style="border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:8px">
+      <div style="font-family:var(--font-display);font-size:22px;line-height:1.4">말하면, 회로도부터 조립까지.<br>하드웨어 올인원 대장간.</div>
+      <div class="muted" style="font-size:12px;line-height:1.6">이미 구독 중인 AI에 커넥터로 연결해서 추가 비용 없이 써요. 부품 불량으로 바꾸는 부품값만 해도 서러우니까.</div>
+    </div>
+    ${S.joined ? `
+      <div class="queue"><div class="muted" style="font-size:13px">대장간 대기 순번</div><b>#[순번]</b><div class="muted" style="font-size:12px">${fireName()} 자리 맡아둘게</div></div>
+      <div class="note"><div style="font-family:var(--font-display);font-size:18px">도깨비한테 메밀묵 갖다주기</div>
+      <div style="font-size:13px;line-height:1.6;color:#3A3D45">친구가 이 링크로 도깨비불을 찾으면 메밀묵 한 그릇. 한 그릇마다 순번이 앞당겨지고, 누코드 스토어 쿠폰 [쿠폰 내용]을 받아.</div>
+      <button class="btn btn-ghost" id="copy">초대 링크 복사</button></div>`
+    : `<div style="display:flex;flex-direction:column;gap:10px">
+      <label for="email">오픈하면 네 도깨비불의 설계도 첫 장을 보내줄게</label>
+      <input type="email" id="email" placeholder="이메일 주소" style="min-height:52px">
+      <button class="btn" id="join">오픈 알림 받기</button></div>`}
+    <button class="btn btn-ghost" id="restart" style="border:none;color:var(--muted);text-decoration:underline;min-height:44px">처음부터 다시</button>
+  </section>`,
+};
+
+const BIND = {
+  intro(){
+    applyFire(root.querySelector('.dk'), 30, 104);
+    const ta = root.querySelector('#idea'), btn = root.querySelector('#go');
+    const sync = () => { S.idea = ta.value; btn.disabled = !S.idea.trim(); };
+    ta.addEventListener('input', sync);
+    root.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>{ ta.value=EXAMPLES[b.dataset.ex]; sync(); });
+    root.querySelector('#dice').onclick = ()=>{ ta.value = DICE[Math.floor(Math.random()*DICE.length)]; sync(); track('dice'); };
+    btn.onclick = ()=>{ if(!S.idea.trim()) return; track('idea_submit',{idea:S.idea}); go('thinking');
+      setTimeout(()=>{ resetFire(); go(SW_PATTERN.test(S.idea)?'software':'stoke'); }, 1500); };
+  },
+  thinking(){ applyFire(root.querySelector('.dk'), 35, 150); },
+  software(){ applyFire(root.querySelector('.dk'), 50, 70); root.querySelector('#tohw').onclick=()=>{ resetFire(); go('stoke'); }; },
+  stoke(){
+    renderChips(); updateStoke();
+    root.querySelector('#lock').onclick = ()=>{ if(S.picked.length){ track('fire_locked',{peak:S.peak,picked:S.picked}); go('reveal'); } };
+  },
+  reveal(){
+    applyFire(root.querySelector('.dk'), S.peak, 160);
+    root.querySelector('#toforge').onclick=()=>go('forge');
+    root.querySelector('#again').onclick=()=>{ resetFire(); go('stoke'); };
+    root.querySelector('#sharebtn').onclick=openShare;
+  },
+  forge(){
+    root.querySelector('#restart').onclick=()=>{ Object.assign(S,{idea:'',joined:false}); resetFire(); go('intro'); };
+    const j = root.querySelector('#join');
+    if(j) j.onclick=()=>{ S.email = root.querySelector('#email').value; S.joined = true; track('waitlist_join'); render(); };
+    const c = root.querySelector('#copy'); if(c) c.onclick=()=>{ c.textContent='복사했어!'; track('invite_copy'); };
+  },
+};
+
+/* ═════════════════ 6. 장작 넣기 루프 ═════════════════ */
+function resetFire(){ Object.assign(S,{picked:[],fire:FIRE.start,peak:FIRE.start,shown:''}); }
+function visibleChips(){
+  return [...ROOT, ...S.picked.flatMap(id=>FOLLOW[id]||[])].filter(c=>!S.picked.includes(c.id));
+}
+function renderChips(){
+  const box = root.querySelector('#chips'); if(!box) return;
+  box.innerHTML = visibleChips().map(c=>`<button class="chip" data-id="${c.id}"><span class="tag" style="background:${CAT_COLOR[c.cat]}">${c.cat}</span>${c.label}</button>`).join('');
+  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>pick(b.dataset.id));
+}
+function pick(id){
+  const chip = byId(id), had = cats();
+  const isFollow = !ROOT.some(r=>r.id===id);
+  const add = FIRE.perChip + (had[chip.cat]?0:FIRE.newCategoryBonus) + (isFollow?FIRE.followUpBonus:0);
+  S.picked.push(id);
+  S.fire = Math.min(FIRE.max, S.fire + add); S.peak = Math.max(S.peak, S.fire);
+  document.documentElement.style.setProperty('--fire', fireColor());
+  renderChips(); emberBurst(); updateStoke();
+  track('chip_pick',{id, fire:S.fire});
+}
+function updateStoke(){
+  if(S.screen!=='stoke') return;
+  const v = S.fire, $ = s=>root.querySelector(s);
+  applyFire($('.dk'), v);
+  $('#flabel').textContent = fireLabel(v); $('#fnum').textContent = Math.round(v);
+  $('#fbar').style.width = v + '%';
+  $('#fcats').textContent = Object.keys(cats()).length;
+  $('#fcount').textContent = `장작 ${S.picked.length}개`;
+  $('#lock').disabled = !S.picked.length;
+}
+// 불이 사그라드는 시계
+setInterval(()=>{ if(S.screen!=='stoke') return; S.fire = Math.max(FIRE.floor, S.fire - FIRE.decayPerTick); updateStoke(); }, FIRE.tickMs);
+// 받아 적기: 고른 말이 한 글자씩 쓰인다
+setInterval(()=>{
+  if(S.screen!=='stoke') return;
+  const full = scrollText(), el = root.querySelector('#typed'); if(!el) return;
+  let shown = S.shown, p = 0; while(p < shown.length && shown[p] === full[p]) p++;
+  if(shown.length > p) shown = shown.slice(0, Math.max(p, shown.length - 2));   // 바뀐 부분은 빠르게 지우고
+  else if(shown.length < full.length) shown = full.slice(0, shown.length + 1);    // 한 글자씩 다시 쓴다
+  if(shown !== S.shown){ S.shown = shown; el.textContent = shown; }
+}, FIRE.typeMs);
+
+/* ═════════════════ 7. 공유 카드 (실서비스: html-to-image 등으로 PNG 저장 — HANDOFF.md §6) ═════════════════ */
+function openShare(){
+  track('share_open');
+  const o = document.createElement('div'); o.className='overlay';
+  o.innerHTML = `<div class="share" role="dialog" aria-label="공유 카드 미리보기">
+    <div class="muted" style="font-size:13px;letter-spacing:1px">내 도깨비불</div>
+    ${dk()}
+    <div style="font-family:var(--font-display);font-size:28px;text-align:center;line-height:1.25">${fireName().replace(' ', '<br>')}</div>
+    <div><span class="muted" style="font-size:13px">화력</span> <span style="font-family:var(--font-display);font-size:36px">${Math.round(S.peak)}</span></div>
+    <div class="chips" style="justify-content:center">${S.picked.slice(0,4).map(id=>`<span class="chip" style="min-height:30px;font-size:12px;padding:0 10px">${byId(id).label}</span>`).join('')}</div>
+    <div class="spacer"></div>
+    <div style="width:100%;border-top:1px solid var(--line);padding-top:12px;display:flex;justify-content:space-between;font-size:12px"><b style="font-family:var(--font-display);font-weight:400;font-size:15px">달그락 대장간</b><span class="muted">너의 도깨비불은? [링크]</span></div>
+  </div>`;
+  o.onclick = e => { if(e.target===o) o.remove(); };
+  document.body.appendChild(o);
+  applyFire(o.querySelector('.dk'), S.peak, 150);
+}
+
+/* ═════════════════ 8. 유틸 ═════════════════ */
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function track(name, props={}){ /* 실서비스: 분석 도구로 전송 — HANDOFF.md §8 */ console.debug('[track]', name, props); }
+
+render();
+</script>
+</body>
+</html>
