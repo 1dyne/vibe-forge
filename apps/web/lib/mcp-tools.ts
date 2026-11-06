@@ -3,7 +3,7 @@ import { z } from "zod";
 import { buildFromSubmission } from "./build-pipeline";
 import { PlanSchema } from "./design-agent";
 import { applyAgentPlan, createProject, getProject, listProjects, mutateProject, saveMakerProfile } from "./local-project-store";
-import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile, ProjectTask } from "./project-types";
+import type { AgentId, AgentPlan, DevProfile, FormField, LocalProject, MakerProfile, ProjectTask } from "./project-types";
 type ProjectTaskKind = ProjectTask["kind"];
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
@@ -19,7 +19,8 @@ import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDev
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
-import { CoordinationError, PURCHASE_LABEL, boardSummary, closeConflict, raiseConflict, recordPurchase, setTaskStatus, upsertTask } from "./coordination";
+import { CoordinationError, PURCHASE_LABEL, answerTaskQuestion, boardSummary, buildForm, closeConflict, raiseConflict, recordPurchase, setTaskStatus, upsertTask } from "./coordination";
+import { INFO_FORMATS } from "./info-formats";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
 // the thinking on the person's subscription; the server stores the result and
@@ -183,6 +184,12 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 에이전트 할 일을 시작하면 update_task로 in_progress와 session(세션 이름이나 주소)을 남긴다. 다른 세션이 2시간 안에 진행 중이면 맡지 않는다. 끝나면 completed, 막히면 blocked와 이유를 남긴다.
 - 사람의 할 일 상태는 사람이 대시보드에서 바꾼다(하는 중·완료·막힘·못 함). 사람이 채팅으로 결과를 말하면 record_task_result로 기록한다. 사람이 '막힘'이나 '못 함'을 고르면 note의 이유를 읽고 측정 방법을 풀어 설명하거나 다른 방법을 다시 제안한다.
 - 사람에게 할 일·충돌 카드를 만들었으면 답변 끝에 결과의 openUrl로 [달그락에서 열기](openUrl) 링크를 붙인다.
+
+## 정보 요청 포맷과 측정 요청
+- 사람이 찾은 정보(재고·가격, 부품 링크, 실측 치수, 측정값, 오류 메시지)를 받을 때는 채팅으로 묻지 말고 upsert_task에 format이나 fields를 붙여 요청한다. 사람은 대시보드에서 칸을 채워 보낸다. formHelp에는 무엇을 왜, 어디서 찾는지 쓴다. 칸마다 help를 쓰면 사람이 '?'로 바로 본다.
+- 측정 요청은 kind=measure, format=measurement로 만들고 howTo에 멀티미터 모드와 빨간·검은 리드 위치를 단계로 쓴다. 정상 범위는 데이터시트나 부품 카드 근거가 있을 때만 expected에 넣는다. 서버가 범위 안·밖을 판정하지만 합격 판정은 아니다.
+- 보낸 값은 board.recentlyDone[].response에 온다. 사람이 '할 수 없어요'를 고르면 note를 읽는다: 방법을 모르면 howTo를 더 쉽게 고쳐 다시 요청하고, 도구가 없거나 위험하면 다른 관찰 방법이나 설계를 제안한다.
+- 사람이 할 일에 질문을 남기면 board.openQuestions에 온다. answer_task_question으로 답한다.
 
 ## 충돌 카드 (raise_conflict · close_conflict)
 - 재고가 없어 부품을 바꿔야 할 때, 두 결정이 부딪칠 때(예: 무선 방식과 앱 구조), 확정 뒤 설계를 바꿔야 할 때 올린다.
@@ -1003,7 +1010,10 @@ TOOLS.push(
 
 const AgentRole = z.enum(["chief", "hw", "sw", "me", "id"]);
 const TaskKind = z.enum(["confirm_spec", "confirm_availability", "measure", "run_firmware", "provide_info", "purchase", "assemble", "code", "design", "review"]);
-const UpsertTaskInput = z.object({ projectId: z.string().uuid(), by: AgentRole, taskId: z.string().uuid().optional(), assignee: z.enum(["human", "chief", "hw", "sw", "me", "id"]), kind: TaskKind, title: z.string().trim().min(1).max(80), plain: z.string().trim().min(1).max(600), doneWhen: z.string().trim().max(300).optional(), dependsOn: z.array(z.string().uuid()).max(8).optional() }).strict();
+const FieldInput = z.object({ key: z.string().regex(/^[a-z][a-z0-9_]{0,30}$/), label: z.string().trim().min(1).max(60), type: z.enum(["number", "text", "choice", "link"]), unit: z.string().max(12).optional(), required: z.boolean(), choices: z.array(z.string().max(60)).max(10).optional(), help: z.string().max(300).optional(), long: z.boolean().optional() }).strict();
+const UpsertTaskInput = z.object({ projectId: z.string().uuid(), by: AgentRole, taskId: z.string().uuid().optional(), assignee: z.enum(["human", "chief", "hw", "sw", "me", "id"]), kind: TaskKind, title: z.string().trim().min(1).max(80), plain: z.string().trim().min(1).max(600), doneWhen: z.string().trim().max(300).optional(), dependsOn: z.array(z.string().uuid()).max(8).optional(),
+  format: z.enum(Object.keys(INFO_FORMATS) as [string, ...string[]]).optional(), fields: z.array(FieldInput).max(8).optional(), formHelp: z.string().max(800).optional(),
+  expected: z.record(z.string(), z.object({ min: z.number().nullable().optional(), max: z.number().nullable().optional() }).strict()).optional(), howTo: z.array(z.string().trim().min(1).max(200)).max(10).optional() }).strict();
 const UpdateTaskInput = z.object({ projectId: z.string().uuid(), by: AgentRole, taskId: z.string().uuid(), status: z.enum(["ready", "in_progress", "blocked", "completed", "cancelled"]), note: z.string().max(1000).optional(), session: z.string().trim().max(300).optional() }).strict();
 const ConflictInput = z.object({
   projectId: z.string().uuid(), by: AgentRole, conflictId: z.string().uuid().optional(),
@@ -1013,7 +1023,7 @@ const ConflictInput = z.object({
 }).strict();
 // Spelled out for the same reason as TeamTurn above.
 type Role = "chief" | "hw" | "sw" | "me" | "id";
-type UpsertTask = { projectId: string; by: Role; taskId?: string; assignee: "human" | Role; kind: ProjectTaskKind; title: string; plain: string; doneWhen?: string; dependsOn?: string[] };
+type UpsertTask = { projectId: string; by: Role; taskId?: string; assignee: "human" | Role; kind: ProjectTaskKind; title: string; plain: string; doneWhen?: string; dependsOn?: string[]; format?: string; fields?: FormField[]; formHelp?: string; expected?: Record<string, { min?: number | null; max?: number | null }>; howTo?: string[] };
 type UpdateTask = { projectId: string; by: Role; taskId: string; status: "ready" | "in_progress" | "blocked" | "completed" | "cancelled"; note?: string; session?: string };
 type ConflictIn = { projectId: string; by: Role; conflictId?: string; title: string; detail: string; source: "rule" | "stock" | "interface" | "agent" | "change"; refs: string[]; options: Array<{ label: string; detail: string; costDeltaKRW: number | null; changes: string[]; affects: string[] }> };
 type CloseConflict = { projectId: string; by: Role; conflictId: string; status: "resolved" | "dismissed"; note: string };
@@ -1022,14 +1032,21 @@ const roleProp = { type: "string", enum: ["chief", "hw", "sw", "me", "id"], desc
 TOOLS.push(
   {
     name: "upsert_task", title: "할 일 만들기·고치기",
-    description: "할 일 보드에 사람(assignee=human) 또는 에이전트의 할 일을 만들거나 고친다. 같은 담당·내용의 열린 할 일이 있으면 새로 만들지 않고 고친다. 사람에게 부탁하는 일은 무엇을, 왜, 어떻게 하는지 초보자도 따라 할 수 있게 쓴다. 결과의 openUrl을 답변에 링크로 붙인다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "assignee", "kind", "title", "plain"], properties: { projectId, by: roleProp, taskId: { type: "string", description: "고칠 할 일 ID (새로 만들 때는 생략)" }, assignee: { type: "string", enum: ["human", "chief", "hw", "sw", "me", "id"] }, kind: { type: "string", enum: TaskKind.options }, title: { type: "string", description: "80자 이내" }, plain: { type: "string", description: "할 일 설명 (600자 이내)" }, doneWhen: { type: "string", description: "완료 기준" }, dependsOn: { type: "array", items: { type: "string" }, description: "먼저 끝나야 하는 할 일 ID" } } },
+    description: `할 일 보드에 사람(assignee=human) 또는 에이전트의 할 일을 만들거나 고친다. 같은 담당·내용의 열린 할 일이 있으면 새로 만들지 않고 고친다. 사람에게 부탁하는 일은 무엇을, 왜, 어떻게 하는지 초보자도 따라 할 수 있게 쓴다. 사람이 찾은 정보를 정해진 형식으로 받고 싶으면 format(기본 포맷: ${Object.entries(INFO_FORMATS).map(([id, f]) => `${id}=${f.title}`).join(", ")})이나 fields로 입력 양식을 붙이고, formHelp에 무엇을 왜 넣는지 쓴다(대시보드의 정보 탭). 측정이면 howTo에 멀티미터 모드·리드 위치를 단계로, expected에 칸별 정상 범위(데이터시트·부품 카드 근거가 있을 때만)를 넣는다. 결과의 openUrl을 답변에 링크로 붙인다.`,
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "assignee", "kind", "title", "plain"], properties: { projectId, by: roleProp, taskId: { type: "string", description: "고칠 할 일 ID (새로 만들 때는 생략)" }, assignee: { type: "string", enum: ["human", "chief", "hw", "sw", "me", "id"] }, kind: { type: "string", enum: TaskKind.options }, title: { type: "string", description: "80자 이내" }, plain: { type: "string", description: "할 일 설명 (600자 이내)" }, doneWhen: { type: "string", description: "완료 기준" }, dependsOn: { type: "array", items: { type: "string" }, description: "먼저 끝나야 하는 할 일 ID" },
+      format: { type: "string", enum: Object.keys(INFO_FORMATS), description: "기본 입력 포맷" },
+      fields: { type: "array", maxItems: 8, description: "추가 입력 칸 (key는 영문 소문자)", items: { type: "object", additionalProperties: false, required: ["key", "label", "type", "required"], properties: { key: { type: "string" }, label: { type: "string" }, type: { type: "string", enum: ["number", "text", "choice", "link"] }, unit: { type: "string" }, required: { type: "boolean" }, choices: { type: "array", items: { type: "string" } }, help: { type: "string", description: "이 칸에 무엇을 넣는지 한두 문장" }, long: { type: "boolean", description: "여러 줄 글(로그 등)이면 true" } } } },
+      formHelp: { type: "string", description: "정보 탭: 무엇을 왜, 어디서 찾는지" },
+      expected: { type: "object", description: "칸 key별 정상 범위 {min,max}. 근거 없으면 넣지 않는다", additionalProperties: { type: "object", additionalProperties: false, properties: { min: { type: ["number", "null"] }, max: { type: ["number", "null"] } } } },
+      howTo: { type: "array", items: { type: "string" }, description: "측정·작업 방법 단계 (예: 멀티미터를 DC 20V로 → 빨간 리드 5V 핀 → 검은 리드 GND)" } } },
     run: async (input, context) => {
       const parsed = UpsertTaskInput.parse(input) as UpsertTask;
       await ownedProject(parsed.projectId, context);
       let result: { id: string; created: boolean } = { id: "", created: false };
       const updated = await mutateProject(parsed.projectId, (p) => {
-        const { task, created } = upsertTask(p, { assignee: parsed.assignee, kind: parsed.kind, title: parsed.title, plain: parsed.plain, doneWhen: parsed.doneWhen, dependsOn: parsed.dependsOn }, parsed.by, parsed.taskId);
+        if ((parsed.format || parsed.fields) && parsed.assignee !== "human") throw new ToolError("입력 양식은 사람에게 부탁하는 할 일(assignee=human)에만 붙여요.");
+        const form = buildForm(parsed.format, parsed.fields, parsed.formHelp, parsed.expected);
+        const { task, created } = upsertTask(p, { assignee: parsed.assignee, kind: parsed.kind, title: parsed.title, plain: parsed.plain, doneWhen: parsed.doneWhen, dependsOn: parsed.dependsOn, form, howTo: parsed.howTo }, parsed.by, parsed.taskId);
         result = { id: task.id, created };
       });
       const openUrl = itemUrl(context, parsed.projectId, "task", result.id);
@@ -1047,6 +1064,17 @@ openUrl: ${openUrl}`, data: { taskId: result.id, created: result.created, openUr
       await ownedProject(parsed.projectId, context);
       const updated = await mutateProject(parsed.projectId, (p) => { setTaskStatus(p, parsed.taskId, parsed.status, parsed.by, { note: parsed.note, session: parsed.session }); });
       return { text: `할 일 상태를 ${parsed.status}로 바꿨어요.`, data: { board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
+    }
+  },
+  {
+    name: "answer_task_question", title: "할 일에 대한 질문에 답하기",
+    description: "사람이 대시보드에서 할 일에 남긴 질문(get_project의 board.openQuestions)에 답한다. 답은 그 할 일 아래에 보인다. 설명이 부족했던 것이면 upsert_task(taskId)로 할 일 설명·howTo·formHelp도 고친다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "taskId", "questionId", "answer"], properties: { projectId, by: roleProp, taskId: { type: "string" }, questionId: { type: "string" }, answer: { type: "string", description: "초보자 기준 답 (1500자 이내)" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), by: AgentRole, taskId: z.string().uuid(), questionId: z.string().uuid(), answer: z.string().trim().min(1).max(1500) }).strict().parse(input) as { projectId: string; by: Role; taskId: string; questionId: string; answer: string };
+      await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(parsed.projectId, (p) => { answerTaskQuestion(p, parsed.taskId, parsed.questionId, parsed.answer, parsed.by); });
+      return { text: "답을 남겼어요. 사람은 할 일 아래에서 답을 봐요.", data: { openUrl: itemUrl(context, parsed.projectId, "task", parsed.taskId), board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
     }
   },
   {

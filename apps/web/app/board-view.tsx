@@ -30,30 +30,54 @@ export function BoardView({ project, onAction, busy, focus }: { project: LocalPr
     <section aria-labelledby="board-agents"><h3 id="board-agents">달그락들이 하는 일</h3>
       {lanes.length ? lanes.map((lane) => <div className="lane" key={lane}><h4><span className={`agent-dot dot-${lane}`} />{AGENTS[lane].name}</h4><ul>{agents.filter((t) => assigneeOf(t) === lane).map((t) => { const expired = claimExpired(t); const status = expired ? "ready" : t.status; return <li key={t.id} id={`board-task-${t.id}`} className={focus === `task:${t.id}` ? "focused" : ""}><span className={`pill ${STATUS_CLASS[status]}`}>{STATUS[status]}</span> <strong>{t.title}</strong><p>{t.plain}</p>{t.claimedBy && !expired && status === "in_progress" && <small>진행 중인 곳: {t.claimedBy}</small>}{expired && <small>2시간 넘게 소식이 없어 다시 맡을 수 있는 상태예요.</small>}{t.note && <small className="task-note">메모: {t.note}</small>}</li>; })}</ul></div>) : <p className="muted">에이전트가 맡은 일이 아직 없어요.</p>}
     </section>
-    {(done.length > 0 || settled.length > 0) && <details className="board-done"><summary>끝난 일 · 정리된 결정</summary><ul>{settled.map((c) => <li key={c.id}>✓ {c.title}{c.resolution?.note ? ` — ${c.resolution.note}` : ""}</li>)}{done.map((t) => <li key={t.id}>{t.status === "completed" ? "✓" : "–"} [{who(assigneeOf(t))}] {t.title}{t.note ? ` — ${t.note}` : ""}</li>)}</ul></details>}
+    {(done.length > 0 || settled.length > 0) && <details className="board-done"><summary>끝난 일 · 정리된 결정</summary><ul>{settled.map((c) => <li key={c.id}>✓ {c.title}{c.resolution?.note ? ` — ${c.resolution.note}` : ""}</li>)}{done.map((t) => <li key={t.id}>{t.status === "completed" ? "✓" : "–"} [{who(assigneeOf(t))}] {t.title}{t.response ? ` — ${Object.entries(t.response.values).map(([k, v]) => `${t.form?.fields.find((f) => f.key === k)?.label ?? k} ${v}${t.response!.judgements[k] === "abnormal" ? " (범위 밖)" : ""}`).join(", ")}` : t.note ? ` — ${t.note}` : ""}</li>)}</ul></details>}
     <p className="muted">결과를 보내도 검증 합격으로 바로 처리되지 않아요. 달그락이 결과를 보고 다음 할 일을 정해요.</p>
   </div>;
 }
 
 function HumanTask({ task, onAction, busy, focused, blockedBy }: { task: ProjectTask; onAction: (input: Record<string, unknown>) => void; busy: boolean; focused: boolean; blockedBy: ProjectTask[] }) {
-  const [mode, setMode] = useState<null | "completed" | "blocked" | "cannot">(null);
+  const [mode, setMode] = useState<null | "completed" | "blocked" | "cannot" | "question">(null);
   const [note, setNote] = useState("");
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [help, setHelp] = useState<string | null>(null);
   const send = (status: string, text?: string) => { onAction({ action: "task_status", taskId: task.id, status, ...(text?.trim() ? { note: text.trim() } : {}) }); setMode(null); setNote(""); };
+  const form = task.form;
+  const missing = form ? form.fields.filter((f) => f.required && !values[f.key]?.trim()) : [];
+  const submitForm = () => { onAction({ action: "task_submit", taskId: task.id, values: Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim())), ...(note.trim() ? { note: note.trim() } : {}) }); setNote(""); };
   return <li id={`board-task-${task.id}`} className={`human-task ${focused ? "focused" : ""}`}>
     <div className="task-head"><span className={`pill ${STATUS_CLASS[task.status]}`}>{STATUS[task.status]}</span><strong>{task.title}</strong></div>
     <p>{task.plain}</p>
+    {task.howTo?.length ? <div className="how-to"><b>이렇게 해요</b><ol>{task.howTo.map((step, i) => <li key={i}>{step}</li>)}</ol></div> : null}
     {task.doneWhen && <small>완료 기준: {task.doneWhen}</small>}
     {blockedBy.length > 0 && <small className="task-note">먼저 끝낼 일: {blockedBy.map((t) => t.title).join(", ")}</small>}
     {task.note && <small className="task-note">내 메모: {task.note}</small>}
+    {form && <div className="task-form">
+      <details className="form-info"><summary>정보 · 무엇을 왜 넣나요</summary><p>{form.help}</p></details>
+      {form.fields.map((f) => <div className="form-field" key={f.key}>
+        <label htmlFor={`f-${task.id}-${f.key}`}>{f.label}{f.required ? <span aria-hidden> *</span> : <small> (선택)</small>}{f.expected && <small> · 정상 {f.expected.min ?? "…"}~{f.expected.max ?? "…"}{f.unit ?? ""}</small>}</label>
+        <div className="form-input">
+          {f.type === "choice" ? <select id={`f-${task.id}-${f.key}`} value={values[f.key] ?? ""} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}><option value="">고르세요</option>{f.choices?.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+            : f.type === "text" && f.long ? <textarea id={`f-${task.id}-${f.key}`} rows={2} value={values[f.key] ?? ""} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
+            : <input id={`f-${task.id}-${f.key}`} type={f.type === "link" ? "url" : "text"} inputMode={f.type === "number" ? "decimal" : undefined} placeholder={f.type === "link" ? "https://" : ""} value={values[f.key] ?? ""} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />}
+          {f.unit && f.type === "number" && <span className="unit">{f.unit}</span>}
+          {f.help && <button type="button" className="help-button" aria-label={`${f.label} 도움말`} aria-expanded={help === f.key} onClick={() => setHelp(help === f.key ? null : f.key)}>?</button>}
+        </div>
+        {help === f.key && <small className="field-help">{f.help}</small>}
+      </div>)}
+      <textarea aria-label="메모" rows={2} value={note} placeholder="덧붙일 말 (선택)" onChange={(e) => setNote(e.target.value)} />
+      <div className="task-actions"><button className="primary" disabled={busy || missing.length > 0} onClick={submitForm}>정보 보내기</button>{missing.length > 0 && <small>필수 칸 {missing.length}개가 남았어요</small>}</div>
+    </div>}
+    {(task.questions ?? []).map((q) => <div className="task-question" key={q.id}><small>내 질문: {q.text}</small>{q.answer ? <p>↳ {q.answeredBy ? AGENTS[q.answeredBy].name : "달그락"}: {q.answer}</p> : <small className="muted">답을 기다리고 있어요</small>}</div>)}
     {mode === null ? <div className="task-actions">
       {task.status !== "in_progress" && <button disabled={busy} onClick={() => send("in_progress")}>하는 중</button>}
-      <button className="primary" disabled={busy} onClick={() => setMode("completed")}>완료 · 결과 보내기</button>
+      {!form && <button className="primary" disabled={busy} onClick={() => setMode("completed")}>완료 · 결과 보내기</button>}
       <button disabled={busy} onClick={() => setMode("blocked")}>막혔어요</button>
       <button disabled={busy} onClick={() => setMode("cannot")}>할 수 없어요</button>
+      <button className="link-button" disabled={busy} onClick={() => setMode("question")}>질문 남기기</button>
     </div> : <div className="evidence-input">
       {mode === "cannot" && <div className="reason-chips" role="group" aria-label="할 수 없는 이유">{CANNOT_REASONS.map((r) => <button type="button" key={r} className={note === r ? "selected" : ""} onClick={() => setNote(r)}>{r}</button>)}</div>}
-      <textarea aria-label={`${task.title} ${mode === "completed" ? "결과" : "이유"}`} value={note} placeholder={mode === "completed" ? "측정값, 오류 메시지, 확인한 내용을 적어주세요 (선택)" : mode === "blocked" ? "어디서 막혔는지 적어주세요" : "이유를 고르거나 적어주세요"} onChange={(e) => setNote(e.target.value)} />
-      <div className="task-actions"><button className="primary" disabled={busy || (mode !== "completed" && !note.trim())} onClick={() => send(mode, note)}>{mode === "completed" ? "완료로 보내기" : "달그락에게 알리기"}</button><button disabled={busy} onClick={() => { setMode(null); setNote(""); }}>취소</button></div>
+      <textarea aria-label={`${task.title} ${mode === "completed" ? "결과" : mode === "question" ? "질문" : "이유"}`} value={note} placeholder={mode === "completed" ? "측정값, 오류 메시지, 확인한 내용을 적어주세요 (선택)" : mode === "question" ? "무엇이 궁금한지 적어주세요. 요청한 달그락이 답해요." : mode === "blocked" ? "어디서 막혔는지 적어주세요" : "이유를 고르거나 적어주세요"} onChange={(e) => setNote(e.target.value)} />
+      <div className="task-actions"><button className="primary" disabled={busy || (mode !== "completed" && !note.trim())} onClick={() => { if (mode === "question") { onAction({ action: "task_question", taskId: task.id, text: note.trim() }); setMode(null); setNote(""); } else send(mode, note); }}>{mode === "completed" ? "완료로 보내기" : mode === "question" ? "질문 보내기" : "달그락에게 알리기"}</button><button disabled={busy} onClick={() => { setMode(null); setNote(""); }}>취소</button></div>
     </div>}
   </li>;
 }

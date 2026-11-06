@@ -367,6 +367,17 @@ describe("conversation privacy", () => {
     const read = await tool(token, "get_project", { projectId: id });
     expect(read.structuredContent!.board.humanTasks.find((t: { id: string }) => t.id === ask.structuredContent!.taskId)).toMatchObject({ status: "cannot", note: "측정·작업 방법을 모르겠어요" });
 
+    const measure = await tool(token, "upsert_task", { projectId: id, by: "hw", assignee: "human", kind: "measure", title: "USB 5V", plain: "포트 전압을 재주세요.", format: "measurement", expected: { value: { min: 4.75, max: 5.25 } }, howTo: ["DC 20V 모드", "빨간 리드 5V, 검은 리드 GND"] });
+    expect(measure.isError).toBeFalsy();
+    const sent = await act({ action: "task_submit", taskId: measure.structuredContent!.taskId, values: { value: "5.02", power: "켜진 상태" } });
+    expect(sent.status).toBe(200);
+    expect(sent.project.messages.at(-1).text).toContain("범위 안");
+    const asked = await act({ action: "task_question", taskId: ask.structuredContent!.taskId, text: "어디서 확인해요?" });
+    const question = asked.project.tasks.find((t: { id: string }) => t.id === ask.structuredContent!.taskId).questions[0];
+    const answered = await tool(token, "answer_task_question", { projectId: id, by: "chief", taskId: ask.structuredContent!.taskId, questionId: question.id, answer: "디바이스마트 상품 페이지 아래쪽 재고 표시예요." });
+    expect(answered.structuredContent!.board.openQuestions).toHaveLength(0);
+    expect((await tool(token, "upsert_task", { projectId: id, by: "sw", assignee: "sw", kind: "code", title: "x", plain: "y", format: "stock_check" })).isError).toBe(true);
+
     const card = await tool(token, "raise_conflict", { projectId: id, by: "chief", title: "무선 방식", detail: "기기가 웹을 직접 띄울지, 서버를 거칠지", source: "interface", refs: [], options: [{ label: "기기 직접", detail: "서버 없음", costDeltaKRW: 0, changes: ["서버 제거"], affects: ["웹앱"] }, { label: "서버 중계", detail: "Cloudflare", costDeltaKRW: null, changes: ["서버 추가"], affects: ["펌웨어"] }] });
     const conflictId = card.structuredContent!.conflictId as string;
     expect(decodeURIComponent(card.structuredContent!.openUrl)).toContain(`open=conflict:${conflictId}`);

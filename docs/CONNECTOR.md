@@ -95,6 +95,7 @@ claude
 | `write_dev_spec` | SW 명세서 → SPEC.md · CLAUDE.md · AGENTS.md |
 | `log_dev_progress` | Claude Code·Codex에서 구현 진행·막힌 점·하드웨어 확인 요청 |
 | `upsert_task` · `update_task` | 할 일 보드: 사람·에이전트별 할 일 만들기, 착수(세션 표시, 2시간 뒤 풀림)·완료·막힘 |
+| `answer_task_question` | 사람이 할 일에 남긴 질문에 답하기 (답은 그 할 일 아래에 보임) |
 | `raise_conflict` · `close_conflict` | 충돌 카드: 재고 변동·결정 충돌·확정 뒤 변경을 선택지로 올리고, 사람이 고른 뒤 반영해 닫기 |
 
 ### 조율 → 최종 확정 → 작업대
@@ -103,6 +104,12 @@ claude
 - 대시보드의 **최종 설계 확정**(예전 '대장간 입장', API `finalize`)은 모든 부품이 재고 확인됨·주문 완료·수령 완료이고, 열린 충돌이 없고, 회로 차단 규칙과 교차 검토 실패가 없을 때만 된다. 서버가 같은 조건을 다시 검사한다(`lib/coordination.ts`의 `finalizeBlockers`).
 - 확정 뒤 단계(`workshop`)는 **작업대**다. 확정 뒤 올린 충돌 카드는 '확정 뒤 변경 제안'으로 표시된다.
 - 사람의 할 일 상태는 사람만 바꾼다(하는 중·완료·막혔어요·할 수 없어요). 막힘·못 함에는 이유가 필요하다. 에이전트는 자기가 만든 사람의 할 일을 취소만 할 수 있다.
+
+### 정보 요청 포맷과 측정 요청
+
+- `upsert_task`에 `format`(기본 5개: `stock_check` 재고·가격, `part_link` 찾은 부품, `dimension` 실측 치수, `measurement` 측정값, `error_log` 오류 메시지)이나 `fields`를 붙이면 대시보드에 입력 양식이 생긴다. 포맷마다 정보 탭(무엇을 왜, 어디서)과 칸별 '?' 도움말이 있다. 정의는 `lib/info-formats.ts`.
+- 측정 요청은 `howTo`(측정 단계)와 `expected`(칸별 정상 범위, 근거 있을 때만)를 받는다. 서버가 값을 범위 안·밖으로 판정해 팀 기록에 남긴다. 판정은 합격이 아니다.
+- 사람은 '할 수 없어요'에서 이유(방법 모름·도구 없음·손이 안 닿음·위험해 보임)를 고르거나, '질문 남기기'로 요청한 달그락에게 묻는다(`board.openQuestions`).
 
 ### Claude가 보여주는 링크
 

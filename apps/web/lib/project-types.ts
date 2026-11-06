@@ -14,6 +14,11 @@ export type DesignSlot = {
 // Older projects only have kind/title/plain/status (ready|completed) and are
 // read as tasks for the person.
 export type TaskAssignee = "human" | AgentId;
+// A form an agent asks the person to fill in. "help" is the 정보 tab: what to
+// put in, why and where to find it.
+export type FormField = { key: string; label: string; type: "number" | "text" | "choice" | "link"; unit?: string; required: boolean; choices?: string[]; help?: string; long?: boolean; expected?: { min?: number | null; max?: number | null } };
+export type InfoForm = { formatId?: string; help: string; fields: FormField[] };
+export type TaskQuestion = { id: string; text: string; at: string; answer?: string; answeredBy?: AgentId; answeredAt?: string };
 export type TaskStatus = "ready" | "in_progress" | "blocked" | "cannot" | "completed" | "cancelled";
 export type ProjectTask = {
   id: string;
@@ -33,6 +38,11 @@ export type ProjectTask = {
   createdAt?: string;
   updatedAt?: string;
   history?: Array<{ at: string; by: "human" | "server" | AgentId; status: TaskStatus; note?: string }>;
+  // Structured request: fill-in form and, for measurements, how to measure.
+  form?: InfoForm;
+  howTo?: string[];
+  response?: { values: Record<string, string | number>; judgements: Record<string, "normal" | "abnormal" | "unknown">; at: string };
+  questions?: TaskQuestion[];
 };
 
 // A design choice the person settles: stock ran out, two decisions clash, or

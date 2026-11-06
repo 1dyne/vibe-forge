@@ -8,7 +8,7 @@ import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
-import { CoordinationError, finalizeBlockers, recordPurchase, resolveConflictByPerson, setTaskStatus } from "../../../../../lib/coordination";
+import { CoordinationError, askAboutTask, finalizeBlockers, questionOwner, recordPurchase, resolveConflictByPerson, setTaskStatus, submitTaskForm } from "../../../../../lib/coordination";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
   solderingSkill: z.enum(["unanswered", "none", "tried", "comfortable"]).optional(), printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
@@ -23,6 +23,8 @@ const Input = z.discriminatedUnion("action", [
   // "finalize" is the new name of "enter_workshop": the design is fixed once every part is orderable.
   z.object({ action: z.literal("finalize") }),
   z.object({ action: z.literal("task_status"), taskId: z.string().uuid(), status: z.enum(["ready", "in_progress", "blocked", "cannot", "completed"]), note: z.string().trim().max(1000).optional() }),
+  z.object({ action: z.literal("task_submit"), taskId: z.string().uuid(), values: z.record(z.string(), z.union([z.string().max(3000), z.number()])), note: z.string().trim().max(1000).optional() }),
+  z.object({ action: z.literal("task_question"), taskId: z.string().uuid(), text: z.string().trim().min(1).max(800) }),
   z.object({ action: z.literal("resolve_conflict"), conflictId: z.string().uuid(), optionId: z.string().max(8).optional(), proposal: z.string().trim().max(1500).optional() }),
   z.object({ action: z.literal("reopen") }),
   z.object({ action: z.literal("evidence"), taskId: z.string(), text: z.string().trim().min(1).max(3000) }),
@@ -104,6 +106,19 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text, shared: true, createdAt: now });
         w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `사용자 진행: ${text}${input.status === "completed" ? " (결과 제출, 검증 합격 아님)" : ""}`, createdAt: now });
         pushActivity(p, { source: "person", title: `할 일 ${label}`, detail: task.title });
+      } else if (input.action === "task_submit") {
+        const { task, summary } = submitTaskForm(p, input.taskId, input.values, input.note);
+        w.evidence.push({ taskId: task.id, text: summary, createdAt: now });
+        p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task.title}] ${summary}`, shared: true, createdAt: now });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `사용자 입력 [${task.title}]: ${summary} (검증 합격 아님, 평가 필요)`, createdAt: now });
+        pushActivity(p, { source: "person", title: "요청한 정보 보냄", detail: task.title });
+      } else if (input.action === "task_question") {
+        const task = p.tasks.find((t) => t.id === input.taskId);
+        askAboutTask(p, input.taskId, input.text);
+        const to = task ? questionOwner(task) : "chief";
+        p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task?.title ?? "할 일"}] 질문: ${input.text}`, shared: true, createdAt: now });
+        w.sharedUpdates.push({ id: randomUUID(), agent: to, text: `사람의 질문 [${task?.title ?? "할 일"}]: ${input.text} (${to.toUpperCase()}가 answer_task_question으로 답해야 해요)`, createdAt: now });
+        pushActivity(p, { source: "person", title: "할 일에 질문", detail: task?.title });
       } else if (input.action === "resolve_conflict") {
         if (!input.optionId && !input.proposal) throw new CoordinationError("선택지를 고르거나 제안을 적어주세요.");
         const conflict = resolveConflictByPerson(p, input.conflictId, { optionId: input.optionId, proposal: input.proposal });

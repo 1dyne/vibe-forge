@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TASK_LEASE_MS, boardSummary, claimExpired, closeConflict, finalizeBlockers, raiseConflict, recordPurchase, resolveConflictByPerson, setTaskStatus, upsertTask } from "../apps/web/lib/coordination";
+import { TASK_LEASE_MS, answerTaskQuestion, askAboutTask, buildForm, submitTaskForm, boardSummary, claimExpired, closeConflict, finalizeBlockers, raiseConflict, recordPurchase, resolveConflictByPerson, setTaskStatus, upsertTask } from "../apps/web/lib/coordination";
 import type { LocalProject } from "../apps/web/lib/project-types";
 
 function handoffProject(): LocalProject {
@@ -93,5 +93,34 @@ describe("decisions and finalising the design", () => {
     p.workflow!.finalizedAt = "2026-11-07";
     const change = raiseConflict(p, { title: "저울 교체", detail: "더 큰 용량", source: "change", refs: ["SC1"], options }, "hw");
     expect(change.afterFinal).toBe(true);
+  });
+});
+
+describe("information requests", () => {
+  it("builds a form from a ready-made format plus extra fields and judges readings against the expected range", () => {
+    const p = handoffProject();
+    const form = buildForm("measurement", [{ key: "photo_note", label: "보드 LED 색", type: "text", required: false }], "USB 포트 전압이에요.", { value: { min: 4.75, max: 5.25 } });
+    expect(form!.fields.map((f) => f.key)).toEqual(["value", "power", "where", "photo_note"]);
+    expect(form!.help).toContain("USB 포트 전압");
+    expect(() => buildForm("nope", undefined, undefined)).toThrow("없는 포맷");
+    const { task } = upsertTask(p, { assignee: "human", kind: "measure", title: "5V 확인", plain: "포트 전압", form, howTo: ["멀티미터를 DC 20V로", "빨간 리드 5V, 검은 리드 GND"] }, "hw");
+    expect(() => submitTaskForm(p, task.id, { value: "약 5" , power: "켜진 상태" })).toThrow("숫자");
+    expect(() => submitTaskForm(p, task.id, { value: "4.1" })).toThrow("전원 상태");
+    const { summary } = submitTaskForm(p, task.id, { value: "4.1", power: "켜진 상태" }, "케이블이 길어요");
+    expect(p.tasks[0]).toMatchObject({ status: "completed", response: { values: { value: 4.1 }, judgements: { value: "abnormal" } } });
+    expect(summary).toContain("범위 밖");
+    expect(boardSummary(p, link).recentlyDone[0].response!.values.value).toBe(4.1);
+  });
+
+  it("checks stock-check links and routes a question to the agent that asked", () => {
+    const p = handoffProject();
+    const { task } = upsertTask(p, { assignee: "human", kind: "confirm_availability", title: "재고", plain: "U177", form: buildForm("stock_check", undefined, undefined) }, "chief");
+    expect(() => submitTaskForm(p, task.id, { url: "디바이스마트", model: "U177", stock: 3 })).toThrow("http");
+    const q = askAboutTask(p, task.id, "재고 표시가 없으면 어떻게 해요?");
+    expect(boardSummary(p, link).openQuestions[0]).toMatchObject({ for: "chief", questionId: q.id });
+    answerTaskQuestion(p, task.id, q.id, "장바구니에 2개를 담아 보세요.", "chief");
+    expect(boardSummary(p, link).openQuestions).toHaveLength(0);
+    submitTaskForm(p, task.id, { url: "https://www.devicemart.co.kr/goods/view?no=1", model: "U177", stock: "2", price: "13,530" });
+    expect(p.tasks[0].response!.values.price).toBe(13530);
   });
 });

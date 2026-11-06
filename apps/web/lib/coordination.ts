@@ -1,4 +1,5 @@
-import type { AgentId, ConflictOption, DesignConflict, LocalProject, ProjectTask, PurchaseStatus, TaskAssignee, TaskStatus } from "./project-types";
+import { INFO_FORMATS, checkSubmission, describeSubmission } from "./info-formats";
+import type { FormField, InfoForm, TaskQuestion, AgentId, ConflictOption, DesignConflict, LocalProject, ProjectTask, PurchaseStatus, TaskAssignee, TaskStatus } from "./project-types";
 import { workflowFor } from "./workflow";
 
 // The shared board: who does what (the person or an agent), what clashes and
@@ -24,7 +25,20 @@ function addHistory(task: ProjectTask, by: "human" | "server" | AgentId, status:
   task.updatedAt = at;
 }
 
-export type TaskDraft = { assignee: TaskAssignee; kind: ProjectTask["kind"]; title: string; plain: string; doneWhen?: string; dependsOn?: string[] };
+export type TaskDraft = { assignee: TaskAssignee; kind: ProjectTask["kind"]; title: string; plain: string; doneWhen?: string; dependsOn?: string[]; form?: InfoForm; howTo?: string[] };
+
+// A request may name a ready-made format, define its own fields, or both
+// (the format's fields first, then the extra ones). Expected ranges on number
+// fields let the server judge readings as they arrive.
+export function buildForm(formatId: string | undefined, fields: FormField[] | undefined, help: string | undefined, expected?: Record<string, { min?: number | null; max?: number | null }>): InfoForm | undefined {
+  const base = formatId ? INFO_FORMATS[formatId] : undefined;
+  if (formatId && !base) throw new CoordinationError(`없는 포맷이에요: ${formatId}. 쓸 수 있는 포맷: ${Object.keys(INFO_FORMATS).join(", ")}`);
+  if (!base && !fields?.length) return undefined;
+  const all = [...(base?.fields ?? []), ...(fields ?? [])].map((f) => ({ ...f, ...(expected?.[f.key] ? { expected: expected[f.key] } : {}) }));
+  const keys = new Set<string>();
+  for (const f of all) { if (keys.has(f.key)) throw new CoordinationError(`입력 칸 key가 겹쳐요: ${f.key}`); keys.add(f.key); if (f.type === "choice" && !f.choices?.length) throw new CoordinationError(`${f.label}: 선택 칸에는 choices가 필요해요.`); }
+  return { ...(formatId ? { formatId } : {}), help: [base?.help, help].filter(Boolean).join("\n\n") || "요청한 달그락이 이 정보로 다음 설계를 정해요.", fields: all };
+}
 
 // Adds a task, or updates the open one with the same assignee and content
 // instead of making a duplicate (the same check asked twice is one task).
@@ -35,7 +49,7 @@ export function upsertTask(p: LocalProject, draft: TaskDraft, by: "human" | "ser
   if (taskId && !task) throw new CoordinationError("할 일을 찾을 수 없어요. get_project의 tasks에서 ID를 확인하세요.");
   if (task) {
     if (!isOpenTask(task) && taskId) throw new CoordinationError("이미 끝났거나 취소된 할 일이에요. 새 할 일로 만들어주세요.");
-    Object.assign(task, { assignee: draft.assignee, kind: draft.kind, title: draft.title, plain: draft.plain, ...(draft.doneWhen !== undefined ? { doneWhen: draft.doneWhen } : {}), ...(draft.dependsOn ? { dependsOn: draft.dependsOn } : {}) });
+    Object.assign(task, { assignee: draft.assignee, kind: draft.kind, title: draft.title, plain: draft.plain, ...(draft.doneWhen !== undefined ? { doneWhen: draft.doneWhen } : {}), ...(draft.dependsOn ? { dependsOn: draft.dependsOn } : {}), ...(draft.form ? { form: draft.form } : {}), ...(draft.howTo ? { howTo: draft.howTo } : {}) });
     addHistory(task, by, task.status, "내용 수정");
     return { task, created: false };
   }
@@ -70,6 +84,41 @@ export function setTaskStatus(p: LocalProject, taskId: string, status: TaskStatu
   addHistory(task, by, status, options.note?.trim().slice(0, 300));
   return task;
 }
+
+// The person fills in a requested form: values are checked, readings compared
+// with the expected range, and the task is done (a submission, not a pass).
+export function submitTaskForm(p: LocalProject, taskId: string, raw: Record<string, unknown>, note?: string): { task: ProjectTask; summary: string } {
+  const task = p.tasks.find((t) => t.id === taskId);
+  if (!task) throw new CoordinationError("할 일을 찾을 수 없어요.");
+  if (assigneeOf(task) !== "human") throw new CoordinationError("사람의 할 일만 입력할 수 있어요.");
+  if (!task.form) throw new CoordinationError("입력 양식이 없는 할 일이에요. '완료 · 결과 보내기'로 보내주세요.");
+  const { values, judgements, errors } = checkSubmission(task.form.fields, raw);
+  if (errors.length) throw new CoordinationError(errors.join(" "));
+  const at = new Date().toISOString();
+  task.response = { values, judgements, at };
+  const summary = describeSubmission(task.form.fields, values, judgements) + (note?.trim() ? ` / 메모: ${note.trim().slice(0, 500)}` : "");
+  task.status = "completed";
+  task.note = note?.trim().slice(0, 1000) || task.note;
+  addHistory(task, "human", "completed", summary.slice(0, 300));
+  return { task, summary };
+}
+
+// Questions about a request go to the agent that made it (the chief when the
+// server made it); the answer appears under the task.
+export function askAboutTask(p: LocalProject, taskId: string, text: string): TaskQuestion {
+  const task = p.tasks.find((t) => t.id === taskId);
+  if (!task) throw new CoordinationError("할 일을 찾을 수 없어요.");
+  const question = { id: crypto.randomUUID(), text: text.trim().slice(0, 800), at: new Date().toISOString() };
+  task.questions = [...(task.questions ?? []), question].slice(-10);
+  return question;
+}
+export function answerTaskQuestion(p: LocalProject, taskId: string, questionId: string, answer: string, by: AgentId): TaskQuestion {
+  const question = p.tasks.find((t) => t.id === taskId)?.questions?.find((q) => q.id === questionId);
+  if (!question) throw new CoordinationError("질문을 찾을 수 없어요. get_project의 board.openQuestions를 확인하세요.");
+  Object.assign(question, { answer: answer.trim().slice(0, 1500), answeredBy: by, answeredAt: new Date().toISOString() });
+  return question;
+}
+export const questionOwner = (task: ProjectTask): AgentId => task.createdBy && task.createdBy !== "server" && task.createdBy !== "human" ? task.createdBy : "chief";
 
 export function claimExpired(task: ProjectTask, now = Date.now()) {
   return task.status === "in_progress" && assigneeOf(task) !== "human" && !!task.claimedAt && now - Date.parse(task.claimedAt) >= TASK_LEASE_MS;
@@ -175,12 +224,13 @@ export function finalizeBlockers(p: LocalProject): string[] {
 // Read model for Claude and the dashboard.
 export function boardSummary(p: LocalProject, link: (kind: "task" | "conflict", id: string) => string) {
   const now = Date.now();
-  const task = (t: ProjectTask) => ({ id: t.id, assignee: assigneeOf(t), kind: t.kind, title: t.title, plain: t.plain, status: claimExpired(t, now) ? "ready" : t.status, claimedBy: claimExpired(t, now) ? null : t.claimedBy ?? null, note: t.note ?? null, doneWhen: t.doneWhen ?? null, dependsOn: t.dependsOn ?? [], openUrl: link("task", t.id) });
+  const task = (t: ProjectTask) => ({ id: t.id, assignee: assigneeOf(t), kind: t.kind, title: t.title, plain: t.plain, status: claimExpired(t, now) ? "ready" : t.status, claimedBy: claimExpired(t, now) ? null : t.claimedBy ?? null, note: t.note ?? null, doneWhen: t.doneWhen ?? null, dependsOn: t.dependsOn ?? [], ...(t.form ? { form: { formatId: t.form.formatId ?? null, fields: t.form.fields.map((f) => f.key) } } : {}), openUrl: link("task", t.id) });
   const open = p.tasks.filter(isOpenTask);
   return {
     humanTasks: open.filter((t) => assigneeOf(t) === "human").map(task),
     agentTasks: open.filter((t) => assigneeOf(t) !== "human").map(task),
-    recentlyDone: p.tasks.filter((t) => t.status === "completed").slice(-5).map(({ id, title }) => ({ id, title })),
+    recentlyDone: p.tasks.filter((t) => t.status === "completed").slice(-5).map(({ id, title, response, note }) => ({ id, title, ...(response ? { response } : {}), ...(note ? { note } : {}) })),
+    openQuestions: p.tasks.flatMap((t) => (t.questions ?? []).filter((q) => !q.answer).map((q) => ({ taskId: t.id, taskTitle: t.title, questionId: q.id, text: q.text, for: questionOwner(t) }))),
     conflicts: (p.conflicts ?? []).filter((c) => c.status !== "dismissed").slice(-12).map((c) => ({ ...c, openUrl: link("conflict", c.id) })),
     finalizeBlockers: workflowFor(p).phase === "handoff" ? finalizeBlockers(p) : []
   };
