@@ -7,7 +7,7 @@ import { CATS, FOLLOW, ROOTS, compose, fireName, lookup, reactKind, toChip, type
 import { analyzeFind, chipTree, classify } from "../apps/web/lib/find/classify";
 import { PROJECTS, canShowImage, matchProjects, matchScore } from "../apps/web/lib/find/projects";
 import { resetRateLimits } from "../apps/web/lib/find/rate-limit";
-import { endPool } from "../apps/web/lib/find/store";
+import { allWaitlist, clearEvents, endPool, getFire, recordEvent, removeEntry } from "../apps/web/lib/find/store";
 import { POST as analyzeRoute } from "../apps/web/app/api/find/analyze/route";
 import { POST as fireRoute } from "../apps/web/app/api/find/fires/route";
 import { POST as waitlistRoute } from "../apps/web/app/api/find/waitlist/route";
@@ -153,6 +153,17 @@ describe("공개 API와 저장소 (파일 저장)", () => {
     expect(again.alreadyJoined).toBe(true);
     expect(again.referrals).toBe(1);
     expect(again.position).toBe(1);
+  });
+  it("삭제 요청이 오면 신청과 그 사람의 도깨비불을 함께 지운다", async () => {
+    const find = lookup(chipTree("화분에 물 줄 때를 모르겠어"));
+    const { fire } = await (await fireRoute(post("/api/find/fires", { idea: "화분에 물 줄 때를 모르겠어", picked: ["f_pot", "s_soil", "r_light"].map((id) => find(id)), peak: 50 }))).json();
+    await waitlistRoute(post("/api/find/waitlist", { email: "delete-me@example.com", fireId: fire.id, privacyConsent: true, marketingConsent: false, ref: null }));
+    const [entry] = await allWaitlist();
+    expect(await removeEntry(entry.id)).toBe(true);
+    expect(await allWaitlist()).toEqual([]);
+    expect(await getFire(fire.id)).toBeNull();
+    await recordEvent({ name: "dice", session: "abcdef", props: {}, createdAt: new Date().toISOString() });
+    expect(await clearEvents()).toBe(1);
   });
   it("다른 사이트에서 보낸 요청과 봇 칸을 채운 신청은 막는다", async () => {
     expect((await analyzeRoute(post("/api/find/analyze", { idea: "화분" }, { origin: "https://evil.example" }))).status).toBe(403);
