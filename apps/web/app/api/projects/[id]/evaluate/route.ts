@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { reevaluateBuild } from "../../../../../lib/build-pipeline";
 import { applyBuildResult, getProject } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
+import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
 
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
+  const viewer = await getViewer(request);
+  if (!viewer) return unauthorized();
   const { id } = await context.params;
   const project = await getProject(id);
+  if (!canAccess(viewer, project)) return notFound();
+  if (!canUseWebAi(viewer)) return webAiDenied();
   if (!project) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
   try {
     const build = await reevaluateBuild(project);
@@ -18,3 +23,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: "Evaluator 재검토 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
+
+export const POST = withViewerVault(handlePOST);

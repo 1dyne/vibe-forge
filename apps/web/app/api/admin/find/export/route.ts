@@ -1,3 +1,4 @@
+import { isOperator } from "../../../../../lib/find/admin-auth";
 import { NextResponse } from "next/server";
 import { allWaitlist } from "../../../../../lib/find/store";
 
@@ -8,6 +9,7 @@ function cell(v: unknown) {
 }
 
 export async function GET() {
+  if (!(await isOperator())) return NextResponse.json({ error: "운영자만 볼 수 있어요." }, { status: 403 });
   const rows = await allWaitlist();
   const head = ["created_at", "email", "referral_code", "referred_by", "fire_id", "idea", "sentence", "picked", "peak_fire", "fire_color", "marketing_consent", "coupon_sent_at"];
   const body = rows.map((r) => [r.createdAt, r.email, r.referralCode, r.referredBy, r.fireId, r.idea, r.sentence, r.picked, r.peakFire, r.fireColor, r.marketingConsent, r.couponSentAt].map(cell).join(","));

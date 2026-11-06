@@ -9,6 +9,7 @@ import { AttachmentsSchema, modelImages } from "../apps/web/lib/attachments";
 import { teamContext } from "../apps/web/lib/workshop-agent";
 import * as workshopAgent from "../apps/web/lib/workshop-agent";
 import type { AgentPlan, BuildResult, LocalProject } from "../apps/web/lib/project-types";
+import { signSession } from "../apps/web/lib/session";
 
 vi.mock("../apps/web/lib/build-pipeline", async (importOriginal) => {
   const original = await importOriginal<typeof import("../apps/web/lib/build-pipeline")>();
@@ -25,9 +26,11 @@ import { GET as downloadFile } from "../apps/web/app/api/projects/[id]/files/[fi
 
 let folder:string;
 const plan:AgentPlan={projectName:"테스트 제작",oneLiner:"설계 흐름 검증",reply:"어떤 동작을 만들까요?",slotUpdates:[],tasks:[]};
-const request=(suffix:string,body:unknown)=>new NextRequest("http://localhost:3000/api/projects/test/"+suffix,{method:"POST",headers:{"content-type":"application/json",origin:"http://localhost:3000"},body:JSON.stringify(body)});
+let cookie="";
+const request=(suffix:string,body:unknown)=>new NextRequest("http://localhost:3000/api/projects/test/"+suffix,{method:"POST",headers:{"content-type":"application/json",origin:"http://localhost:3000",cookie},body:JSON.stringify(body)});
+const signedGet=()=>new NextRequest("http://localhost:3000",{headers:{cookie}});
 async function act(p:LocalProject,input:unknown) {const response=await workflowPost(request("workflow",input),{params:Promise.resolve({id:p.id})});return {status:response.status,...await response.json()} as {status:number;project:LocalProject;error?:string};}
-beforeAll(async()=>{folder=await mkdtemp(path.join(tmpdir(),"forge-workflow-test-"));vi.stubEnv("FORGE_TEST_DATA_FILE",path.join(folder,"projects.json"));vi.stubEnv("APP_MODE","mock");});
+beforeAll(async()=>{folder=await mkdtemp(path.join(tmpdir(),"forge-workflow-test-"));vi.stubEnv("FORGE_TEST_DATA_FILE",path.join(folder,"projects.json"));vi.stubEnv("FORGE_TEST_USERS_FILE",path.join(folder,"users.json"));vi.stubEnv("APP_MODE","mock");vi.stubEnv("SESSION_SECRET","test-secret-for-workflow-routes-0123456789");cookie="dalgeurak_session="+await signSession(Date.now()+3_600_000,"test-secret-for-workflow-routes-0123456789");});
 afterAll(async()=>{vi.unstubAllEnvs();await rm(folder,{recursive:true,force:true});});
 
 describe("persisted approval and team workflow",()=>{
@@ -64,7 +67,7 @@ describe("persisted approval and team workflow",()=>{
     expect(p.build?.evaluator.hw.verdict).toBe("unknown");
     p=(await act(p,{action:"reopen"})).project;
     expect(p.workflow?.circuitApprovedAt).toBeNull();
-    const blocked=await download(new NextRequest("http://localhost:3000"),{params:Promise.resolve({id:p.id,artifactId:cad.id})});
+    const blocked=await download(signedGet(),{params:Promise.resolve({id:p.id,artifactId:cad.id})});
     expect(blocked.status).toBe(409);
     expect((await getProject(p.id))?.workflow?.phase).toBe("brainstorm");
   });
@@ -102,7 +105,7 @@ describe("persisted approval and team workflow",()=>{
       expect(teamContext(saved).workspaceFiles?.[0].content).toBe(content);
       expect(teamContext(saved).sharedUpdates.at(-1)?.text).toContain("실측 없음");
       const file = saved.workspaceFiles![0];
-      const result = await downloadFile(new NextRequest("http://localhost:3000"), { params: Promise.resolve({ id: saved.id, fileId: file.id }) });
+      const result = await downloadFile(signedGet(), { params: Promise.resolve({ id: saved.id, fileId: file.id }) });
       expect(result.headers.get("content-disposition")).toContain("button.scad");
       expect(await result.text()).toBe(content);
       expect(saved.build).toEqual(created.build);

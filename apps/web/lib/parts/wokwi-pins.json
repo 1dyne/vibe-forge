@@ -1,0 +1,994 @@
+{
+ "arduino-uno": {
+  "widthMm": 72.58,
+  "heightMm": 53.34,
+  "pins": [
+   {
+    "name": "A5.2",
+    "xMm": 23.02,
+    "yMm": 2.38,
+    "roles": [
+     "analog",
+     "i2c_scl"
+    ]
+   },
+   {
+    "name": "A4.2",
+    "xMm": 25.66,
+    "yMm": 2.38,
+    "roles": [
+     "analog",
+     "i2c_sda"
+    ]
+   },
+   {
+    "name": "AREF",
+    "xMm": 28.05,
+    "yMm": 2.38,
+    "roles": []
+   },
+   {
+    "name": "GND.1",
+    "xMm": 30.56,
+    "yMm": 2.38,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "13",
+    "xMm": 33.07,
+    "yMm": 2.38,
+    "roles": [
+     "spi"
+    ]
+   },
+   {
+    "name": "12",
+    "xMm": 35.59,
+    "yMm": 2.38,
+    "roles": [
+     "spi"
+    ]
+   },
+   {
+    "name": "11",
+    "xMm": 38.1,
+    "yMm": 2.38,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "10",
+    "xMm": 40.61,
+    "yMm": 2.38,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "9",
+    "xMm": 43.13,
+    "yMm": 2.38,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "8",
+    "xMm": 45.77,
+    "yMm": 2.38,
+    "roles": []
+   },
+   {
+    "name": "7",
+    "xMm": 50.01,
+    "yMm": 2.38,
+    "roles": []
+   },
+   {
+    "name": "6",
+    "xMm": 52.52,
+    "yMm": 2.38,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "5",
+    "xMm": 55.03,
+    "yMm": 2.38,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "4",
+    "xMm": 57.55,
+    "yMm": 2.38,
+    "roles": []
+   },
+   {
+    "name": "3",
+    "xMm": 60.06,
+    "yMm": 2.38,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "2",
+    "xMm": 62.57,
+    "yMm": 2.38,
+    "roles": []
+   },
+   {
+    "name": "1",
+    "xMm": 65.09,
+    "yMm": 2.38,
+    "roles": [
+     "uart"
+    ]
+   },
+   {
+    "name": "0",
+    "xMm": 67.6,
+    "yMm": 2.38,
+    "roles": [
+     "uart"
+    ]
+   },
+   {
+    "name": "IOREF",
+    "xMm": 34.66,
+    "yMm": 50.67,
+    "roles": []
+   },
+   {
+    "name": "RESET",
+    "xMm": 37.17,
+    "yMm": 50.67,
+    "roles": []
+   },
+   {
+    "name": "3.3V",
+    "xMm": 39.69,
+    "yMm": 50.67,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "5V",
+    "xMm": 42.33,
+    "yMm": 50.67,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "GND.2",
+    "xMm": 44.85,
+    "yMm": 50.67,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "GND.3",
+    "xMm": 47.36,
+    "yMm": 50.67,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "VIN",
+    "xMm": 49.87,
+    "yMm": 50.67,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "A0",
+    "xMm": 55.03,
+    "yMm": 50.67,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A1",
+    "xMm": 57.55,
+    "yMm": 50.67,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A2",
+    "xMm": 60.06,
+    "yMm": 50.67,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A3",
+    "xMm": 62.57,
+    "yMm": 50.67,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A4",
+    "xMm": 65.09,
+    "yMm": 50.67,
+    "roles": [
+     "analog",
+     "i2c_sda"
+    ]
+   },
+   {
+    "name": "A5",
+    "xMm": 67.6,
+    "yMm": 50.67,
+    "roles": [
+     "analog",
+     "i2c_scl"
+    ]
+   }
+  ]
+ },
+ "arduino-nano": {
+  "widthMm": 44.9,
+  "heightMm": 17.8,
+  "pins": [
+   {
+    "name": "12",
+    "xMm": 5.21,
+    "yMm": 1.27,
+    "roles": [
+     "spi"
+    ]
+   },
+   {
+    "name": "11",
+    "xMm": 7.75,
+    "yMm": 1.27,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "10",
+    "xMm": 10.29,
+    "yMm": 1.27,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "9",
+    "xMm": 12.83,
+    "yMm": 1.27,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "8",
+    "xMm": 15.37,
+    "yMm": 1.27,
+    "roles": []
+   },
+   {
+    "name": "7",
+    "xMm": 17.91,
+    "yMm": 1.27,
+    "roles": []
+   },
+   {
+    "name": "6",
+    "xMm": 20.45,
+    "yMm": 1.27,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "5",
+    "xMm": 22.99,
+    "yMm": 1.27,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "4",
+    "xMm": 25.53,
+    "yMm": 1.27,
+    "roles": []
+   },
+   {
+    "name": "3",
+    "xMm": 28.07,
+    "yMm": 1.27,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "2",
+    "xMm": 30.61,
+    "yMm": 1.27,
+    "roles": []
+   },
+   {
+    "name": "GND.2",
+    "xMm": 33.15,
+    "yMm": 1.27,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "RESET.2",
+    "xMm": 35.69,
+    "yMm": 1.27,
+    "roles": []
+   },
+   {
+    "name": "0",
+    "xMm": 38.23,
+    "yMm": 1.27,
+    "roles": [
+     "uart"
+    ]
+   },
+   {
+    "name": "1",
+    "xMm": 40.77,
+    "yMm": 1.27,
+    "roles": [
+     "uart"
+    ]
+   },
+   {
+    "name": "13",
+    "xMm": 5.21,
+    "yMm": 16.51,
+    "roles": [
+     "spi"
+    ]
+   },
+   {
+    "name": "3.3V",
+    "xMm": 7.75,
+    "yMm": 16.51,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "AREF",
+    "xMm": 10.29,
+    "yMm": 16.51,
+    "roles": []
+   },
+   {
+    "name": "A0",
+    "xMm": 12.83,
+    "yMm": 16.51,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A1",
+    "xMm": 15.37,
+    "yMm": 16.51,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A2",
+    "xMm": 17.91,
+    "yMm": 16.51,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A3",
+    "xMm": 20.45,
+    "yMm": 16.51,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A4",
+    "xMm": 22.99,
+    "yMm": 16.51,
+    "roles": [
+     "analog",
+     "i2c_sda"
+    ]
+   },
+   {
+    "name": "A5",
+    "xMm": 25.53,
+    "yMm": 16.51,
+    "roles": [
+     "analog",
+     "i2c_scl"
+    ]
+   },
+   {
+    "name": "A6",
+    "xMm": 28.07,
+    "yMm": 16.51,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "A7",
+    "xMm": 30.61,
+    "yMm": 16.51,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "5V",
+    "xMm": 33.15,
+    "yMm": 16.51,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "RESET",
+    "xMm": 35.69,
+    "yMm": 16.51,
+    "roles": []
+   },
+   {
+    "name": "GND.1",
+    "xMm": 38.23,
+    "yMm": 16.51,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "VIN",
+    "xMm": 40.77,
+    "yMm": 16.51,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "12.2",
+    "xMm": 43.31,
+    "yMm": 11.43,
+    "roles": [
+     "spi"
+    ]
+   },
+   {
+    "name": "13.2",
+    "xMm": 43.31,
+    "yMm": 8.89,
+    "roles": [
+     "spi"
+    ]
+   },
+   {
+    "name": "RESET.3",
+    "xMm": 43.31,
+    "yMm": 6.35,
+    "roles": []
+   }
+  ]
+ },
+ "esp32-devkit-v1": {
+  "widthMm": 28.2,
+  "heightMm": 54.05,
+  "pins": [
+   {
+    "name": "VIN",
+    "xMm": 1.32,
+    "yMm": 41.94,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "GND.2",
+    "xMm": 1.32,
+    "yMm": 39.42,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "D13",
+    "xMm": 1.32,
+    "yMm": 36.91,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D12",
+    "xMm": 1.32,
+    "yMm": 34.5,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D14",
+    "xMm": 1.32,
+    "yMm": 31.75,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D27",
+    "xMm": 1.32,
+    "yMm": 29.32,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "D26",
+    "xMm": 1.32,
+    "yMm": 26.72,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "D25",
+    "xMm": 1.32,
+    "yMm": 24.16,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "D33",
+    "xMm": 1.32,
+    "yMm": 21.62,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "D32",
+    "xMm": 1.32,
+    "yMm": 19.1,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "D35",
+    "xMm": 1.32,
+    "yMm": 16.64,
+    "roles": []
+   },
+   {
+    "name": "D34",
+    "xMm": 1.32,
+    "yMm": 14.05,
+    "roles": []
+   },
+   {
+    "name": "VN",
+    "xMm": 1.32,
+    "yMm": 11.64,
+    "roles": []
+   },
+   {
+    "name": "VP",
+    "xMm": 1.32,
+    "yMm": 9.0,
+    "roles": []
+   },
+   {
+    "name": "EN",
+    "xMm": 1.32,
+    "yMm": 6.35,
+    "roles": []
+   },
+   {
+    "name": "3V3",
+    "xMm": 26.8,
+    "yMm": 41.94,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "GND.1",
+    "xMm": 26.8,
+    "yMm": 39.42,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "D15",
+    "xMm": 26.8,
+    "yMm": 36.91,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D2",
+    "xMm": 26.8,
+    "yMm": 34.5,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "D4",
+    "xMm": 26.8,
+    "yMm": 31.75,
+    "roles": [
+     "pwm"
+    ]
+   },
+   {
+    "name": "RX2",
+    "xMm": 26.8,
+    "yMm": 29.32,
+    "roles": [
+     "pwm",
+     "uart"
+    ]
+   },
+   {
+    "name": "TX2",
+    "xMm": 26.8,
+    "yMm": 26.72,
+    "roles": [
+     "pwm",
+     "uart"
+    ]
+   },
+   {
+    "name": "D5",
+    "xMm": 26.8,
+    "yMm": 24.16,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D18",
+    "xMm": 26.8,
+    "yMm": 21.62,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D19",
+    "xMm": 26.8,
+    "yMm": 19.1,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   },
+   {
+    "name": "D21",
+    "xMm": 26.8,
+    "yMm": 16.64,
+    "roles": [
+     "pwm",
+     "i2c_sda"
+    ]
+   },
+   {
+    "name": "RX0",
+    "xMm": 26.8,
+    "yMm": 14.05,
+    "roles": [
+     "pwm",
+     "uart"
+    ]
+   },
+   {
+    "name": "TX0",
+    "xMm": 26.8,
+    "yMm": 11.64,
+    "roles": [
+     "pwm",
+     "uart"
+    ]
+   },
+   {
+    "name": "D22",
+    "xMm": 26.8,
+    "yMm": 9.0,
+    "roles": [
+     "pwm",
+     "i2c_scl"
+    ]
+   },
+   {
+    "name": "D23",
+    "xMm": 26.8,
+    "yMm": 6.35,
+    "roles": [
+     "pwm",
+     "spi"
+    ]
+   }
+  ]
+ },
+ "led": {
+  "widthMm": 10.58,
+  "heightMm": 13.23,
+  "pins": [
+   {
+    "name": "A",
+    "xMm": 6.61,
+    "yMm": 11.11,
+    "roles": []
+   },
+   {
+    "name": "C",
+    "xMm": 3.97,
+    "yMm": 11.11,
+    "roles": []
+   }
+  ]
+ },
+ "resistor": {
+  "widthMm": 15.64,
+  "heightMm": 3.0,
+  "pins": [
+   {
+    "name": "1",
+    "xMm": 0.0,
+    "yMm": 1.49,
+    "roles": []
+   },
+   {
+    "name": "2",
+    "xMm": 15.56,
+    "yMm": 1.49,
+    "roles": []
+   }
+  ]
+ },
+ "pushbutton": {
+  "widthMm": 17.8,
+  "heightMm": 12.0,
+  "pins": [
+   {
+    "name": "1.l",
+    "xMm": 0.0,
+    "yMm": 3.44,
+    "roles": []
+   },
+   {
+    "name": "2.l",
+    "xMm": 0.0,
+    "yMm": 8.47,
+    "roles": []
+   },
+   {
+    "name": "1.r",
+    "xMm": 17.73,
+    "yMm": 3.44,
+    "roles": []
+   },
+   {
+    "name": "2.r",
+    "xMm": 17.73,
+    "yMm": 8.47,
+    "roles": []
+   }
+  ]
+ },
+ "pushbutton-6mm": {
+  "widthMm": 7.41,
+  "heightMm": 6.0,
+  "pins": [
+   {
+    "name": "1.l",
+    "xMm": 0.0,
+    "yMm": 0.58,
+    "roles": []
+   },
+   {
+    "name": "2.l",
+    "xMm": 0.0,
+    "yMm": 5.56,
+    "roles": []
+   },
+   {
+    "name": "1.r",
+    "xMm": 7.41,
+    "yMm": 0.58,
+    "roles": []
+   },
+   {
+    "name": "2.r",
+    "xMm": 7.41,
+    "yMm": 5.56,
+    "roles": []
+   }
+  ]
+ },
+ "servo": {
+  "widthMm": 45.0,
+  "heightMm": 31.63,
+  "pins": [
+   {
+    "name": "GND",
+    "xMm": 0.0,
+    "yMm": 13.23,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "V+",
+    "xMm": 0.0,
+    "yMm": 15.74,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "PWM",
+    "xMm": 0.0,
+    "yMm": 18.26,
+    "roles": [
+     "pwm"
+    ]
+   }
+  ]
+ },
+ "ssd1306": {
+  "widthMm": 39.16,
+  "heightMm": 30.16,
+  "pins": [
+   {
+    "name": "DATA",
+    "xMm": 9.66,
+    "yMm": 3.31,
+    "roles": [
+     "i2c_sda"
+    ]
+   },
+   {
+    "name": "CLK",
+    "xMm": 12.04,
+    "yMm": 3.31,
+    "roles": [
+     "i2c_scl"
+    ]
+   },
+   {
+    "name": "DC",
+    "xMm": 14.42,
+    "yMm": 3.31,
+    "roles": []
+   },
+   {
+    "name": "RST",
+    "xMm": 17.07,
+    "yMm": 3.31,
+    "roles": []
+   },
+   {
+    "name": "CS",
+    "xMm": 19.71,
+    "yMm": 3.31,
+    "roles": []
+   },
+   {
+    "name": "3V3",
+    "xMm": 22.09,
+    "yMm": 3.31,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "VIN",
+    "xMm": 24.74,
+    "yMm": 3.31,
+    "roles": [
+     "power"
+    ]
+   },
+   {
+    "name": "GND",
+    "xMm": 27.38,
+    "yMm": 3.18,
+    "roles": [
+     "ground"
+    ]
+   }
+  ]
+ },
+ "buzzer": {
+  "widthMm": 17.0,
+  "heightMm": 20.0,
+  "pins": [
+   {
+    "name": "1",
+    "xMm": 7.14,
+    "yMm": 22.23,
+    "roles": []
+   },
+   {
+    "name": "2",
+    "xMm": 9.79,
+    "yMm": 22.23,
+    "roles": []
+   }
+  ]
+ },
+ "potentiometer": {
+  "widthMm": 20.0,
+  "heightMm": 20.0,
+  "pins": [
+   {
+    "name": "GND",
+    "xMm": 7.67,
+    "yMm": 18.12,
+    "roles": [
+     "ground"
+    ]
+   },
+   {
+    "name": "SIG",
+    "xMm": 10.32,
+    "yMm": 18.12,
+    "roles": [
+     "analog"
+    ]
+   },
+   {
+    "name": "VCC",
+    "xMm": 12.96,
+    "yMm": 18.12,
+    "roles": [
+     "power"
+    ]
+   }
+  ]
+ }
+}

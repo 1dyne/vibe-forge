@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runDesignAgent } from "../../../../../lib/design-agent";
 import { applyAgentPlan, getProject, mutateProject } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
+import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
 import { randomUUID } from "node:crypto";
 import { AttachmentsSchema } from "../../../../../lib/attachments";
 import { runWorkshopAgent } from "../../../../../lib/workshop-agent";
@@ -11,12 +12,15 @@ import type { ImageAttachment } from "../../../../../lib/project-types";
 
 const Message = z.object({ text: z.string().trim().min(1).max(4000), attachments: AttachmentsSchema, channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main"), mode: z.enum(["work", "evaluate"]).default("work") }).strict();
 
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   try {
+    const viewer = await getViewer(request);
+    if (!viewer) return unauthorized();
     const { id } = await context.params;
     const project = await getProject(id);
-    if (!project) return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
+    if (!project || !canAccess(viewer, project)) return notFound();
+    if (!canUseWebAi(viewer)) return webAiDenied();
     const input = Message.parse(await request.json());
     const attachments = input.attachments as ImageAttachment[];
     const workflow = workflowFor(project);
@@ -58,3 +62,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: "답변을 반영하지 못했습니다." }, { status: 500 });
   }
 }
+
+export const POST = withViewerVault(handlePOST);

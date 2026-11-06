@@ -1,9 +1,13 @@
+import type { NextRequest } from "next/server";
+import { canAccess, getViewer, withViewerVault } from "../../../../../../lib/viewer";
 import { getProject } from "../../../../../../lib/local-project-store";
 import { workbenchItems } from "../../../../../../lib/workbench";
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string; itemId: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ id: string; itemId: string }> }) {
   const { id, itemId } = await context.params;
-  const item = workbenchItems(await getProject(id)).find(i => i.id === itemId);
+  const viewer = await getViewer(request);
+  const found = await getProject(id);
+  const item = workbenchItems(viewer && canAccess(viewer, found) ? found : null).find(i => i.id === itemId);
   if (!item) return Response.json({ error: "작업물을 찾을 수 없습니다." }, { status: 404 });
   const fallback = item.filename.replace(/[^A-Za-z0-9._-]/g, "_");
   return new Response(item.content, { headers: {
@@ -13,3 +17,5 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     "x-content-type-options": "nosniff"
   } });
 }
+
+export const GET = withViewerVault(handleGET);

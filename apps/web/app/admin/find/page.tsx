@@ -1,10 +1,13 @@
+import { isOperator } from "../../../lib/find/admin-auth";
 import { allWaitlist, eventCounts, storageKind } from "../../../lib/find/store";
+import { notFound } from "next/navigation";
 import CouponToggle from "./coupon-toggle";
 
 export const dynamic = "force-dynamic";
 
 // 도깨비불 찾기 운영 화면 (로그인한 사람만). HANDOFF §8 핵심 지표 + 대기열.
 export default async function FindAdmin() {
+  if (!(await isOperator())) notFound();
   const [counts, waitlist] = await Promise.all([eventCounts(), allWaitlist()]);
   const n = (k: string) => counts[k] ?? 0;
   const referred = waitlist.filter((w) => w.referredBy).length;
