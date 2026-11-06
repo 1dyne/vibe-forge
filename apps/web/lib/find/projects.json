@@ -1,0 +1,1383 @@
+[
+ {
+  "id": "hydration-device-oled-ir",
+  "title": "Hack Your Productivity with This Next-Level Arduino Hydration Device!",
+  "title_ko": "물병 감지 물 마시기 타이머",
+  "summary_ko": "물병이 놓였는지 IR 센서로 확인하고, 정한 시간(1~20분)이 지나면 OLED와 삐 소리로 물 마실 때를 알려 줍니다.",
+  "source": "Arduino Project Hub",
+  "source_url": "https://projecthub.arduino.cc/rohan_barnwal/hack-your-productivity-with-this-next-level-arduino-hydration-device-f08b2a",
+  "author": "rohan_barnwal",
+  "license": "GPL3+",
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "화면 표시",
+    "소리"
+   ],
+   "감지": [
+    "시간",
+    "거리·접근",
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino UNO R4 WiFi",
+   "0.96\" OLED",
+   "Rotary encoder",
+   "IR obstacle sensor"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "smart-glass-counter",
+  "title": "Smart Glass Counter - A Step-by-Step Arduino Hydration Tracking Project",
+  "title_ko": "물 잔 세는 수분 섭취 카운터",
+  "summary_ko": "잔이 놓이고 물이 채워졌는지 감지해 마신 잔 수를 세고, 마실 때까지 알림음을 울리다 목표를 채우면 축하음을 냅니다.",
+  "source": "Arduino Project Hub",
+  "source_url": "https://projecthub.arduino.cc/rohan_barnwal/smart-glass-counter-a-step-by-step-arduino-hydration-tracking-project-1e2dbc",
+  "author": "rohan_barnwal",
+  "license": "GPL3+",
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "소리",
+    "멜로디"
+   ],
+   "감지": [
+    "시간",
+    "거리·접근"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino UNO R4 WiFi",
+   "XKC-Y26-V liquid level sensor",
+   "IR obstacle sensor",
+   "Piezo buzzer"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "hydration-reminder-fsr-coaster",
+  "title": "HydrationReminder",
+  "title_ko": "컵 들면 리셋되는 물 마시기 코스터",
+  "summary_ko": "코스터 아래 압력 센서로 컵을 들었다 놓는 것을 감지하고, 오래 마시지 않으면 소리로 물 마시라고 알려 줍니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/mitesan1206/hydrationreminder-b40012",
+  "author": "mitesan",
+  "license": "MIT",
+  "images": [
+   {
+    "url": "/find/projects/hydration-reminder-fsr-coaster.jpg",
+    "kind": "photo",
+    "credit": "mitesan · Hackster · MIT"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "소리",
+    "화면 표시"
+   ],
+   "감지": [
+    "무게",
+    "시간"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "M5Stack Core2",
+   "FSR402 force sensor"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "arduino-water-bottle",
+  "title": "Arduino-Powered Water Bottle",
+  "title_ko": "마신 양 기록하는 스마트 물병",
+  "summary_ko": "물병 뚜껑의 초음파 센서로 수위를 재서 하루 마신 양을 기록하고, 오래 안 마시면 부저로 알려 주는 배터리 물병입니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/taifur/arduino-powered-water-bottle-42ee43",
+  "author": "Md. Khairul Alam",
+  "license": "CC BY",
+  "images": [
+   {
+    "url": "/find/projects/arduino-water-bottle.jpg",
+    "kind": "photo",
+    "credit": "Md. Khairul Alam · Hackster · CC BY"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "들고 다니는"
+   ],
+   "반응": [
+    "소리",
+    "화면 표시"
+   ],
+   "감지": [
+    "거리·접근",
+    "시간"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino Pro Mini 5V",
+   "Waterproof ultrasonic sensor",
+   "RTC module",
+   "4-digit 7-segment display",
+   "Buzzer",
+   "1000mAh Li-ion battery"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "smart-plant-soil-monitor",
+  "title": "Smart Plant Soil Monitor",
+  "title_ko": "화분 흙 상태 알림 모니터",
+  "summary_ko": "흙 수분과 온습도를 재서 OLED와 색 LED로 화분 흙 상태를 알려 줍니다.",
+  "source": "Arduino Project Hub",
+  "source_url": "https://projecthub.arduino.cc/opulentcook/smart-plant-monitoring-system-c8b8ea",
+  "author": "opulentcook",
+  "license": "CC BY 4+",
+  "images": [],
+  "tags": {
+   "형태": [
+    "화분·정원"
+   ],
+   "반응": [
+    "화면 표시",
+    "색 변화"
+   ],
+   "감지": [
+    "흙 수분",
+    "온습도"
+   ],
+   "누구": [
+    "식물"
+   ]
+  },
+  "parts": [
+   "Arduino Uno Rev3",
+   "Soil moisture sensor",
+   "DHT11",
+   "SSD1306 OLED",
+   "Red/Green/Blue LED"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "nano-soil-moisture-led",
+  "title": "Soil Moisture Sensor",
+  "title_ko": "흙 마르면 켜지는 화분 LED",
+  "summary_ko": "아두이노 나노와 흙 수분 센서로 흙이 마르면 LED가 켜져 물 줄 때를 알려 주는 첫 프로젝트입니다.",
+  "source": "Arduino Project Hub",
+  "source_url": "https://projecthub.arduino.cc/biotronicmaker/soil-moisture-sensor-561f5f",
+  "author": "biotronicmaker",
+  "license": "CC BY 4+",
+  "images": [],
+  "tags": {
+   "형태": [
+    "화분·정원"
+   ],
+   "반응": [
+    "빛"
+   ],
+   "감지": [
+    "흙 수분"
+   ],
+   "누구": [
+    "식물"
+   ]
+  },
+  "parts": [
+   "Arduino Nano",
+   "LM393 soil moisture sensor",
+   "5mm LED",
+   "Resistors"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "diy-plant-moisture-rgb",
+  "title": "DIY Plant Moisture Sensor",
+  "title_ko": "흙 수분 색깔 신호등",
+  "summary_ko": "못 두 개로 만든 탐침으로 흙의 수분을 재서 RGB LED 색으로 마름·적당·과습을 보여 줍니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/millerman4487/diy-plant-moisture-sensor-474543",
+  "author": "millerman4487",
+  "license": "CC BY-NC-SA",
+  "images": [],
+  "tags": {
+   "형태": [
+    "화분·정원"
+   ],
+   "반응": [
+    "색 변화"
+   ],
+   "감지": [
+    "흙 수분"
+   ],
+   "누구": [
+    "식물"
+   ]
+  },
+  "parts": [
+   "Arduino UNO",
+   "RGB LED (common anode)",
+   "Nuts and bolts probes",
+   "Resistors"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "mailbox-notifier-ultrasonic",
+  "title": "Mailbox notifier",
+  "title_ko": "우편함 새 우편 알림이",
+  "summary_ko": "우편함 안의 초음파 센서로 새 우편을 감지해 Wi-Fi(IFTTT)로 폰에 알림을 보냅니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/354529/mailbox-notifier-ed6dba",
+  "author": "Adrien Sales, Mathéo Moinet (boiteConnectee)",
+  "license": "GPL3+",
+  "images": [
+   {
+    "url": "/find/projects/mailbox-notifier-ultrasonic.jpg",
+    "kind": "photo",
+    "credit": "Adrien Sales, Mathéo Moinet (boiteConnectee) · Hackster · GPL3+"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "현관·문"
+   ],
+   "반응": [
+    "폰 알림",
+    "빛"
+   ],
+   "감지": [
+    "거리·접근",
+    "버튼"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "NodeMCU ESP8266",
+   "HC-SR04 ultrasonic",
+   "Push button",
+   "LED"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "smartphone-mailbox-notifier-v2",
+  "title": "Smartphone Mailbox Notifier (Version 2, Sept 2018)",
+  "title_ko": "우편 도착·수거 스마트폰 알림",
+  "summary_ko": "우편함 문에 단 자석 센서로 우편이 도착하거나 수거될 때 스마트폰·스마트워치로 알림을 보냅니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/Rom3oDelta7/smartphone-mailbox-notifier-version-2-sept-2018-822a1d",
+  "author": "Rob Redford",
+  "license": "CC BY-SA",
+  "images": [
+   {
+    "url": "/find/projects/smartphone-mailbox-notifier-v2.jpg",
+    "kind": "photo",
+    "credit": "Rob Redford · Hackster · CC BY-SA"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "현관·문"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "문 열림"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "WeMos D1 Mini (ESP8266)",
+   "945T magnetic contact",
+   "Green LED",
+   "Logic-level N-MOSFET",
+   "5V DC power jack"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "iot-mailbox-guard",
+  "title": "IoT mailbox guard",
+  "title_ko": "우편함 열림 이메일 알리미",
+  "summary_ko": "우편함 투입구가 열리면 마이크로스위치가 깨운 ESP-01S가 이메일을 보내고 다시 꺼지는 9V 배터리 장치입니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/shredengineer/iot-mailbox-guard-ab33c1",
+  "author": "Paul Wilhelm",
+  "license": "MIT",
+  "images": [
+   {
+    "url": "/find/projects/iot-mailbox-guard.jpg",
+    "kind": "photo",
+    "credit": "Paul Wilhelm · Hackster · MIT"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "현관·문"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "문 열림"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "ESP-01S",
+   "Microswitch",
+   "9V battery",
+   "3.3V DC/DC step-down",
+   "External antenna"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "aquaniner-pet-hydration",
+  "title": "AquaNiner Pet Hydration Monitor",
+  "title_ko": "반려동물 물그릇 알리미",
+  "summary_ko": "물그릇 수위를 감지해 물이 부족하면 폰 알림을 보내고 얼마나 마셨는지 기록합니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/aquaniner/aquaniner-pet-hydration-monitor-bf40dd",
+  "author": "Team AquaNiner (Will Thrailkill, Joshua Waits)",
+  "license": "CC BY-NC",
+  "images": [],
+  "tags": {
+   "형태": [
+    "반려동물 곁"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "거리·접근"
+   ],
+   "누구": [
+    "반려동물"
+   ]
+  },
+  "parts": [
+   "Particle Photon x2",
+   "Non-contact liquid level sensor",
+   "HC-SR04 ultrasonic"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "pet-food-level-light-bar",
+  "title": "3D Printable Pet Foot Dispenser With Level Sensing",
+  "title_ko": "사료통 잔량 표시 LED 바",
+  "summary_ko": "사료통 안의 레버(조이스틱)로 사료 높이를 재서 옆면 RGB LED 바로 남은 양을 보여 줍니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/ElationSportsTechnologies/3d-printable-pet-foot-dispenser-with-level-sensing-74c45e",
+  "author": "Austin Allen",
+  "license": "MIT",
+  "images": [
+   {
+    "url": "/find/projects/pet-food-level-light-bar.jpg",
+    "kind": "photo",
+    "credit": "Austin Allen · Hackster · MIT"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "반려동물 곁"
+   ],
+   "반응": [
+    "빛",
+    "색 변화"
+   ],
+   "감지": [
+    "움직임·기울기"
+   ],
+   "누구": [
+    "반려동물"
+   ]
+  },
+  "parts": [
+   "ESP32 dev board",
+   "LED light strip",
+   "Single-axis joystick",
+   "5V DC power supply"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "door-alarm-reed",
+  "title": "Door Alarm Sensor (Wired)",
+  "title_ko": "문 열림 경보기",
+  "summary_ko": "자석(리드) 스위치로 문이 열리면 부저와 LED로 알려 주는 간단한 문 경보기입니다.",
+  "source": "Arduino Project Hub",
+  "source_url": "https://projecthub.arduino.cc/avalosservando23/door-alarm-sensor-wired-769faf",
+  "author": "avalosservando23",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "현관·문"
+   ],
+   "반응": [
+    "소리",
+    "빛"
+   ],
+   "감지": [
+    "문 열림"
+   ],
+   "누구": [
+    "가족"
+   ]
+  },
+  "parts": [
+   "Arduino Uno Rev3",
+   "Reed switch + magnet",
+   "Piezo buzzer",
+   "Red/Yellow LED"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "lock-unlock-alarm-lcd",
+  "title": "Arduino based LOCK/UNLOCK ALARM with LCD",
+  "title_ko": "문 잠김 확인 알리미",
+  "summary_ko": "잠금장치에 단 광단속 센서로 걸쇠가 제대로 걸렸는지 확인해, 안 잠겼으면 LED·부저·LCD로 알려 줍니다.",
+  "source": "Arduino Project Hub",
+  "source_url": "https://projecthub.arduino.cc/ambhatt/arduino-based-lockunlock-alarm-with-lcd-6de4dc",
+  "author": "ambhatt",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "현관·문"
+   ],
+   "반응": [
+    "화면 표시",
+    "빛",
+    "소리"
+   ],
+   "감지": [
+    "문 열림"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "Arduino Uno Rev3",
+   "MOC7811 opto-interrupter",
+   "16x2 LCD",
+   "Red LED",
+   "Piezo buzzer"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "dht11-leds-piezo",
+  "title": "DHT11 Sensor with LEDs and a Piezo Speaker",
+  "title_ko": "온습도 LED·소리 알림",
+  "summary_ko": "DHT11로 온도와 습도를 재서 범위에 따라 초록·빨강 LED를 켜고 피에조로 소리를 냅니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/Prince_Matthew/dht11-sensor-with-leds-and-a-piezo-speaker-cd41ff",
+  "author": "PrinceMatthew",
+  "license": "CC BY-NC-ND",
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "빛",
+    "소리"
+   ],
+   "감지": [
+    "온습도"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "Arduino UNO",
+   "DHT11",
+   "LEDs (1 green, 2 red)",
+   "Piezo speaker"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "co2-traffic-light-lamp",
+  "title": "CO2 Traffic Light for Indoor Air Quality, COVID and beyond",
+  "title_ko": "환기 알림 CO2 신호등 램프",
+  "summary_ko": "CO2 센서 값에 따라 램프 색이 초록·노랑·빨강으로 바뀌어 환기할 때를 알려 줍니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/fablabeu/co2-traffic-light-for-indoor-air-quality-covid-and-beyond-2b9cce",
+  "author": "fab-lab.eu",
+  "license": "CC BY-NC",
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "색 변화"
+   ],
+   "감지": [
+    "공기질"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "IoT Octopus (ESP8266)",
+   "SCD30 CO2 sensor",
+   "NeoPixel FeatherWing",
+   "IKEA PELARBOJ lamp"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "oled-pomodoro-study-timer",
+  "title": "OLED Pomodoro Study Timer",
+  "title_ko": "돌려서 맞추는 뽀모도로 공부 타이머",
+  "summary_ko": "로터리 엔코더로 집중 시간을 정하면 작은 OLED에 남은 시간을 보여 주는 책상용 타이머입니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/wong_o/oled-pomodoro-study-timer-27cd4a",
+  "author": "wong_o",
+  "license": "GPL3+",
+  "images": [
+   {
+    "url": "/find/projects/oled-pomodoro-study-timer.jpg",
+    "kind": "photo",
+    "credit": "wong_o · Hackster · GPL3+"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "화면 표시"
+   ],
+   "감지": [
+    "시간",
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino Nano",
+   "Rotary encoder with push button",
+   "0.96\" OLED (SSD1315)"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "tiny-pomodoro-goblin",
+  "title": "My Tiny Pomodoro Goblin",
+  "title_ko": "쉬라고 말해 주는 둥근 화면 타이머",
+  "summary_ko": "1시간 집중하면 둥근 화면이 2분 휴식을 권하고, 터치 버튼으로 휴식 시작·건너뛰기·5분 미루기를 고릅니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/elliecai0219/my-tiny-pomodoro-reminder-e3f72f",
+  "author": "Ellie Cai",
+  "license": "GPL3+",
+  "images": [
+   {
+    "url": "/find/projects/tiny-pomodoro-goblin.jpg",
+    "kind": "photo",
+    "credit": "Ellie Cai · Hackster · GPL3+"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "화면 표시"
+   ],
+   "감지": [
+    "시간",
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Seeed XIAO ESP32S3",
+   "Seeed Round Display for XIAO"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "arduband-sitting-alarm",
+  "title": "arduBand - Save your eyes!",
+  "title_ko": "오래 앉으면 울리는 손목밴드",
+  "summary_ko": "가속도 센서로 10분마다 자세를 확인하고 30분 넘게 앉아 있으면 소리·진동·LED로 일어나라고 알려 줍니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/ardutronic123/arduband-save-your-eyes-2bcc6e",
+  "author": "ardutronic",
+  "license": "CC BY-NC",
+  "images": [],
+  "tags": {
+   "형태": [
+    "몸에 착용"
+   ],
+   "반응": [
+    "소리",
+    "빛"
+   ],
+   "감지": [
+    "움직임·기울기",
+    "시간"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino Nano",
+   "ADXL335 accelerometer",
+   "LiPo charger/booster",
+   "Buzzer",
+   "WS2812B LED"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "m5-stretch-reminder",
+  "title": "M5StretchReminder",
+  "title_ko": "스트레칭 알림 책상 친구",
+  "summary_ko": "초음파로 책상에 앉아 있는 시간을 재거나 몸에 달아 같은 자세가 오래 이어지면 알려 스트레칭을 권합니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/rainbow0210/m5stretchreminder-19669a",
+  "author": "Sh.Rei",
+  "license": "MIT",
+  "images": [
+   {
+    "url": "/find/projects/m5-stretch-reminder.jpg",
+    "kind": "photo",
+    "credit": "Sh.Rei · Hackster · MIT"
+   }
+  ],
+  "tags": {
+   "형태": [
+    "책상 위",
+    "몸에 착용"
+   ],
+   "반응": [
+    "화면 표시",
+    "소리"
+   ],
+   "감지": [
+    "거리·접근",
+    "움직임·기울기",
+    "시간"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "M5Stack Core2",
+   "M5Stack ultrasonic unit (RCWL-9620)"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "wireless-light-switch-servo",
+  "title": "Wireless Light Switch Manipulator",
+  "title_ko": "누워서 끄는 무선 서보 스위치",
+  "summary_ko": "침대에서 버튼을 누르면 433MHz 무선으로 벽 스위치 위 서보가 스위치를 눌러 불을 끄고 켭니다(전기 배선은 건드리지 않음).",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/einsteinunicorn/wireless-light-switch-manipulator-cdb0c3",
+  "author": "Becky Button",
+  "license": "CC BY-NC-SA",
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는"
+   ],
+   "반응": [
+    "움직임"
+   ],
+   "감지": [
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino UNO x2",
+   "MG996R servo",
+   "433MHz TX/RX module"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "sound-activated-light-switch",
+  "title": "Automated Light Switch",
+  "title_ko": "소리로 끄는 서보 전등 스위치",
+  "summary_ko": "소리 센서로 소리를 감지하면 SG90 서보 두 개가 벽 스위치를 눌러 불을 켜고 끕니다.",
+  "source": "Hackster",
+  "source_url": "https://www.hackster.io/AitchdeeCee/automated-light-switch-8d9500",
+  "author": "Henry-Che",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는"
+   ],
+   "반응": [
+    "움직임"
+   ],
+   "감지": [
+    "소리"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino Nano",
+   "DFRobot analog sound sensor",
+   "SG90 micro servo x2"
+  ],
+  "checked_at": "2026-11-06"
+ },
+ {
+  "id": "wled",
+  "title": "WLED",
+  "title_ko": "폰으로 조종하는 LED 조명",
+  "summary_ko": "LED 줄조명을 와이파이로 연결해 폰으로 색과 효과를 바꾸는 조명 펌웨어",
+  "source": "GitHub",
+  "source_url": "https://github.com/Aircoookie/WLED",
+  "author": "Aircoookie",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는",
+    "책상 위"
+   ],
+   "반응": [
+    "빛",
+    "색 변화",
+    "깜빡임",
+    "폰 알림"
+   ],
+   "감지": [
+    "버튼",
+    "소리"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "WS2812B LED"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "watchy",
+  "title": "Watchy",
+  "title_ko": "전자잉크 오픈소스 손목시계",
+  "summary_ko": "ESP32와 전자잉크 화면으로 만든, 진동으로 알려주는 손목시계",
+  "source": "GitHub",
+  "source_url": "https://github.com/sqfmi/Watchy",
+  "author": "sqfmi",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "몸에 착용"
+   ],
+   "반응": [
+    "화면 표시",
+    "진동"
+   ],
+   "감지": [
+    "시간",
+    "움직임·기울기",
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "E-paper",
+   "BMA423",
+   "진동 모터"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "infinitime",
+  "title": "InfiniTime",
+  "title_ko": "걸음·심박 재는 스마트워치",
+  "summary_ko": "PineTime 시계에서 걸음 수와 심박을 재고 폰 알림을 진동으로 받는 펌웨어",
+  "source": "GitHub",
+  "source_url": "https://github.com/InfiniTimeOrg/InfiniTime",
+  "author": "InfiniTimeOrg",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "몸에 착용"
+   ],
+   "반응": [
+    "화면 표시",
+    "진동",
+    "폰 알림"
+   ],
+   "감지": [
+    "심박",
+    "움직임·기울기",
+    "시간",
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "nRF52832",
+   "심박 센서",
+   "가속도 센서"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "open-smartwatch",
+  "title": "Open-Smartwatch",
+  "title_ko": "직접 만드는 스마트워치",
+  "summary_ko": "ESP32로 직접 만드는 손목시계용 운영체제",
+  "source": "GitHub",
+  "source_url": "https://github.com/Open-Smartwatch/open-smartwatch-os",
+  "author": "Open-Smartwatch",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "몸에 착용"
+   ],
+   "반응": [
+    "화면 표시"
+   ],
+   "감지": [
+    "시간",
+    "움직임·기울기",
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "원형 LCD",
+   "가속도 센서"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "slimevr",
+  "title": "SlimeVR Tracker",
+  "title_ko": "몸에 붙이는 자세 추적기",
+  "summary_ko": "몸 여러 곳에 붙인 센서로 움직임과 자세를 따라가는 웨어러블 트래커",
+  "source": "GitHub",
+  "source_url": "https://github.com/SlimeVR/SlimeVR-Tracker-ESP",
+  "author": "SlimeVR",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "몸에 착용"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "움직임·기울기"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "ESP8266",
+   "IMU",
+   "리튬 배터리"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "sensor-community",
+  "title": "Sensor.Community",
+  "title_ko": "동네 미세먼지 측정소",
+  "summary_ko": "미세먼지와 온습도를 재서 인터넷 지도에 올리는 시민 측정소",
+  "source": "GitHub",
+  "source_url": "https://github.com/opendata-stuttgart/sensors-software",
+  "author": "opendata-stuttgart",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는",
+    "화분·정원"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "공기질",
+    "온습도"
+   ],
+   "누구": [
+    "가족"
+   ]
+  },
+  "parts": [
+   "ESP8266",
+   "SDS011",
+   "BME280"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "airgradient",
+  "title": "AirGradient",
+  "title_ko": "실내 공기질 측정기",
+  "summary_ko": "미세먼지·이산화탄소·온습도를 재서 화면과 불빛으로 보여주는 측정기",
+  "source": "GitHub",
+  "source_url": "https://github.com/airgradienthq/arduino",
+  "author": "airgradienthq",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위",
+    "벽에 붙는"
+   ],
+   "반응": [
+    "화면 표시",
+    "빛",
+    "색 변화"
+   ],
+   "감지": [
+    "공기질",
+    "온습도"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "PMS5003",
+   "SenseAir S8",
+   "OLED"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "higrow",
+  "title": "LilyGo HiGrow",
+  "title_ko": "화분 지킴이 센서 보드",
+  "summary_ko": "화분에 꽂아 흙 수분·햇빛·온도를 재고 폰으로 보내는 식물 모니터",
+  "source": "GitHub",
+  "source_url": "https://github.com/Xinyuan-LilyGO/LilyGo-HiGrow",
+  "author": "Xinyuan-LilyGO",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "화분·정원"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "흙 수분",
+    "빛 밝기",
+    "온습도"
+   ],
+   "누구": [
+    "식물"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "정전식 수분 센서",
+   "BH1750"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "otto",
+  "title": "Otto DIY",
+  "title_ko": "걷고 춤추는 책상 로봇",
+  "summary_ko": "서보 모터로 걷고 초음파로 장애물을 피하는 교육용 로봇",
+  "source": "GitHub",
+  "source_url": "https://github.com/OttoDIY/OttoDIYLib",
+  "author": "OttoDIY",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "움직임",
+    "소리",
+    "멜로디"
+   ],
+   "감지": [
+    "거리·접근",
+    "버튼"
+   ],
+   "누구": [
+    "아이",
+    "나"
+   ]
+  },
+  "parts": [
+   "Arduino Nano",
+   "SG90 서보 x4",
+   "HC-SR04",
+   "부저"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "magicmirror",
+  "title": "MagicMirror²",
+  "title_ko": "날씨·일정 띄우는 스마트 거울",
+  "summary_ko": "라즈베리파이와 모니터로 거울 속에 날씨와 일정을 띄우는 거울",
+  "source": "GitHub",
+  "source_url": "https://github.com/MagicMirrorOrg/MagicMirror",
+  "author": "MagicMirrorOrg",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는"
+   ],
+   "반응": [
+    "화면 표시"
+   ],
+   "감지": [
+    "시간",
+    "거리·접근"
+   ],
+   "누구": [
+    "가족"
+   ]
+  },
+  "parts": [
+   "Raspberry Pi",
+   "모니터",
+   "하프미러"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "weather-station",
+  "title": "Weather Station",
+  "title_ko": "탁상 날씨판",
+  "summary_ko": "인터넷 날씨를 받아 작은 화면에 보여주는 탁상 날씨판",
+  "source": "GitHub",
+  "source_url": "https://github.com/ThingPulse/esp8266-weather-station",
+  "author": "ThingPulse",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "화면 표시"
+   ],
+   "감지": [
+    "시간",
+    "온습도"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "ESP8266",
+   "OLED"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "walkie-talkie",
+  "title": "ESP32 Walkie-Talkie",
+  "title_ko": "버튼 누르고 말하는 무전기",
+  "summary_ko": "마이크와 스피커를 붙여 ESP32끼리 말을 주고받는 무전기",
+  "source": "GitHub",
+  "source_url": "https://github.com/atomic14/esp32-walkie-talkie",
+  "author": "atomic14",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "들고 다니는"
+   ],
+   "반응": [
+    "소리"
+   ],
+   "감지": [
+    "버튼",
+    "소리"
+   ],
+   "누구": [
+    "가족",
+    "아이"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "INMP441 마이크",
+   "MAX98357A 앰프"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "mysensors",
+  "title": "MySensors",
+  "title_ko": "집안 곳곳 무선 센서",
+  "summary_ko": "배터리로 오래 가는 작은 무선 센서를 집안에 두는 센서 네트워크",
+  "source": "GitHub",
+  "source_url": "https://github.com/mysensors/MySensors",
+  "author": "mysensors",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는",
+    "현관·문"
+   ],
+   "반응": [
+    "폰 알림"
+   ],
+   "감지": [
+    "온습도",
+    "문 열림",
+    "거리·접근"
+   ],
+   "누구": [
+    "가족"
+   ]
+  },
+  "parts": [
+   "Arduino Pro Mini",
+   "nRF24L01",
+   "도어 센서"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "esphome",
+  "title": "ESPHome",
+  "title_ko": "설정만으로 만드는 스마트홈 센서",
+  "summary_ko": "설정 파일만으로 센서·불빛·버튼을 붙여 스마트홈에 연결하는 펌웨어",
+  "source": "GitHub",
+  "source_url": "https://github.com/esphome/esphome",
+  "author": "esphome",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "벽에 붙는",
+    "책상 위",
+    "현관·문"
+   ],
+   "반응": [
+    "빛",
+    "폰 알림",
+    "화면 표시"
+   ],
+   "감지": [
+    "온습도",
+    "공기질",
+    "거리·접근",
+    "문 열림",
+    "빛 밝기",
+    "버튼"
+   ],
+   "누구": [
+    "가족"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "각종 센서"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "esp-skainet",
+  "title": "ESP-Skainet",
+  "title_ko": "말로 부르는 음성 명령",
+  "summary_ko": "ESP32에서 호출어와 짧은 음성 명령을 알아듣는 음성 인식",
+  "source": "GitHub",
+  "source_url": "https://github.com/espressif/esp-skainet",
+  "author": "espressif",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위"
+   ],
+   "반응": [
+    "소리",
+    "빛"
+   ],
+   "감지": [
+    "소리"
+   ],
+   "누구": [
+    "나",
+    "가족"
+   ]
+  },
+  "parts": [
+   "ESP32-S3",
+   "마이크"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "zmk",
+  "title": "ZMK",
+  "title_ko": "배터리로 오래 가는 무선 키보드",
+  "summary_ko": "블루투스 무선 키보드·버튼 패드 펌웨어",
+  "source": "GitHub",
+  "source_url": "https://github.com/zmkfirmware/zmk",
+  "author": "zmkfirmware",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "책상 위",
+    "들고 다니는"
+   ],
+   "반응": [
+    "화면 표시"
+   ],
+   "감지": [
+    "버튼"
+   ],
+   "누구": [
+    "나"
+   ]
+  },
+  "parts": [
+   "nRF52840",
+   "키 스위치"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ },
+ {
+  "id": "meshtastic",
+  "title": "Meshtastic",
+  "title_ko": "통신망 없이 쓰는 휴대 무전 메신저",
+  "summary_ko": "LoRa로 통신망 없는 곳에서 메시지와 위치를 주고받는 휴대 기기",
+  "source": "GitHub",
+  "source_url": "https://github.com/meshtastic/firmware",
+  "author": "meshtastic",
+  "license": null,
+  "images": [],
+  "tags": {
+   "형태": [
+    "들고 다니는"
+   ],
+   "반응": [
+    "화면 표시",
+    "폰 알림",
+    "진동"
+   ],
+   "감지": [
+    "버튼",
+    "움직임·기울기"
+   ],
+   "누구": [
+    "가족",
+    "나"
+   ]
+  },
+  "parts": [
+   "ESP32",
+   "LoRa SX1262",
+   "GPS"
+  ],
+  "checked_at": "2026-11-06",
+  "note": "GitHub 저장소 존재만 확인. 라이선스·부품은 페이지에서 확인하지 않음"
+ }
+]

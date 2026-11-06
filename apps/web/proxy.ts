@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "./lib/session";
 
-const publicPaths = new Set(["/login", "/start", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
+const publicPaths = new Set(["/login", "/find", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
 // The install prompt fetches the manifest and icons before anyone logs in.
-const publicPrefixes = ["/icons/", "/demo/", "/api/start/"];
+const publicPrefixes = ["/icons/", "/demo/", "/find/", "/f/", "/api/find/"];
+// 온보딩 전용 도메인(쉼표로 여러 개). 이 도메인의 첫 화면은 바로 도깨비불 찾기(/find)다.
+const landingHosts = () => (process.env.FIND_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").split(":")[0].toLowerCase();
+  if (pathname === "/" && landingHosts().includes(host)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/find";
+    return NextResponse.rewrite(url);
+  }
+  if (pathname === "/start") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/find";
+    return NextResponse.redirect(url, 308);
+  }
   if (publicPaths.has(pathname) || publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return NextResponse.next();
   if (!process.env.APP_PASSWORD || !process.env.SESSION_SECRET) {
     if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "로그인 설정이 필요합니다." }, { status: 503 });
