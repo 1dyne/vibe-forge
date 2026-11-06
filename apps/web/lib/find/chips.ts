@@ -28,7 +28,7 @@ export const MATCH_WEIGHTS: Record<Cat, number> = { 감지: 0.35, 반응: 0.3, �
 
 export const FIRE = {
   start: 20, floor: 8, max: 100,
-  tickMs: 100, decayPerTick: 0.18, // ≈ 초당 1.8 → 가득 찬 불이 꺼지기까지 약 50초
+  tickMs: 100, decayPerTick: 0.08, // ≈ 초당 0.8 → 가득 찬 불이 꺼지기까지 약 2분. 생각할 여유를 준다
   perChip: 6, newCategoryBonus: 10, followUpBonus: 5,
   typeMs: 38
 } as const;
@@ -144,8 +144,48 @@ export const FOLLOW: Record<string, Chip[]> = {
   ],
   w_plant: [{ id: "w_many", cat: "누구", label: "화분 여러 개", say: "화분 여러 개를 위해", replaces: "w_plant", tags: [] }],
   w_kid: [{ id: "w_safe", cat: "누구", label: "만져도 안전하게", say: "아이 손이 닿아도 안전하게", tags: [] }],
-  w_family: [{ id: "w_far", cat: "누구", label: "멀리 사는 부모님", say: "멀리 사는 부모님을 위해", replaces: "w_family", tags: [] }]
+  w_family: [{ id: "w_far", cat: "누구", label: "멀리 사는 부모님", say: "멀리 사는 부모님을 위해", replaces: "w_family", tags: [] }],
+  // ── 후속의 후속: 고를수록 한 단계씩 더 구체적인 장작이 붙는다 ──
+  f_tiny: [{ id: "f_round", cat: "형태", label: "동글동글하게", say: "동글동글한", tags: [] }],
+  f_key: [{ id: "f_bag", cat: "형태", label: "가방에 달기", say: "가방에 다는", tags: [] }],
+  f_mag: [{ id: "f_fridge", cat: "형태", label: "냉장고에", say: "냉장고에 착 붙는", replaces: "f_mag", tags: [] }],
+  f_wrist: [{ id: "f_band", cat: "형태", label: "실리콘 밴드로", say: "실리콘 밴드로 된", tags: [] }],
+  f_clip: [{ id: "f_light", cat: "형태", label: "티 안 나게 가볍게", say: "티 안 나게 가벼운", tags: [] }],
+  f_splash: [{ id: "f_solar", cat: "형태", label: "햇빛으로 충전", say: "햇빛으로 충전되는", tags: [] }],
+  f_thin: [{ id: "f_wood", cat: "형태", label: "나무 느낌", say: "나무 느낌의", tags: [] }],
+  f_dim: [{ id: "f_soft", cat: "형태", label: "말랑하게", say: "말랑한", tags: [] }],
+  f_tough: [{ id: "f_wash", cat: "형태", label: "물로 씻을 수 있게", say: "물로 씻을 수 있는", tags: [] }],
+  f_noglue: [{ id: "f_battery", cat: "형태", label: "건전지로 오래", say: "건전지로 몇 달 가는", tags: [] }],
+  r_blink: [{ id: "r_breathe", cat: "반응", label: "숨 쉬듯 천천히", say: "숨 쉬듯 천천히", pre: true, tags: [], react: "light" }],
+  r_color: [{ id: "r_traffic", cat: "반응", label: "신호등 색으로", say: "초록·노랑·빨강 신호등 색으로", pre: true, tags: [], react: "light" }],
+  r_melody: [{ id: "r_voice", cat: "반응", label: "목소리로 말해주기", say: "급할 땐 목소리로 직접 말해줘.", tail: true, tags: [] }],
+  r_buzz: [{ id: "r_quiet", cat: "반응", label: "밤엔 조용히", say: "밤에는 소리 없이 진동만 해.", tail: true, tags: [] }],
+  r_wave: [{ id: "r_dance", cat: "반응", label: "다 하면 춤추기", say: "다 끝내면 신나게 춤을 춰.", tail: true, tags: [] }],
+  r_tap: [{ id: "r_pattern", cat: "반응", label: "상황마다 다르게", say: "상황마다 진동 모양이 달라.", tail: true, tags: [] }],
+  r_face: [{ id: "r_mood", cat: "반응", label: "상태 따라 표정", say: "상태에 따라 표정이 바뀌어.", tail: true, tags: [] }],
+  r_big: [{ id: "r_count", cat: "반응", label: "남은 횟수 보여주기", say: "오늘 남은 횟수도 보여줘.", tail: true, tags: [] }],
+  r_log: [{ id: "r_week", cat: "반응", label: "일주일 그래프", say: "일주일치 그래프도 볼 수 있어.", tail: true, tags: [] }],
+  r_fam: [{ id: "r_only", cat: "반응", label: "급할 때만", say: "정말 급할 때만 보내.", tail: true, tags: [] }],
+  s_cup: [{ id: "s_goal", cat: "감지", label: "하루 목표 세기", say: "하루 목표만큼 채웠는지 세어서", tags: [] }],
+  s_reset: [{ id: "s_streak", cat: "감지", label: "연속 기록 세기", say: "며칠 연속 지켰는지도 세어서", tags: [] }],
+  s_temp: [{ id: "s_hot", cat: "감지", label: "너무 더우면 따로", say: "너무 더우면 따로 알려줘.", tail: true, tags: [] }],
+  s_count: [{ id: "s_when", cat: "감지", label: "먹은 시간 적기", say: "언제 먹었는지 시간을 적어두고", tags: ["시간"] }],
+  s_lock: [{ id: "s_away", cat: "감지", label: "집 나설 때만", say: "내가 집을 나설 때만", tags: ["거리·접근"] }],
+  s_sun: [{ id: "s_season", cat: "감지", label: "계절마다 기준 바꾸기", say: "계절마다 물 줄 기준이 바뀌어.", tail: true, tags: [] }],
+  s_co2: [{ id: "s_window", cat: "감지", label: "창문 열 때 알려주기", say: "창문을 열 때가 되면", tags: [] }],
+  s_level: [{ id: "s_classroom", cat: "감지", label: "교실·사무실용", say: "여럿이 있는 방에서도 잘 보이게", tags: [] }],
+  s_posture: [{ id: "s_standup", cat: "감지", label: "일어나면 리셋", say: "일어나면 다시 세기 시작해.", tail: true, tags: [] }],
+  s_htemp: [{ id: "s_humidifier", cat: "감지", label: "가습기 켤 때 알려주기", say: "가습기를 켤 때가 되면", tags: [] }],
+  s_night: [{ id: "s_motion", cat: "감지", label: "지나갈 때만 켜기", say: "누가 지나갈 때만", tags: ["거리·접근"] }],
+  w_fam: [{ id: "w_kids2", cat: "누구", label: "아이도 쓰게", say: "아이도 혼자 쓸 수 있게", tags: ["아이"] }],
+  w_cat: [{ id: "w_cats", cat: "누구", label: "여러 마리", say: "여러 마리 고양이를 위해", replaces: "w_cat", tags: [] }],
+  w_dog: [{ id: "w_walk", cat: "누구", label: "산책도 챙기게", say: "산책 시간도 챙기게", tags: [] }],
+  w_many: [{ id: "w_vacation", cat: "누구", label: "휴가 갈 때도", say: "휴가 가서도 걱정 없게", tags: [] }],
+  w_far: [{ id: "w_daily", cat: "누구", label: "매일 안부 확인", say: "매일 안부를 확인할 수 있게", tags: [] }]
 };
+
+// 장작 칸에 한 번에 보이는 뿌리 장작 수. 하나를 고르면 다음으로 관련 있는 장작이 그 자리를 채운다.
+export const ROOT_VISIBLE = 10;
 
 export function toChip({ keywords: _k, fallbackRank: _f, ...chip }: RootDef): Chip {
   return chip;

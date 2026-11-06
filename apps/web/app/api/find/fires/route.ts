@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ChipSchema, IdeaSchema } from "../../../../lib/find/api-schema";
-import { FIRE, REACT_FIRE, compose, fireName, reactKind, type Chip } from "../../../../lib/find/chips";
+import { FIRE, REACT_FIRE, ROOTS, compose, fireName, reactKind, type Chip } from "../../../../lib/find/chips";
+import { assessMaturity } from "../../../../lib/find/maturity";
 import { matchProjects, uniqueToIdea } from "../../../../lib/find/projects";
 import { newId, saveFire } from "../../../../lib/find/store";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
@@ -45,5 +46,8 @@ export async function POST(request: NextRequest) {
     console.error("find fire save failed", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ error: "불을 저장하지 못했어. 잠시 후 다시 해줘." }, { status: 500 });
   }
-  return NextResponse.json({ fire, matches, unique: uniqueToIdea(ids, find, matches[0]) }, { status: 201 });
+  const unique = uniqueToIdea(ids, find, matches[0]);
+  const followIds = new Set(ids.filter((id) => !ROOTS.some((r) => r.id === id)));
+  const maturity = assessMaturity([...chips.values()], followIds, matches, unique);
+  return NextResponse.json({ fire, matches, unique, maturity }, { status: 201 });
 }

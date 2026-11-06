@@ -38,6 +38,7 @@ body:has(.find){background:#fff}
 .find .chip{min-height:44px;padding:0 14px 0 10px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:14px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:transform .12s,background .2s;animation:fd-in .3s ease-out}
 .find .chip:active{transform:scale(.94)}
 .find .chip .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;color:var(--ink)}
+.find .chip.fresh{border-color:var(--fire);box-shadow:0 0 0 3px color-mix(in srgb,var(--fire) 18%,transparent)}
 .find .chip.example{padding:0 14px;color:#3A3D45}
 .find .chip.dice{border:1.5px dashed var(--teal-ink);color:var(--teal-ink)}
 .find .field{display:flex;flex-direction:column;gap:8px}
@@ -91,6 +92,16 @@ body:has(.find){background:#fff}
 .find .trio{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .find .trio>div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:3px}
 .find .trio small{font-size:11px;color:var(--muted)}.find .trio b{font-size:13px;word-break:keep-all}
+.find .growth{border:1.5px solid var(--fire);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.find .growth-head{display:flex;justify-content:space-between;align-items:flex-end}
+.find .growth-steps{display:flex;gap:5px}
+.find .growth-steps i{width:22px;height:8px;border-radius:999px;background:var(--surface-2)}
+.find .growth-steps i.on{background:var(--fire)}
+.find .growth-next{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
+.find .growth-next li{font-size:14px;line-height:1.55;color:#3A3D45}
+.find .growth-next b{display:block;color:var(--ink);margin-bottom:1px}
+.find .growth-next span{display:block}
+.find .growth-next a{font-size:12px}
 .find .rail-head{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
 .find .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:20px;margin:0 -20px;padding:2px 20px 6px;scrollbar-width:none}
 .find .rail::-webkit-scrollbar{display:none}
