@@ -21,7 +21,8 @@ import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow
 import { workbenchItems } from "./workbench";
 import { CoordinationError, PURCHASE_LABEL, answerTaskQuestion, boardSummary, buildForm, closeConflict, raiseConflict, recordPurchase, setTaskStatus, upsertTask } from "./coordination";
 import { INFO_FORMATS } from "./info-formats";
-import { notifyPerson, noticesBetween } from "./notify";
+import { addDeadline, clearDeadline, notifyPerson, noticesBetween } from "./notify";
+import { CODING_ROLES, LINK_LABEL, LOCAL_KINDS, WorkspaceError, addLink, cliLink, firePayload, fireRoutine, routinePrompt, setWake, wakeView } from "./workspaces";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
 // the thinking on the person's subscription; the server stores the result and
@@ -186,6 +187,12 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 사람의 할 일 상태는 사람이 대시보드에서 바꾼다(하는 중·완료·막힘·못 함). 사람이 채팅으로 결과를 말하면 record_task_result로 기록한다. 사람이 '막힘'이나 '못 함'을 고르면 note의 이유를 읽고 측정 방법을 풀어 설명하거나 다른 방법을 다시 제안한다.
 - 사람에게 할 일·충돌 카드를 만들었으면 답변 끝에 결과의 openUrl로 [달그락에서 열기](openUrl) 링크를 붙인다.
 
+## 작업 공간과 코딩 에이전트 깨우기
+- 대장(Claude 채팅)은 전체 진행과 사람과의 대화를 맡는다. HW 펌웨어 작성·컴파일, SW, ME·ID 모델링은 Claude Code나 Codex 세션이 맡는 것이 기본이다. 그 일은 upsert_task(assignee=hw/sw/me/id)로 보드에 올린다.
+- 대장은 set_wake_mode로 넘기는 방식을 고른다: 사람이 곧 그 세션을 열 상황이면 manual, 몇 시간 단위로 묶어 처리해도 되면 schedule, 사람이 기다리고 있어 바로 시작해야 하면 event. 이유를 짧게 남긴다.
+- 코딩 세션은 시작할 때 register_session으로 자기 주소를 등록하거나 update_task의 session에 세션 주소를 남긴다. 대시보드에 그 역할의 바로가기 버튼이 생긴다.
+- 내 컴퓨터에서 도는 Claude Code·Codex(code_cli·code_vscode·codex)는 컴퓨터와 앱이 켜져 있어야 응답한다. 보드에 USB로 펌웨어를 올리거나 시리얼 로그를 보는 일은 사람의 컴퓨터에서만 된다. 그런 할 일에는 이 점을 적는다.
+
 ## 정보 요청 포맷과 측정 요청
 - 사람이 찾은 정보(재고·가격, 부품 링크, 실측 치수, 측정값, 오류 메시지)를 받을 때는 채팅으로 묻지 말고 upsert_task에 format이나 fields를 붙여 요청한다. 사람은 대시보드에서 칸을 채워 보낸다. formHelp에는 무엇을 왜, 어디서 찾는지 쓴다. 칸마다 help를 쓰면 사람이 '?'로 바로 본다.
 - 측정 요청은 kind=measure, format=measurement로 만들고 howTo에 멀티미터 모드와 빨간·검은 리드 위치를 단계로 쓴다. 정상 범위는 데이터시트나 부품 카드 근거가 있을 때만 expected에 넣는다. 서버가 범위 안·밖을 판정하지만 합격 판정은 아니다.
@@ -330,6 +337,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     slots: project.slots.map(({ key, label, status, valueText, assumption, acknowledged }) => ({ key, label, status, valueText, assumption, acknowledged })),
     openTasks: project.tasks.filter((task) => task.status === "ready" && (task.assignee ?? "human") === "human").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
     board: boardSummary(project, (kind, itemId) => itemUrl(context, project.id, kind, itemId)),
+    workspaces: { links: (workflow.links ?? []).map(({ role, kind, label, url }) => ({ role, kind, label, url, local: LOCAL_KINDS.includes(kind) })), wake: wakeView(project), routinePrompt: routinePrompt(project) },
     circuit: project.build ? {
       status: project.build.status, board: project.build.blueprint.board, supplyVoltage: project.build.blueprint.supplyVoltage,
       components: project.build.blueprint.components.map(({ ref, valueOrModel }) => ({ ref, valueOrModel, purchase: workflow.purchases[ref] ?? "needed" })),
@@ -1051,9 +1059,8 @@ TOOLS.push(
         result = { id: task.id, created };
       });
       const openUrl = itemUrl(context, parsed.projectId, "task", result.id);
-      return { text: `${result.created ? "할 일을 만들었어요" : "기존 할 일을 고쳤어요"}: ${parsed.title}
-taskId: ${result.id}
-openUrl: ${openUrl}`, data: { taskId: result.id, created: result.created, openUrl, board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
+      const dispatched = result.created && CODING_ROLES.includes(parsed.assignee as AgentId) ? await dispatchToCoder(updated, result.id, context) : null;
+      return { text: `${result.created ? "할 일을 만들었어요" : "기존 할 일을 고쳤어요"}: ${parsed.title}\ntaskId: ${result.id}\nopenUrl: ${openUrl}${dispatched ? `\n${dispatched}` : ""}`, data: { taskId: result.id, created: result.created, openUrl, board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
     }
   },
   {
@@ -1063,7 +1070,12 @@ openUrl: ${openUrl}`, data: { taskId: result.id, created: result.created, openUr
     run: async (input, context) => {
       const parsed = UpdateTaskInput.parse(input) as UpdateTask;
       await ownedProject(parsed.projectId, context);
-      const updated = await mutateProject(parsed.projectId, (p) => { setTaskStatus(p, parsed.taskId, parsed.status, parsed.by, { note: parsed.note, session: parsed.session }); });
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        setTaskStatus(p, parsed.taskId, parsed.status, parsed.by, { note: parsed.note, session: parsed.session });
+        // A session that names its own Claude Code address becomes that role's button.
+        if (parsed.status === "in_progress" && parsed.session && /^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9_-]+$/.test(parsed.session)) { try { addLink(p, { role: parsed.by, kind: "code_cloud", label: `${parsed.by.toUpperCase()} 진행 세션`, url: parsed.session, registeredBy: parsed.by }); } catch { /* not a full session address: the claim still counts */ } }
+      });
+      if (parsed.status !== "ready") await clearDeadline(parsed.taskId).catch(() => {});
       return { text: `할 일 상태를 ${parsed.status}로 바꿨어요.`, data: { board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
     }
   },
@@ -1076,6 +1088,37 @@ openUrl: ${openUrl}`, data: { taskId: result.id, created: result.created, openUr
       await ownedProject(parsed.projectId, context);
       const updated = await mutateProject(parsed.projectId, (p) => { answerTaskQuestion(p, parsed.taskId, parsed.questionId, parsed.answer, parsed.by); });
       return { text: "답을 남겼어요. 사람은 할 일 아래에서 답을 봐요.", data: { openUrl: itemUrl(context, parsed.projectId, "task", parsed.taskId), board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
+    }
+  },
+  {
+    name: "register_session", title: "작업 세션 바로가기 등록",
+    description: "이 역할이 일하는 곳을 대시보드 버튼으로 등록한다. 클라우드 Claude Code 세션은 그 세션 주소(https://claude.ai/code/session_…), 내 컴퓨터 터미널의 Claude Code는 kind=code_cli와 repo(owner/name)를 주면 서버가 claude-cli:// 링크를 만든다(누르면 터미널이 열리고 첫 메시지가 채워지며 Enter는 사람이 누른다). VS Code는 code_vscode, Codex는 codex://threads/<id>. Claude 채팅 프로젝트 주소는 사람이 대시보드에서 등록한다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "kind"], properties: { projectId, by: roleProp, kind: { type: "string", enum: ["code_cloud", "code_cli", "code_vscode", "codex"] }, url: { type: "string", description: "code_cloud·code_vscode·codex의 주소" }, repo: { type: "string", description: "code_cli: GitHub owner/name (그 컴퓨터에서 claude를 실행한 적 있는 저장소)" }, label: { type: "string" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), by: AgentRole, kind: z.enum(["code_cloud", "code_cli", "code_vscode", "codex"]), url: z.string().max(1500).optional(), repo: z.string().max(200).optional(), label: z.string().max(60).optional() }).strict().parse(input) as { projectId: string; by: Role; kind: "code_cloud" | "code_cli" | "code_vscode" | "codex"; url?: string; repo?: string; label?: string };
+      const project = await ownedProject(parsed.projectId, context);
+      const url = parsed.kind === "code_cli" ? cliLink(parsed.repo, `달그락 프로젝트 ${project.id}(${project.name})의 ${parsed.by.toUpperCase()} 달그락 일을 이어서 해줘. get_project로 board.agentTasks를 먼저 읽어.`) : parsed.url ?? (parsed.kind === "code_vscode" ? "vscode://anthropic.claude-code/open" : "");
+      let saved = { label: "", url: "" };
+      await mutateProject(project.id, (p) => { saved = addLink(p, { role: parsed.by, kind: parsed.kind, label: parsed.label ?? `${parsed.by.toUpperCase()} · ${LINK_LABEL[parsed.kind]}`, url, registeredBy: parsed.by }); });
+      return { text: `대시보드에 '${saved.label}' 버튼을 만들었어요.${LOCAL_KINDS.includes(parsed.kind) ? " 내 컴퓨터에서 도는 도구라 컴퓨터와 앱이 켜져 있어야 응답해요." : ""}`, data: { link: saved } };
+    }
+  },
+  {
+    name: "set_wake_mode", title: "코딩 에이전트 깨우는 방식 정하기 (대장)",
+    description: "대장이 상황에 따라 HW·SW·ME·ID 할 일을 코딩 에이전트에게 넘기는 방식을 정한다. manual=사람이 세션을 열어 말한다(바로가기 버튼). schedule=Claude Code 예약 작업이 정해진 시간마다(클라우드는 최소 1시간) 보드를 확인한다. event=에이전트 할 일이 생기면 서버가 예약 작업의 API 트리거를 바로 호출한다(사람이 대시보드에 호출 주소와 토큰을 한 번 등록해야 함). 결과의 routinePrompt를 예약 작업의 프롬프트로 쓰라고 안내한다. deadlineMinutes 안에 아무 세션도 맡지 않으면 사람에게 '응답 없음' 알림이 간다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "mode", "reason"], properties: { projectId, mode: { type: "string", enum: ["manual", "schedule", "event"] }, reason: { type: "string", description: "왜 이 방식인지 한 문장" }, deadlineMinutes: { type: "integer", minimum: 10, maximum: 1440, description: "응답 없음 알림까지 기다릴 분 (기본 event 30, schedule 90)" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), mode: z.enum(["manual", "schedule", "event"]), reason: z.string().trim().min(1).max(300), deadlineMinutes: z.number().int().min(10).max(1440).optional() }).strict().parse(input) as { projectId: string; mode: "manual" | "schedule" | "event"; reason: string; deadlineMinutes?: number };
+      const project = await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(project.id, (p) => {
+        setWake(p, { mode: parsed.mode, reason: parsed.reason, setBy: "chief", deadlineMinutes: parsed.deadlineMinutes });
+        const w = workflowFor(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `코딩 에이전트 깨우기: ${{ manual: "직접 열기", schedule: "예약 시간마다", event: "할 일이 생기면 바로" }[parsed.mode]} · ${parsed.reason}`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+      });
+      const view = wakeView(updated);
+      const setup = parsed.mode === "manual" ? "사람이 대시보드의 세션 버튼으로 열어 '달그락 할 일 확인해'라고 말하면 돼요." : `사람에게 안내하세요: claude.ai/code/routines에서 예약 작업을 만들고(달그락 커넥터 포함), 프롬프트에 routinePrompt를 붙여넣기.${parsed.mode === "schedule" ? " 반복 주기를 고르기(클라우드는 최소 1시간)." : " 트리거에 API를 추가하고, 호출 주소와 토큰을 대시보드의 작업 공간 → 이벤트 연결에 등록하기."}${view.eventReady || parsed.mode === "schedule" ? "" : " 아직 호출 주소·토큰이 등록되지 않았어요."}`;
+      return { text: `깨우는 방식을 정했어요. ${setup}`, data: { wake: view, routinePrompt: routinePrompt(updated) } };
     }
   },
   {
@@ -1116,6 +1159,29 @@ openUrl: ${openUrl}`, data: { conflictId: id, openUrl, board: boardSummary(updat
     }
   }
 );
+
+// Hands a new agent task to a coding agent according to the chief's choice.
+// event: fire the routine now; schedule: expect the next run; both set a
+// deadline after which the person is told nobody took it.
+async function dispatchToCoder(project: LocalProject, taskId: string, context: ToolContext): Promise<string | null> {
+  const wake = project.workflow?.wake;
+  const task = project.tasks.find((t) => t.id === taskId);
+  if (!wake || wake.mode === "manual" || !task) return null;
+  const due = new Date(Date.now() + wake.deadlineMinutes * 60_000).toISOString();
+  if (wake.mode === "schedule") { await addDeadline({ userId: context.user.id, projectId: project.id, taskId, dueAt: due }); return `예약 작업이 다음 실행 때 이 할 일을 맡아요. ${wake.deadlineMinutes}분 안에 맡지 않으면 사람에게 알려요.`; }
+  const result = await fireRoutine(wake, firePayload(project, task));
+  await mutateProject(project.id, (p) => {
+    const t = p.tasks.find((x) => x.id === taskId);
+    const at = new Date().toISOString();
+    if (t) t.dispatch = { at, ...result };
+    if (p.workflow?.wake) p.workflow.wake.lastFire = { at, ...result };
+    if (result.sessionUrl && task.assignee && task.assignee !== "human") { try { addLink(p, { role: task.assignee, kind: "code_cloud", label: `${task.assignee.toUpperCase()} 진행 세션`, url: result.sessionUrl, registeredBy: "chief" }); } catch { /* an unexpected address shape: keep the dispatch record without a button */ } }
+  }).catch((e) => console.error("dispatch record failed", e instanceof Error ? e.message : "unknown"));
+  if (result.ok) { await addDeadline({ userId: context.user.id, projectId: project.id, taskId, dueAt: due }); return `예약 작업을 바로 깨웠어요${result.sessionUrl ? ` (${result.sessionUrl})` : ""}.`; }
+  const why = result.status === null ? (wake.fireUrl && wake.token ? "응답이 없어요" : "호출 주소·토큰이 등록되지 않았어요") : `응답 ${result.status}`;
+  await notifyPerson(context.user.id, project.id, project.name, [{ title: `Code를 깨우지 못했어요 (${why}). 작업 공간의 이벤트 연결을 확인해 주세요`, url: itemUrl(context, project.id, "task", taskId) }]).catch(() => {});
+  return `예약 작업을 깨우지 못했어요 (${why}). 사람에게 알렸어요.`;
+}
 
 export function resetStage(p: LocalProject, stage: "product_form" | "plan") {
   const w = workflowFor(p);
@@ -1175,7 +1241,7 @@ export async function callTool(name: string, input: unknown, context: ToolContex
     return { content: [{ type: "text", text }], ...(result.data && typeof result.data === "object" ? { structuredContent: result.data as Record<string, unknown> } : {}) };
   } catch (error) {
     if (error instanceof z.ZodError) return { content: [{ type: "text", text: `입력 형식이 맞지 않아요: ${error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`).join("; ")}` }], isError: true };
-    if (error instanceof ToolError || error instanceof CoordinationError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error instanceof ToolError || error instanceof CoordinationError || error instanceof WorkspaceError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
     console.error("mcp tool failed", name, error instanceof Error ? error.message : "unknown error");
     return { content: [{ type: "text", text: "도구 실행 중 오류가 났어요. 잠시 후 다시 시도해주세요." }], isError: true };
   }

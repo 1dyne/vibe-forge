@@ -43,6 +43,8 @@ export type ProjectTask = {
   howTo?: string[];
   response?: { values: Record<string, string | number>; judgements: Record<string, "normal" | "abnormal" | "unknown">; at: string };
   questions?: TaskQuestion[];
+  // Set when the task was handed to a coding agent through a routine.
+  dispatch?: { at: string; ok: boolean; status: number | null; sessionUrl?: string };
 };
 
 // A design choice the person settles: stock ran out, two decisions clash, or
@@ -241,6 +243,12 @@ export type DevProfile = {
   installed: string[];
   confirmed: boolean;
 };
+// Where each role works and how coding agents are woken (lib/workspaces.ts).
+export type LinkKind = "claude_project" | "claude_chat" | "code_cloud" | "code_cli" | "code_vscode" | "codex";
+export type WorkspaceLink = { id: string; role: AgentId; kind: LinkKind; label: string; url: string; registeredBy: "human" | AgentId; at: string };
+export type WakeMode = "manual" | "schedule" | "event";
+export type WakeConfig = { mode: WakeMode; reason: string; setBy: AgentId | "human"; at: string; deadlineMinutes: number; fireUrl?: string; token?: string; lastFire?: { at: string; ok: boolean; status: number | null; sessionUrl?: string } };
+
 // "available" = the person checked a seller has enough in stock to order.
 export type PurchaseStatus = "needed" | "available" | "ordered" | "received" | "problem";
 export type Workflow = {
@@ -259,6 +267,10 @@ export type Workflow = {
   partSources?: Record<string, PartSource[]>;
   // How the person will build the software part; shapes the SW guidance.
   devProfile?: DevProfile;
+  links?: WorkspaceLink[];
+  // The routine token is the person's secret: it stays in the sealed record
+  // and is stripped from every response (see publicProject).
+  wake?: WakeConfig;
 };
 
 export type AgentPlan = {

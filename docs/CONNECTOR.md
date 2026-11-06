@@ -96,6 +96,8 @@ claude
 | `log_dev_progress` | Claude Code·Codex에서 구현 진행·막힌 점·하드웨어 확인 요청 |
 | `upsert_task` · `update_task` | 할 일 보드: 사람·에이전트별 할 일 만들기, 착수(세션 표시, 2시간 뒤 풀림)·완료·막힘 |
 | `answer_task_question` | 사람이 할 일에 남긴 질문에 답하기 (답은 그 할 일 아래에 보임) |
+| `register_session` | 이 역할이 일하는 곳(클라우드 Claude Code 세션, 내 컴퓨터 터미널·VS Code, Codex)을 대시보드 바로가기 버튼으로 등록 |
+| `set_wake_mode` | 대장이 코딩 에이전트를 깨우는 방식을 고름: 직접 열기 / 예약 시간마다 / 할 일이 생기면 바로(예약 작업 API 호출) |
 | `raise_conflict` · `close_conflict` | 충돌 카드: 재고 변동·결정 충돌·확정 뒤 변경을 선택지로 올리고, 사람이 고른 뒤 반영해 닫기 |
 
 ### 조율 → 최종 확정 → 작업대
@@ -110,6 +112,16 @@ claude
 - `upsert_task`에 `format`(기본 5개: `stock_check` 재고·가격, `part_link` 찾은 부품, `dimension` 실측 치수, `measurement` 측정값, `error_log` 오류 메시지)이나 `fields`를 붙이면 대시보드에 입력 양식이 생긴다. 포맷마다 정보 탭(무엇을 왜, 어디서)과 칸별 '?' 도움말이 있다. 정의는 `lib/info-formats.ts`.
 - 측정 요청은 `howTo`(측정 단계)와 `expected`(칸별 정상 범위, 근거 있을 때만)를 받는다. 서버가 값을 범위 안·밖으로 판정해 팀 기록에 남긴다. 판정은 합격이 아니다.
 - 사람은 '할 수 없어요'에서 이유(방법 모름·도구 없음·손이 안 닿음·위험해 보임)를 고르거나, '질문 남기기'로 요청한 달그락에게 묻는다(`board.openQuestions`).
+
+### 작업 공간과 코딩 에이전트 깨우기
+
+- 할 일 보드의 **작업 공간**에 역할별 바로가기 버튼이 있다. 대장(Claude 채팅)은 사람이 Claude 프로젝트·채팅 주소를 등록하고, 코딩 세션은 `register_session`이나 `update_task`의 `session`(세션 주소)으로 스스로 등록한다. 허용하는 주소는 claude.ai 프로젝트·채팅·Code 세션, `claude-cli://open`, `vscode://anthropic.claude-code/open`, `codex://threads/…`뿐이다(`lib/workspaces.ts`의 `checkLink`).
+- `claude-cli://` 버튼은 터미널을 열고 첫 메시지만 채운다(Enter는 사람이 누름). 그 컴퓨터에서 Claude Code로 메시지를 한 번 보낸 적이 있어야 동작한다. 내 컴퓨터 도구는 컴퓨터와 앱이 켜져 있어야 응답한다. Claude 데스크톱 앱의 특정 세션으로 가는 링크는 아직 없다.
+- **깨우기 방식**(대장이 `set_wake_mode`로 고름):
+  - 직접 열기(manual): 사람이 버튼으로 세션을 열어 말한다.
+  - 예약 시간마다(schedule): Claude Code 예약 작업이 주기적으로 보드를 확인한다. 클라우드 예약 작업은 최소 1시간 간격이다. 기한(기본 90분) 안에 아무 세션도 맡지 않으면 사람에게 알린다.
+  - 바로 깨우기(event): 에이전트 할 일이 생기면 서버가 예약 작업의 API 트리거(`https://api.anthropic.com/v1/claude_code/routines/trig_…/fire`)를 호출한다. 사람이 대시보드에 호출 주소와 토큰을 한 번 등록한다. 토큰은 프로젝트 기록 안에 잠가 두고, 대시보드·Claude에 가는 응답에서는 항상 지운다(`publicProject`). 호출에 실패하면 바로, 기한(기본 30분) 안에 맡지 않으면 그때 사람에게 알린다.
+- 예약 작업에 넣을 프롬프트는 `get_project`의 `workspaces.routinePrompt`와 대시보드의 "예약 작업 설정 방법"에 있다.
 
 ### Claude가 보여주는 링크
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { DesignConflict, LocalProject, ProjectTask, TaskAssignee } from "../lib/project-types";
 import { AGENTS } from "../lib/workflow";
 import { assigneeOf, claimExpired, isOpenTask } from "../lib/coordination";
+import { OpenButtons, WorkspaceSection } from "./workspace-links";
 
 // The shared board: decisions waiting for the person, the person's tasks in
 // order, and what each agent is doing. Agents' tasks are read-only here.
@@ -25,17 +26,18 @@ export function BoardView({ project, onAction, busy, focus }: { project: LocalPr
   return <div className="board">
     {conflicts.length > 0 && <section aria-labelledby="board-conflicts"><h3 id="board-conflicts">결정해 주세요 <span className="count">{conflicts.length}</span></h3>{conflicts.map((c) => <ConflictCard key={c.id} conflict={c} onAction={onAction} busy={busy} focused={focus === `conflict:${c.id}`} />)}</section>}
     <section aria-labelledby="board-mine"><h3 id="board-mine">내가 할 일 <span className="count">{mine.length}</span></h3>
-      {mine.length ? <ol className="task-list">{mine.map((t) => <HumanTask key={t.id} task={t} onAction={onAction} busy={busy} focused={focus === `task:${t.id}`} blockedBy={(t.dependsOn ?? []).map((id) => project.tasks.find((x) => x.id === id)).filter((x): x is ProjectTask => !!x && isOpenTask(x))} />)}</ol> : <p className="muted">지금 내가 할 일은 없어요. 새로 생기면 여기에 나타나요.</p>}
+      {mine.length ? <ol className="task-list">{mine.map((t) => <HumanTask key={t.id} project={project} task={t} onAction={onAction} busy={busy} focused={focus === `task:${t.id}`} blockedBy={(t.dependsOn ?? []).map((id) => project.tasks.find((x) => x.id === id)).filter((x): x is ProjectTask => !!x && isOpenTask(x))} />)}</ol> : <p className="muted">지금 내가 할 일은 없어요. 새로 생기면 여기에 나타나요.</p>}
     </section>
     <section aria-labelledby="board-agents"><h3 id="board-agents">달그락들이 하는 일</h3>
-      {lanes.length ? lanes.map((lane) => <div className="lane" key={lane}><h4><span className={`agent-dot dot-${lane}`} />{AGENTS[lane].name}</h4><ul>{agents.filter((t) => assigneeOf(t) === lane).map((t) => { const expired = claimExpired(t); const status = expired ? "ready" : t.status; return <li key={t.id} id={`board-task-${t.id}`} className={focus === `task:${t.id}` ? "focused" : ""}><span className={`pill ${STATUS_CLASS[status]}`}>{STATUS[status]}</span> <strong>{t.title}</strong><p>{t.plain}</p>{t.claimedBy && !expired && status === "in_progress" && <small>진행 중인 곳: {t.claimedBy}</small>}{expired && <small>2시간 넘게 소식이 없어 다시 맡을 수 있는 상태예요.</small>}{t.note && <small className="task-note">메모: {t.note}</small>}</li>; })}</ul></div>) : <p className="muted">에이전트가 맡은 일이 아직 없어요.</p>}
+      {lanes.length ? lanes.map((lane) => <div className="lane" key={lane}><h4><span className={`agent-dot dot-${lane}`} />{AGENTS[lane].name}<OpenButtons project={project} role={lane} compact /></h4><ul>{agents.filter((t) => assigneeOf(t) === lane).map((t) => { const expired = claimExpired(t); const status = expired ? "ready" : t.status; return <li key={t.id} id={`board-task-${t.id}`} className={focus === `task:${t.id}` ? "focused" : ""}><span className={`pill ${STATUS_CLASS[status]}`}>{STATUS[status]}</span> <strong>{t.title}</strong><p>{t.plain}</p>{t.claimedBy && !expired && status === "in_progress" && <small>진행 중인 곳: {/^https:\/\/claude\.ai\/code\/session_/.test(t.claimedBy) ? <a href={t.claimedBy} target="_blank" rel="noreferrer noopener">세션 열기 ↗</a> : t.claimedBy}</small>}{t.dispatch && !t.dispatch.ok && <small className="task-note">Code를 깨우지 못했어요{t.dispatch.status ? ` (응답 ${t.dispatch.status})` : ""}. 작업 공간의 연결을 확인해 주세요.</small>}{expired && <small>2시간 넘게 소식이 없어 다시 맡을 수 있는 상태예요.</small>}{t.note && <small className="task-note">메모: {t.note}</small>}</li>; })}</ul></div>) : <p className="muted">에이전트가 맡은 일이 아직 없어요.</p>}
     </section>
+    <WorkspaceSection project={project} onAction={onAction} busy={busy} />
     {(done.length > 0 || settled.length > 0) && <details className="board-done"><summary>끝난 일 · 정리된 결정</summary><ul>{settled.map((c) => <li key={c.id}>✓ {c.title}{c.resolution?.note ? ` — ${c.resolution.note}` : ""}</li>)}{done.map((t) => <li key={t.id}>{t.status === "completed" ? "✓" : "–"} [{who(assigneeOf(t))}] {t.title}{t.response ? ` — ${Object.entries(t.response.values).map(([k, v]) => `${t.form?.fields.find((f) => f.key === k)?.label ?? k} ${v}${t.response!.judgements[k] === "abnormal" ? " (범위 밖)" : ""}`).join(", ")}` : t.note ? ` — ${t.note}` : ""}</li>)}</ul></details>}
     <p className="muted">결과를 보내도 검증 합격으로 바로 처리되지 않아요. 달그락이 결과를 보고 다음 할 일을 정해요.</p>
   </div>;
 }
 
-function HumanTask({ task, onAction, busy, focused, blockedBy }: { task: ProjectTask; onAction: (input: Record<string, unknown>) => void; busy: boolean; focused: boolean; blockedBy: ProjectTask[] }) {
+function HumanTask({ project, task, onAction, busy, focused, blockedBy }: { project: LocalProject; task: ProjectTask; onAction: (input: Record<string, unknown>) => void; busy: boolean; focused: boolean; blockedBy: ProjectTask[] }) {
   const [mode, setMode] = useState<null | "completed" | "blocked" | "cannot" | "question">(null);
   const [note, setNote] = useState("");
   const [values, setValues] = useState<Record<string, string>>({});
@@ -51,6 +53,8 @@ function HumanTask({ task, onAction, busy, focused, blockedBy }: { task: Project
     {task.doneWhen && <small>완료 기준: {task.doneWhen}</small>}
     {blockedBy.length > 0 && <small className="task-note">먼저 끝낼 일: {blockedBy.map((t) => t.title).join(", ")}</small>}
     {task.note && <small className="task-note">내 메모: {task.note}</small>}
+    {task.createdBy && task.createdBy !== "human" && task.createdBy !== "server" && <small className="task-with">요청한 달그락: {AGENTS[task.createdBy].name} <OpenButtons project={project} role={task.createdBy} compact /></small>}
+    {task.kind === "run_firmware" && <small className="muted">보드를 USB로 꽂아 올리는 일은 내 컴퓨터에서만 돼요.</small>}
     {form && <div className="task-form">
       <details className="form-info"><summary>정보 · 무엇을 왜 넣나요</summary><p>{form.help}</p></details>
       {form.fields.map((f) => <div className="form-field" key={f.key}>

@@ -1,3 +1,4 @@
+import { publicProject } from "../../../../../lib/workspaces";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -8,6 +9,7 @@ import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
+import { WorkspaceError, addLink, fireRoutine, removeLink, setWake } from "../../../../../lib/workspaces";
 import { CoordinationError, askAboutTask, finalizeBlockers, questionOwner, recordPurchase, resolveConflictByPerson, setTaskStatus, submitTaskForm } from "../../../../../lib/coordination";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
@@ -24,6 +26,10 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("finalize") }),
   z.object({ action: z.literal("task_status"), taskId: z.string().uuid(), status: z.enum(["ready", "in_progress", "blocked", "cannot", "completed"]), note: z.string().trim().max(1000).optional() }),
   z.object({ action: z.literal("task_submit"), taskId: z.string().uuid(), values: z.record(z.string(), z.union([z.string().max(3000), z.number()])), note: z.string().trim().max(1000).optional() }),
+  z.object({ action: z.literal("link_add"), role: z.enum(["chief", "hw", "sw", "me", "id"]), kind: z.enum(["claude_project", "claude_chat", "code_cloud", "code_cli", "code_vscode", "codex"]), url: z.string().trim().max(1500), label: z.string().trim().max(60).optional() }),
+  z.object({ action: z.literal("link_remove"), id: z.string().uuid() }),
+  z.object({ action: z.literal("wake_connect"), fireUrl: z.string().trim().max(300).optional(), token: z.string().trim().max(400).optional(), deadlineMinutes: z.number().int().min(10).max(1440).optional() }),
+  z.object({ action: z.literal("wake_test") }),
   z.object({ action: z.literal("task_question"), taskId: z.string().uuid(), text: z.string().trim().min(1).max(800) }),
   z.object({ action: z.literal("resolve_conflict"), conflictId: z.string().uuid(), optionId: z.string().max(8).optional(), proposal: z.string().trim().max(1500).optional() }),
   z.object({ action: z.literal("reopen") }),
@@ -56,6 +62,8 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
       const blockers = finalizeBlockers(project);
       if (blockers.length) return NextResponse.json({ error: `아직 설계를 확정할 수 없어요: ${blockers.join(" / ")}`, blockers }, { status: 409 });
     }
+    // A test call to the routine happens before the save, outside the project lock.
+    const fired = input.action === "wake_test" ? await fireRoutine(current.wake ?? { mode: "event", reason: "", setBy: "human", at: "", deadlineMinutes: 30 }, `달그락 프로젝트 ${project.id}: 연결 시험이에요. 할 일을 바꾸지 말고 get_project만 읽고 끝내세요.`) : null;
     let newBuild = null;
     if (input.action === "plan") {
       transition(current, "plan", !!project.build);
@@ -112,6 +120,20 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task.title}] ${summary}`, shared: true, createdAt: now });
         w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `사용자 입력 [${task.title}]: ${summary} (검증 합격 아님, 평가 필요)`, createdAt: now });
         pushActivity(p, { source: "person", title: "요청한 정보 보냄", detail: task.title });
+      } else if (input.action === "link_add") {
+        p.workflow = w;
+        const link = addLink(p, { role: input.role, kind: input.kind, label: input.label ?? "", url: input.url, registeredBy: "human" });
+        pushActivity(p, { source: "person", title: "작업 공간 바로가기 등록", detail: link.label });
+      } else if (input.action === "link_remove") {
+        p.workflow = w;
+        removeLink(p, input.id);
+      } else if (input.action === "wake_connect") {
+        p.workflow = w;
+        setWake(p, { mode: w.wake?.mode ?? "event", reason: w.wake?.reason || "사람이 이벤트 연결을 등록했어요.", setBy: w.wake?.setBy ?? "human", fireUrl: input.fireUrl, token: input.token, deadlineMinutes: input.deadlineMinutes });
+        pushActivity(p, { source: "person", title: "코딩 에이전트 이벤트 연결 등록" });
+      } else if (input.action === "wake_test") {
+        if (w.wake) w.wake.lastFire = { at: now, ...fired! };
+        if (!fired?.ok) throw new WorkspaceError(fired?.status ? `예약 작업이 응답 ${fired.status}을(를) 돌려줬어요. 토큰과 주소를 확인해 주세요.` : "예약 작업에 연결하지 못했어요. 호출 주소와 토큰을 등록했는지 확인해 주세요.");
       } else if (input.action === "task_question") {
         const task = p.tasks.find((t) => t.id === input.taskId);
         askAboutTask(p, input.taskId, input.text);
@@ -155,7 +177,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
       p.workflow = w;
     }, project.designRevision);
     if (input.action === "profile") await saveMakerProfile(input.profile as MakerProfile, ownerIdOf(viewer));
-    return NextResponse.json({ project: updated });
+    return NextResponse.json({ project: publicProject(updated) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "요청에 실패했습니다.";
     if (message.includes("max_tokens") || message.startsWith("MODEL_OUTPUT_INVALID")) {

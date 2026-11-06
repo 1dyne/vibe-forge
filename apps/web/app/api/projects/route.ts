@@ -1,3 +1,4 @@
+import { publicProject } from "../../../lib/workspaces";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runDesignAgent } from "../../../lib/design-agent";
@@ -12,7 +13,7 @@ const CreateProject = z.object({ idea: z.string().trim().min(3).max(4000), attac
 async function handleGET(request: NextRequest) {
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
-  return NextResponse.json({ projects: await listProjects(ownerIdOf(viewer)), viewer: viewer.kind === "operator" ? { kind: "operator" } : { kind: "user", name: viewer.user.name, webAi: viewer.user.webAi, projectLimit: limits.projectsPerUser() } });
+  return NextResponse.json({ projects: (await listProjects(ownerIdOf(viewer))).map(publicProject), viewer: viewer.kind === "operator" ? { kind: "operator" } : { kind: "user", name: viewer.user.name, webAi: viewer.user.webAi, projectLimit: limits.projectsPerUser() } });
 }
 
 async function handlePOST(request: NextRequest) {
@@ -25,7 +26,7 @@ async function handlePOST(request: NextRequest) {
     const attachments = input.attachments as ImageAttachment[];
     const result = await runDesignAgent(input.idea, undefined, attachments, await getMakerProfile(ownerIdOf(viewer)));
     const project = await createProject(input.idea, result.plan, result.mode, attachments, { ownerId: ownerIdOf(viewer) ?? undefined, origin: "web" });
-    return NextResponse.json({ project, call: { mode: result.mode, costUsd: result.costUsd } }, { status: 201 });
+    return NextResponse.json({ project: publicProject(project), call: { mode: result.mode, costUsd: result.costUsd } }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && ["LIVE_BUDGET_BLOCKED", "LIVE_DAILY_BUDGET_BLOCKED"].includes(error.message)) {
       return NextResponse.json({ error: "설정된 API 비용 한도를 사용할 수 없습니다. 일일 잔여 한도와 턴당 한도를 확인해주세요." }, { status: 409 });

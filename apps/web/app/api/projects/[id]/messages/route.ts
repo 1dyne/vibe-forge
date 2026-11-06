@@ -1,3 +1,4 @@
+import { publicProject } from "../../../../../lib/workspaces";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runDesignAgent } from "../../../../../lib/design-agent";
@@ -38,11 +39,11 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         p.workflow = w;
         p.lastAgentMode = process.env.APP_MODE === "live" ? "live" : "mock";
       }, project.designRevision);
-      return NextResponse.json({ project: updated });
+      return NextResponse.json({ project: publicProject(updated) });
     }
     const result = await runDesignAgent(input.text, project, attachments);
     const updated = await applyAgentPlan(id, input.text, result.plan, result.mode, attachments);
-    return NextResponse.json({ project: updated, call: { mode: result.mode, costUsd: result.costUsd } });
+    return NextResponse.json({ project: publicProject(updated), call: { mode: result.mode, costUsd: result.costUsd } });
   } catch (error) {
     if (error instanceof Error && error.message === "LIVE_CONTEXT_BUDGET_BLOCKED") {
       return NextResponse.json({ error: "프로젝트 자료와 완결된 답변을 담기에는 턴당 API 한도가 작습니다. 유료 생성 전 중단했어요. 설정의 턴당 한도를 높인 뒤 다시 요청해주세요." }, { status: 409 });

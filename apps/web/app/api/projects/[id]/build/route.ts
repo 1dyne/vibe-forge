@@ -1,3 +1,4 @@
+import { publicProject } from "../../../../../lib/workspaces";
 import { NextRequest, NextResponse } from "next/server";
 import { runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { applyBuildResult, getProject } from "../../../../../lib/local-project-store";
@@ -18,7 +19,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
   try {
     const build = await runBuildPipeline(project, true);
     const updated = await applyBuildResult(id, build);
-    return NextResponse.json({ project: updated });
+    return NextResponse.json({ project: publicProject(updated) });
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     if (["LIVE_BUDGET_BLOCKED", "LIVE_DAILY_BUDGET_BLOCKED"].includes(code)) return NextResponse.json({ error: "live 파이프라인 비용 한도를 사용할 수 없습니다." }, { status: 409 });
