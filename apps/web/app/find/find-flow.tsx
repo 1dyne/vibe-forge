@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATS, FIRE, REACT_FIRE, compose, fireGain, fireLabel, fireName, lookup, reactKind, type Chip, type ChipTree } from "../../lib/find/chips";
+import { CATS, FIRE, REACT_FIRE, ROOT_VISIBLE, compose, fireGain, fireLabel, fireName, lookup, reactKind, type Chip, type ChipTree } from "../../lib/find/chips";
 import type { FindAnalysis } from "../../lib/find/classify";
+import type { Maturity } from "../../lib/find/maturity";
 import type { ProjectMatch } from "../../lib/find/projects";
 import Dokkaebi from "./dokkaebi";
 import { track } from "./track";
@@ -14,7 +15,7 @@ const VIBE_PROMPT = (idea: string) => `나는 개발자가 아니야. "${idea.tr
 
 type Screen = "intro" | "thinking" | "software" | "unsafe" | "stoke" | "reveal" | "forge";
 type Fire = { id: string; name: string; sentence: string; color: string; reactKind: string; peak: number; labels: string[] };
-type Result = { fire: Fire; matches: ProjectMatch[]; unique: string[] };
+type Result = { fire: Fire; matches: ProjectMatch[]; unique: string[]; maturity: Maturity };
 type Standing = { code: string; position: number; total: number; referrals: number; alreadyJoined: boolean; fireName: string | null };
 
 const EMPTY_TREE: ChipTree = { root: [], follow: {} };
@@ -141,7 +142,12 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     }
   }
 
-  const visible = [...tree.root, ...picked.flatMap((id) => tree.follow[id] ?? [])].filter((c) => !picked.includes(c.id));
+  // 방금 고른 장작의 후속(더 구체적인 것)을 앞에, 그 뒤로 아직 안 고른 뿌리 장작을 채운다.
+  // 뿌리 장작은 첫 입력과 관련 있는 순서라서, 하나를 고르면 다음으로 관련 있는 장작이 빈자리에 들어온다.
+  const follows = [...picked].reverse().flatMap((id) => tree.follow[id] ?? []).filter((c) => !picked.includes(c.id));
+  const roots = tree.root.filter((c) => !picked.includes(c.id)).slice(0, Math.max(4, ROOT_VISIBLE - Math.min(follows.length, 6)));
+  const visible = [...new Map([...follows, ...roots].map((c) => [c.id, c])).values()];
+  const freshIds = new Set(picked.length ? (tree.follow[picked[picked.length - 1]] ?? []).map((c) => c.id) : []);
   const filledCats = CATS.filter((c) => picked.some((id) => find(id)?.cat === c)).length;
   const stokeMotion = fire <= FIRE.floor + 0.01 ? "fallen" : fire >= 55 ? "blaze" : "stoke";
 
@@ -232,7 +238,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           </div>
           <div className="chips">
             {visible.map((c) => (
-              <button key={c.id} type="button" className="chip" onClick={() => pick(c)}>
+              <button key={c.id} type="button" className={`chip${freshIds.has(c.id) ? " fresh" : ""}`} onClick={() => pick(c)}>
                 <span className="tag" style={{ background: CAT_COLOR[c.cat] }}>{c.cat}</span>{c.label}
               </button>
             ))}
@@ -245,7 +251,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
 
       {screen === "reveal" && result && (
         <Reveal result={result} picked={picked} find={find} idea={idea} onShare={() => { setShareOpen(true); track("share_open"); }}
-          onAgain={() => { resetFire(); go("stoke"); }} onForge={() => go("forge")} />
+          onAgain={() => { resetFire(); go("stoke"); }} onMore={() => { setResult(null); go("stoke"); }} onForge={() => go("forge")} />
       )}
 
       {screen === "forge" && (
@@ -282,10 +288,10 @@ function VibeGuide({ idea }: { idea: string }) {
   );
 }
 
-function Reveal({ result, picked, find, idea, onShare, onAgain, onForge }: {
-  result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onForge: () => void;
+function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge }: {
+  result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
 }) {
-  const { fire, matches, unique } = result;
+  const { fire, matches, unique, maturity } = result;
   const byCat = (cat: string) => picked.map(find).filter((c): c is Chip => Boolean(c) && c!.cat === cat).map((c) => c.label).join(" · ") || "아직 몰라";
   return (
     <section className="screen">
@@ -303,6 +309,20 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onForge }: {
       <div className="note">
         <div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div>
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
+      </div>
+      <div className="growth">
+        <div className="growth-head">
+          <div><div className="tiny muted">지금 네 아이디어는</div><div className="display" style={{ fontSize: 21 }}>{maturity.label}</div></div>
+          <div className="growth-steps" aria-label={`4단계 중 ${maturity.level}단계`}>{[1, 2, 3, 4].map((n) => <i key={n} className={n <= maturity.level ? "on" : ""} />)}</div>
+        </div>
+        <div className="body">{maturity.summary}</div>
+        {maturity.next.length > 0 && <div className="tiny muted" style={{ marginTop: 4 }}>지금 더 해보면 좋은 것</div>}
+        <ol className="growth-next">
+          {maturity.next.map((n) => (
+            <li key={n.title}><b>{n.title}</b><span>{n.body}</span>{n.href && <a href={n.href} target="_blank" rel="noopener noreferrer">원문 열기 ↗</a>}</li>
+          ))}
+        </ol>
+        {maturity.level <= 2 && <button className="btn btn-ghost" type="button" onClick={onMore}>고른 장작 그대로, 더 넣으러 가기</button>}
       </div>
       <div className="rail-head"><div className="display" style={{ fontSize: 19 }}>닮은 메이커 프로젝트</div>{matches.length > 0 && <span className="badge">일치율 = 갈래별 겹친 태그</span>}</div>
       {matches.length ? (

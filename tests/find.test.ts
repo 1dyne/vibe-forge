@@ -5,6 +5,7 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { CATS, FOLLOW, ROOTS, compose, fireName, lookup, reactKind, toChip, type Chip } from "../apps/web/lib/find/chips";
 import { analyzeFind, chipTree, classify } from "../apps/web/lib/find/classify";
+import { assessMaturity } from "../apps/web/lib/find/maturity";
 import { PROJECTS, canShowImage, matchProjects, matchScore } from "../apps/web/lib/find/projects";
 import { resetRateLimits } from "../apps/web/lib/find/rate-limit";
 import { allWaitlist, clearEvents, endPool, getFire, recordEvent, removeEntry } from "../apps/web/lib/find/store";
@@ -53,16 +54,50 @@ describe("규칙 기반 판별", () => {
   it("뿌리 장작은 갈래마다 2개 이상, 최대 10개이고 입력과 관련된 걸 먼저 준다", () => {
     for (const idea of ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "뭔가 재밌는 거", "현관문 잠갔는지 매번 불안해"]) {
       const { root } = chipTree(idea);
-      expect(root.length).toBeLessThanOrEqual(10);
-      for (const cat of CATS) expect(root.filter((c) => c.cat === cat).length, `${idea} ${cat}`).toBeGreaterThanOrEqual(2);
+      const first = root.slice(0, 10);
+      for (const cat of CATS) expect(first.filter((c) => c.cat === cat).length, `${idea} ${cat}`).toBeGreaterThanOrEqual(2);
+      expect(new Set(root.map((c) => c.id)).size).toBe(ROOTS.length); // 나머지는 빈자리를 채울 예비 장작
     }
-    const ids = chipTree("고양이가 밥 먹었는지 모르겠어").root.map((c) => c.id);
+    const ids = chipTree("고양이가 밥 먹었는지 모르겠어").root.slice(0, 10).map((c) => c.id);
     expect(ids).toEqual(expect.arrayContaining(["f_bowl", "s_weight", "w_pet"]));
   });
   it("AI 응답과 같은 모양을 돌려준다(§4)", () => {
     const a = analyzeFind("화분에 물 줄 때를 모르겠어");
     expect(Object.keys(a).sort()).toEqual(["chips", "engine", "kind", "reason", "safety"]);
-    expect(Object.keys(a.chips.follow).every((id) => a.chips.root.some((r) => r.id === id))).toBe(true);
+    const reachable = new Set([...a.chips.root.map((r) => r.id), ...Object.values(a.chips.follow).flat().map((c) => c.id)]);
+    expect(Object.keys(a.chips.follow).every((id) => reachable.has(id))).toBe(true);
+  });
+});
+
+describe("계속 붙는 장작", () => {
+  it("후속 장작을 고르면 그 아래로 또 더 구체적인 장작이 붙는다", () => {
+    const { follow } = chipTree("물 마시는 걸 자꾸 까먹어");
+    expect(follow.s_time.map((c) => c.id)).toContain("s_cup");
+    expect(follow.s_cup.map((c) => c.id)).toContain("s_goal");
+    const t = lookup(chipTree("물 마시는 걸 자꾸 까먹어"));
+    expect(compose(["f_cup", "s_time", "s_cup", "s_goal", "r_light"], t)).toBe("컵 받침처럼 생긴 물건이야. 정해진 시간마다, 컵 무게로 마셨는지 확인해서, 하루 목표만큼 채웠는지 세어서 빛으로 알려줘.");
+  });
+});
+
+describe("구상 수준", () => {
+  const chipsOf = (ids: string[]) => ids.map(chip);
+  it("장작이 적으면 1단계, 빈 갈래부터 채우라고 한다", () => {
+    const m = assessMaturity(chipsOf(["s_time"]), new Set(), [], []);
+    expect(m.level).toBe(1);
+    expect(m.next[0].title).toBe("어떻게 알려줄지 정하기");
+  });
+  it("갈래가 비면 2단계, 빈 갈래를 짚어준다", () => {
+    const m = assessMaturity(chipsOf(["f_desk", "s_time", "r_light"]), new Set(), [], []);
+    expect(m.level).toBe(2);
+    expect(m.summary).toContain("누구");
+  });
+  it("네 갈래 + 후속까지 고르면 4단계, 만들기 쪽 할 일을 준다", () => {
+    const picked = ["f_cup", "f_thin", "s_time", "s_cup", "r_light", "w_me"];
+    const matches = matchProjects(picked, all);
+    const m = assessMaturity(chipsOf(picked), new Set(["f_thin", "s_cup"]), matches, ["빛으로 알려줘"]);
+    expect(m.level).toBe(4);
+    expect(m.next.map((n) => n.title)).toEqual(["닮은 프로젝트 뜯어보기", "네 것만의 부분 생각해두기", "전원 정하기"]);
+    expect(m.next[0].href).toBe(matches[0].source_url);
   });
 });
 

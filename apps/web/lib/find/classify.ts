@@ -42,32 +42,48 @@ export function classify(idea: string): Pick<FindAnalysis, "kind" | "reason" | "
 }
 
 const ROOT_PER_CAT = 3;
-const ROOT_MAX = 10;
+const ROOT_FIRST = 10;
 
-/** 입력과 관련 있는 뿌리 장작을 갈래마다 2~3개 고른다. 관련 있는 게 없으면 기본 순서로 채운다. */
+/**
+ * 뿌리 장작 전체를 첫 입력과 관련 있는 순서로 돌려준다.
+ * 앞 10개는 갈래마다 2~3개씩 섞여 있고(첫 화면), 나머지는 고를 때마다 빈자리를 채우는 예비 장작이다.
+ */
 export function chipTree(idea: string): ChipTree {
   const text = normalize(idea);
-  const picked: typeof ROOTS = [];
-  for (const cat of CATS) {
-    const scored = ROOTS.filter((r) => r.cat === cat)
-      .map((r) => ({ r, score: r.keywords.filter((k) => text.includes(k)).length }))
-      .sort((a, b) => b.score - a.score || (a.r.fallbackRank ?? 99) - (b.r.fallbackRank ?? 99));
-    const relevant = scored.filter((s) => s.score > 0).slice(0, ROOT_PER_CAT);
-    const fill = scored.filter((s) => s.score === 0).slice(0, Math.max(0, 2 - relevant.length));
-    picked.push(...[...relevant, ...fill].map((s) => s.r));
+  const score = (r: (typeof ROOTS)[number]) => r.keywords.filter((k) => text.includes(k)).length;
+  const lanes = CATS.map((cat) => ROOTS.filter((r) => r.cat === cat)
+    .map((r) => ({ r, s: score(r) }))
+    .sort((a, b) => b.s - a.s || (a.r.fallbackRank ?? 99) - (b.r.fallbackRank ?? 99)));
+  // 첫 화면: 갈래마다 관련 있는 것 최대 3개, 없으면 기본 2개
+  const first = lanes.map((lane) => {
+    const relevant = lane.filter((x) => x.s > 0).slice(0, ROOT_PER_CAT);
+    return [...relevant, ...lane.filter((x) => x.s === 0).slice(0, Math.max(0, 2 - relevant.length))];
+  });
+  while (first.flat().length > ROOT_FIRST) {
+    const biggest = first.reduce((a, b) => (b.length > a.length ? b : a));
+    if (biggest.length <= 2) break;
+    biggest.pop();
   }
-  // 10개를 넘으면 관련 없는 채움 장작부터 뺀다. 갈래마다 2개는 남긴다.
-  while (picked.length > ROOT_MAX) {
-    const counts = new Map(CATS.map((c) => [c, picked.filter((p) => p.cat === c).length]));
-    const idx = [...picked].reverse().findIndex((p) => (counts.get(p.cat) ?? 0) > 2);
-    if (idx < 0) break;
-    picked.splice(picked.length - 1 - idx, 1);
+  const firstIds = new Set(first.flat().map((x) => x.r.id));
+  // 화면에서는 형태·반응·감지·누구를 번갈아 놓는다
+  const ordered: typeof ROOTS = [];
+  for (let i = 0; ordered.length < firstIds.size; i++) for (const lane of first) if (lane[i]) ordered.push(lane[i].r);
+  // 예비 장작: 입력과 관련 있는 것 먼저, 그다음 갈래를 번갈아
+  const rest = lanes.map((lane) => lane.filter((x) => !firstIds.has(x.r.id)));
+  const reserve: typeof ROOTS = [];
+  for (const x of rest.flat().filter((x) => x.s > 0).sort((a, b) => b.s - a.s)) reserve.push(x.r);
+  const leftover = rest.map((lane) => lane.filter((x) => x.s === 0));
+  for (let i = 0; leftover.some((l) => l[i]); i++) for (const lane of leftover) if (lane[i]) reserve.push(lane[i].r);
+  const root = [...ordered, ...reserve].map(toChip);
+  // 후속 장작은 고른 장작 아래로 몇 단계든 이어진다
+  const follow: ChipTree["follow"] = {};
+  const queue = root.map((r) => r.id);
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (follow[id] || !FOLLOW[id]) continue;
+    follow[id] = FOLLOW[id];
+    queue.push(...FOLLOW[id].map((c) => c.id));
   }
-  // 화면에서는 갈래가 섞여 보이도록 형태·반응·감지·누구를 번갈아 놓는다.
-  const lanes = CATS.map((c) => picked.filter((p) => p.cat === c));
-  const root = [];
-  for (let i = 0; root.length < picked.length; i++) for (const lane of lanes) if (lane[i]) root.push(toChip(lane[i]));
-  const follow = Object.fromEntries(root.filter((r) => FOLLOW[r.id]).map((r) => [r.id, FOLLOW[r.id]]));
   return { root, follow };
 }
 
