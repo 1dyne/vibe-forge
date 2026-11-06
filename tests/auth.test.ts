@@ -47,10 +47,10 @@ const plan = { projectName: "잠긴 램프", oneLiner: "버튼 램프", reply: "
 const json = (url: string, body: unknown, headers: Record<string, string> = {}) => new NextRequest(url, { method: "POST", headers: { "content-type": "application/json", origin: ORIGIN, ...headers }, body: JSON.stringify(body) });
 const cookieOf = (response: Response, name = "dalgeurak_session") => response.headers.getSetCookie().map((c) => c.split(";")[0]).find((c) => c.startsWith(`${name}=`) && c.length > name.length + 1)!;
 const linkFrom = (mail: { text: string }, page: string) => mail.text.match(new RegExp(`${page}#([A-Za-z0-9_-]+)`))![1];
-const consent = { agreeTerms: true, agreePrivacy: true, age14: true };
+const consent = { agreeTerms: true, agreePrivacy: true, age14: true, lock: "sealed" };
 
-async function signUpAndVerify(name: string, email: string, password: string) {
-  const response = await signup(json(`${ORIGIN}/api/auth/signup`, { name, email, password, ...consent }));
+async function signUpAndVerify(name: string, email: string, password: string, lock: "sealed" | "server" = "sealed") {
+  const response = await signup(json(`${ORIGIN}/api/auth/signup`, { name, email, password, ...consent, lock }));
   expect(response.status).toBe(201);
   const { recoveryCode } = await response.json();
   const mail = outbox.find((item) => item.to === email && item.subject.includes("인증"))!;
@@ -155,6 +155,26 @@ describe("email accounts", () => {
     expect(result.keptRecords).toBe(false);
     const again = await signIn("nocode@example.com", "fresh password 3");
     expect(await projectsOf(again.cookie)).toEqual([]);
+  });
+
+  it("asks how to keep the records at sign-up; the server lock keeps them through a reset without the code", async () => {
+    const { lock: _lock, ...noChoice } = consent;
+    expect((await signup(json(`${ORIGIN}/api/auth/signup`, { name: "안 고름", email: "nochoice@example.com", password: "first password 1", ...noChoice }))).status).toBe(400);
+    await signUpAndVerify("서버 보관", "server@example.com", "first password 1", "server");
+    const first = await signIn("server@example.com", "first password 1");
+    expect((await (await me(new NextRequest(`${ORIGIN}/api/me`, { headers: { cookie: first.cookie } }))).json()).lock).toBe("server");
+    await tool(await connectorToken(first.cookie), "create_project", { idea: "서버가 지켜준 아이디어", plan });
+    await forgot(json(`${ORIGIN}/api/auth/forgot`, { email: "server@example.com" }));
+    const result = await (await reset(json(`${ORIGIN}/api/auth/reset`, { token: linkFrom(outbox.at(-1)!, "/auth/reset"), password: "fresh password 3", abandon: true }))).json();
+    expect(result.keptRecords).toBe(true);
+    const again = await signIn("server@example.com", "fresh password 3");
+    expect((await projectsOf(again.cookie))!.map((p) => p.idea)).toEqual(["서버가 지켜준 아이디어"]);
+    // Switching to the sealed lock removes the server's key; the records stay.
+    expect((await meAction(json(`${ORIGIN}/api/me`, { action: "switch_lock", to: "sealed", password: "wrong password 9" }, { cookie: again.cookie }))).status).toBe(403);
+    expect((await meAction(json(`${ORIGIN}/api/me`, { action: "switch_lock", to: "sealed", password: "fresh password 3" }, { cookie: again.cookie }))).status).toBe(200);
+    const users = JSON.parse(await readFile(path.join(folder, "users.json"), "utf8")).users;
+    expect(users.find((u: { email?: string }) => u.email === "server@example.com").keys.server).toBeUndefined();
+    expect((await projectsOf(again.cookie))!).toHaveLength(1);
   });
 
   it("changes the password and signs other devices out", async () => {

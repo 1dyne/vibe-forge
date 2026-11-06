@@ -15,7 +15,16 @@ export class AccountError extends Error {
 const consentNow = (): Consent => ({ termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, ageConfirmed: true, agreedAt: new Date().toISOString() });
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 
-export async function signUpWithEmail(input: { name: string; email: string; password: string; inviteCode?: string; origin: string }): Promise<{ user: PublicUser; recoveryCode: string }> {
+// The person chooses how their records are locked when they sign up:
+// "sealed"  – only their password or recovery code opens the records; the
+//             operator cannot, and a forgotten password without the code
+//             loses them.
+// "server"  – the server also keeps a key (VAULT_MASTER_KEY), so a password
+//             reset keeps the records and the server can work on them while
+//             the person is away. They can switch later in 내 계정.
+export type LockChoice = "sealed" | "server";
+export const serverLockAvailable = () => (process.env.VAULT_MASTER_KEY ?? "").length >= 32;
+export async function signUpWithEmail(input: { name: string; email: string; password: string; inviteCode?: string; origin: string; lock?: LockChoice }): Promise<{ user: PublicUser; recoveryCode: string }> {
   const email = normalizeEmail(input.email);
   if (!EMAIL.test(email)) throw new AccountError("이메일 주소를 확인해주세요.");
   const problem = passwordProblem(input.password, email);
@@ -23,7 +32,8 @@ export async function signUpWithEmail(input: { name: string; email: string; pass
   const id = randomUUID();
   const dataKey = newDataKey();
   const recoveryCode = newRecoveryCode();
-  const keys = { password: await sealWithPassword(dataKey, input.password, id), recovery: sealWithRecovery(dataKey, recoveryCode, id) };
+  if (input.lock === "server" && !serverLockAvailable()) throw new AccountError("지금은 서버 보관을 고를 수 없어요. 잠금 보관으로 가입해주세요.", 409);
+  const keys = { password: await sealWithPassword(dataKey, input.password, id), recovery: sealWithRecovery(dataKey, recoveryCode, id), ...(input.lock === "server" ? { server: sealWithServer(dataKey, id) } : {}) };
   const user = await createAccount({ id, name: input.name, email, auth: "password", emailVerified: false, passwordHash: await hashPassword(input.password), keys, consent: consentNow(), inviteCode: input.inviteCode })
     .catch((error) => { if (error instanceof SignupError) throw new AccountError(error.message, 403); throw error; });
   await sendVerification(user.id, email, user.name, input.origin);
@@ -79,7 +89,10 @@ export async function resetPassword(input: { token: string; password: string; re
   if (!account) throw new AccountError("계정을 찾을 수 없어요.", 404);
   const problem = passwordProblem(input.password, account.email);
   if (problem) throw new AccountError(problem);
+  // Server-held lock: the records survive a reset without the recovery code.
   let dataKey = input.recoveryCode ? openWithRecovery(account.keys?.recovery, input.recoveryCode, userId) : null;
+  const serverKept = account.keys?.server && account.keys.password ? openWithServer(account.keys.server, userId) : null;
+  if (!dataKey && serverKept) dataKey = serverKept;
   if (!dataKey && !input.abandon) throw new AccountError("복구 코드가 맞지 않아요. 다시 확인하거나 ‘복구 코드가 없어요’를 선택해주세요.");
   const keptRecords = Boolean(dataKey);
   if (!dataKey) {
@@ -89,7 +102,7 @@ export async function resetPassword(input: { token: string; password: string; re
   const recoveryCode = newRecoveryCode();
   const passwordEnvelope = await sealWithPassword(dataKey, input.password, userId);
   const passwordHash = await hashPassword(input.password);
-  await changeAccount(userId, (record) => { record.passwordHash = passwordHash; record.keys = { password: passwordEnvelope, recovery: sealWithRecovery(dataKey!, recoveryCode, userId) }; record.emailVerifiedAt ??= new Date().toISOString(); });
+  await changeAccount(userId, (record) => { record.passwordHash = passwordHash; record.keys = { password: passwordEnvelope, recovery: sealWithRecovery(dataKey!, recoveryCode, userId), ...(serverKept ? { server: record.keys!.server } : {}) }; record.emailVerifiedAt ??= new Date().toISOString(); });
   await endUserSessions(userId);
   await revokeUserGrants(userId);
   await audit(keptRecords ? "password_reset" : "password_reset_records_erased", { userId });
@@ -187,4 +200,18 @@ export async function unlockWithPassword(unlockToken: string, password: string):
 
 export async function unlockToken(userId: string) {
   return createEmailToken(userId, "unlock");
+}
+
+// Switch between the two locks later (내 계정). Needs the password, and the
+// records' key from the signed-in session.
+export async function switchLock(input: { user: PublicUser; dataKey: Buffer; password: string; to: LockChoice }): Promise<void> {
+  const account = await accountById(input.user.id);
+  if (!account?.keys?.password || !account.passwordHash) throw new AccountError("비밀번호가 있는 계정에서만 바꿀 수 있어요.");
+  if (!(await verifyPassword(input.password, account.passwordHash))) throw new AccountError("비밀번호가 맞지 않아요.", 403);
+  if (input.to === "server" && !serverLockAvailable()) throw new AccountError("지금은 서버 보관을 고를 수 없어요.", 409);
+  await changeAccount(account.id, (record) => {
+    const { server: _server, ...rest } = record.keys ?? {};
+    record.keys = input.to === "server" ? { ...rest, server: sealWithServer(input.dataKey, account.id) } : rest;
+  });
+  await audit(input.to === "server" ? "lock_server" : "lock_sealed", { userId: account.id });
 }

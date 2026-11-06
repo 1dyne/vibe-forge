@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { forgetUser } from "../../../lib/notify";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { changePassword, newRecovery, setPassword } from "../../../lib/account-service";
+import { changePassword, newRecovery, setPassword, switchLock } from "../../../lib/account-service";
 import { audit } from "../../../lib/audit";
 import { createSession, endUserSessions, SESSION_LONG_MS } from "../../../lib/auth-store";
 import { failure, origin, setAccountCookie } from "../../../lib/auth-http";
@@ -40,6 +40,7 @@ const Action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set_password"), password: z.string().max(200), email: z.string().trim().max(254).optional() }).strict(),
   z.object({ action: z.literal("change_password"), current: z.string().max(200), next: z.string().max(200) }).strict(),
   z.object({ action: z.literal("new_recovery"), password: z.string().max(200) }).strict(),
+  z.object({ action: z.literal("switch_lock"), to: z.enum(["sealed", "server"]), password: z.string().max(200) }).strict(),
   z.object({ action: z.literal("rename"), name: z.string().trim().min(1).max(30) }).strict(),
   z.object({ action: z.literal("reset_records"), confirm: z.literal("초기화") }).strict()
 ]);
@@ -65,6 +66,10 @@ export async function POST(request: NextRequest) {
       const response = NextResponse.json({ connectorUrl: mcpResource(request), legacyConnectorUrl: legacyConnectorLink(request, token), dashboardUrl: dashboardLink(request, token) }, { headers: noStore });
       response.cookies.set("dalgeurak_session", userSessionValue(token), { ...cookieOptions, maxAge: 60 * 60 * 24 * 30 });
       return response;
+    }
+    if (input.action === "switch_lock") {
+      await switchLock({ user: viewer.user, dataKey: viewer.vault.key, password: input.password, to: input.to as "sealed" | "server" });
+      return NextResponse.json({ lock: input.to === "server" ? "server" : "password" }, { headers: noStore });
     }
     if (input.action === "set_password") {
       const result = await setPassword({ user: viewer.user, dataKey: viewer.vault.key, password: input.password, email: input.email, origin: origin(request) });

@@ -5,7 +5,8 @@ import RecoveryCode from "../recovery-code";
 
 type Done = { name: string; email: string; recoveryCode: string };
 
-export default function JoinForm({ needsCode, google, askGoogleConsent }: { needsCode: boolean; google: boolean; askGoogleConsent: boolean }) {
+export default function JoinForm({ needsCode, google, askGoogleConsent, serverLock }: { needsCode: boolean; google: boolean; askGoogleConsent: boolean; serverLock: boolean }) {
+  const [lock, setLock] = useState<"" | "sealed" | "server">("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +29,7 @@ export default function JoinForm({ needsCode, google, askGoogleConsent }: { need
     if (password !== confirm) { setError("비밀번호 확인이 일치하지 않아요."); return; }
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/auth/signup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: name.trim(), email: email.trim(), password, ...(needsCode ? { inviteCode: code.trim() } : {}), agreeTerms: terms, agreePrivacy: privacy, age14 }) });
+      const response = await fetch("/api/auth/signup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: name.trim(), email: email.trim(), password, ...(needsCode ? { inviteCode: code.trim() } : {}), lock, agreeTerms: terms, agreePrivacy: privacy, age14 }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
       setDone(body);
@@ -81,8 +82,11 @@ export default function JoinForm({ needsCode, google, askGoogleConsent }: { need
       <label className="remember-session"><input type="checkbox" checked={age14} onChange={(e) => setAge14(e.target.checked)} />만 14세 이상이에요</label>
       <label className="remember-session"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} /><span><a href="/terms" target="_blank">이용약관</a>에 동의해요 (필수)</span></label>
       <label className="remember-session"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} /><span><a href="/privacy" target="_blank">개인정보 수집·이용</a>에 동의해요 (필수)</span></label>
-      <p className="muted"><small>이메일로 가입하면 내 기록이 내 비밀번호로 잠겨서 운영자도 볼 수 없어요.</small></p>
-      <button type="submit" disabled={busy || !name.trim() || !email.trim() || password.length < 10 || !confirm || !agreedAll || (needsCode && !code.trim())}>{busy ? "가입하는 중…" : "이메일로 가입하기"}</button>
+      <fieldset className="lock-choice"><legend>내 기록을 어떻게 보관할까요? <small>(필수 · 나중에 내 계정에서 바꿀 수 있어요)</small></legend>
+        <label className={lock === "sealed" ? "on" : ""}><input type="radio" name="lock" value="sealed" checked={lock === "sealed"} onChange={() => setLock("sealed")} /><span><b>잠금 보관</b><small>열쇠는 내 계정에만 있어요. 저장된 기록은 운영자도 열 수 없어요.</small><small className="warn">비밀번호를 잊으면 <b>복구 코드</b>가 있어야 기록을 되살릴 수 있어요.</small><small>운영자가 내 프로젝트를 보고 도와줄 수 없고, 내가 없을 때는 내용 없는 알림만 보낼 수 있어요.</small></span></label>
+        <label className={`${lock === "server" ? "on" : ""} ${serverLock ? "" : "disabled"}`}><input type="radio" name="lock" value="server" disabled={!serverLock} checked={lock === "server"} onChange={() => setLock("server")} /><span><b>서버 보관</b><small>달그락 서버도 열쇠를 함께 보관해요.</small><small>비밀번호를 잊어도 이메일로 재설정하면 기록이 그대로 남아요.</small><small>문제가 생기면 운영자가 내 프로젝트를 보고 도와줄 수 있어요.{serverLock ? "" : " (지금은 이 서버에서 쓸 수 없어요)"}</small></span></label>
+      </fieldset>
+      <button type="submit" disabled={busy || !name.trim() || !email.trim() || password.length < 10 || !confirm || !lock || !agreedAll || (needsCode && !code.trim())}>{busy ? "가입하는 중…" : "이메일로 가입하기"}</button>
       {google && <><div className="or-divider"><span>또는</span></div><button type="button" className="google-button" onClick={openGoogle}>구글로 가입하기</button></>}
     </form>
     {notice && <GoogleNotice onClose={() => setNotice(false)} onEmail={() => { setNotice(false); document.getElementById("join-email")?.focus(); }} onContinue={continueGoogle} />}

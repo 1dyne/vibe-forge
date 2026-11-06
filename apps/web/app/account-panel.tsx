@@ -16,8 +16,8 @@ function Copy({ value }: { value: string }) {
 }
 
 const LOCK_TEXT: Record<Me["lock"], string> = {
-  password: "내 기록은 내 비밀번호로 잠겨 있어요. 운영자를 포함해 누구도 열어볼 수 없어요.",
-  server: "구글로 가입해서 기록을 여는 열쇠를 서버가 보관하고 있어요. 운영자는 정책에 따라 열람하지 않지만, 기술적으로 열 수 없는 구조는 아니에요. 아래에서 비밀번호를 설정하면 이메일 가입과 같은 잠금으로 바꿀 수 있어요.",
+  password: "잠금 보관: 열쇠는 내 계정에만 있어요. 저장된 기록은 운영자도 열 수 없어요. 비밀번호를 잊으면 복구 코드가 있어야 기록을 되살릴 수 있어요.",
+  server: "서버 보관: 기록을 여는 열쇠를 서버도 보관해요. 비밀번호를 잊어도 기록이 남고, 운영자가 문제를 함께 봐줄 수 있어요. 운영자는 정책에 따라 열람하지 않지만, 기술적으로 열 수 없는 구조는 아니에요.",
   link: "예전 방식(개인 링크) 계정이에요. 링크를 잃으면 기록을 되찾을 수 없으니, 아래에서 이메일·비밀번호로 바꾸는 걸 권해요."
 };
 
@@ -39,7 +39,7 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
   const [newName, setNewName] = useState("");
   const [connections, setConnections] = useState<Connection[]>([]);
   const [recovery, setRecovery] = useState("");
-  const [form, setForm] = useState({ email: "", password: "", confirm: "", current: "", next: "", recoveryPassword: "" });
+  const [form, setForm] = useState({ email: "", password: "", confirm: "", current: "", next: "", recoveryPassword: "", lockPassword: "" });
   const field = (key: keyof typeof form) => ({ value: form[key], onChange: (e: { target: { value: string } }) => setForm((f) => ({ ...f, [key]: e.target.value })) });
 
   const load = () => fetch("/api/me", { cache: "no-store" }).then((r) => r.json()).then((b) => b.kind === "user" ? setMe(b) : setError("운영자 계정에는 개인 설정이 없어요.")).catch(() => setError("계정 정보를 불러오지 못했어요."));
@@ -55,6 +55,12 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
     setRecovery(b.recoveryCode);
     setNotice(b.verificationSent ? `비밀번호를 설정했어요. ${form.email.trim()}로 인증 메일을 보냈어요. 다음 로그인부터는 이메일과 비밀번호로 들어와요.` : "비밀번호를 설정했어요. 이제 내 기록은 내 비밀번호로 잠겨요. 다음에 구글로 로그인하면 비밀번호를 한 번 더 물어봐요.");
     setForm((f) => ({ ...f, password: "", confirm: "" })); await load(); await loadConnections();
+  }); };
+  const switchLock = (event: FormEvent) => { event.preventDefault(); void run(async () => {
+    const to = me?.lock === "server" ? "sealed" : "server";
+    await post({ action: "switch_lock", to, password: form.lockPassword });
+    setNotice(to === "server" ? "서버 보관으로 바꿨어요. 이제 비밀번호를 잊어도 기록이 남아요." : "잠금 보관으로 바꿨어요. 이제 내 비밀번호와 복구 코드로만 기록이 열려요.");
+    setForm((f) => ({ ...f, lockPassword: "" })); await load();
   }); };
   const changePassword = (event: FormEvent) => { event.preventDefault(); if (form.next !== form.confirm) { setError("새 비밀번호 확인이 일치하지 않아요."); return; } void run(async () => {
     await post({ action: "change_password", current: form.current, next: form.next });
@@ -113,6 +119,12 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
             <label htmlFor="acc-current">지금 비밀번호</label><input id="acc-current" type="password" required autoComplete="current-password" {...field("current")} />
             <label htmlFor="acc-next">새 비밀번호 <small>(10자 이상)</small></label><input id="acc-next" type="password" minLength={10} required autoComplete="new-password" {...field("next")} />
             <label htmlFor="acc-next-confirm">새 비밀번호 확인</label><input id="acc-next-confirm" type="password" required autoComplete="new-password" {...field("confirm")} />
+            <button disabled={busy}>바꾸기</button>
+          </form>
+          <form className="account-form" onSubmit={switchLock}>
+            <h3>{me.lock === "server" ? "잠금 보관으로 바꾸기" : "서버 보관으로 바꾸기"}</h3>
+            <p className="muted"><small>{me.lock === "server" ? "서버가 보관하던 열쇠를 지워요. 그 뒤에는 운영자도 기록을 열 수 없고, 비밀번호를 잊으면 복구 코드가 필요해요." : "서버도 열쇠를 함께 보관해요. 비밀번호를 잊어도 기록이 남고, 운영자가 문제를 함께 볼 수 있어요."}</small></p>
+            <label htmlFor="acc-lock-password">비밀번호</label><input id="acc-lock-password" type="password" required autoComplete="current-password" {...field("lockPassword")} />
             <button disabled={busy}>바꾸기</button>
           </form>
           <form className="account-form" onSubmit={newRecovery}>

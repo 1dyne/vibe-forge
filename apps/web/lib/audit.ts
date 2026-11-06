@@ -9,7 +9,7 @@ export type AuditEvent =
   | "web_ai_changed" | "link_rotated" | "data_exported"
   | "invite_created" | "invite_disabled" | "project_deleted" | "app_connected" | "app_disconnected"
   | "email_verified" | "login" | "login_failed" | "password_reset_requested" | "password_reset" | "password_reset_records_erased"
-  | "password_changed" | "password_set" | "lock_upgraded" | "link_converted" | "recovery_code_replaced" | "records_reset";
+  | "password_changed" | "password_set" | "lock_upgraded" | "link_converted" | "recovery_code_replaced" | "records_reset" | "lock_server" | "lock_sealed";
 
 function auditFile() {
   if (process.env.FORGE_TEST_AUDIT_FILE && process.env.NODE_ENV === "test") return process.env.FORGE_TEST_AUDIT_FILE;

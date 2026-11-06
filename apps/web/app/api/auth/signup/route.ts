@@ -11,6 +11,7 @@ const Signup = z.object({
   email: z.string().trim().max(254),
   password: z.string().max(200),
   inviteCode: z.string().trim().max(40).optional(),
+  lock: z.enum(["sealed", "server"]),
   agreeTerms: z.literal(true), agreePrivacy: z.literal(true), age14: z.literal(true)
 }).strict();
 
@@ -21,11 +22,11 @@ export async function POST(request: NextRequest) {
   const limited = hit("signup", clientIp(request));
   if (!limited.ok) return tooMany(limited.retryAfterSec);
   const parsed = Signup.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "별명, 이메일, 비밀번호를 채우고 만 14세 이상 확인과 약관·개인정보 동의에 체크해주세요." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "별명, 이메일, 비밀번호를 채우고 기록 보관 방식을 고른 뒤, 만 14세 이상 확인과 약관·개인정보 동의에 체크해주세요." }, { status: 400 });
   if (mode === "invite" && !parsed.data.inviteCode) return NextResponse.json({ error: "초대 코드를 입력해주세요." }, { status: 400 });
   try {
-    const { name, email, password, inviteCode } = parsed.data;
-    const { user, recoveryCode } = await signUpWithEmail({ name: name!, email: email!, password: password!, inviteCode: mode === "invite" ? inviteCode : undefined, origin: origin(request) });
+    const { name, email, password, inviteCode, lock } = parsed.data;
+    const { user, recoveryCode } = await signUpWithEmail({ name: name!, email: email!, password: password!, inviteCode: mode === "invite" ? inviteCode : undefined, origin: origin(request), lock: lock as "sealed" | "server" });
     return NextResponse.json({ name: user.name, email: user.email, recoveryCode }, { status: 201, headers: { "cache-control": "no-store" } });
   } catch (error) {
     return failure(error, "가입하지 못했어요. 잠시 후 다시 시도해주세요.");

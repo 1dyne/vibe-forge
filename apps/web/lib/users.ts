@@ -83,7 +83,8 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
-export const lockOf = (user: Pick<ForgeUser, "keys" | "auth">): PublicUser["lock"] => user.keys?.password ? "password" : user.keys?.server ? "server" : "link";
+// A server envelope means the server can open the records, whatever else exists.
+export const lockOf = (user: Pick<ForgeUser, "keys" | "auth">): PublicUser["lock"] => user.keys?.server ? "server" : user.keys?.password ? "password" : "link";
 const toPublic = ({ tokenHash: _hash, tokenSealed: _sealed, passwordHash: _password, keys, googleSub: _sub, ...user }: ForgeUser): PublicUser => ({ ...user, auth: user.auth ?? "link", passwordSet: Boolean(keys?.password), lock: lockOf({ keys, auth: user.auth }) });
 const legacySealingKey = () => createHash("sha256").update(`dalgeurak-token:${process.env.SESSION_SECRET ?? ""}`).digest();
 
