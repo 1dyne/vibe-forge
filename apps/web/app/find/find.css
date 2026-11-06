@@ -132,6 +132,53 @@ body:has(.find){background:#fff}
 .find .fine{margin:-4px 0 0 26px;font-size:11.5px;line-height:1.55;color:#8C8F98}
 .find .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 
+/* 도깨비불 트레이딩 카드 */
+.find .fcard{perspective:1400px;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
+.find .fcard-inner{position:relative;display:grid;transition:transform .6s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.find .fcard.flipped .fcard-inner{transform:rotateY(180deg)}
+.find .fcard-face{grid-area:1/1;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:22px;background:#fff;padding:16px 16px 12px;position:relative;overflow:hidden;
+  border:3px solid transparent;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,color-mix(in srgb,var(--fire) 45%,#fff),var(--fire) 35%,#FFD6F2 52%,var(--fire) 70%,#7FE0D2) border-box;
+  box-shadow:0 14px 40px -16px color-mix(in srgb,var(--fire) 80%,transparent)}
+.find .fcard-face.back{transform:rotateY(180deg);display:flex;flex-direction:column}
+.find .fcard.grade-common .fcard-face{background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,var(--line),#cfcabd) border-box;box-shadow:0 10px 30px -18px rgba(0,0,0,.35)}
+.find .fcard .holo{position:absolute;inset:-40%;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.7) 48%,color-mix(in srgb,var(--fire) 25%,transparent) 52%,transparent 60%);mix-blend-mode:overlay;pointer-events:none;animation:fd-sheen 3.2s ease-in-out infinite}
+.find .fcard.grade-common .holo{display:none}
+@keyframes fd-sheen{0%{transform:translateX(-35%)}60%,100%{transform:translateX(35%)}}
+.find .fcard-top{display:flex;justify-content:space-between;align-items:center;position:relative}
+.find .attr{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px}
+.find .attr i{width:10px;height:10px;border-radius:50%;background:var(--fire);display:block}
+.find .attr-light{background:#EFE9FF;color:#5B3FD1}.find .attr-sound{background:#FFEBDD;color:#B5591A}.find .attr-move{background:#DDF3E5;color:#2E7D4F}.find .attr-none{background:#E1F2EF;color:#2C7A70}
+.find .grade{font-family:var(--font-display);font-size:15px;border-radius:8px;padding:4px 10px;letter-spacing:1px;color:#fff;background:var(--fire)}
+.find .grade-legend .grade{background:linear-gradient(135deg,#7A55FF,#C04BD8,#FF8F3F);box-shadow:0 0 0 2px #fff,0 0 14px color-mix(in srgb,var(--fire) 70%,transparent)}
+.find .grade-common .grade{background:var(--surface-2);color:var(--muted)}
+.find .fcard .art{height:200px;margin:6px 0 0;border-radius:14px;background:radial-gradient(circle at 50% 55%,color-mix(in srgb,var(--fire) 22%,#fff) 0%,color-mix(in srgb,var(--fire) 8%,#fff) 45%,#fff 72%);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.find .fcard .art .aura{display:none}
+.find .fname{font-family:var(--font-display);font-size:27px;text-align:center;line-height:1.2;margin-top:4px}
+.find .fsub{text-align:center;font-size:13px;color:var(--muted);margin-top:4px}.find .fsub b{font-family:var(--font-display);font-weight:400;font-size:20px;color:var(--ink)}
+.find .rare-line{margin:10px 0 2px;background:var(--ink);color:#fff;border-radius:12px;padding:9px 12px;font-size:13px;line-height:1.5;text-align:center}
+.find .rare-line b{color:color-mix(in srgb,var(--fire) 45%,#fff)}
+.find .stats{display:flex;flex-direction:column;gap:6px;margin-top:12px;font-size:13px}
+.find .stat{display:grid;grid-template-columns:34px 1fr 14px;gap:10px;align-items:center}
+.find .sbar{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}.find .sbar i{display:block;height:100%;border-radius:99px}
+.find .stat b{font-family:var(--font-display);font-weight:400;font-size:15px;text-align:right}
+.find .traits{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.find .trait{border:1px solid var(--line);border-radius:12px;padding:9px 10px;font-size:13px;line-height:1.45;word-break:keep-all}
+.find .trait small{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.find .flip-hint{text-align:center;font-size:12px;color:var(--muted);margin-top:10px}
+.find .back-title{font-family:var(--font-display);font-size:21px;margin:2px 0 8px}
+.find .brow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.find .brow.last{border:0;padding-bottom:0}
+.find .stars{color:var(--fire);letter-spacing:2px;filter:saturate(1.4)}
+.find .bparts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.find .bparts span{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff}
+.find .basis{display:flex;gap:10px;align-items:center;margin-top:12px;background:var(--surface);border-radius:12px;padding:8px;font-size:12.5px;line-height:1.45}
+.find .basis img,.find .basis-ph{width:64px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--surface-2)}
+.find .bnote{font-size:11.5px;color:#8C8F98;line-height:1.5;margin-top:10px}
+.find .fcard-face.back .flip-hint{margin-top:auto;padding-top:10px}
+.find .roast{display:flex;gap:8px;align-items:flex-start}
+.find .roast-dk{width:58px;flex-shrink:0}
+.find .roast-bubble{background:var(--surface);border:1px solid var(--line);border-radius:4px 18px 18px 18px;padding:12px 14px;font-size:15px;line-height:1.55}
+.find .roast-bubble b{font-family:var(--font-display);font-weight:400;font-size:17px}
+
 /* 공유 시트 */
 .find .overlay{position:fixed;inset:0;background:rgba(20,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fd-in .2s}
 .find .sheet{width:min(360px,100%);max-height:calc(100dvh - 40px);overflow:auto;background:#fff;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}

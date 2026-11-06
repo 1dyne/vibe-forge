@@ -1,10 +1,12 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATS, FIRE, REACT_FIRE, ROOT_VISIBLE, compose, fireGain, fireLabel, fireName, lookup, reactKind, type Chip, type ChipTree } from "../../lib/find/chips";
+import { CATS, FIRE, REACT_FIRE, ROOT_VISIBLE, compose, fireGain, fireLabel, fireName, lookup, reactKind, type Chip, type ChipTree, type ReactKind } from "../../lib/find/chips";
 import type { FindAnalysis } from "../../lib/find/classify";
 import type { Maturity } from "../../lib/find/maturity";
 import type { ProjectMatch } from "../../lib/find/projects";
 import Dokkaebi from "./dokkaebi";
+import FireCardView, { Roast } from "./fire-card";
+import type { FireCard } from "../../lib/find/card";
 import { track } from "./track";
 
 const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
@@ -14,7 +16,7 @@ const STEP: Record<Screen, string> = { intro: "1 / 4", thinking: "1 / 4", softwa
 const VIBE_PROMPT = (idea: string) => `나는 개발자가 아니야. "${idea.trim().slice(0, 200)}" 이걸 해결하는 걸 만들고 싶어.\n1) 하루 만에 써볼 수 있는 가장 작은 버전을 기능 3개 이내로 제안해줘.\n2) 모르는 용어는 풀어서 설명하고, 정할 건 선택지로 물어봐줘.\n3) 동작하는 첫 화면부터 만들고 하나씩 붙여가자.`;
 
 type Screen = "intro" | "thinking" | "software" | "unsafe" | "stoke" | "reveal" | "forge";
-type Fire = { id: string; name: string; sentence: string; color: string; reactKind: string; peak: number; labels: string[] };
+type Fire = { id: string; name: string; sentence: string; color: string; reactKind: string; peak: number; labels: string[]; card: FireCard | null };
 type Result = { fire: Fire; matches: ProjectMatch[]; unique: string[]; maturity: Maturity };
 type Standing = { code: string; position: number; total: number; referrals: number; alreadyJoined: boolean; fireName: string | null };
 
@@ -292,20 +294,21 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
   result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
 }) {
   const { fire, matches, unique, maturity } = result;
-  const byCat = (cat: string) => picked.map(find).filter((c): c is Chip => Boolean(c) && c!.cat === cat).map((c) => c.label).join(" · ") || "아직 몰라";
   return (
     <section className="screen">
-      <div className="muted small" style={{ textAlign: "center" }}>네 도깨비불이야</div>
-      <div className="card">
-        <Dokkaebi motion="blaze" fire={fire.peak} width={160} kind={fire.reactKind as never} />
-        <div className="display" style={{ fontSize: 26, textAlign: "center" }}>{fire.name}</div>
-        <div className="muted small">최고 화력 <span className="display ink" style={{ fontSize: 20 }}>{fire.peak}</span> · {fireLabel(fire.peak)}</div>
-        <div className="trio">
-          <div><small>형태</small><b>{byCat("형태")}</b></div>
-          <div><small>반응</small><b>{byCat("반응")}</b></div>
-          <div><small>감지</small><b>{byCat("감지")}</b></div>
+      <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 도깨비불이 태어났어</div>
+      {fire.card ? (
+        <>
+          <FireCardView name={fire.name} peak={fire.peak} kind={fire.reactKind as ReactKind} card={fire.card} />
+          <Roast head={fire.card.roast.head} body={fire.card.roast.body} kind={fire.reactKind as ReactKind} />
+        </>
+      ) : (
+        <div className="card">
+          <Dokkaebi motion="blaze" fire={fire.peak} width={160} kind={fire.reactKind as never} />
+          <div className="display" style={{ fontSize: 26, textAlign: "center" }}>{fire.name}</div>
+          <div className="muted small">최고 화력 <span className="display ink" style={{ fontSize: 20 }}>{fire.peak}</span> · {fireLabel(fire.peak)}</div>
         </div>
-      </div>
+      )}
       <div className="note">
         <div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div>
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>

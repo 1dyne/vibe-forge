@@ -3,8 +3,9 @@ import { z } from "zod";
 import { ChipSchema, IdeaSchema } from "../../../../lib/find/api-schema";
 import { FIRE, REACT_FIRE, ROOTS, compose, fireName, reactKind, type Chip } from "../../../../lib/find/chips";
 import { assessMaturity } from "../../../../lib/find/maturity";
+import { buildCard, comboKey } from "../../../../lib/find/card";
 import { matchProjects, uniqueToIdea } from "../../../../lib/find/projects";
-import { newId, saveFire } from "../../../../lib/find/store";
+import { fireRarity, newId, saveFire } from "../../../../lib/find/store";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
 import { hasValidOrigin } from "../../../../lib/request-security";
 
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
   const find = (id: string) => chips.get(id);
   const kind = reactKind(ids, find);
   const matches = matchProjects(ids, find);
+  const key = comboKey(ids);
+  let rarity = { total: 0, sameCombo: 0, higherPeak: 0 };
+  try {
+    rarity = await fireRarity(key, Math.round(peak));
+  } catch (error) {
+    console.error("find rarity failed", error instanceof Error ? error.message : "unknown");
+  }
+  const card = buildCard([...chips.values()], Math.round(peak), rarity, matches);
   const fire = {
     id: newId(),
     idea,
@@ -38,6 +47,8 @@ export async function POST(request: NextRequest) {
     reactKind: kind,
     name: fireName(ids, find),
     matches: matches.map((m) => ({ id: m.id, match: m.match })),
+    comboKey: key,
+    card,
     createdAt: new Date().toISOString()
   };
   try {
