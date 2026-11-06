@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "./lib/session";
 
-const publicPaths = new Set(["/login", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
+const publicPaths = new Set(["/login", "/start", "/api/session", "/api/health", "/characters/idle.png", "/characters/thinking_1.png", "/characters/thinking_2.png", "/manifest.webmanifest", "/icon.png"]);
 // The install prompt fetches the manifest and icons before anyone logs in.
-const publicPrefixes = ["/icons/", "/demo/"];
+const publicPrefixes = ["/icons/", "/demo/", "/api/start/"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
