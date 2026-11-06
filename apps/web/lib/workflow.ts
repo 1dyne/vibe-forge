@@ -38,9 +38,10 @@ export function transition(workflow: Workflow, action: "plan" | "approve_circuit
     next.mockupApprovedAt = new Date().toISOString();
     next.phase = "handoff";
   } else {
-    if (next.phase !== "handoff" || !next.mockupApprovedAt) throw new Error("회로와 3D를 승인한 후 대장간에 입장할 수 있습니다.");
+    if (next.phase !== "handoff" || !next.mockupApprovedAt) throw new Error("회로와 3D를 승인한 후 설계를 확정할 수 있습니다.");
     if (!next.activeAgents.length) throw new Error("함께 작업할 에이전트를 하나 이상 선택해주세요.");
     next.phase = "workshop";
+    next.finalizedAt = new Date().toISOString();
   }
   return next;
 }

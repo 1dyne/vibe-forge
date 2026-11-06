@@ -9,11 +9,26 @@ import AccountPanel from "./account-panel";
 import DeleteProjectDialog from "./delete-project-dialog";
 import ProgressPanel from "./progress-panel";
 import { CHECKLIST } from "../lib/checklist";
+import { finalizeBlockers, openConflicts } from "../lib/coordination";
 import { ResizeHandle, useWorkspaceLayout, layoutLimits } from "./workspace-layout";
 import { useWorkspacePreferences } from "./workspace-preferences";
 
 type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean; projectLimit?: number };
-const phaseNames = {brainstorm:"아이디어",circuit:"계획 · 회로",mockup:"계획 · 3D",handoff:"계획 · 작업 준비",workshop:"대장간"};
+const phaseNames = {brainstorm:"아이디어",circuit:"계획 · 회로",mockup:"계획 · 3D",handoff:"조율 · 재고 확인",workshop:"제작 · 작업대"};
+// The 조율 step's gate: what still has to happen before the person can
+// finalise the design. The server applies the same check.
+function FinalizeChecklist({ project, busy, onOpenBoard, onOpenBom, onFinalize }: { project: LocalProject; busy: boolean; onOpenBoard: () => void; onOpenBom: () => void; onFinalize: () => void }) {
+  const blockers = finalizeBlockers(project);
+  const conflicts = openConflicts(project).length;
+  return <div className="finalize-check">
+    <strong>최종 설계 확정 전에</strong>
+    {blockers.length ? <ul>{blockers.map(b => <li key={b}>○ {b}</li>)}</ul> : <p>✓ 모든 부품을 주문할 수 있고, 정리하지 않은 결정이 없어요.</p>}
+    <div className="task-actions"><button disabled={busy} onClick={onOpenBom}>부품목록에서 재고 확인</button>{conflicts > 0 && <button disabled={busy} onClick={onOpenBoard}>결정할 것 {conflicts}건 보기</button>}</div>
+    <p className="muted">확정하면 작업대에서 내가 할 일과 순서가 정리돼요. 확정 뒤에 재고가 바뀌면 변경 제안 카드로 다시 골라요.</p>
+    <button className="primary" disabled={busy || blockers.length > 0} onClick={onFinalize}>최종 설계 확정 · 작업대로 →</button>
+  </div>;
+}
+
 function Avatar({ agent="chief", busy=false, large=false }: {agent?:AgentId;busy?:boolean;large?:boolean}) {
   return <span className={["avatar",large?"large":"","avatar-"+agent].join(" ")}><img src="/characters/idle.png" alt={AGENTS[agent].name+" 캐릭터"} className={busy?"hidden":""}/>{busy&&<><img className="thinking first" src="/characters/thinking_1.png" alt="생각하는 달그락"/><img className="thinking second" src="/characters/thinking_2.png" alt=""/></>}<b>{agent==="chief"?"대장":agent.toUpperCase()}</b></span>;
 }
@@ -35,6 +50,7 @@ export default function ProjectWorkspace() {
   const [makerHelp,setMakerHelp]=useState(false);
   const [showAccount,setShowAccount]=useState(false);
   const [deleting,setDeleting]=useState<LocalProject|null>(null);
+  const [focusItem,setFocusItem]=useState<string|null>(null);
   const {preferences,setWorkbench,expand,toggleProjects,toggleFolder}=useWorkspacePreferences();
   const end=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
@@ -50,10 +66,10 @@ export default function ProjectWorkspace() {
   // Connector accounts talk to their own Claude; this page shows and approves.
   const connectorOnly=viewer.kind==="user"&&!viewer.webAi;
   const busyRef=useRef("");busyRef.current=busy;
-  useEffect(()=>{fetch("/api/projects",{cache:"no-store"}).then(async r=>{if(r.status===401){window.location.assign("/login");return;}if(!r.ok)throw new Error("프로젝트를 불러오지 못했습니다. 로그인 상태를 확인해주세요.");const b=await r.json();setProjects(b.projects);if(b.viewer)setViewer(b.viewer);
+  useEffect(()=>{fetch("/api/projects",{cache:"no-store"}).then(async r=>{if(r.status===401){window.location.assign("/login?next="+encodeURIComponent(window.location.pathname+window.location.search));return;}if(!r.ok)throw new Error("프로젝트를 불러오지 못했습니다. 로그인 상태를 확인해주세요.");const b=await r.json();setProjects(b.projects);if(b.viewer)setViewer(b.viewer);
     // Links from Claude can name a project and a panel (?p=<id>&open=profile|claude|dev).
     const query=new URLSearchParams(window.location.search);if(query.get("open")==="account"){setShowAccount(true);window.history.replaceState(null,"","/");}const target=(b.projects as LocalProject[]).find(x=>x.id===query.get("p"));
-    if(target){setSelectedId(target.id);expand(target.id);const open=query.get("open");if(open==="profile"){setProfile(workflowFor(target).profile);setShowProfile(true);}else if(open==="claude"||open==="dev")setConnectTab(open);window.history.replaceState(null,"","/");}
+    if(target){setSelectedId(target.id);expand(target.id);const open=query.get("open");if(open==="profile"){setProfile(workflowFor(target).profile);setShowProfile(true);}else if(open==="claude"||open==="dev")setConnectTab(open);else if(open&&/^(task|conflict):[0-9a-f-]{36}$/.test(open)){setWorkbench(target.id,true,"document:tasks");setFocusItem(open);}window.history.replaceState(null,"","/");}
   }).catch(e=>setError(e.message)).finally(()=>setLoading(false));},[]);
   // Claude writes to projects from outside this page, so pick up changes while idle.
   // Poll every 3s while Claude reports live progress on the open project, else every 8s.
@@ -73,7 +89,7 @@ export default function ProjectWorkspace() {
     finally{setBusy("");}
   }
   async function submit(e:FormEvent) {e.preventDefault();if(!text.trim()&&!attachments.length)return;const p=await request(project?"/api/projects/"+project.id+"/messages":"/api/projects",project?{text:text.trim()||"첨부 이미지로 아이디어를 함께 논의해주세요.",attachments,channel,mode}:{idea:text.trim()||"첨부 이미지로 제작 아이디어를 구체화해주세요.",attachments},(workshop&&channel!=="main"?AGENTS[channel].name:"대장 달그락")+"이 생각하고 있어요");if(p){setText("");setAttachments([]);}}
-  async function action(input:Record<string,unknown>) {if(!project)return;const labels:Record<string,string>={plan:"회로 초안을 설계하고 검토하고 있어요",approve_circuit:"승인된 회로로 3D 목업을 만들고 있어요",approve_mockup:"다음 작업을 정리하고 있어요",enter_workshop:"대장간을 준비하고 있어요"};const p=await request("/api/projects/"+project.id+"/workflow",input,labels[String(input.action)]??"프로젝트에 반영하고 있어요");if(p){const kind=input.action==="plan"?"circuit":input.action==="approve_circuit"?"cad":input.action==="approve_mockup"?"tasks":null;const item=workbenchItems(p).find(i=>i.kind===kind);if(item)setWorkbench(p.id,true,item.id);if(input.action==="enter_workshop")setChannel("main");if(input.action==="profile"){setShowProfile(false);const access=(input.profile as MakerProfile|undefined)?.printerAccess;if(access==="makerspace"||access==="none")setMakerHelp(true);}}}
+  async function action(input:Record<string,unknown>) {if(!project)return;const labels:Record<string,string>={plan:"회로 초안을 설계하고 검토하고 있어요",approve_circuit:"승인된 회로로 3D 목업을 만들고 있어요",approve_mockup:"다음 작업을 정리하고 있어요",enter_workshop:"대장간을 준비하고 있어요",finalize:"설계를 확정하고 작업대를 준비하고 있어요"};const p=await request("/api/projects/"+project.id+"/workflow",input,labels[String(input.action)]??"프로젝트에 반영하고 있어요");if(p){const kind=input.action==="plan"?"circuit":input.action==="approve_circuit"?"cad":input.action==="approve_mockup"?"tasks":null;const item=workbenchItems(p).find(i=>i.kind===kind);if(item)setWorkbench(p.id,true,item.id);if(input.action==="enter_workshop"||input.action==="finalize")setChannel("main");if(input.action==="profile"){setShowProfile(false);const access=(input.profile as MakerProfile|undefined)?.printerAccess;if(access==="makerspace"||access==="none")setMakerHelp(true);}}}
   async function attach(files:FileList|null) {if(!files)return;setError("");try {const added:ImageAttachment[]=[];for(const f of Array.from(files)){if(!["image/png","image/jpeg","image/webp"].includes(f.type))throw new Error("PNG, JPG, WebP 이미지를 선택해주세요.");if(f.size>5*1024*1024)throw new Error("이미지 한 장은 5MB 이하로 첨부해주세요.");const bitmap=await createImageBitmap(f);const canvas=document.createElement("canvas");const scale=Math.min(1,1200/Math.max(bitmap.width,bitmap.height));canvas.width=bitmap.width*scale;canvas.height=bitmap.height*scale;canvas.getContext("2d")!.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();added.push({name:f.name,dataUrl:canvas.toDataURL("image/jpeg",.82)});}if(attachments.length+added.length>3)throw new Error("한 번에 이미지는 3장까지 첨부할 수 있어요.");setAttachments([...attachments,...added]);}catch(e){setError(e instanceof Error?e.message:"이미지 처리에 실패했습니다.");}if(fileInput.current)fileInput.current.value="";}
   function switchProject(id:string|null,room:ChatChannel="main"){if(busy)return;setConnectTab(null);setSelectedId(id);setChannel(room);setText("");setAttachments([]);setError("");setMode("work");setShowProfile(false);if(id)expand(id);}
   function toggleAgent(agent:AgentId) {if(!workflow)return;const next=workflow.activeAgents.includes(agent)?workflow.activeAgents.filter(a=>a!==agent):[...workflow.activeAgents,agent];if(!next.length){setError("함께 작업할 에이전트를 하나 이상 선택해주세요.");return;}if(channel===agent)setChannel("main");void action({action:"agents",agents:next});}
@@ -99,7 +115,7 @@ export default function ProjectWorkspace() {
     <section className="chat-panel" id="chat-panel" aria-label="대화">
       <header className="chat-header"><div><span className="breadcrumb">내 대장간 / {project?.name??"새로운 아이디어"}</span><h1>{workshop?(channel==="main"?"메인 대장간":AGENTS[channel].name+" 작업실"):phaseNames[phase]}</h1></div>{items.length>0&&<button className="workbench-toggle" aria-expanded={showArtifacts} aria-controls="workbench-panel" onClick={()=>project&&setWorkbench(project.id,!showArtifacts,selectedItem.id)}>▥ 작업대 <span>{items.length}</span></button>}</header>
       {project&&<ProgressPanel project={project}/>}
-      <div className="phase-strip" hidden={!!project}><span className={phase==="brainstorm"?"current":"done"}>01 아이디어</span><i/><span className={phase!=="brainstorm"&&!workshop?"current":workshop?"done":""}>02 계획</span><i/><span className={workshop?"current":""}>03 대장간</span></div>
+      <div className="phase-strip" hidden={!!project}><span className={phase==="brainstorm"?"current":"done"}>01 아이디어</span><i/><span className={phase!=="brainstorm"&&!workshop?"current":workshop?"done":""}>02 계획 · 조율</span><i/><span className={workshop?"current":""}>03 작업대</span></div>
       {workshop&&<div className="team-strip"><span>함께 일할 팀</span>{(["hw","sw","me","id"] as AgentId[]).map(a=><label key={a} className={workflow!.activeAgents.includes(a)?"on":""}><input type="checkbox" checked={workflow!.activeAgents.includes(a)} disabled={!!busy} onChange={()=>toggleAgent(a)}/>{a.toUpperCase()}</label>)}<select aria-label="에이전트 모드" value={mode} onChange={e=>setMode(e.target.value as "work"|"evaluate")}><option value="work">작업 모드</option><option value="evaluate">Evaluator 모드</option></select></div>}
       <div className="chat-scroll" role="log" aria-label="프로젝트 대화" aria-live="polite">
         {!project&&<div className="welcome"><Avatar large/><p className="eyebrow">YOUR IDEA, OUR NEXT PROJECT</p><h2>무엇을 만들어볼까요?</h2>{connectorOnly?<p>대화는 내 Claude에서 이어가요.<br/>Claude에게 아이디어를 말하고 “달그락 대장간에 프로젝트로 만들어줘”라고 하면 여기에 폴더가 생겨요.</p>:<p>아직 다 정해지지 않아도 괜찮아요.<br/>대장 달그락과 이야기하며 첫 설계를 시작해보세요.</p>}{!connectorOnly&&<div className="idea-prompts">{["내 팔에 앉는 부엉이 반려 로봇","식물의 상태를 알려주는 화분","책상 위 작은 집중 타이머"].map(s=><button key={s} onClick={()=>setText(s)}>{s} ↗</button>)}</div>}</div>}
@@ -111,7 +127,7 @@ export default function ProjectWorkspace() {
         {project&&phase==="brainstorm"&&<div className="intake-card"><strong>설계 전, 함께 확인할 것</strong><p>핵심 동작과 보유 도구, 펌웨어 경험을 알려주세요. 경험은 설명을 맞추는 데만 사용합니다.</p><div className="intake-status">{["핵심 동작","보유 도구","펌웨어 경험"].map(s=><span key={s} className={intakeMissing(workflow!.profile).includes(s)?"":"complete"}>{intakeMissing(workflow!.profile).includes(s)?"○":"✓"} {s}</span>)}</div><button onClick={openProfile} disabled={!!busy}>체크리스트 작성하기</button>{connectorOnly?<p className="connector-hint">준비가 되면 내 Claude에게 “회로 계획 시작해줘”라고 말해주세요.</p>:<button className="primary" disabled={!!busy||intakeMissing(workflow!.profile).length>0} onClick={()=>action({action:"plan"})}>브레인스토밍 마치고 계획 시작 →</button>}</div>}
         {project&&phase==="circuit"&&<div className="stage-card"><span className="pill">먼저, 회로</span><strong>회로 방향을 확인해주세요.</strong><p>오른쪽 회로도에서 연결과 미확정 항목을 검토하고 변경할 부분은 채팅으로 논의해요.</p><button className="primary" disabled={!!busy||!project.build} onClick={()=>action({action:"approve_circuit"})}>회로 방향 승인 · 3D 목업 만들기 →</button><button disabled={!!busy} onClick={()=>action({action:"reopen"})}>아이디어·회로 다시 논의</button></div>}
         {project&&phase==="mockup"&&<div className="stage-card"><strong>돌려보고, 형태를 확인해주세요.</strong><p>회로에 맞춘 치수 목업입니다. 실제 부품 크기와 착용감은 제작 단계에서 확인해요.</p><button className="primary" disabled={!!busy} onClick={()=>action({action:"approve_mockup"})}>3D 방향 승인 · 작업 나누기 →</button><button disabled={!!busy} onClick={()=>action({action:"reopen"})}>설계 변경 논의</button></div>}
-        {project&&phase==="handoff"&&<div className="handoff-card"><h3>함께 만들 달그락 팀이에요.</h3><p>아이디어 범위에 맞춰 제안했어요. 사용할 에이전트를 직접 고를 수 있습니다.</p><div className="agent-cards">{(["hw","sw","me","id"] as AgentId[]).map(a=><label key={a}><Avatar agent={a}/><strong>{AGENTS[a].name}</strong><small>{AGENTS[a].title}</small><input type="checkbox" aria-label={AGENTS[a].name+" 선택"} checked={workflow!.activeAgents.includes(a)} disabled={!!busy} onChange={()=>toggleAgent(a)}/></label>)}</div><p>다음 할 일과 BOM을 확인했으면 준비된 작업부터 시작해요. 부품이 없어도 코드·설계 논의를 진행할 수 있어요.</p><button className="primary" disabled={!!busy} onClick={()=>action({action:"enter_workshop"})}>대장간 입장 →</button></div>}
+        {project&&phase==="handoff"&&<div className="handoff-card"><span className="pill">조율 단계</span><h3>실제 재고에 맞춰 설계를 확정해요.</h3><p>부품마다 주문할 수 있는지 확인하고, 재고 때문에 바뀌는 부분이나 부딪치는 결정은 아래 카드에서 골라주세요. 함께 만들 달그락 팀도 여기서 정해요.</p><div className="agent-cards">{(["hw","sw","me","id"] as AgentId[]).map(a=><label key={a}><Avatar agent={a}/><strong>{AGENTS[a].name}</strong><small>{AGENTS[a].title}</small><input type="checkbox" aria-label={AGENTS[a].name+" 선택"} checked={workflow!.activeAgents.includes(a)} disabled={!!busy} onChange={()=>toggleAgent(a)}/></label>)}</div><FinalizeChecklist project={project} busy={!!busy} onOpenBoard={()=>setWorkbench(project.id,true,"document:tasks")} onOpenBom={()=>setWorkbench(project.id,true,"document:bom")} onFinalize={()=>action({action:"finalize"})}/></div>}
         {busy&&<div className="thinking-message" role="status"><Avatar agent={activeSpeaker} busy/><div><strong>{busy}</strong><p>필요한 정보를 살펴보고 있어요<span className="loading-dots">…</span></p></div></div>}
         {loading&&<p className="loading-text">저장한 프로젝트를 불러오고 있어요…</p>}<div ref={end}/>
       </div>
@@ -122,7 +138,7 @@ export default function ProjectWorkspace() {
     </section>
     {showArtifacts&&project&&<>
       <ResizeHandle className="workbench-resizer" controls="workbench-panel" label="작업대 크기 조절" axis={layout.stacked?"y":"x"} reverse value={layout.stacked?layout.sizes.workbenchHeight:layout.sizes.workbench} min={layout.stacked?180:280} max={layout.stacked?800:1000} onResize={v=>resize(layout.stacked?"workbenchHeight":"workbench",v)} onReset={()=>resize(layout.stacked?"workbenchHeight":"workbench",layout.stacked?360:460)}/>
-      <WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action}/>
+      <WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} focus={focusItem} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action}/>
     </>}
     {makerHelp&&<div className="modal-backdrop" onClick={()=>setMakerHelp(false)}><section className="profile-modal maker-help" role="dialog" aria-modal="true" aria-label="메이커스페이스 안내" onClick={e=>e.stopPropagation()}><header><h2>3D 프린터가 없어도 괜찮아요</h2><button aria-label="닫기" onClick={()=>setMakerHelp(false)}>×</button></header>
       {connectorOnly?<p>내 Claude에게 <b>“내 근처 메이커스페이스 찾아줘”</b>라고 말하면, 사는 곳과 이동할 수 있는 범위를 먼저 묻고 근처에서 쓸 수 있는 공간을 찾아 정리해줘요.</p>:<p className="notice">미안해요. 웹 대화에서 근처 메이커스페이스를 찾아주는 기능은 아직 설계 중이에요. 아래 방법으로 직접 찾아보실 수 있어요. Claude 커넥터로 쓰시면 Claude가 위치를 묻고 대신 찾아드려요.</p>}

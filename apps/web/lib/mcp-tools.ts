@@ -3,7 +3,8 @@ import { z } from "zod";
 import { buildFromSubmission } from "./build-pipeline";
 import { PlanSchema } from "./design-agent";
 import { applyAgentPlan, createProject, getProject, listProjects, mutateProject, saveMakerProfile } from "./local-project-store";
-import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile } from "./project-types";
+import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile, ProjectTask } from "./project-types";
+type ProjectTaskKind = ProjectTask["kind"];
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
 import { approvedCad, blockingChecks } from "./build-pipeline";
@@ -18,6 +19,7 @@ import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDev
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
+import { CoordinationError, PURCHASE_LABEL, boardSummary, closeConflict, raiseConflict, recordPurchase, setTaskStatus, upsertTask } from "./coordination";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
 // the thinking on the person's subscription; the server stores the result and
@@ -36,7 +38,8 @@ export const SERVER_INSTRUCTIONS = [
   "작업 중인 프로젝트를 고정한다: Claude 프로젝트 지침이나 대화에 '달그락 프로젝트 ID'가 있으면 그 ID에만 기록한다. ID를 모르면 추측하지 말고 list_projects를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 새 프로젝트를 만들지 않는다.",
   "체크리스트는 get_checklist의 선택지 그대로 묻는다(가능하면 선택형 아티팩트). 회로 전에 형태 질문을 하고 완성품 미리보기(set_product_form)를 보여준 뒤, 대장이 전체 구조·연결 단계·먼저 익힐 연습을 set_build_plan으로 정의한다. 회로 뒤에는 실제 기판 배치와 문제 카드가 있는 조립 가이드(set_assembly_guide)를 만든다.",
   "비용은 항상 원 단위 숫자로 말하고 예산과 비교한다. 넘으면 예산 상향·단계 개발·대체 부품을 숫자로 제안한다. 부품은 보드에 연결할 수 있는 모듈로 제안하고 완제품 기기는 기본 제안으로 쓰지 않는다.",
-  "회로 승인, 3D 목업 승인, 대장간 입장은 사람만 대시보드에서 한다. 너는 승인했다고 말하거나 승인된 것처럼 진행하지 않는다.",
+  "회로 승인, 3D 목업 승인, 최종 설계 확정, 충돌 카드의 선택은 사람만 대시보드에서 한다. 너는 승인했다고 말하거나 승인된 것처럼 진행하지 않는다.",
+  "사람에게 할 일이나 충돌 카드를 만들면 답변 끝에 결과의 openUrl로 [달그락에서 열기](openUrl) 링크를 붙인다.",
   "확인·측정·실행하지 않은 것은 unknown으로 둔다. 웹 검색을 쓸 수 있으면 부품·데이터시트·가격·메이커스페이스를 찾아도 되지만, 출처 링크와 확인 날짜를 record_part_source로 남기고 가격·재고는 '검색 시점 기준, 구매 전 확인'으로 안내한다. 찾지 못한 값은 꾸며내지 않는다."
 ].join("\n");
 
@@ -171,8 +174,20 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 1. brainstorm: 체크리스트 → 아이디어 구체화(질문 2개 이하씩, 정해진 설계 사실을 record_brainstorm으로 기록) → 형태 질문과 완성품 미리보기(set_product_form) → 대장의 설계도(set_build_plan). 슬롯(power, wireless, sensing, actuation, data_sink, form, runtime, fab)은 사용자가 말한 사실만 filled, 합리적 임시값은 assumed. 핵심 동작·보유 도구·펌웨어 경험이 있어야 회로로 넘어간다.
 2. circuit: 설계도의 1단계에 해당하는 첫 목업 회로를 submit_circuit으로 제출한다. 실제 부품 목록과 배선을 components/nets에 직접 쓴다(쓰지 않으면 기본 템플릿이 쓰이고 불필요한 LED·전원 부품이 붙을 수 있다). 보드 내장 기능은 connection=builtin, 끼우는 보드는 socket. Evaluator 관점의 검토(review)를 함께 낸다. 그 다음 사람이 대시보드에서 승인한다.
 3. mockup: 사람이 회로를 승인하면 완성품 형태를 따른 3D 외형(OpenSCAD)이 만들어진다. 사용자가 확인하고 승인한다.
-4. handoff: 설계도 1단계의 조립 가이드(set_assembly_guide)를 만들고, set_team으로 팀을 정한 뒤 사람이 대시보드에서 대장간에 입장한다.
-5. workshop: 사용자는 조립 가이드를 따라 만들고 문제 카드 결과를 보낸다. 분야별 달그락 팀으로 답하고 설계 변경과 미검증 사항만 log_team_turn으로 남긴다. 다음 단계 가이드도 이어서 만든다.
+4. handoff (조율): 실제 재고를 확인하며 설계를 맞춘다. 사람이 부품마다 주문 가능 여부를 확인하고(set_purchase_status available), 재고 변동·결정 충돌은 충돌 카드(raise_conflict)로 사람에게 고르게 한다. 설계도 1단계의 조립 가이드(set_assembly_guide)를 만들고 set_team으로 팀을 정한다. 모든 부품이 주문 가능하고 충돌이 없으면 사람이 대시보드에서 '최종 설계 확정'을 누른다. 남은 조건은 get_project의 board.finalizeBlockers에 있다.
+5. workshop (작업대): 확정된 설계로 사람이 만들고 문제 카드 결과를 보낸다. 분야별 달그락 팀으로 답하고 설계 변경과 미검증 사항만 log_team_turn으로 남긴다. 다음 단계 가이드도 이어서 만든다. 확정 뒤 설계를 바꿔야 하면 바로 고치지 말고 raise_conflict(source=change)로 변경 제안을 올려 사람의 선택을 받는다.
+
+## 할 일 보드 (upsert_task · update_task)
+- 사람의 할 일과 각 에이전트(chief·hw·sw·me·id)의 할 일이 한 보드에 있다. get_project의 board.humanTasks·agentTasks를 읽고 시작한다.
+- 사람에게 부탁할 일은 assignee=human으로, 에이전트 자신이 할 일은 자기 역할로 만든다. 같은 내용을 다시 만들면 서버가 기존 할 일을 고친다.
+- 에이전트 할 일을 시작하면 update_task로 in_progress와 session(세션 이름이나 주소)을 남긴다. 다른 세션이 2시간 안에 진행 중이면 맡지 않는다. 끝나면 completed, 막히면 blocked와 이유를 남긴다.
+- 사람의 할 일 상태는 사람이 대시보드에서 바꾼다(하는 중·완료·막힘·못 함). 사람이 채팅으로 결과를 말하면 record_task_result로 기록한다. 사람이 '막힘'이나 '못 함'을 고르면 note의 이유를 읽고 측정 방법을 풀어 설명하거나 다른 방법을 다시 제안한다.
+- 사람에게 할 일·충돌 카드를 만들었으면 답변 끝에 결과의 openUrl로 [달그락에서 열기](openUrl) 링크를 붙인다.
+
+## 충돌 카드 (raise_conflict · close_conflict)
+- 재고가 없어 부품을 바꿔야 할 때, 두 결정이 부딪칠 때(예: 무선 방식과 앱 구조), 확정 뒤 설계를 바꿔야 할 때 올린다.
+- 선택지는 2~3개, 각각 비용 차이(원, 모르면 null), 바뀌는 것(changes), 영향받는 작업·파일(affects)을 쓴다. 사람은 하나를 고르거나 제3안을 쓴다.
+- 사람이 고르면 그 선택대로 설계도·회로·할 일을 고친다. 제3안(status=reviewing)이면 규칙과 비용을 검토해 같은 conflictId로 선택지를 다시 올리거나, 그대로 반영할 수 있으면 close_conflict(resolved)로 닫고 무엇을 바꿨는지 note에 쓴다.
 
 ## 회로 제약 (submit_circuit)
 - 3.3~12V 저전압만. AC 전원, 리튬 셀 직접 충전, 고전압·고전류 금지. 배터리는 보호회로가 있는 충전 모듈이나 USB 보조배터리를 쓴다.
@@ -282,8 +297,8 @@ const PHASE_NEXT: Record<string, string> = {
   brainstorm: "① get_checklist의 선택지로 체크리스트 → ② 형태 질문 후 완성품 미리보기(set_product_form) → ③ 대장의 전체 설계도(set_build_plan) → ④ 1단계 회로(submit_circuit) 순서예요. 빠진 것부터 하세요.",
   circuit: "사용자에게 대시보드에서 회로를 확인하고 '회로 승인'을 눌러 달라고 안내하세요. 수정이 필요하면 submit_circuit으로 다시 제출할 수 있어요.",
   mockup: "사용자에게 대시보드에서 3D 목업을 돌려보고 '3D 승인'을 눌러 달라고 안내하세요.",
-  handoff: "설계도 1단계의 조립 가이드(set_assembly_guide: 실제 기판 치수 위 부품 배치·배선 단계·문제 카드)를 만들고, set_team으로 팀을 정한 뒤 대시보드에서 '대장간 입장'을 눌러 달라고 안내하세요.",
-  workshop: "사용자는 대시보드의 조립 가이드를 단계별로 따라 해요. assemblyReports(문제 카드 확인 결과)를 읽고 원인을 좁혀 답하고, 다음 단계 가이드가 필요하면 set_assembly_guide로 갱신하세요. 매 턴을 log_team_turn으로 기록하세요."
+  handoff: "조율 단계예요. 부품마다 주문 가능 여부를 사람에게 확인받고(대시보드 부품목록 또는 set_purchase_status available), 재고 문제·결정 충돌은 raise_conflict로 올리세요. 설계도 1단계의 조립 가이드(set_assembly_guide)를 만들고 set_team으로 팀을 정하세요. board.finalizeBlockers가 비면 사람에게 대시보드에서 '최종 설계 확정'을 눌러 달라고 안내하세요.",
+  workshop: "작업대 단계예요. board.humanTasks의 순서대로 사람이 만들고, assemblyReports(문제 카드 확인 결과)를 읽고 원인을 좁혀 답하세요. 다음 단계 가이드가 필요하면 set_assembly_guide로 갱신하고, 확정된 설계를 바꿔야 하면 raise_conflict(source=change)로 제안하세요. 매 턴을 log_team_turn으로 기록하세요."
 };
 
 function summarize(project: LocalProject, context: ToolContext) {
@@ -305,7 +320,8 @@ function summarize(project: LocalProject, context: ToolContext) {
     blockedChecks: blockingChecks(project.build).map((c) => c.message),
     team: workflow.activeAgents,
     slots: project.slots.map(({ key, label, status, valueText, assumption, acknowledged }) => ({ key, label, status, valueText, assumption, acknowledged })),
-    openTasks: project.tasks.filter((task) => task.status === "ready").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
+    openTasks: project.tasks.filter((task) => task.status === "ready" && (task.assignee ?? "human") === "human").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
+    board: boardSummary(project, (kind, itemId) => itemUrl(context, project.id, kind, itemId)),
     circuit: project.build ? {
       status: project.build.status, board: project.build.blueprint.board, supplyVoltage: project.build.blueprint.supplyVoltage,
       components: project.build.blueprint.components.map(({ ref, valueOrModel }) => ({ ref, valueOrModel, purchase: workflow.purchases[ref] ?? "needed" })),
@@ -325,6 +341,8 @@ function summarize(project: LocalProject, context: ToolContext) {
 }
 
 const checklistUrl = (project: LocalProject, context: ToolContext) => withLinkParams(context.dashboardUrl, { p: project.id, open: "profile" });
+// A link that opens one task or decision card on the dashboard.
+export const itemUrl = (context: ToolContext, projectId: string, kind: "task" | "conflict", itemId: string) => withLinkParams(context.dashboardUrl, { p: projectId, open: `${kind}:${itemId}` });
 
 const stored = (project: LocalProject, context: ToolContext, message: string): ToolResult => ({
   text: `${message}\n다음: ${PHASE_NEXT[workflowFor(project).phase]}\n대시보드: ${context.dashboardUrl}`,
@@ -658,22 +676,20 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "set_purchase_status", title: "부품 구매 상태 기록",
-    description: "회로 부품(ref, 예: U1, S1, A1)의 구매 상태를 기록한다. 사용자가 말해준 상태만 기록한다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "ref", "status"], properties: { projectId, ref: { type: "string" }, status: { type: "string", enum: ["needed", "ordered", "received", "problem"] }, note: { type: "string", description: "변경된 모델·수량·문제 메모 (1000자 이내)" } } },
+    description: "회로 부품(ref, 예: U1, S1, A1)의 구매 상태를 기록한다. 사용자가 말해준 상태만 기록한다. available=판매처에서 필요한 수량을 주문할 수 있다고 사람이 확인함. problem(재고 없음·다른 부품 도착)이면 서버가 충돌 카드를 열고, 대장은 raise_conflict로 대체 선택지를 채운다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "ref", "status"], properties: { projectId, ref: { type: "string" }, status: { type: "string", enum: ["needed", "available", "ordered", "received", "problem"] }, note: { type: "string", description: "변경된 모델·수량·문제 메모 (1000자 이내)" } } },
     run: async (input, context) => {
-      const { projectId: id, ref, status, note } = z.object({ projectId: z.string().uuid(), ref: z.string().max(80), status: z.enum(["needed", "ordered", "received", "problem"]), note: z.string().max(1000).default("") }).strict().parse(input);
+      const { projectId: id, ref, status, note } = z.object({ projectId: z.string().uuid(), ref: z.string().max(80), status: z.enum(["needed", "available", "ordered", "received", "problem"]), note: z.string().max(1000).default("") }).strict().parse(input);
       await ownedProject(id, context);
       const updated = await mutateProject(id, (p) => {
-        if (!p.build?.blueprint.components.some((c) => c.ref === ref)) throw new ToolError("부품을 찾을 수 없습니다. get_project의 circuit.components에서 ref를 확인하세요.");
+        const text = recordPurchase(p, ref, status, note);
         const w = workflowFor(p);
         const now = new Date().toISOString();
-        w.purchases[ref] = status;
-        const text = `${ref} 구매 상태: ${{ needed: "구매 예정", ordered: "주문 완료", received: "수령 완료", problem: "문제 발생" }[status]}${note ? ` · ${note}` : ""}`;
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text, shared: true, createdAt: now });
         w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text, createdAt: now });
         p.workflow = w;
       });
-      return stored(updated, context, "구매 상태를 기록했어요.");
+      return stored(updated, context, status === "problem" ? `구매 상태를 기록하고 충돌 카드를 열었어요. raise_conflict로 대체 부품 선택지를 채워주세요.` : `구매 상태를 기록했어요 (${PURCHASE_LABEL[status]}).`);
     }
   }
 ];
@@ -977,10 +993,97 @@ TOOLS.push(
         const text = [`[개발 진행] ${parsed.summary}`, parsed.done.length && `한 일: ${parsed.done.join(" / ")}`, parsed.next.length && `다음: ${parsed.next.join(" / ")}`, parsed.blockers.length && `막힌 점: ${parsed.blockers.join(" / ")}`].filter(Boolean).join("\n");
         p.messages.push({ id: randomUUID(), role: "assistant", agent: "sw", channel: w.phase === "workshop" && w.activeAgents.includes("sw") ? "sw" : "main", text, createdAt: now, shared: true });
         w.sharedUpdates.push({ id: randomUUID(), agent: "sw", text, createdAt: now });
-        for (const plain of parsed.hardwareRequests) p.tasks.push({ id: randomUUID(), kind: "run_firmware", title: "개발 중 하드웨어 확인", plain, status: "ready" });
+        for (const plain of parsed.hardwareRequests) upsertTask(p, { assignee: "human", kind: "provide_info", title: "SW가 요청한 확인", plain }, "sw");
         p.workflow = w;
       });
       return stored(updated, context, `개발 진행을 기록했어요${parsed.hardwareRequests.length ? ` (사람 확인 ${parsed.hardwareRequests.length}건을 할 일에 추가)` : ""}.`);
+    }
+  }
+);
+
+const AgentRole = z.enum(["chief", "hw", "sw", "me", "id"]);
+const TaskKind = z.enum(["confirm_spec", "confirm_availability", "measure", "run_firmware", "provide_info", "purchase", "assemble", "code", "design", "review"]);
+const UpsertTaskInput = z.object({ projectId: z.string().uuid(), by: AgentRole, taskId: z.string().uuid().optional(), assignee: z.enum(["human", "chief", "hw", "sw", "me", "id"]), kind: TaskKind, title: z.string().trim().min(1).max(80), plain: z.string().trim().min(1).max(600), doneWhen: z.string().trim().max(300).optional(), dependsOn: z.array(z.string().uuid()).max(8).optional() }).strict();
+const UpdateTaskInput = z.object({ projectId: z.string().uuid(), by: AgentRole, taskId: z.string().uuid(), status: z.enum(["ready", "in_progress", "blocked", "completed", "cancelled"]), note: z.string().max(1000).optional(), session: z.string().trim().max(300).optional() }).strict();
+const ConflictInput = z.object({
+  projectId: z.string().uuid(), by: AgentRole, conflictId: z.string().uuid().optional(),
+  title: z.string().trim().min(1).max(100), detail: z.string().trim().min(1).max(1000),
+  source: z.enum(["rule", "stock", "interface", "agent", "change"]), refs: z.array(z.string().max(40)).max(12).default([]),
+  options: z.array(z.object({ label: z.string().trim().min(1).max(80), detail: z.string().trim().min(1).max(600), costDeltaKRW: z.number().int().min(-10_000_000).max(10_000_000).nullable(), changes: z.array(z.string().max(200)).max(8), affects: z.array(z.string().max(120)).max(8) }).strict()).min(2).max(4)
+}).strict();
+// Spelled out for the same reason as TeamTurn above.
+type Role = "chief" | "hw" | "sw" | "me" | "id";
+type UpsertTask = { projectId: string; by: Role; taskId?: string; assignee: "human" | Role; kind: ProjectTaskKind; title: string; plain: string; doneWhen?: string; dependsOn?: string[] };
+type UpdateTask = { projectId: string; by: Role; taskId: string; status: "ready" | "in_progress" | "blocked" | "completed" | "cancelled"; note?: string; session?: string };
+type ConflictIn = { projectId: string; by: Role; conflictId?: string; title: string; detail: string; source: "rule" | "stock" | "interface" | "agent" | "change"; refs: string[]; options: Array<{ label: string; detail: string; costDeltaKRW: number | null; changes: string[]; affects: string[] }> };
+type CloseConflict = { projectId: string; by: Role; conflictId: string; status: "resolved" | "dismissed"; note: string };
+const roleProp = { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "이 기록을 남기는 역할" };
+
+TOOLS.push(
+  {
+    name: "upsert_task", title: "할 일 만들기·고치기",
+    description: "할 일 보드에 사람(assignee=human) 또는 에이전트의 할 일을 만들거나 고친다. 같은 담당·내용의 열린 할 일이 있으면 새로 만들지 않고 고친다. 사람에게 부탁하는 일은 무엇을, 왜, 어떻게 하는지 초보자도 따라 할 수 있게 쓴다. 결과의 openUrl을 답변에 링크로 붙인다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "assignee", "kind", "title", "plain"], properties: { projectId, by: roleProp, taskId: { type: "string", description: "고칠 할 일 ID (새로 만들 때는 생략)" }, assignee: { type: "string", enum: ["human", "chief", "hw", "sw", "me", "id"] }, kind: { type: "string", enum: TaskKind.options }, title: { type: "string", description: "80자 이내" }, plain: { type: "string", description: "할 일 설명 (600자 이내)" }, doneWhen: { type: "string", description: "완료 기준" }, dependsOn: { type: "array", items: { type: "string" }, description: "먼저 끝나야 하는 할 일 ID" } } },
+    run: async (input, context) => {
+      const parsed = UpsertTaskInput.parse(input) as UpsertTask;
+      await ownedProject(parsed.projectId, context);
+      let result: { id: string; created: boolean } = { id: "", created: false };
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        const { task, created } = upsertTask(p, { assignee: parsed.assignee, kind: parsed.kind, title: parsed.title, plain: parsed.plain, doneWhen: parsed.doneWhen, dependsOn: parsed.dependsOn }, parsed.by, parsed.taskId);
+        result = { id: task.id, created };
+      });
+      const openUrl = itemUrl(context, parsed.projectId, "task", result.id);
+      return { text: `${result.created ? "할 일을 만들었어요" : "기존 할 일을 고쳤어요"}: ${parsed.title}
+taskId: ${result.id}
+openUrl: ${openUrl}`, data: { taskId: result.id, created: result.created, openUrl, board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
+    }
+  },
+  {
+    name: "update_task", title: "할 일 진행 상태 바꾸기",
+    description: "에이전트 할 일의 진행 상태를 바꾼다. 시작할 때 in_progress와 session(세션 이름이나 주소)을 남기고, 끝나면 completed, 막히면 blocked와 이유(note)를 남긴다. 사람의 할 일은 바꾸지 못한다(자기가 만든 사람의 할 일을 cancelled로 거두는 것만 가능).",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "taskId", "status"], properties: { projectId, by: roleProp, taskId: { type: "string" }, status: { type: "string", enum: ["ready", "in_progress", "blocked", "completed", "cancelled"] }, note: { type: "string", description: "진행 메모나 막힌 이유 (1000자 이내)" }, session: { type: "string", description: "이 일을 하는 세션 이름이나 주소 (in_progress일 때)" } } },
+    run: async (input, context) => {
+      const parsed = UpdateTaskInput.parse(input) as UpdateTask;
+      await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(parsed.projectId, (p) => { setTaskStatus(p, parsed.taskId, parsed.status, parsed.by, { note: parsed.note, session: parsed.session }); });
+      return { text: `할 일 상태를 ${parsed.status}로 바꿨어요.`, data: { board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
+    }
+  },
+  {
+    name: "raise_conflict", title: "충돌 카드 올리기·고치기",
+    description: "재고 변동, 결정 사이의 충돌, 확정 뒤 설계 변경처럼 사람이 골라야 하는 것을 충돌 카드로 올린다. 선택지 2~4개에 비용 차이·바뀌는 것·영향받는 작업을 쓴다. conflictId를 주면 그 카드의 선택지를 고친다(사람의 제3안을 검토한 뒤 등). 사람은 대시보드에서 하나를 고르거나 제3안을 쓴다. 결과의 openUrl을 답변에 링크로 붙인다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "title", "detail", "source", "options"], properties: { projectId, by: roleProp, conflictId: { type: "string" }, title: { type: "string" }, detail: { type: "string", description: "무엇이 왜 부딪치는지 초보자 기준으로" }, source: { type: "string", enum: ["rule", "stock", "interface", "agent", "change"], description: "stock=재고, interface=HW·SW 연결, change=확정 뒤 변경" }, refs: { type: "array", items: { type: "string" }, description: "관련 부품 ref" }, options: { type: "array", minItems: 2, maxItems: 4, items: { type: "object", additionalProperties: false, required: ["label", "detail", "costDeltaKRW", "changes", "affects"], properties: { label: { type: "string" }, detail: { type: "string" }, costDeltaKRW: { type: ["integer", "null"], description: "지금 설계 대비 비용 차이(원). 모르면 null" }, changes: { type: "array", items: { type: "string" } }, affects: { type: "array", items: { type: "string" }, description: "다시 해야 하는 작업·파일" } } } } } },
+    run: async (input, context) => {
+      const parsed = ConflictInput.parse(input) as ConflictIn;
+      await ownedProject(parsed.projectId, context);
+      let id = "";
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        const conflict = raiseConflict(p, { title: parsed.title, detail: parsed.detail, source: parsed.source, refs: parsed.refs, options: parsed.options }, parsed.by, parsed.conflictId);
+        id = conflict.id;
+        const w = workflowFor(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: parsed.by, text: `충돌 카드: ${parsed.title} (선택지 ${parsed.options.length}개, 사람의 선택 대기)`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+      });
+      const openUrl = itemUrl(context, parsed.projectId, "conflict", id);
+      return { text: `충돌 카드를 올렸어요. 사람에게 대시보드에서 골라 달라고 안내하세요.
+conflictId: ${id}
+openUrl: ${openUrl}`, data: { conflictId: id, openUrl, board: boardSummary(updated, (kind, itemId) => itemUrl(context, updated.id, kind, itemId)) } };
+    }
+  },
+  {
+    name: "close_conflict", title: "충돌 카드 닫기",
+    description: "사람이 고른 선택이나 제3안을 설계에 반영한 뒤 카드를 닫는다(resolved). 더 이상 해당 없으면 dismissed. 사람이 아직 고르지 않은 카드는 resolved로 닫을 수 없다. note에 무엇을 바꿨는지 쓴다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "conflictId", "status", "note"], properties: { projectId, by: roleProp, conflictId: { type: "string" }, status: { type: "string", enum: ["resolved", "dismissed"] }, note: { type: "string", description: "반영한 내용 (600자 이내)" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), by: AgentRole, conflictId: z.string().uuid(), status: z.enum(["resolved", "dismissed"]), note: z.string().trim().min(1).max(600) }).strict().parse(input) as CloseConflict;
+      await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        const conflict = closeConflict(p, parsed.conflictId, parsed.status, parsed.note);
+        const w = workflowFor(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: parsed.by, text: `충돌 정리: ${conflict.title} → ${parsed.note}`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+      });
+      return stored(updated, context, "충돌 카드를 닫았어요.");
     }
   }
 );
@@ -1036,7 +1139,7 @@ export async function callTool(name: string, input: unknown, context: ToolContex
     return { content: [{ type: "text", text }], ...(result.data && typeof result.data === "object" ? { structuredContent: result.data as Record<string, unknown> } : {}) };
   } catch (error) {
     if (error instanceof z.ZodError) return { content: [{ type: "text", text: `입력 형식이 맞지 않아요: ${error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`).join("; ")}` }], isError: true };
-    if (error instanceof ToolError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error instanceof ToolError || error instanceof CoordinationError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
     console.error("mcp tool failed", name, error instanceof Error ? error.message : "unknown error");
     return { content: [{ type: "text", text: "도구 실행 중 오류가 났어요. 잠시 후 다시 시도해주세요." }], isError: true };
   }

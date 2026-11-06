@@ -10,12 +10,48 @@ export type DesignSlot = {
   acknowledged: boolean;
 };
 
+// One board for everyone's work: the person's tasks and each agent's.
+// Older projects only have kind/title/plain/status (ready|completed) and are
+// read as tasks for the person.
+export type TaskAssignee = "human" | AgentId;
+export type TaskStatus = "ready" | "in_progress" | "blocked" | "cannot" | "completed" | "cancelled";
 export type ProjectTask = {
   id: string;
-  kind: "confirm_spec" | "confirm_availability" | "measure" | "run_firmware" | "provide_info";
+  kind: "confirm_spec" | "confirm_availability" | "measure" | "run_firmware" | "provide_info" | "purchase" | "assemble" | "code" | "design" | "review";
   title: string;
   plain: string;
-  status: "ready" | "completed";
+  status: TaskStatus;
+  assignee?: TaskAssignee;
+  doneWhen?: string;
+  dependsOn?: string[];
+  // An agent session that took the task; the claim lapses after TASK_LEASE_MS.
+  claimedBy?: string | null;
+  claimedAt?: string | null;
+  // Latest note: the person's reason for "blocked"/"cannot", or an agent's progress.
+  note?: string;
+  createdBy?: "server" | "human" | AgentId;
+  createdAt?: string;
+  updatedAt?: string;
+  history?: Array<{ at: string; by: "human" | "server" | AgentId; status: TaskStatus; note?: string }>;
+};
+
+// A design choice the person settles: stock ran out, two decisions clash, or
+// a change is proposed after the design was finalised. The person picks an
+// option or writes a third proposal, which the chief reviews before it applies.
+export type ConflictOption = { id: string; label: string; detail: string; costDeltaKRW: number | null; changes: string[]; affects: string[] };
+export type DesignConflict = {
+  id: string;
+  title: string;
+  detail: string;
+  source: "rule" | "stock" | "interface" | "agent" | "change";
+  raisedBy: "server" | AgentId;
+  refs: string[];
+  options: ConflictOption[];
+  status: "open" | "reviewing" | "resolved" | "dismissed";
+  resolution?: { optionId: string | null; proposal: string | null; note?: string; at: string };
+  afterFinal?: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type ChatMessage = {
@@ -100,6 +136,7 @@ export type LocalProject = {
   designRevision: number;
   slots: DesignSlot[];
   tasks: ProjectTask[];
+  conflicts?: DesignConflict[];
   messages: ChatMessage[];
   build: BuildResult | null;
   lastAgentMode: "mock" | "live";
@@ -194,14 +231,19 @@ export type DevProfile = {
   installed: string[];
   confirmed: boolean;
 };
+// "available" = the person checked a seller has enough in stock to order.
+export type PurchaseStatus = "needed" | "available" | "ordered" | "received" | "problem";
 export type Workflow = {
   phase: "brainstorm" | "circuit" | "mockup" | "handoff" | "workshop";
   profile: MakerProfile;
   activeAgents: AgentId[];
   circuitApprovedAt: string | null;
   mockupApprovedAt: string | null;
+  // The person finalised the design once every part was confirmed orderable.
+  // Projects that entered the workshop before this step have it unset.
+  finalizedAt?: string | null;
   sharedUpdates: Array<{ id: string; agent: AgentId; text: string; createdAt: string }>;
-  purchases: Record<string, "needed" | "ordered" | "received" | "problem">;
+  purchases: Record<string, PurchaseStatus>;
   evidence: Array<{ taskId: string; text: string; createdAt: string }>;
   // Where Claude found each part (web search or a link the person gave).
   partSources?: Record<string, PartSource[]>;

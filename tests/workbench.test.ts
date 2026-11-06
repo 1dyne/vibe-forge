@@ -39,8 +39,8 @@ describe("project workbench documents", () => {
     expect(bom.content).not.toContain("<script>bad</script>");
     expect(bom.content).toContain("&lt;script&gt;");
     expect(bom.filename).not.toContain("/");
-    expect(workbenchItems(p).find(i => i.kind === "tasks")?.content).toContain("- [ ] 전압 확인");
+    expect(workbenchItems(p).find(i => i.kind === "tasks")?.content).toContain("- [ ] (나) 전압 확인");
     p.tasks[0].status = "completed";
-    expect(workbenchItems(p).find(i => i.kind === "tasks")?.content).toContain("- [x] 전압 확인");
+    expect(workbenchItems(p).find(i => i.kind === "tasks")?.content).toContain("- [x] (나) 전압 확인");
   });
 });

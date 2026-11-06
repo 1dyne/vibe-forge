@@ -72,5 +72,6 @@ export default function ParticipantLogin({ next, google, unlock, canJoin }: { ne
     <button type="button" className="link-button" onClick={() => { setMode("forgot"); setError(""); }}>비밀번호를 잊었어요</button>
     {google && <><div className="or-divider"><span>또는</span></div><a className="google-button" href={`/api/auth/google/start?intent=login&next=${encodeURIComponent(next)}`}>구글로 로그인</a></>}
     {canJoin && <p className="login-links">처음이라면 <a href="/join">가입하기</a></p>}
+    <p className="muted">개인 링크로 쓰던 계정이면, 처음 받은 개인 링크를 다시 열면 로그인돼요. 내 계정에서 이메일과 비밀번호를 만들어 두면 다음부터 여기서 로그인할 수 있어요.</p>
   </form>;
 }

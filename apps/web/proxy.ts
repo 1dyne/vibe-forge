@@ -20,7 +20,10 @@ export async function proxy(request: NextRequest) {
   const valid = userTokenFrom(cookie) !== null || sessionSecretFrom(cookie) !== null || await verifySession(cookie, process.env.SESSION_SECRET);
   if (valid) return NextResponse.next();
   if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "다시 로그인해주세요." }, { status: 401 });
-  return NextResponse.redirect(publicUrl(request, "/login"));
+  const login = publicUrl(request, "/login");
+  // Come back to the item a link pointed at (for example ?p=…&open=task:…) after signing in.
+  if (pathname === "/" && request.nextUrl.search) login.searchParams.set("next", `/${request.nextUrl.search}`);
+  return NextResponse.redirect(login);
 }
 
 export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };

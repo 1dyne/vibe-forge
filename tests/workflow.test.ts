@@ -50,8 +50,12 @@ describe("persisted approval and team workflow",()=>{
     expect(cad.content).toContain("difference()");
     p=(await act(p,{action:"approve_mockup"})).project;
     expect(p.tasks.some(t=>t.kind==="measure")).toBe(true);
+    const early=await act(p,{action:"enter_workshop"});
+    expect(early.status).toBe(409);
+    for(const c of p.build!.blueprint.components)p=(await act(p,{action:"purchase",ref:c.ref,status:"available"})).project;
     p=(await act(p,{action:"enter_workshop"})).project;
     expect(p.stage).toBe("workshop");
+    expect(p.workflow?.finalizedAt).toBeTruthy();
     const response=await messagePost(request("messages",{text:"멀티미터가 없어요. 구매도 어렵습니다. 대체 확인 방법을 알려주세요.",channel:"hw",mode:"evaluate"}),{params:Promise.resolve({id:p.id})});
     expect(response.status).toBe(200);
     p=(await response.json()).project;

@@ -53,7 +53,9 @@ describe("Claude connector", () => {
     const { token } = await createUser("주최측", false);
     const init = await rpc(token, "initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1" } });
     expect(init.body.result.protocolVersion).toBe("2025-06-18");
-    expect(init.body.result.instructions).toContain(`https://forge.example/u#${token}`);
+    // Links Claude shows end up in the chat history, so they never carry the token.
+    expect(init.body.result.instructions).toContain("대시보드: https://forge.example/");
+    expect(init.body.result.instructions).not.toContain(token);
     const listed = await rpc(token, "tools/list");
     const names = listed.body.result.tools.map((t: { name: string }) => t.name);
     expect(names).toContain("submit_circuit");
@@ -174,7 +176,10 @@ describe("Claude connector", () => {
     expect(again.structuredContent!.files.filter((f: { filename: string }) => f.filename === "SPEC.md")).toHaveLength(1);
 
     const progress = await tool(token, "log_dev_progress", { projectId: id, summary: "시리얼 읽기 완성", done: ["포트 열기"], next: ["화면 표시"], hardwareRequests: ["보드를 USB로 연결하고 시리얼 모니터에 state=1이 찍히는지 알려주세요."] });
-    expect(progress.structuredContent!.openTasks.some((t: { title: string }) => t.title === "개발 중 하드웨어 확인")).toBe(true);
+    expect(progress.structuredContent!.board.humanTasks.some((t: { title: string; kind: string }) => t.title === "SW가 요청한 확인" && t.kind === "provide_info")).toBe(true);
+    // The same request again does not make a second task.
+    const repeat = await tool(token, "log_dev_progress", { projectId: id, summary: "다시 확인", done: [], next: [], hardwareRequests: ["보드를 USB로 연결하고 시리얼 모니터에 state=1이 찍히는지 알려주세요."] });
+    expect(repeat.structuredContent!.board.humanTasks.filter((t: { title: string }) => t.title === "SW가 요청한 확인")).toHaveLength(1);
 
     const me = await (await meRoute(new NextRequest("http://localhost:3000/api/me", { headers: { cookie: "dalgeurak_session=" + userSessionValue(token) } }))).json();
     expect(me.connectorUrl).toBe("https://forge.example/api/mcp");
@@ -188,7 +193,7 @@ describe("Claude connector", () => {
     const id = created.structuredContent!.id as string;
     const checklist = await tool(token, "get_checklist", { projectId: id });
     expect(checklist.content[0].text).toContain("① 해본 적 없어요");
-    expect(checklist.structuredContent!.checklistUrl).toBe(`https://forge.example/u?p=${id}&open=profile#${token}`);
+    expect(checklist.structuredContent!.checklistUrl).toBe(`https://forge.example/?p=${id}&open=profile`);
     expect(checklist.structuredContent!.missing.recommended).toContain("납땜 경험");
 
     await tool(token, "set_maker_profile", { projectId: id, coreBehavior: "말하면 눈을 깜빡인다", tools: [], toolsConfirmed: true, firmwareExperience: "none", solderingSkill: "none", printerAccess: "makerspace", region: "서울 마포구", budgetKRW: 150000, purpose: "personal" });
@@ -267,7 +272,12 @@ describe("Claude connector", () => {
 
     await act({ action: "approve_mockup" });
     await tool(token, "set_team", { projectId: id, agents: ["hw"] });
-    const entered = await act({ action: "enter_workshop" });
+    // The design is finalised only once every part is confirmed orderable.
+    const early = await act({ action: "finalize" });
+    expect(early.project).toBeUndefined();
+    expect(early.blockers.join(" ")).toContain("주문 가능 여부");
+    for (const c of approved.project.build.blueprint.components) await act({ action: "purchase", ref: c.ref, status: "available" });
+    const entered = await act({ action: "finalize" });
     expect(workflowFor(entered.project).phase).toBe("workshop");
     const reported = await act({ action: "assembly_report", step: 1, cardId: "s1-c1", text: "3.1V 나와요" });
     expect(reported.project.assemblyReports).toHaveLength(1);
@@ -334,5 +344,35 @@ describe("conversation privacy", () => {
       expect(schema.required).not.toContain("userMessage");
       expect(schema.properties).not.toHaveProperty("userMessage");
     }
+  });
+
+  it("shares one task board and decision cards between Claude and the dashboard", async () => {
+    const { token } = await createUser("보드 참여자", false);
+    const created = await tool(token, "create_project", { idea: "무게로 수량을 세는 저울", plan });
+    const id = created.structuredContent!.id as string;
+    const cookie = "dalgeurak_session=" + userSessionValue(token);
+    const act = async (body: unknown) => { const r = await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) }); return { status: r.status, ...(await r.json()) }; };
+
+    const ask = await tool(token, "upsert_task", { projectId: id, by: "chief", assignee: "human", kind: "confirm_availability", title: "저울 재고 확인", plain: "U177을 2개 주문할 수 있는지 확인해주세요." });
+    expect(ask.isError).toBeFalsy();
+    expect(decodeURIComponent(ask.structuredContent!.openUrl)).toBe(`https://forge.example/?p=${id}&open=task:${ask.structuredContent!.taskId}`);
+    const mine = await tool(token, "upsert_task", { projectId: id, by: "chief", assignee: "sw", kind: "code", title: "웹앱 뼈대", plain: "품목 등록 화면" });
+    const claim = await tool(token, "update_task", { projectId: id, by: "sw", taskId: mine.structuredContent!.taskId, status: "in_progress", session: "https://claude.ai/code/session_x" });
+    expect(claim.structuredContent!.board.agentTasks[0]).toMatchObject({ status: "in_progress", claimedBy: "https://claude.ai/code/session_x" });
+    // Claude cannot finish the person's task; the person does on the dashboard.
+    const blocked = await tool(token, "update_task", { projectId: id, by: "chief", taskId: ask.structuredContent!.taskId, status: "completed" });
+    expect(blocked.isError).toBe(true);
+    const stuck = await act({ action: "task_status", taskId: ask.structuredContent!.taskId, status: "cannot", note: "측정·작업 방법을 모르겠어요" });
+    expect(stuck.status).toBe(200);
+    const read = await tool(token, "get_project", { projectId: id });
+    expect(read.structuredContent!.board.humanTasks.find((t: { id: string }) => t.id === ask.structuredContent!.taskId)).toMatchObject({ status: "cannot", note: "측정·작업 방법을 모르겠어요" });
+
+    const card = await tool(token, "raise_conflict", { projectId: id, by: "chief", title: "무선 방식", detail: "기기가 웹을 직접 띄울지, 서버를 거칠지", source: "interface", refs: [], options: [{ label: "기기 직접", detail: "서버 없음", costDeltaKRW: 0, changes: ["서버 제거"], affects: ["웹앱"] }, { label: "서버 중계", detail: "Cloudflare", costDeltaKRW: null, changes: ["서버 추가"], affects: ["펌웨어"] }] });
+    const conflictId = card.structuredContent!.conflictId as string;
+    expect(decodeURIComponent(card.structuredContent!.openUrl)).toContain(`open=conflict:${conflictId}`);
+    expect((await tool(token, "close_conflict", { projectId: id, by: "chief", conflictId, status: "resolved", note: "직접" })).isError).toBe(true);
+    const picked = await act({ action: "resolve_conflict", conflictId, optionId: "o2" });
+    expect(picked.project.conflicts[0]).toMatchObject({ status: "resolved", resolution: { optionId: "o2" } });
+    expect(picked.project.messages.at(-1).text).toContain("서버 중계");
   });
 });

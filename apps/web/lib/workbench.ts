@@ -61,8 +61,11 @@ export function workbenchItems(project: LocalProject | null): WorkbenchItem[] {
     const rows = project.build.blueprint.components.map(c => `<tr><td>${escapeHtml(c.ref)}</td><td>${escapeHtml(c.valueOrModel)}</td><td>${escapeHtml(c.reason)}</td><td>${sourceCell(c.ref)}</td><td>${escapeHtml(workflow.purchases[c.ref] ?? "needed")}</td></tr>`).join("");
     items.push({ id: "document:bom", filename: `${stem}-부품목록.html`, kind: "bom", mimeType: "text/html; charset=utf-8", content: `<!doctype html><html lang="ko"><meta charset="utf-8"><title>${escapeHtml(project.name)} · 부품목록</title><style>body{font:14px/1.8 system-ui;padding:24px;color:#1f1f1f}table{border-collapse:collapse;width:100%}td,th{border:1px solid #d8dcdb;padding:12px;text-align:left}th{background:#e5f3ee}</style><h1>${escapeHtml(project.name)} · 부품목록</h1><p>구매 전 정확한 모델·수량·가격·재고를 확인해주세요. 출처의 가격은 확인한 날짜 기준이에요.</p><table><tr><th>참조</th><th>부품</th><th>용도</th><th>출처</th><th>구매 상태</th></tr>${rows}</table></html>` });
   }
-  if (project.tasks.length) {
-    items.push({ id: "document:tasks", filename: `${stem}-작업목록.md`, kind: "tasks", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 작업목록\n\n${project.tasks.map(t => `- [${t.status === "completed" ? "x" : " "}] ${t.title}\n  ${t.plain}`).join("\n\n")}\n` });
+  if (project.tasks.length || project.conflicts?.length) {
+    const who = (a: string | undefined) => !a || a === "human" ? "나" : a === "chief" ? "대장" : a.toUpperCase();
+    const status: Record<string, string> = { ready: " ", in_progress: "~", blocked: "!", cannot: "!", completed: "x", cancelled: "-" };
+    const conflicts = (project.conflicts ?? []).filter(c => c.status === "open" || c.status === "reviewing");
+    items.push({ id: "document:tasks", filename: `${stem}-할일보드.md`, kind: "tasks", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 할 일 보드\n\n${conflicts.length ? `## 결정할 것\n\n${conflicts.map(c => `- ${c.title}\n  ${c.detail}\n${c.options.map(o => `  - ${o.label}: ${o.detail}`).join("\n")}`).join("\n\n")}\n\n` : ""}## 할 일\n\n${project.tasks.map(t => `- [${status[t.status] ?? " "}] (${who(t.assignee)}) ${t.title}\n  ${t.plain}${t.note ? `\n  메모: ${t.note}` : ""}`).join("\n\n")}\n` });
   }
   if (workflow.sharedUpdates.length) {
     items.push({ id: "document:record", filename: `${stem}-팀기록.md`, kind: "record", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 팀 기록\n\n${workflow.sharedUpdates.map(u => `## ${u.agent} · ${u.createdAt}\n\n${u.text}`).join("\n\n")}\n` });
