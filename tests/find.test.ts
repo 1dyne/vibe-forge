@@ -139,7 +139,12 @@ describe("도깨비불 카드", () => {
     expect(card.roast.head).toBe("컵 무게까지 재겠다고?");
     expect(card.specialty).toBe("컵 무게 재기 → 깜빡깜빡");
     expect(card.weakness).toBe("올려두지 않으면 아무것도 모름");
-    expect(card.build.parts).toEqual(expect.arrayContaining(["로드셀 + HX711", "LED (WS2812)", "USB 전원"]));
+    const roles = card.build.parts as Array<{ key: string; role: string; does: string; parts: Array<{ name: string }> }>;
+    expect(roles.map((r) => r.role)).toEqual(["작은 두뇌 보드", "무게를 재는 판", "색이 바뀌는 불빛", "전원", "몸통"]);
+    expect(roles.find((r) => r.key === "weight")?.does).toBe("컵을 들었는지, 얼마나 마셨는지 알아채");
+    expect(roles.find((r) => r.key === "led")?.does).toBe("때가 되면 깜빡여");
+    expect(roles.find((r) => r.key === "weight")?.parts.map((x) => x.name)).toEqual(["로드셀", "HX711 보드"]);
+    expect(JSON.stringify(roles)).not.toMatch(/\d\s*원|₩|https?:/); // 가격·구매처는 넣지 않는다
     expect(card.rarityLine).toBe("이 조합은 지금까지 도깨비불 41개 중 너만 찾았어");
     expect(card.peakLine).toBe("화력 상위 8%"); // 3위 / 41개
     expect(card.stats.find((s) => s.cat === "감지")?.value).toBe(2);

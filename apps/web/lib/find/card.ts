@@ -1,5 +1,6 @@
 import { CATS, reactKind, type Cat, type Chip, type ReactKind } from "./chips";
 import type { ProjectMatch } from "./projects";
+import { partRoles, type PartRole } from "./parts";
 
 // 결과 화면의 트레이딩 카드: 등급(희귀도+화력), 능력치, 특기·약점, 도깨비 한 줄 평, 뒷면 설계 정보.
 // 전부 규칙으로 만든다. 숫자를 지어내지 않도록 부품·난이도는 고른 장작에서만 어림하고, 화면에 '어림'이라고 밝힌다.
@@ -21,7 +22,8 @@ export type FireCard = {
     difficulty: number;
     time: string;
     partsRange: string;
-    parts: string[];
+    /** 하는 일 중심 부품 목록. 예전에 저장된 카드는 문자열 목록일 수 있다. */
+    parts: Array<PartRole | string>;
     basis: { title: string; source: string; match: number; image: string | null; url: string } | null;
   };
 };
@@ -95,26 +97,6 @@ const ROASTS: Array<[string[], string, string]> = [
   [["r_sound", "r_melody"], "소리로 알려달라니", "이어폰 끼고 있으면 못 들을 거 각오해."]
 ];
 
-const PART: Array<[string[], string]> = [
-  [["s_weight", "s_cup", "s_goal", "s_count"], "로드셀 + HX711"],
-  [["s_dist", "s_sit", "s_away", "s_motion"], "거리 센서"],
-  [["s_move", "s_reset", "s_posture", "s_shake"], "기울기·움직임 센서"],
-  [["s_door", "s_lock"], "문 열림 센서"],
-  [["s_soil"], "흙 수분 센서"],
-  [["s_air", "s_co2", "s_window"], "공기질 센서"],
-  [["s_humid", "s_htemp", "s_humidifier", "s_temp"], "온습도 센서"],
-  [["s_dark", "s_sun", "s_night"], "조도 센서"],
-  [["s_noise", "s_level"], "마이크 센서"],
-  [["s_btn", "s_off", "s_long"], "버튼"],
-  [["r_light", "r_blink", "r_color", "r_breathe", "r_traffic"], "LED (WS2812)"],
-  [["r_sound", "r_melody", "r_voice"], "부저·작은 스피커"],
-  [["r_vibe", "r_buzz", "r_tap", "r_pattern"], "진동 모터"],
-  [["r_move", "r_wave", "r_walk", "r_press", "r_dance"], "서보 모터"],
-  [["r_screen", "r_face", "r_big", "r_count", "r_mood"], "작은 화면(OLED)"]
-];
-const CARRIED = ["f_hand", "f_wear", "f_wrist", "f_clip", "f_key", "f_bag", "f_band"];
-const WIFI = ["r_phone", "r_log", "r_fam", "r_week", "r_only"];
-
 const has = (ids: string[], list: string[]) => list.some((id) => ids.includes(id));
 
 export function buildCard(chips: Chip[], peak: number, rarity: Rarity, matches: ProjectMatch[]): FireCard {
@@ -133,13 +115,10 @@ export function buildCard(chips: Chip[], peak: number, rarity: Rarity, matches: 
   const tail = peak >= 80 ? " 장작 솜씨도 수준급이고." : peak < 40 ? " 불은 좀 약했지만 씨앗은 좋아." : "";
   const roast = hit ? { head: hit[1], body: hit[2] + tail } : { head: "흠, 재밌는 불이네.", body: "이런 조합은 나도 처음 봐." + tail };
 
-  const parts = [...new Set(PART.filter(([list]) => has(ids, list)).map(([, p]) => p))];
-  const wifi = has(ids, WIFI);
-  const carried = has(ids, CARRIED);
-  const board = wifi ? "ESP32 보드(와이파이)" : "작은 보드(아두이노·ESP32)";
-  const allParts = [board, ...parts, carried ? "충전 배터리" : "USB 전원", "케이스(3D 프린트·상자)"];
-  const motor = parts.includes("서보 모터");
-  const difficulty = Math.max(1, Math.min(5, 1 + (motor ? 1 : 0) + (wifi ? 1 : 0) + (parts.length >= 3 ? 1 : 0) + (carried ? 1 : 0)));
+  const roles = partRoles(ids);
+  const keys = new Set(roles.map((r) => r.key));
+  const features = roles.filter((r) => !["brain", "power", "body"].includes(r.key)).length;
+  const difficulty = Math.max(1, Math.min(5, 1 + (keys.has("motor") ? 1 : 0) + (ids.some((id) => id.startsWith("r_phone") || ["r_log", "r_fam", "r_week", "r_only"].includes(id)) ? 1 : 0) + (features >= 3 ? 1 : 0) + (roles.some((r) => r.key === "power" && r.role === "충전 배터리") ? 1 : 0)));
   const time = difficulty <= 2 ? "주말 하루" : difficulty === 3 ? "주말 이틀" : "주말 두세 번";
   const top = matches[0];
 
@@ -154,8 +133,8 @@ export function buildCard(chips: Chip[], peak: number, rarity: Rarity, matches: 
     build: {
       difficulty,
       time,
-      partsRange: `${allParts.length - 1}~${allParts.length}개`,
-      parts: allParts,
+      partsRange: `${roles.length - 1}~${roles.length}가지`,
+      parts: roles,
       basis: top ? { title: top.title_ko, source: top.source, match: top.match, image: top.image?.url ?? null, url: top.source_url } : null
     }
   };
