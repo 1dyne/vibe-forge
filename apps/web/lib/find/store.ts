@@ -22,6 +22,8 @@ export type FireRecord = {
   card: FireCard | null;
   /** 공개 닉네임 (욕설 필터를 거친 값, 없으면 "이름 없는 도깨비") */
   nickname: string;
+  /** 이 불이 사는 대장간 */
+  forgeId?: string | null;
   createdAt: string;
 };
 
@@ -85,9 +87,9 @@ interface Backend {
 }
 
 // ── JSON 파일 ────────────────────────────────────────────
-type FileData = { version: 1; fires: FireRecord[]; waitlist: WaitlistRecord[]; events: EventRecord[] };
+export type FileData = { version: 1; fires: FireRecord[]; waitlist: WaitlistRecord[]; events: EventRecord[]; forges?: unknown[]; mails?: unknown[]; notices?: unknown[]; meta?: Record<string, string> };
 let queue: Promise<unknown> = Promise.resolve();
-function serial<T>(op: () => Promise<T>): Promise<T> {
+export function serial<T>(op: () => Promise<T>): Promise<T> {
   const next = queue.then(op, op);
   queue = next.then(() => undefined, () => undefined);
   return next;
@@ -98,7 +100,7 @@ function dataFile() {
   const workspace = path.basename(cwd) === "web" && path.basename(path.dirname(cwd)) === "apps" ? path.resolve(cwd, "../..") : cwd;
   return path.join(workspace, ".data", "find.json");
 }
-async function readData(): Promise<FileData> {
+export async function readData(): Promise<FileData> {
   try {
     return JSON.parse(await readFile(/* turbopackIgnore: true */ dataFile(), "utf8")) as FileData;
   } catch (error) {
@@ -106,7 +108,7 @@ async function readData(): Promise<FileData> {
     throw error;
   }
 }
-async function writeData(data: FileData) {
+export async function writeData(data: FileData) {
   const file = dataFile();
   await mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
@@ -168,27 +170,40 @@ CREATE INDEX IF NOT EXISTS find_events_name ON find_events(name);
 ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS combo_key text;
 ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS card jsonb;
 ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS nickname text;
+ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS forge_id text;
+CREATE INDEX IF NOT EXISTS find_fires_forge ON find_fires(forge_id);
+CREATE TABLE IF NOT EXISTS find_forges (
+  id text PRIMARY KEY, owner_hash text NOT NULL UNIQUE, nickname text NOT NULL, theme text NOT NULL, alley_seq integer NOT NULL, plot_no integer NOT NULL,
+  visibility text NOT NULL DEFAULT 'public', created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (theme, alley_seq, plot_no)
+);
+CREATE TABLE IF NOT EXISTS find_mail (
+  id text PRIMARY KEY, forge_id text, kind text NOT NULL, body text NOT NULL, context jsonb NOT NULL DEFAULT '{}', status text NOT NULL DEFAULT 'new', reply text,
+  reply_seen boolean NOT NULL DEFAULT false, notion_page_id text, notion_synced boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS find_mail_forge ON find_mail(forge_id);
+CREATE TABLE IF NOT EXISTS find_notices (id bigserial PRIMARY KEY, title text NOT NULL, body text NOT NULL, kind text NOT NULL DEFAULT 'update', published_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS find_meta (key text PRIMARY KEY, value text NOT NULL);
 CREATE INDEX IF NOT EXISTS find_fires_combo ON find_fires(combo_key);
 `;
 
 let pool: pg.Pool | null = null;
 let ready: Promise<void> | null = null;
-function databaseUrl() {
+export function databaseUrl() {
   return process.env.DATABASE_URL_WEB?.trim() || process.env.DATABASE_URL?.trim() || "";
 }
-async function db() {
+export async function db() {
   pool ??= new pg.Pool({ connectionString: databaseUrl(), max: 5, ssl: /sslmode=require/.test(databaseUrl()) ? { rejectUnauthorized: false } : undefined });
   ready ??= pool.query(FIND_SCHEMA).then(() => undefined).catch((error) => { ready = null; throw error; });
   await ready;
   return pool;
 }
 
-const rowToFire = (r: Record<string, unknown>): FireRecord => ({ id: r.id as string, idea: r.idea as string, sentence: r.sentence as string, picked: r.picked as string[], labels: r.labels as string[], peak: r.peak as number, color: r.color as string, reactKind: r.react_kind as string, name: r.name as string, matches: r.matches as FireRecord["matches"], comboKey: (r.combo_key as string) ?? "", card: (r.card as FireCard) ?? null, nickname: (r.nickname as string) ?? "이름 없는 도깨비", createdAt: new Date(r.created_at as string).toISOString() });
+export const rowToFire = (r: Record<string, unknown>): FireRecord => ({ id: r.id as string, idea: r.idea as string, sentence: r.sentence as string, picked: r.picked as string[], labels: r.labels as string[], peak: r.peak as number, color: r.color as string, reactKind: r.react_kind as string, name: r.name as string, matches: r.matches as FireRecord["matches"], comboKey: (r.combo_key as string) ?? "", card: (r.card as FireCard) ?? null, nickname: (r.nickname as string) ?? "이름 없는 도깨비", forgeId: (r.forge_id as string) ?? null, createdAt: new Date(r.created_at as string).toISOString() });
 const rowToWait = (r: Record<string, unknown>): WaitlistRecord => ({ id: r.id as string, email: r.email as string, fireId: (r.fire_id as string) ?? null, idea: (r.idea as string) ?? null, sentence: (r.sentence as string) ?? null, picked: (r.picked as string[]) ?? [], peakFire: (r.peak_fire as number) ?? null, fireColor: (r.fire_color as string) ?? null, referralCode: r.referral_code as string, referredBy: (r.referred_by as string) ?? null, consentedAt: new Date(r.consented_at as string).toISOString(), marketingConsent: Boolean(r.marketing_consent), couponSentAt: r.coupon_sent_at ? new Date(r.coupon_sent_at as string).toISOString() : null, createdAt: new Date(r.created_at as string).toISOString() });
 
 const pgBackend: Backend = {
   async saveFire(f) {
-    await (await db()).query("INSERT INTO find_fires (id, idea, sentence, picked, labels, peak, color, react_kind, name, matches, combo_key, card, nickname, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)", [f.id, f.idea, f.sentence, JSON.stringify(f.picked), JSON.stringify(f.labels), f.peak, f.color, f.reactKind, f.name, JSON.stringify(f.matches), f.comboKey, f.card ? JSON.stringify(f.card) : null, f.nickname, f.createdAt]);
+    await (await db()).query("INSERT INTO find_fires (id, idea, sentence, picked, labels, peak, color, react_kind, name, matches, combo_key, card, nickname, forge_id, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)", [f.id, f.idea, f.sentence, JSON.stringify(f.picked), JSON.stringify(f.labels), f.peak, f.color, f.reactKind, f.name, JSON.stringify(f.matches), f.comboKey, f.card ? JSON.stringify(f.card) : null, f.nickname, f.forgeId ?? null, f.createdAt]);
   },
   async rarity(key, peak) {
     const { rows } = await (await db()).query("SELECT count(*)::int AS total, count(*) FILTER (WHERE combo_key = $1)::int AS same, count(*) FILTER (WHERE peak > $2)::int AS higher FROM find_fires", [key, peak]);
