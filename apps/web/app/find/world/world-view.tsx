@@ -8,9 +8,9 @@ import { buildWorld, villageCenter, type Spot, type WorldHouse, type WorldVillag
 // 걷는 도깨비 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
 
-type Props = { houses: WorldHouse[]; villages: WorldVillage[]; alleyNames: Record<string, string>; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number };
+type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number };
 
-export default function WorldView({ houses, villages, alleyNames, hallStage, hallPct, myForgeId, myHue }: Props) {
+export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myHue }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const stick = useRef({ x: 0, y: 0, active: false });
   const [near, setNear] = useState<Spot | null>(null);
@@ -37,15 +37,21 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       el.appendChild(renderer.domElement);
 
       const scene = new three.Scene();
-      scene.background = new three.Color("#CFE9F1");
-      scene.fog = new three.Fog("#CFE9F1", 35, 110);
+      // 하루 시간대: 이 기기의 지금 시각을 따른다 (밤 = 별·반딧불·모든 창문 / 새벽 = 안개 / 저녁 = 노을)
+      const hourParam = process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("hour") : null; // 개발 확인용
+      const hour = hourParam ? Number(hourParam) : new Date().getHours();
+      const phase = hour >= 19 || hour < 5 ? "night" : hour < 8 ? "dawn" : hour >= 17 ? "dusk" : "day";
+      const SKY = { day: ["#CFE9F1", 35, 110], dawn: ["#E8E4EC", 14, 70], dusk: ["#F6D2B8", 30, 100], night: ["#1D2547", 30, 105] } as const;
+      const [skyCol, fogNear, fogFar] = SKY[phase];
+      scene.background = new three.Color(skyCol);
+      scene.fog = new three.Fog(skyCol, fogNear, fogFar);
       const camera = new three.PerspectiveCamera(55, el.clientWidth / el.clientHeight, 0.1, 300);
-      scene.add(new three.HemisphereLight("#ffffff", "#A9CF9A", 1.15));
-      const sun = new three.DirectionalLight("#fff3dd", 1.5);
+      scene.add(phase === "night" ? new three.HemisphereLight("#8FA0D8", "#2C3550", 0.75) : new three.HemisphereLight(phase === "dusk" ? "#FFE2C8" : "#ffffff", "#A9CF9A", 1.15));
+      const sun = new three.DirectionalLight(phase === "night" ? "#B9C6FF" : phase === "dusk" ? "#FFB27A" : "#fff3dd", phase === "night" ? 0.45 : 1.5);
       sun.position.set(30, 40, 12);
       scene.add(sun);
 
-      const world = buildWorld(three, scene, { houses, villages, alleyNames, hallStage, hallPct, myForgeId, hasForge: !!myForgeId });
+      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, night: phase === "night" });
 
       // 마을의 기척: 1분 반마다 '지금 마을에 있는 집'을 받아 연기·창문 불빛을 바꾼다 (내 집도 '마을에 있음'으로 기록됨)
       const beat = async () => {
@@ -77,7 +83,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
 
       let heading = Math.PI; // 처음엔 북쪽(-z, 본관 방향)을 본다
       // 개발 확인용: ?at=마을id 로 그 마을 문 앞에서 시작
-      const at = process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("at") : null;
+      const at = new URLSearchParams(location.search).get("at"); // ?at=마을id: 그 마을 문 앞에서 시작 (2D 지도에서 넘어올 때)
       const atIdx = villages.findIndex((v) => v.id === at);
       // ?house=집id (또는 me): 그 집 문 앞에 서서 집을 바라보며 시작
       const houseParam = new URLSearchParams(location.search).get("house");
@@ -124,6 +130,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
         tex.offset.x = frame / 25;
         player.position.set(pos.x, ground + 1.2 + (moving ? Math.abs(Math.sin(t * 10)) * 0.12 : 0), pos.z);
         shadow.position.set(pos.x, ground + 0.04, pos.z);
+        world.player.x = pos.x; world.player.z = pos.z;
 
         const back = { x: Math.sin(heading) * 8.5, z: -Math.cos(heading) * 8.5 };
         camPos.set(pos.x + back.x, ground + 5.6, pos.z + back.z);
@@ -133,7 +140,12 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
         camRay.set(eye, toCam); camRay.far = full;
         const near = world.occluders.filter((o) => Math.hypot(o.position.x - pos.x, o.position.z - pos.z) < full + 6);
         const hitCam = camRay.intersectObjects(near, true)[0];
-        if (hitCam) camPos.copy(eye).addScaledVector(toCam, Math.max(1.6, hitCam.distance - 0.4));
+        if (hitCam) {
+          // 너무 가까이 붙지 않게: 3.4보다 가까워지면 대신 위로 올라가 내려다본다
+          const d = hitCam.distance - 0.4;
+          camPos.copy(eye).addScaledVector(toCam, Math.max(3.4, d));
+          if (d < 3.4) camPos.y += (3.4 - d) * 1.6;
+        }
         const camGround = world.heightAt(camPos.x, camPos.z);
         if (camPos.y < camGround + 2) camPos.y = camGround + 2;
         if (first) { camera.position.copy(camPos); first = false; } else camera.position.lerp(camPos, 0.12);
@@ -174,7 +186,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       };
     })().catch(() => setFailed(true));
     return () => { disposed = true; cleanup(); };
-  }, [houses, villages, alleyNames, hallStage, hallPct, myForgeId, myHue]);
+  }, [houses, villages, hallStage, hallPct, myForgeId, myHue]);
 
   // 마을에 들어서면 이름표를 잠깐 띄운다
   const [banner, setBanner] = useState<WorldVillage | null>(null);
@@ -202,12 +214,12 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
   if (failed) return (
     <div className="world-fallback">
       <p>이 기기에서는 3D 마을을 열 수 없어. 지도로 볼래?</p>
-      <a className="btn btn-fire" href="/find/village" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을 지도로 보기</a>
+      <a className="btn btn-fire" href="/find/map" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을 지도로 보기</a>
     </div>
   );
 
-  const enterHref = near ? (near.kind === "hall" ? "/find/village#hall" : near.kind === "plot" ? "/find" : `/f/${near.house!.id}`) : "";
-  const enterText = near ? (near.kind === "hall" ? "본관 공사장 보기" : near.kind === "plot" ? "내 도깨비불 찾고 여기 입주하기" : `${near.label} 들어가기`) : "";
+  const enterHref = near ? (near.kind === "hall" ? "/find/map#hall" : near.kind === "plot" ? "/find" : `/f/${near.house!.id}`) : "";
+  const enterText = near ? (near.kind === "hall" ? "본관 게시판 보기" : near.kind === "plot" ? "내 도깨비불 찾고 여기 입주하기" : `${near.label} 들어가기`) : "";
 
   return (
     <div className="world">
@@ -225,7 +237,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       {near && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
       <div className="world-top">
         <a href="/find">달그락 대장간</a>
-        <span><a href="/find/village">지도</a>{myForgeId ? <a href="/find/world?house=me">내 집 앞으로</a> : <a href="/find">내 집 짓기</a>}</span>
+        <span><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 집 앞으로</a> : <a href="/find">내 집 짓기</a>}</span>
       </div>
     </div>
   );

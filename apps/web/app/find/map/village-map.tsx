@@ -3,12 +3,10 @@ import { useState } from "react";
 import { track } from "../track";
 import ForgeSignup from "../waitlist";
 
-type Alley = { theme: string; themeName: string; seq: number; name: string; residents: number };
-type Street = { id: string; name: string; topics: string; alleys: Alley[] };
+type Street = { id: string; name: string; topics: string; mood: string; residents: number };
 type Plan = { id: number; title: string; description: string; status: "voting" | "building" | "done"; fuel: number; mine: number };
 type Props = {
   streets: Street[];
-  capacity: number;
   hall: { pct: number; stage: number; label: string; totalFuel: number; goal: number };
   floating: number;
   totalForges: number;
@@ -44,7 +42,7 @@ function Hall({ stage }: { stage: number }) {
 }
 
 export default function VillageMap(props: Props) {
-  const { streets, capacity, hall, floating, totalForges, topWant, notices, me, couponText } = props;
+  const { streets, hall, floating, totalForges, topWant, notices, me, couponText } = props;
   const [sheet, setSheet] = useState<null | { kind: "street"; street: Street } | { kind: "hall" }>(null);
   const [plans, setPlans] = useState(props.plans);
   const [budget, setBudget] = useState(props.budget);
@@ -62,7 +60,7 @@ export default function VillageMap(props: Props) {
     <section className="screen village">
       <div className="village-head">
         <h1 style={{ fontSize: 26 }}>도깨비 마을</h1>
-        <a className="world-link" href="/find/world">3D로 걸어보기</a>
+        <a className="world-link" href="/find/village">마을 걸어보기</a>
         <div className="muted small">지금 마을에 도깨비불 <b>{floating}</b>개가 떠 있어 · 대장간 {totalForges}채</div>
       </div>
 
@@ -71,12 +69,12 @@ export default function VillageMap(props: Props) {
           <rect x="62" y="250" width="240" height="230" rx="96" fill="#EAF5F2" stroke="#232323" strokeWidth="2.5" />
           {streets.map((s) => {
             const f = FINGERS[s.id];
-            const residents = s.alleys.reduce((n, a) => n + a.residents, 0);
+            const residents = s.residents;
             return (
               <g key={s.id} className="finger" transform={`rotate(${f.rot} ${f.x + f.w / 2} ${f.y + f.h})`} onClick={() => { setSheet({ kind: "street", street: s }); track("street_open", { street: s.id }); }} role="button" tabIndex={0} aria-label={`${s.name} 열기`}>
-                <rect x={f.x} y={f.y} width={f.w} height={f.h + 40} rx={f.w / 2} fill={s.alleys.length ? "#F6F5F1" : "#F1F0EB"} stroke="#232323" strokeWidth="2.5" />
+                <rect x={f.x} y={f.y} width={f.w} height={f.h + 40} rx={f.w / 2} fill={residents ? "#F6F5F1" : "#F1F0EB"} stroke="#232323" strokeWidth="2.5" />
                 <text x={f.x + f.w / 2} y={f.y + 26} textAnchor="middle" className="finger-name">{s.name}</text>
-                <text x={f.x + f.w / 2} y={f.y + 44} textAnchor="middle" className="finger-count">{s.alleys.length ? `${residents}채` : "곧 열려"}</text>
+                <text x={f.x + f.w / 2} y={f.y + 44} textAnchor="middle" className="finger-count">{residents ? `${residents}채` : "빈 터"}</text>
                 {Array.from({ length: Math.min(4, Math.ceil(residents / 2) + 1) }).map((_, i) => (
                   <circle key={i} cx={f.x + f.w / 2 + (i % 2 ? 9 : -9)} cy={f.y + 70 + i * 28} r="5" fill={DOT_COLORS[(i + s.id.length) % 4]} className="float-dot" style={{ animationDelay: `${i * 0.7}s` }} />
                 ))}
@@ -137,13 +135,8 @@ export default function VillageMap(props: Props) {
             {sheet.kind === "street" ? (
               <>
                 <div className="display" style={{ fontSize: 22 }}>{sheet.street.name} <span className="muted small">{sheet.street.topics}</span></div>
-                {sheet.street.alleys.length === 0 && <p className="body">아직 이 마을엔 골목이 없어. 곧 열릴 거야.</p>}
-                {sheet.street.alleys.map((a) => (
-                  <a key={`${a.theme}-${a.seq}`} className="shelf-row" href={`/find/village/${a.theme}-${a.seq}`}>
-                    <i style={{ background: "#4FB3A6" }} /><span>{a.name}</span>
-                    <small>{a.residents}/{capacity}터{capacity - a.residents <= 10 && a.residents < capacity ? ` · 마지막 ${capacity - a.residents}터!` : ""}</small>
-                  </a>
-                ))}
+                <p className="body" style={{ margin: 0 }}>{sheet.street.mood}. 지금 대장간 {sheet.street.residents}채.</p>
+                <a className="btn btn-fire" href={`/find/village?at=${sheet.street.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>이 마을 걸어보기</a>
               </>
             ) : (
               <>

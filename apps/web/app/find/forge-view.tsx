@@ -71,7 +71,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   }
   async function share() {
     const url = `${window.location.origin}/f/${forge.id}`;
-    const text = `${forge.nickname}의 대장간에 놀러 와. ${forge.alley} ${forge.plotNo}번 터야.`;
+    const text = `${forge.nickname}의 대장간에 놀러 와. ${forge.alley}에 있어.`;
     try {
       if (navigator.share) await navigator.share({ title: `${forge.nickname}의 대장간`, text, url });
       else { await navigator.clipboard.writeText(`${text}\n${url}`); setCopied(true); setTimeout(() => setCopied(false), 1600); }
@@ -87,7 +87,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   return (
     <section className="screen forge-screen" style={{ ["--fire" as string]: latest?.color ?? "#4FB3A6" }}>
       <div className="forge-head">
-        <div className="tiny muted">{forge.alley} · {forge.plotNo}번 터</div>
+        <div className="tiny muted">{forge.alley}</div>
         <h1 style={{ fontSize: 27 }}>{forge.nickname}의 대장간</h1>
         <div className="muted small">도깨비불 {fires.length}개가 머무는 중 · 대장간 {STAGE_NAME[topStage - 1]} 단계</div>
       </div>
@@ -161,7 +161,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
           <a className="btn btn-fire" href="/find" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>새 아이디어로 불 피우기</a>
           <div className="two">
             <button className="btn btn-ghost" type="button" onClick={() => show("decor")}>대장간 꾸미기</button>
-            <a className="btn btn-ghost" href={`/find/world?house=${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을로 나가기</a>
+            <a className="btn btn-ghost" href={`/find/village?house=${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을로 나가기</a>
           </div>
           <div className="two">
             <button className="btn btn-ghost" type="button" onClick={share}>{copied ? "링크 복사했어!" : "대장간 자랑하기"}</button>
@@ -284,7 +284,7 @@ function DecorSheet({ initial, stats, houseId, onClose }: { initial: Decor; vill
         </label>
         {msg && <div className="small" role="status">{msg}</div>}
         <button className="btn btn-fire" type="button" onClick={save}>저장하기</button>
-        <a className="btn btn-ghost" href={`/find/world?house=${houseId}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을에 나가서 보기</a>
+        <a className="btn btn-ghost" href={`/find/village?house=${houseId}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을에 나가서 보기</a>
         <button className="link" type="button" onClick={onClose}>닫기</button>
       </div>
     </div>

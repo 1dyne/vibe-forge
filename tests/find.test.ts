@@ -300,9 +300,10 @@ describe("도깨비 마을 (Phase 2)", () => {
     expect(pickTheme(["s_air", "r_traffic", "f_wall"], {}).id).toBe("air");
     expect(plotFor(0)).toEqual({ seq: 1, plotNo: 1, left: 99 });
     expect(plotFor(100)).toEqual({ seq: 2, plotNo: 1, left: 99 });
-    expect(alleyName("cat", 2)).toBe("냥집사 2골목");
-    expect(plotLine("cat", 1, 97, 3)).toBe("냥집사 골목 마지막 3터 남았어");
-    expect(plotLine("cat", 1, 1, 99)).toBe("너는 냥집사 골목의 1번째 주민이야");
+    // 골목은 이름 없이 배치에만 쓰이고, 보이는 주소는 마을 이름
+    expect(alleyName("cat", 2)).toBe("꼬물마을");
+    expect(alleyName("toy")).toBe("와글마을");
+    expect(plotLine("cat", 1, 1, 99)).toBe("꼬물마을에 네 대장간 터가 생겼어");
   });
 });
 
@@ -326,8 +327,8 @@ describe("내 대장간·우체통 (파일 저장)", () => {
     const first = await lock(null, ["f_bowl", "s_weight", "w_pet"]);
     const body = await first.json();
     expect(body.forge.isNew).toBe(true);
-    expect(body.forge.alley).toBe("냥집사 골목");
-    expect(body.forge.line).toBe("너는 냥집사 골목의 1번째 주민이야");
+    expect(body.forge.alley).toBe("꼬물마을");
+    expect(body.forge.line).toBe("꼬물마을에 네 대장간 터가 생겼어");
     const cookie = first.cookies.get("find_owner")?.value;
     expect(cookie).toBeTruthy();
     const second = await (await lock(cookie!, ["r_light", "s_time"])).json();
@@ -582,5 +583,18 @@ describe("대장간 꾸미기", () => {
     await vs.setVisibility(forge.id, "private");
     expect((await vs.worldHouses()).houses.some((h) => h.id === forge.id)).toBe(false);
     expect((await vs.worldHouses(forge.id)).houses.some((h) => h.id === forge.id)).toBe(true);
+  });
+});
+
+describe("마을 문", () => {
+  it("대장간 오픈 알림 이메일을 남긴 대장간에만 마을 문이 열린다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const store = await import("../apps/web/lib/find/store");
+    const { forge } = await vs.ensureForge(vs.hashToken(`gate-${Date.now()}`), "문지기", ["w_kid"]);
+    expect(await vs.villageOpenFor(forge.id)).toBe(false);
+    const fire = { id: `gatefire${Date.now()}`, idea: "(테스트)", sentence: "테스트", picked: ["w_kid"], labels: [], peak: 30, color: "#4FB3A6", reactKind: "none", name: "문지기 불", matches: [], comboKey: "x", card: null, nickname: "문지기", forgeId: forge.id, createdAt: new Date().toISOString() };
+    await store.backend().saveFire(fire);
+    await store.joinWaitlist({ email: `gate-${Date.now()}@example.com`, fireId: fire.id, idea: null, sentence: null, picked: [], peakFire: null, fireColor: null, referredBy: null, marketingConsent: false });
+    expect(await vs.villageOpenFor(forge.id)).toBe(true);
   });
 });

@@ -5,7 +5,8 @@ import { track } from "./track";
 type Standing = { code: string; position: number; total: number; referrals: number; fuel?: number; alreadyJoined: boolean; fireName: string | null };
 
 // 대장간 오픈 대기 신청: 손가락 5단계 + 소개 + 이메일. 결과 화면 직후·대장간 설계도·(나중에) 본관에서 같이 쓴다.
-export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRestart }: { fire: { id: string; name: string } | null; forgeId?: string | null; refCode: string | null; couponText: string | null; onRestart?: () => void }) {
+// 대장간이 있는 사람이 이메일을 남기면 도깨비 마을 문이 열린다 (enterVillage: 문 앞 화면에서 쓸 때는 바로 들어가는 버튼을 크게)
+export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRestart, enterVillage }: { fire: { id: string; name: string } | null; forgeId?: string | null; refCode: string | null; couponText: string | null; onRestart?: () => void; enterVillage?: boolean }) {
   const [email, setEmail] = useState("");
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -54,6 +55,13 @@ export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRest
             <b>#{standing.position}</b>
             <div className="muted tiny">{standing.fireName ?? "네 도깨비불"} 자리 맡아둘게 · 받은 장작 {standing.fuel ?? 0}개</div>
           </div>
+          {forgeId && (
+            <div className="note village-open">
+              <div className="display" style={{ fontSize: 18 }}>도깨비 마을 문이 열렸어</div>
+              <div className="small body">다른 도깨비들이 구상 중인 것들을 구경하고, 네 대장간도 꾸며봐.</div>
+              <a className={`btn ${enterVillage ? "btn-fire" : "btn-ghost"}`} href={`/find/village?house=${forgeId}`} onClick={() => track("village_open_enter")} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을로 들어가기</a>
+            </div>
+          )}
           <div className="note">
             <div className="display" style={{ fontSize: 18 }}>장작을 받으면 순번이 앞당겨져</div>
             <div className="small body">친구가 네 대장간에 놀러 와서 장작을 하나 넣을 때마다 순번이 한 칸씩 앞당겨져. 아래 링크를 보내봐.{couponText ? ` 그리고 ${couponText}` : ""}</div>

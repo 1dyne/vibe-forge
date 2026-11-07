@@ -53,7 +53,10 @@ function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz:
   return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
 }
 
-export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: WorldHouse[]; villages: WorldVillage[]; alleyNames: Record<string, string>; hallStage: number; hallPct: number; myForgeId: string | null; hasForge: boolean }) {
+export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; hasForge: boolean; night?: boolean }) {
+  const night = Boolean(opts.night);
+  /** 달그락 위치 (마을 연출이 피하거나 따라오게) */
+  const player = { x: 0, z: 0 };
   const { houses, villages, hallStage, hallPct, myForgeId } = opts;
   const spots: Spot[] = [];
   const solids: Array<{ x: number; z: number; r: number }> = [];
@@ -303,7 +306,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       if (state.active) {
         m.color.copy(on); m.emissive.set("#FF9E3D");
         m.emissiveIntensity = 0.55 + Math.sin(t * 7 + ph) * 0.18 + Math.sin(t * 13.3 + ph) * 0.12;
-      } else if (h.lit) { m.color.copy(on); m.emissive.set("#FFB84D"); m.emissiveIntensity = 0.4; }
+      } else if (h.lit || night) { m.color.copy(on); m.emissive.set("#FFB84D"); m.emissiveIntensity = night ? 0.7 : 0.4; }
       else { m.color.copy(off); m.emissiveIntensity = 0; }
     });
     return m;
@@ -439,13 +442,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     spots.push({ x, z, r: 2.6, kind: "plot", village, label: "빈 터" });
   }
 
-  function signpost(x: number, z: number, text: string, look: Look) {
-    const y = heightAt(x, z);
-    part(CYL6, mat(look.wood), 0.07, 1.8, 0.07, x, y + 0.9, z);
-    const b = textBoard(text, 1.9, 0.5, look.gate, look.gateText, 52); b.position.set(x, y + 1.55, z);
-    b.lookAt(0, y + 1.55, 0);
-    scene.add(b);
-  }
+
 
   function ringCapacity(r: number) { return Math.floor((Math.PI * 2 * r - 6) / SLOT); }
 
@@ -485,14 +482,15 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
         slots.push({ x, z, face: ang + Math.PI, ang, ring: ri });
       }
     });
+    // 골목은 이름 없이 모양만: 같은 관심사 집끼리 이웃해 모이고, 관심사가 바뀌는 자리엔 작은 화단이 경계가 된다
     let lastTheme = "";
     list.slice(0, slots.length).forEach((h, k) => {
       const s = slots[k];
-      if (h.theme !== lastTheme) {
-        lastTheme = h.theme;
-        const r = RINGS[s.ring] - 3.4, a = s.ang - 0.22;
-        signpost(c.x + Math.sin(a) * r, c.z + Math.cos(a) * r, opts.alleyNames[h.theme] ?? h.theme, look);
+      if (lastTheme && h.theme !== lastTheme) {
+        const r = RINGS[s.ring], a = s.ang - (SLOT / r) / 2;
+        flowers(c.x + Math.sin(a) * r, c.z + Math.cos(a) * r, [look.accent, "#FFFFFF", "#FFD27A"], 6, 0.5);
       }
+      lastTheme = h.theme;
       house(h, v.id, s.x, s.z, s.face);
     });
     if (list.length > slots.length) {
@@ -604,7 +602,9 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       anim.push((t) => {
         const d = new Date(); const m = d.getMinutes() + d.getSeconds() / 60, h = (d.getHours() % 12) + m / 60;
         for (const p of hands) { p.h.rotation.z = -(h / 12) * Math.PI * 2; p.m.rotation.z = -(m / 60) * Math.PI * 2; }
-        bell.rotation.z = Math.sin(t * 2) * 0.15;
+        // 정시엔 종이 크게 흔들린다 (째깍마을의 하루 리듬)
+        const ringing = d.getMinutes() === 0 && d.getSeconds() < 30;
+        bell.rotation.z = Math.sin(t * (ringing ? 9 : 2)) * (ringing ? 0.55 : 0.12);
       });
       solids.push({ x, z, r: 2.5 });
     } else if (id === "wagle") {
@@ -678,15 +678,108 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     flowers(5.8, 8.2, ["#FF8C7A", "#FFD27A", "#B9A3E3"], 12, 1.0);
   }
 
-  // ── 떠다니는 도깨비불 ──
+  // ── 마을 연출: 사람 대신 '원래 이 마을에 사는 것들'이 움직인다 (전부 화면 안에서만, 서버 비용 없음) ──
   {
+    const near = (x: number, z: number, d: number) => Math.hypot(x - player.x, z - player.z) < d;
+
+    // 1) 떠돌이 도깨비불 행렬: 광장 → 마을 길을 줄지어 오가다 달그락이 다가가면 흩어졌다 다시 모인다
     const cols = ["#9B7BFF", "#FF8F3F", "#3FBF6E", "#4FB3A6"];
-    const wisps = Array.from({ length: 22 }, (_, i) => {
-      const c = cols[i % 4];
-      const m = part(BALL, new three.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85 }), 0.2, 0.24, 0.2);
-      return { m, r: 8 + ((i * 37) % 50), a: i * 1.7, s: (0.03 + ((i * 13) % 10) / 120) * (i % 2 ? -1 : 1), y: 2 + (i % 4) * 0.8 };
+    const troupes = centers.map((c, vi) => {
+      const path = (k: number) => { // 0~1: 광장 끝 → 마을 고리 한 바퀴 → 다시 광장
+        if (k < 0.3) { const q = k / 0.3; const d = PLAZA_R + q * (VILLAGE_D - LOOP_R - PLAZA_R); return { x: Math.sin(c.a) * d, z: -Math.cos(c.a) * d }; }
+        if (k < 0.7) { const q = (k - 0.3) / 0.4; const a0 = Math.atan2(-c.x, -c.z); const a = a0 + q * Math.PI * 2; return { x: c.x + Math.sin(a) * LOOP_R, z: c.z + Math.cos(a) * LOOP_R }; }
+        const q = (k - 0.7) / 0.3; const d = VILLAGE_D - LOOP_R - q * (VILLAGE_D - LOOP_R - PLAZA_R); return { x: Math.sin(c.a) * d, z: -Math.cos(c.a) * d };
+      };
+      const n = 4;
+      const balls = Array.from({ length: n }, (_, i) => ({ m: part(BALL, new three.MeshBasicMaterial({ color: cols[(i + vi) % 4], transparent: true, opacity: 0.9 }), 0.17, 0.21, 0.17), off: { x: 0, z: 0, y: 0 } }));
+      return { path, balls, speed: 0.012 + vi * 0.002, phase: vi * 0.21, scatter: 0 };
     });
-    anim.push((t, dt) => { for (const w of wisps) { w.a += w.s * dt; const x = Math.cos(w.a) * w.r, z = Math.sin(w.a) * w.r; w.m.position.set(x, heightAt(x, z) + w.y + Math.sin(t + w.r) * 0.4, z); } });
+    anim.push((t, dt) => {
+      for (const tr of troupes) {
+        const head = (t * tr.speed + tr.phase) % 1;
+        const p0 = tr.path(head);
+        tr.scatter = Math.max(0, Math.min(1, tr.scatter + (near(p0.x, p0.z, 4.5) ? dt * 3 : -dt * 0.6)));
+        tr.balls.forEach((b, i) => {
+          const p = tr.path((head - i * 0.006 + 1) % 1);
+          const k = tr.scatter;
+          const sx = Math.cos(i * 2.1 + t * 2) * 3 * k, sz = Math.sin(i * 2.1 + t * 2) * 3 * k;
+          b.m.position.set(p.x + sx, heightAt(p.x, p.z) + 1.6 + Math.sin(t * 3 + i) * 0.15 + k * 1.5, p.z + sz);
+        });
+      }
+    });
+
+    // 2) 혼자 떠도는 불: 언덕 위를 느리게 (밤엔 더 많이 · 더 밝게)
+    const loners = Array.from({ length: night ? 26 : 12 }, (_, i) => {
+      const m = part(BALL, new three.MeshBasicMaterial({ color: cols[i % 4], transparent: true, opacity: night ? 0.95 : 0.7 }), 0.18, 0.22, 0.18);
+      return { m, r: 20 + ((i * 37) % 50), a: i * 1.7, s: (0.02 + ((i * 13) % 10) / 160) * (i % 2 ? -1 : 1), y: 2 + (i % 4) * 0.9 };
+    });
+    anim.push((t, dt) => { for (const w of loners) { w.a += w.s * dt; const x = Math.cos(w.a) * w.r, z = Math.sin(w.a) * w.r; w.m.position.set(x, heightAt(x, z) + w.y + Math.sin(t + w.r) * 0.4, z); } });
+
+    // 3) 발자국: 최근에 누가 다녀간 집 문 앞에서 몇 걸음 찍혔다 사라진다 (실제 방문 기록이 있는 집에만)
+    const visited = spots.filter((sp) => sp.kind === "house" && sp.house!.lit).slice(0, 24);
+    const stepGeo = new three.CircleGeometry(0.13, 10); stepGeo.rotateX(-Math.PI / 2); stepGeo.scale(1, 1, 1.5);
+    const trails = visited.map((sp, ti) => {
+      const v = centers.reduce((b, c, k) => (Math.hypot(sp.x - c.x, sp.z - c.z) < Math.hypot(sp.x - centers[b].x, sp.z - centers[b].z) ? k : b), 0);
+      const c = centers[v];
+      const dx = c.x - sp.x, dz = c.z - sp.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, px = -uz, pz = ux;
+      const steps = Array.from({ length: 8 }, (_, k) => {
+        const mat = new three.MeshBasicMaterial({ color: "#6B5A45", transparent: true, opacity: 0, depthWrite: false });
+        const m = new three.Mesh(stepGeo, mat);
+        const along = 2.0 + k * 0.42, side = (k % 2 ? 1 : -1) * 0.14;
+        const x = sp.x + ux * along + px * side, z = sp.z + uz * along + pz * side;
+        m.position.set(x, heightAt(x, z) + 0.05, z); m.rotation.y = Math.atan2(ux, uz);
+        scene.add(m);
+        return mat;
+      });
+      return { steps, period: 14 + (ti % 5) * 3, phase: ti * 2.3 };
+    });
+    anim.push((t) => {
+      for (const tr of trails) {
+        const q = ((t + tr.phase) % tr.period) / 3.2; // 3.2초 동안 걸어 나갔다가 사라짐
+        tr.steps.forEach((m, k) => { const age = q * 8 - k; m.opacity = age < 0 || q > 2 ? 0 : Math.max(0, 0.55 - age * 0.06); });
+      }
+    });
+
+    // 4) 마을마다 사는 것들
+    villages.forEach((v, vi) => {
+      const c = centers[vi];
+      if (v.id === "kkomul") { // 나비
+        const flies = Array.from({ length: 6 }, (_, i) => {
+          const g = new three.Group(); scene.add(g);
+          const col = ["#F2A3B3", "#FFFFFF", "#FFD27A"][i % 3];
+          const wings = [-1, 1].map((sgn) => { const w = new three.Mesh(new three.CircleGeometry(0.16, 8), mat(col, { side: true })); w.position.x = sgn * 0.12; g.add(w); return w; });
+          return { g, wings, r: 10 + (i % 3) * 4, a: i, s: 0.25 + i * 0.03 };
+        });
+        anim.push((t, dt) => flies.forEach((f) => { f.a += f.s * dt; const x = c.x + Math.cos(f.a) * f.r, z = c.z + Math.sin(f.a * 1.3) * f.r; f.g.position.set(x, heightAt(x, z) + 1 + Math.sin(t * 2 + f.a) * 0.4, z); f.g.rotation.y = -f.a; f.wings.forEach((w, k) => { w.rotation.y = (k ? 1 : -1) * (0.3 + Math.abs(Math.sin(t * 14 + f.a)) * 1.1); }); }));
+      } else if (v.id === "ttukttak") { // 고리 길을 굴러다니는 톱니
+        const gears = [0, 1].map((i) => { const g = part(TORUS, mat(LOOKS.ttukttak.accent), 0.38, 0.38, 0.6); return { g, a: i * Math.PI }; });
+        anim.push((t, dt) => gears.forEach((gg) => { gg.a += dt * 0.35; const x = c.x + Math.sin(gg.a) * LOOP_R, z = c.z + Math.cos(gg.a) * LOOP_R; gg.g.position.set(x, heightAt(x, z) + 0.42, z); gg.g.rotation.set(0, gg.a, -gg.a * LOOP_R / 0.38); }));
+      } else if (v.id === "wagle") { // 혼자 걷는 작은 태엽 장난감들
+        const toys = [0, 1, 2].map((i) => {
+          const g = new three.Group(); scene.add(g);
+          const col = ["#FF8C7A", "#6FC3E8", "#FFD27A"][i];
+          part(BOX, mat(col), 0.35, 0.35, 0.3, 0, 0.35, 0, g); part(BOX, mat("#F6F5F1"), 0.28, 0.24, 0.26, 0, 0.66, 0, g);
+          const key = part(TORUS, mat("#C9A24A"), 0.1, 0.1, 0.1, 0, 0.4, -0.2, g);
+          const legs = [-1, 1].map((sgn) => part(BOX, mat("#555"), 0.07, 0.2, 0.07, sgn * 0.09, 0.1, 0, g));
+          return { g, key, legs, a: i * 2.1, r: LOOP_R + 1.5 + i * 0.4 };
+        });
+        anim.push((t, dt) => toys.forEach((ty, i) => { ty.a += dt * 0.22; const x = c.x + Math.sin(ty.a) * ty.r, z = c.z + Math.cos(ty.a) * ty.r; ty.g.position.set(x, heightAt(x, z) + Math.abs(Math.sin(t * 8 + i)) * 0.05, z); ty.g.rotation.y = ty.a + Math.PI / 2; ty.key.rotation.z = t * 6; ty.legs[0].rotation.x = Math.sin(t * 8 + i) * 0.5; ty.legs[1].rotation.x = -Math.sin(t * 8 + i) * 0.5; }));
+      } else if (v.id === "kkambbak") { // 반딧불이 (밤엔 훨씬 많다)
+        const flies = Array.from({ length: night ? 40 : 12 }, (_, i) => {
+          const m = part(BALL, new three.MeshBasicMaterial({ color: "#E9FF9A", transparent: true }), 0.06, 0.06, 0.06);
+          return { m, x: c.x + Math.cos(i * 2.4) * (6 + (i % 7) * 2.4), z: c.z + Math.sin(i * 2.4) * (6 + (i % 7) * 2.4), ph: i * 0.9 };
+        });
+        anim.push((t) => flies.forEach((f) => { const x = f.x + Math.sin(t * 0.4 + f.ph) * 0.8, z = f.z + Math.cos(t * 0.3 + f.ph) * 0.8; f.m.position.set(x, heightAt(x, z) + 0.6 + Math.sin(t * 0.7 + f.ph) * 0.4, z); (f.m.material as T.MeshBasicMaterial).opacity = Math.max(0, Math.sin(t * 1.6 + f.ph)) * (night ? 1 : 0.6); }));
+      }
+    });
+
+    // 5) 밤하늘 별
+    if (night) {
+      const g = new three.BufferGeometry(); const pts: number[] = [];
+      const rr = rng(33); for (let i = 0; i < 500; i++) { const a = rr() * Math.PI * 2, e = 0.15 + rr() * 1.3, R = 180; pts.push(Math.cos(a) * Math.cos(e) * R, Math.sin(e) * R, Math.sin(a) * Math.cos(e) * R); }
+      g.setAttribute("position", new three.Float32BufferAttribute(pts, 3));
+      scene.add(new three.Points(g, new three.PointsMaterial({ color: "#FFFFFF", size: 1.4, sizeAttenuation: false, fog: false })));
+    }
   }
 
   function walkable(x: number, z: number) {
@@ -701,5 +794,5 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
 
     /** 1분 반마다 받아오는 '지금 기척이 있는 집' 목록으로 바꾼다 */
   function setActive(ids: Set<string>) { for (const [id, st] of houseState) st.active = ids.has(id); }
-  return { spots, anim, nameTags, fades, occluders, heightAt, walkable, villageAt, setActive };
+  return { spots, anim, nameTags, fades, occluders, heightAt, walkable, villageAt, setActive, player };
 }

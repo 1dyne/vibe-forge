@@ -94,6 +94,17 @@ export async function setDecor(forgeId: string, decor: Decor) {
   await serial(async () => { const d = await readData(); const f = (d.forges as ForgeRecord[] | undefined)?.find((x) => x.id === forgeId); if (f) f.decor = decor; await writeData(d); });
 }
 
+/** 마을 문: 이 대장간의 도깨비불로 대장간 오픈 알림(이메일)을 신청했으면 열린다 */
+export async function villageOpenFor(forgeId: string): Promise<boolean> {
+  if (pg()) {
+    const { rows } = await (await db()).query("SELECT 1 FROM find_waitlist w JOIN find_fires f ON f.id = w.fire_id WHERE f.forge_id = $1 LIMIT 1", [forgeId]);
+    return rows.length > 0;
+  }
+  const d = await readData();
+  const mine = new Set(d.fires.filter((f) => f.forgeId === forgeId).map((f) => f.id));
+  return d.waitlist.some((w) => w.fireId && mine.has(w.fireId));
+}
+
 // ── 우체통 ─────────────────────────────────────────────
 export async function createMail(input: { forgeId: string | null; kind: MailKind; body: string; context: Record<string, string> }): Promise<MailRecord> {
   const now = new Date().toISOString();

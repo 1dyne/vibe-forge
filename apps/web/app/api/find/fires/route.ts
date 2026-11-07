@@ -6,8 +6,8 @@ import { assessMaturity } from "../../../../lib/find/maturity";
 import { buildCard, comboKey } from "../../../../lib/find/card";
 import { cleanNickname } from "../../../../lib/find/nickname";
 import { newOwnerToken, ownerTokenFrom, OWNER_COOKIE, setOwnerCookie } from "../../../../lib/find/owner";
-import { ALLEY_CAPACITY, alleyName, plotLine } from "../../../../lib/find/village";
-import { createNotice, ensureForge, hashToken } from "../../../../lib/find/village-store";
+import { alleyName, plotLine } from "../../../../lib/find/village";
+import { ensureForge, hashToken } from "../../../../lib/find/village-store";
 import { matchProjects, uniqueToIdea } from "../../../../lib/find/projects";
 import { fireRarity, newId, saveFire } from "../../../../lib/find/store";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
@@ -78,13 +78,9 @@ export async function POST(request: NextRequest) {
   const followIds = new Set(ids.filter((id) => !ROOTS.some((r) => r.id === id)));
   const maturity = assessMaturity([...chips.values()], followIds, matches, unique);
   const f = forge?.forge;
-  // 골목 완공: 마지막 터가 차면 광장 소식판에 완공 축하 + 다음 골목 개장 공지
-  if (f && forge!.isNew && forge!.left === 0) {
-    await createNotice({ kind: "alley", title: `${alleyName(f.theme, f.alleySeq)} 완공!`, body: `터 ${ALLEY_CAPACITY}개가 다 찼어. 이제 ${alleyName(f.theme, f.alleySeq + 1)}이 열려.` }).catch(() => undefined);
-  }
   const forgeSummary = f ? {
     id: f.id, isNew: forge!.isNew, alley: alleyName(f.theme, f.alleySeq), plotNo: f.plotNo,
-    line: forge!.isNew ? plotLine(f.theme, f.alleySeq, f.plotNo, forge!.left) : `${alleyName(f.theme, f.alleySeq)} ${f.plotNo}번 터`
+    line: forge!.isNew ? plotLine(f.theme, f.alleySeq, f.plotNo, forge!.left) : `${alleyName(f.theme)}에 있는 네 대장간`
   } : null;
   const response = NextResponse.json({ fire, matches, unique, maturity, forge: forgeSummary }, { status: 201 });
   if (!existingToken && f) setOwnerCookie(response, token);

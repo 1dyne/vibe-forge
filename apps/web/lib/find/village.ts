@@ -33,9 +33,9 @@ export function themeById(id: string) {
   return ALLEY_THEMES.find((t) => t.id === id) ?? ALLEY_THEMES[0];
 }
 
-export function alleyName(themeId: string, seq: number) {
-  const t = themeById(themeId);
-  return seq <= 1 ? `${t.name} 골목` : `${t.name} ${seq}골목`;
+/** 사람들에게 보이는 집 주소는 마을 이름뿐이다(골목은 이름 없이 집 배치에만 쓰인다). seq는 예전 호출 호환용 */
+export function alleyName(themeId: string, _seq?: number) {
+  return themeById(themeId).street;
 }
 
 /** 장작과 가장 많이 겹치는 골목. 겹침이 같으면 주민이 적은 골목, 아무것도 안 겹치면 가장 한산한 골목. */
@@ -50,13 +50,9 @@ export function plotFor(index: number) {
   return { seq: Math.floor(index / ALLEY_CAPACITY) + 1, plotNo: (index % ALLEY_CAPACITY) + 1, left: ALLEY_CAPACITY - ((index % ALLEY_CAPACITY) + 1) };
 }
 
-/** 선착순 문구 */
-export function plotLine(themeId: string, seq: number, plotNo: number, left: number) {
-  const name = alleyName(themeId, seq);
-  if (left === 0) return `${name} 마지막 터를 네가 차지했어!`;
-  if (left <= 10) return `${name} 마지막 ${left}터 남았어`;
-  if (plotNo <= 10) return `너는 ${name}의 ${plotNo}번째 주민이야`;
-  return `${name} ${plotNo}번 터`;
+/** 처음 입주했을 때 한 줄 */
+export function plotLine(themeId: string, _seq: number, _plotNo: number, _left: number) {
+  return `${alleyName(themeId)}에 네 대장간 터가 생겼어`;
 }
 
 // ── 마을 5개 ─────────────────────────────────

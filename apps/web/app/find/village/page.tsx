@@ -1,44 +1,42 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
-import { ALLEY_CAPACITY, ALLEY_THEMES, HALL_GOAL, VILLAGES, alleyName, hallProgress } from "../../../lib/find/village";
-import { forgeFires, forgeForOwner, hashToken, touchForge, latestNotices, listPlans, villageOverview, voteBudget } from "../../../lib/find/village-store";
-import Mailbox from "../mailbox";
+import { VILLAGES, hallProgress } from "../../../lib/find/village";
+import { REACT_HUE, type ReactKind } from "../../../lib/find/chips";
+import { villageGate } from "../../../lib/find/village-gate";
+import { forgeFires, touchForge, worldHouses } from "../../../lib/find/village-store";
 import "../fonts";
-import VillageMap from "./village-map";
+import WorldView from "../world/world-view";
+import VillageGate from "./gate";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = await siteOrigin();
-  return { title: "도깨비 마을 · 달그락 대장간", description: "도깨비불들이 모여 사는 다섯 마을. 마을마다 관심사 골목이 있어.", metadataBase: new URL(origin), openGraph: { title: "도깨비 마을", description: "너만의 도깨비불을 찾고, 비슷한 아이디어 골목에 대장간을 지어봐.", images: [{ url: `${origin}/find/og.png?v=1`, width: 1200, height: 600 }] } };
+  return { title: "도깨비 마을 · 달그락 대장간", description: "도깨비불들이 대장간을 짓고 사는 다섯 마을. 너만의 도깨비불을 찾으면 마을에 네 대장간이 생겨.", metadataBase: new URL(origin), openGraph: { title: "도깨비 마을", images: [{ url: `${origin}/find/og.png?v=1`, width: 1200, height: 600 }] } };
 }
 
-// 마을 지도 (줌 1단계): 마을 5개 + 광장 본관 + 마을 장작 게이지. 걷는 3D 마을은 /find/world
+// 걷는 도깨비 마을. 내 도깨비불을 찾고 대장간 오픈 알림(이메일)을 남긴 사람에게 문이 열린다.
+// 2D 지도(/find/map)는 3D가 안 되는 기기용.
 export default async function Village() {
-  const token = ownerTokenFrom((await cookies()).get(OWNER_COOKIE)?.value);
-  const me = token ? await forgeForOwner(hashToken(token)) : null;
+  const gate = await villageGate();
+  if (gate.state !== "open") {
+    return (
+      <main className="find">
+        <header className="top"><a className="brand" href="/find">달그락 대장간</a><div className="step">마을 문 앞</div></header>
+        <VillageGate state={gate.state} fire={gate.state === "locked" ? gate.fire : null} forgeId={gate.state === "locked" ? gate.forge.id : null} couponText={COUPON_TEXT} />
+      </main>
+    );
+  }
+  const me = gate.forge;
+  const world = await worldHouses(me?.id ?? null);
   if (me) await touchForge(me.id).catch(() => undefined);
-  const [overview, notices, plans, budget, myFires] = await Promise.all([
-    villageOverview(), latestNotices(3), listPlans(me?.id ?? null), me ? voteBudget(me.id) : Promise.resolve(null), me ? forgeFires(me.id) : Promise.resolve([])
-  ]);
-  const streets = VILLAGES.map((s) => {
-    const alleys = s.themes.flatMap((theme) => {
-      const existing = overview.alleys.filter((a) => a.theme === theme);
-      const list = existing.length ? existing : [{ theme, seq: 1, residents: 0 }];
-      return list.map((a) => ({ theme, themeName: ALLEY_THEMES.find((t) => t.id === theme)!.name, seq: a.seq, name: alleyName(theme, a.seq), residents: a.residents }));
-    });
-    return { id: s.id, name: s.name, topics: s.topics, alleys };
-  });
-  const hall = { ...hallProgress(overview.totalFuel), totalFuel: overview.totalFuel, goal: HALL_GOAL };
+  // 온보딩에서 받은 내 달그락 색 그대로 마을을 걷는다 (가장 최근 도깨비불의 반응 색)
+  const myKind = (me ? (await forgeFires(me.id))[0]?.reactKind : undefined) as ReactKind | undefined;
+  const myHue = myKind ? REACT_HUE[myKind] ?? 0 : 0;
+  const hall = hallProgress(world.totalFuel);
   return (
-    <main className="find">
-      <header className="top"><a className="brand" href="/find">달그락 대장간</a><div className="step">마을 지도</div></header>
-      <VillageMap streets={streets} capacity={ALLEY_CAPACITY} hall={hall} floating={overview.floating} totalForges={overview.totalForges} topWant={overview.topWant}
-        notices={notices.map((n) => ({ id: n.id, title: n.title, body: n.body, publishedAt: n.publishedAt }))} plans={plans} budget={budget}
-        me={me ? { forgeId: me.id, fire: myFires[0] ? { id: myFires[0].id, name: myFires[0].name } : null } : null} couponText={COUPON_TEXT} />
-      <Mailbox screen="village" />
+    <main className="find world-page">
+      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.topics, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} />
     </main>
   );
 }
