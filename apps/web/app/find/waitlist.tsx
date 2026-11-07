@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { track } from "./track";
 
-type Standing = { code: string; position: number; total: number; referrals: number; alreadyJoined: boolean; fireName: string | null };
+type Standing = { code: string; position: number; total: number; referrals: number; fuel?: number; alreadyJoined: boolean; fireName: string | null };
 
 // 대장간 오픈 대기 신청: 손가락 5단계 + 소개 + 이메일. 결과 화면 직후·대장간 설계도·(나중에) 본관에서 같이 쓴다.
-export default function ForgeSignup({ fire, refCode, couponText, onRestart }: { fire: { id: string; name: string } | null; refCode: string | null; couponText: string | null; onRestart?: () => void }) {
+export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRestart }: { fire: { id: string; name: string } | null; forgeId?: string | null; refCode: string | null; couponText: string | null; onRestart?: () => void }) {
   const [email, setEmail] = useState("");
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -31,7 +31,7 @@ export default function ForgeSignup({ fire, refCode, couponText, onRestart }: { 
       setBusy(false);
     }
   }
-  const invite = typeof window === "undefined" || !standing ? "" : `${window.location.origin}${fire ? `/f/${fire.id}` : "/find"}?ref=${standing.code}`;
+  const invite = typeof window === "undefined" || !standing ? "" : `${window.location.origin}${forgeId ? `/f/${forgeId}` : fire ? `/f/${fire.id}` : "/find"}?ref=${standing.code}`;
 
   return (
     <section className="screen">
@@ -52,11 +52,11 @@ export default function ForgeSignup({ fire, refCode, couponText, onRestart }: { 
           <div className="queue">
             <div className="muted small">{standing.alreadyJoined ? "이미 줄 서 있어! 대장간 대기 순번" : "대장간 대기 순번"}</div>
             <b>#{standing.position}</b>
-            <div className="muted tiny">{standing.fireName ?? "네 도깨비불"} 자리 맡아둘게 · 지금까지 메밀묵 {standing.referrals}그릇</div>
+            <div className="muted tiny">{standing.fireName ?? "네 도깨비불"} 자리 맡아둘게 · 받은 장작 {standing.fuel ?? 0}개</div>
           </div>
           <div className="note">
-            <div className="display" style={{ fontSize: 18 }}>도깨비한테 메밀묵 갖다주기</div>
-            <div className="small body">친구가 이 링크로 도깨비불을 찾고 줄을 서면 메밀묵 한 그릇. 한 그릇마다 순번이 3칸 앞당겨져.{couponText ? ` 그리고 ${couponText}` : ""}</div>
+            <div className="display" style={{ fontSize: 18 }}>장작을 받으면 순번이 앞당겨져</div>
+            <div className="small body">친구가 네 대장간에 놀러 와서 장작을 하나 넣을 때마다 순번이 한 칸씩 앞당겨져. 아래 링크를 보내봐.{couponText ? ` 그리고 ${couponText}` : ""}</div>
             <button className="btn btn-ghost" type="button" onClick={async () => { try { await navigator.clipboard.writeText(invite); setCopied(true); track("invite_copy"); } catch { /* 직접 복사 */ } }}>{copied ? "복사했어!" : "초대 링크 복사"}</button>
             <div className="tiny muted" style={{ wordBreak: "break-all" }}>{invite}</div>
           </div>

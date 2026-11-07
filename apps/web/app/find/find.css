@@ -270,6 +270,28 @@ body:has(.find){background:#fff}
 .find .news .link{color:#C9CBD1;align-self:flex-end;min-height:32px}
 .find .news .muted{color:#A3A6AE}
 
+/* 놀러 가기 */
+.find .social-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.find .social-stats div{border:1px solid var(--line);border-radius:14px;padding:10px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.find .social-stats b{font-family:var(--font-display);font-weight:400;font-size:24px}
+.find .social-stats small{font-size:11px;color:var(--muted)}
+.find .visit-panel{display:flex;flex-direction:column;gap:10px}
+.find .visit-panel .btn{font-size:17px}
+.find .phrases{display:flex;flex-wrap:wrap;gap:6px}
+.find .phrases .chip{min-height:38px;font-size:13px;padding:0 12px}
+.find .phrases .chip:disabled{opacity:.45}
+.find .notes{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:12px}
+.find .note-row{display:flex;gap:8px;font-size:14px;align-items:baseline}
+.find .note-row a{font-weight:700;color:var(--ink);text-decoration:none;flex-shrink:0}
+.find .town-tabs{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:6px}
+.find .town-tabs a{padding:12px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--ink);text-decoration:none;border-right:1px solid var(--line)}
+.find .town-tabs a:last-child{border-right:0}
+.find .dex-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.find .dex-card{border:1.5px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--ink);text-align:center}
+.find .dex-card b{font-size:13px;line-height:1.35}
+.find .dex-card small{font-size:11px;color:var(--muted)}
+.find .dex-empty{border:1.5px dashed var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);font-size:14px}
+
 /* 공유 시트 */
 .find .overlay{position:fixed;inset:0;background:rgba(20,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fd-in .2s}
 .find .sheet{width:min(360px,100%);max-height:calc(100dvh - 40px);overflow:auto;background:#fff;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
