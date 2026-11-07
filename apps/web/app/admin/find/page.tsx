@@ -2,8 +2,8 @@ import { isOperator } from "../../../lib/find/admin-auth";
 import { allWaitlist, eventCounts, storageKind } from "../../../lib/find/store";
 import { notFound } from "next/navigation";
 import { ClearEvents, DeleteEntry } from "./admin-actions";
-import { MailRow, NoticeForm, SyncButton } from "./village-admin";
-import { latestNotices, listMail } from "../../../lib/find/village-store";
+import { MailRow, NoticeForm, PlanAdmin, ReportRow, SyncButton } from "./village-admin";
+import { latestNotices, listMail, listPlans, listReports } from "../../../lib/find/village-store";
 import { notionEnabled } from "../../../lib/find/notion";
 import CouponToggle from "./coupon-toggle";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // 도깨비불 찾기 운영 화면 (로그인한 사람만). HANDOFF §8 핵심 지표 + 대기열.
 export default async function FindAdmin() {
   if (!(await isOperator())) notFound();
-  const [counts, waitlist, mails, notices] = await Promise.all([eventCounts(), allWaitlist(), listMail(), latestNotices(10)]);
+  const [counts, waitlist, mails, notices, plans, reports] = await Promise.all([eventCounts(), allWaitlist(), listMail(), latestNotices(10), listPlans(null), listReports()]);
   const n = (k: string) => counts[k] ?? 0;
   const referred = waitlist.filter((w) => w.referredBy).length;
   const rate = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "-");
@@ -68,6 +68,10 @@ export default async function FindAdmin() {
       <h2 style={{ fontSize: 16, marginTop: 24 }}>마을 소식판</h2>
       <NoticeForm />
       <ul>{notices.map((n) => <li key={n.id}><b>{n.title}</b> — {n.body} <small>({n.publishedAt.slice(0, 10)})</small></li>)}</ul>
+      <h2 style={{ fontSize: 16, marginTop: 24 }}>공사 계획판</h2>
+      <PlanAdmin plans={plans.map((p) => ({ id: p.id, title: p.title, status: p.status, fuel: p.fuel }))} />
+      <h2 style={{ fontSize: 16, marginTop: 24 }}>신고된 집 ({reports.filter((r) => !r.resolved).length})</h2>
+      <table style={{ borderCollapse: "collapse", width: "100%", background: "white" }}><tbody>{reports.map((r) => <ReportRow key={r.id} report={r} />)}</tbody></table>
       <h2 style={{ fontSize: 16, marginTop: 24 }}>이벤트 수</h2>
       <p><ClearEvents /></p>
       <p className="muted">{Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ") || "아직 없음"}</p>

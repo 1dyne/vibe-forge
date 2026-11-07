@@ -461,3 +461,81 @@ describe("놀러 가기 (Phase 3, 파일 저장)", () => {
     expect(again.position).toBe(2); // 3번째 - 장작 2개 = 1번째와 같은 자리, 같으면 먼저 신청한 사람이 앞
   });
 });
+
+describe("손바닥 마을 (Phase 4)", () => {
+  let dir = "";
+  beforeEach(async () => {
+    resetRateLimits();
+    dir = await mkdtemp(path.join(os.tmpdir(), "find-town-"));
+    vi.stubEnv("FIND_TEST_DATA_FILE", path.join(dir, "find.json"));
+    vi.stubEnv("DATABASE_URL", ""); vi.stubEnv("DATABASE_URL_WEB", ""); vi.stubEnv("NOTION_TOKEN", "");
+  });
+  afterEach(async () => { vi.unstubAllEnvs(); await rm(dir, { recursive: true, force: true }); });
+
+  const makeForge = async (nickname: string, ids: string[]) => {
+    const find = lookup(chipTree("고양이가 밥 먹었는지 모르겠어"));
+    const res = await fireRoute(post("/api/find/fires", { idea: "고양이", picked: ids.map((id) => find(id)), peak: 60, nickname }));
+    const body = await res.json();
+    return { cookie: res.cookies.get("find_owner")!.value, forgeId: body.forge.id as string };
+  };
+
+  it("본관 공사는 마을 장작 총합으로 25%마다 한 단계, 집 굴뚝 불은 화력+장작", async () => {
+    const { hallProgress, chimneyLevel, STREETS, ALLEY_THEMES } = await import("../apps/web/lib/find/village");
+    expect(hallProgress(0)).toMatchObject({ pct: 0, stage: 0, label: "터" });
+    expect(hallProgress(500)).toMatchObject({ pct: 50, stage: 2, label: "지붕" });
+    expect(hallProgress(5000)).toMatchObject({ pct: 100, stage: 4, label: "완공" });
+    expect(chimneyLevel(30, 0)).toBe(1);
+    expect(chimneyLevel(60, 10)).toBe(2);
+    expect(chimneyLevel(90, 10)).toBe(3);
+    // 모든 골목은 큰길 하나에 속한다
+    for (const t of ALLEY_THEMES) expect(STREETS.filter((s) => s.themes.includes(t.id)).length, t.id).toBe(1);
+  });
+
+  it("골목 지도는 터 순서대로, 비공개 집은 잠긴 집으로, 이웃은 끈으로", async () => {
+    const a = await makeForge("가", ["f_bowl", "w_pet"]);
+    const b = await makeForge("나", ["f_bowl", "w_cat"]);
+    const c = await makeForge("다", ["f_bowl", "w_pet"]);
+    const { setNeighbor, setVisibility, alleyHouses, villageOverview, giveFuel } = await import("../apps/web/lib/find/village-store");
+    await setNeighbor(a.forgeId, b.forgeId, true);
+    await setNeighbor(a.forgeId, c.forgeId, true);
+    await setVisibility(c.forgeId, "private");
+    await giveFuel(b.forgeId, a.forgeId);
+    const { houses, strings } = await alleyHouses("cat", 1);
+    expect(houses.map((h) => [h.plotNo, h.nickname, h.locked])).toEqual([[1, "가", false], [2, "나", false], [3, "잠긴 집", true]]);
+    expect(houses[2].forgeId).toBeNull();
+    expect(houses[0].fuel).toBe(1);
+    expect(strings).toEqual([{ follower: a.forgeId, followee: b.forgeId }]); // 비공개 집으로 가는 끈은 숨김
+    const overview = await villageOverview();
+    expect(overview).toMatchObject({ totalFuel: 1, totalForges: 3, alleys: [{ theme: "cat", seq: 1, residents: 3 }] });
+  });
+
+  it("공사 계획판: 내 장작(1 + 받은 장작) 안에서, 후보당 최대 3개", async () => {
+    const a = await makeForge("가", ["f_bowl", "w_pet"]);
+    const b = await makeForge("나", ["f_desk", "s_time"]);
+    const { createPlan, giveFuel } = await import("../apps/web/lib/find/village-store");
+    await createPlan("밤 테마 골목", "");
+    await createPlan("도감 교환", "");
+    const { POST } = await import("../apps/web/app/api/find/plan/route");
+    const vote = (cookie: string | null, planId: number, fuel: number) => POST(post("/api/find/plan", { planId, fuel }, cookie ? { cookie: `find_owner=${cookie}` } : {}));
+    expect((await vote(null, 1, 1)).status).toBe(403);
+    expect((await vote(a.cookie, 1, 1)).status).toBe(200);
+    expect((await vote(a.cookie, 2, 1)).status).toBe(409); // 장작 1개뿐
+    await giveFuel(b.forgeId, a.forgeId);
+    const ok = await (await vote(a.cookie, 2, 1)).json();
+    expect(ok.budget).toEqual({ total: 2, used: 2 });
+    expect(ok.plans.map((p: { title: string; fuel: number; mine: number }) => [p.title, p.fuel, p.mine])).toEqual([["밤 테마 골목", 1, 1], ["도감 교환", 1, 1]]);
+  });
+
+  it("집 신고는 쌓이고, 운영자가 숨기면 비공개가 된다", async () => {
+    const a = await makeForge("가", ["f_bowl", "w_pet"]);
+    const { POST } = await import("../apps/web/app/api/find/report/route");
+    expect((await POST(post("/api/find/report", { host: a.forgeId, reason: "불쾌한 이름" }))).status).toBe(201);
+    expect((await POST(post("/api/find/report", { host: a.forgeId, reason: "아무거나" }))).status).toBe(400);
+    const { listReports, resolveReport, setVisibility, getForge } = await import("../apps/web/lib/find/village-store");
+    const [r] = await listReports();
+    expect(r).toMatchObject({ forgeId: a.forgeId, reason: "불쾌한 이름", resolved: false });
+    await setVisibility(a.forgeId, "private"); await resolveReport(r.id);
+    expect((await getForge(a.forgeId))?.visibility).toBe("private");
+    expect((await listReports())[0].resolved).toBe(true);
+  });
+});

@@ -46,3 +46,30 @@ export function plotLine(themeId: string, seq: number, plotNo: number, left: num
   if (plotNo <= 10) return `너는 ${name}의 ${plotNo}번째 주민이야`;
   return `${name} ${plotNo}번 터`;
 }
+
+// ── Phase 4: 손바닥 마을 ─────────────────────────────────
+// 손가락 5개 = 관심사 큰길, 손바닥 = 광장(달그락 대장간 본관 공사 중). 이름은 다인 확정 전 가제.
+export type Street = { id: string; name: string; finger: string; topics: string; themes: string[] };
+export const STREETS: Street[] = [
+  { id: "heart", name: "마음길", finger: "엄지", topics: "선물 · 가족 · 기념", themes: [] },
+  { id: "rest", name: "쉼길", finger: "검지", topics: "잠 · 휴식", themes: ["sleep"] },
+  { id: "work", name: "일길", finger: "중지", topics: "책상 · 공부 · 집중 · 물 한 잔", themes: ["desk", "water"] },
+  { id: "home", name: "집길", finger: "약지", topics: "현관 · 부엌 · 식물", themes: ["door", "kitchen", "plant"] },
+  { id: "pet", name: "반려길", finger: "새끼", topics: "냥집사 · 멍집사", themes: ["cat", "dog"] }
+];
+
+// 주민 모두가 넣은 장작의 총합 = 본관 공사 진행도
+export const HALL_GOAL = Math.max(1, Number(process.env.FIND_HALL_GOAL ?? 1000));
+export const HALL_STAGES = ["터", "뼈대", "지붕", "굴뚝", "완공"] as const;
+export function hallProgress(totalFuel: number) {
+  const pct = Math.min(100, Math.floor((totalFuel / HALL_GOAL) * 100));
+  const stage = pct >= 100 ? 4 : pct >= 75 ? 3 : pct >= 50 ? 2 : pct >= 25 ? 1 : 0;
+  return { pct, stage, label: HALL_STAGES[stage] };
+}
+
+// 집 겉모습: 굴뚝 불(화력 + 받은 장작), 창문 불(최근 7일 방문), 깃발(나도 갖고 싶어가 많이 쌓임)
+export const FLAG_WANTS = Math.max(1, Number(process.env.FIND_FLAG_WANTS ?? 5));
+export function chimneyLevel(peak: number, fuel: number): 1 | 2 | 3 {
+  const v = peak + fuel * 3;
+  return v >= 110 ? 3 : v >= 60 ? 2 : 1;
+}
