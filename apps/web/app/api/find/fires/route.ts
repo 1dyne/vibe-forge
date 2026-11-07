@@ -4,6 +4,7 @@ import { ChipSchema, IdeaSchema } from "../../../../lib/find/api-schema";
 import { FIRE, REACT_FIRE, ROOTS, compose, fireName, reactKind, type Chip } from "../../../../lib/find/chips";
 import { assessMaturity } from "../../../../lib/find/maturity";
 import { buildCard, comboKey } from "../../../../lib/find/card";
+import { cleanNickname } from "../../../../lib/find/nickname";
 import { matchProjects, uniqueToIdea } from "../../../../lib/find/projects";
 import { fireRarity, newId, saveFire } from "../../../../lib/find/store";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
@@ -12,7 +13,8 @@ import { hasValidOrigin } from "../../../../lib/request-security";
 const Body = z.object({
   idea: IdeaSchema,
   picked: z.array(ChipSchema).min(1).max(24),
-  peak: z.number().min(0).max(FIRE.max)
+  peak: z.number().min(0).max(FIRE.max),
+  nickname: z.string().max(40).optional()
 }).strict();
 
 // "이 불로 할래!" — 고른 장작으로 문장·이름·닮은 프로젝트를 만들고 공유 링크(/f/:id)를 발급한다.
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
     matches: matches.map((m) => ({ id: m.id, match: m.match })),
     comboKey: key,
     card,
+    nickname: cleanNickname(parsed.data.nickname),
     createdAt: new Date().toISOString()
   };
   try {
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest) {
     console.error("find fire save failed", error instanceof Error ? error.message : "unknown");
     return NextResponse.json({ error: "불을 저장하지 못했어. 잠시 후 다시 해줘." }, { status: 500 });
   }
-  const unique = uniqueToIdea(ids, find, matches[0]);
+  const unique = uniqueToIdea(ids, find, matches);
   const followIds = new Set(ids.filter((id) => !ROOTS.some((r) => r.id === id)));
   const maturity = assessMaturity([...chips.values()], followIds, matches, unique);
   return NextResponse.json({ fire, matches, unique, maturity }, { status: 201 });

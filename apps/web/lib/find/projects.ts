@@ -78,12 +78,12 @@ export function matchProjects(picked: string[], find: (id: string) => Chip | und
     });
 }
 
-/** 내가 골랐는데 1위 프로젝트에는 없는 것 = 추가 설계가 필요한 부분 */
-export function uniqueToIdea(picked: string[], find: (id: string) => Chip | undefined, top: ProjectMatch | undefined): string[] {
-  const project = top ? PROJECTS.find((p) => p.id === top.id) : undefined;
+/** 내가 골랐는데 화면에 보이는 닮은 프로젝트 어디에도 없는 것 = 추가 설계가 필요한 부분 */
+export function uniqueToIdea(picked: string[], find: (id: string) => Chip | undefined, shown: ProjectMatch[]): string[] {
+  const projects = shown.map((m) => PROJECTS.find((p) => p.id === m.id)).filter((p): p is MakerProject => Boolean(p));
   return picked
     .map((id) => find(id))
     .filter((c): c is Chip => Boolean(c))
-    .filter((c) => !project || (c.tags.length > 0 ? !c.tags.some((t) => project.tags[c.cat]?.includes(t)) : true))
+    .filter((c) => c.tags.length === 0 || !projects.some((p) => c.tags.some((t) => p.tags[c.cat]?.includes(t))))
     .map((c) => c.label);
 }

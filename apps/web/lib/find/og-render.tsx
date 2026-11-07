@@ -43,6 +43,11 @@ function gradePill(fire: FireRecord, size: number) {
   );
 }
 
+function ownerLabel(fire: FireRecord) {
+  const name = fire.nickname && fire.nickname !== "이름 없는 도깨비" ? fire.nickname : "";
+  return name ? `${name}의 도깨비불` : "내 도깨비불";
+}
+
 function glow(color: string) {
   return `radial-gradient(circle at 50% 50%, ${color}55 0%, ${color}22 38%, #FFFFFF00 68%)`;
 }
@@ -79,7 +84,7 @@ export async function fireOg(fire: FireRecord, host: string) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginLeft: 36, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
-            <span style={{ fontSize: 30, color: MUTED, letterSpacing: 2, marginRight: 16 }}>내 도깨비불</span>
+            <span style={{ fontSize: 30, color: MUTED, letterSpacing: 2, marginRight: 16 }}>{ownerLabel(fire)}</span>
             {gradePill(fire, 30)}
           </div>
           <div style={{ display: "flex", flexDirection: "column", fontFamily: "Jua", fontSize: 72, color: INK, lineHeight: 1.18, marginTop: 6 }}>
@@ -108,7 +113,7 @@ export async function fireCard(fire: FireRecord, host: string) {
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", background: "#fff", padding: "120px 90px 90px", fontFamily: "Plex" }}>
         <div style={{ display: "flex", alignItems: "center" }}>
-          <span style={{ fontSize: 40, color: MUTED, letterSpacing: 6, marginRight: 22 }}>내 도깨비불</span>
+          <span style={{ fontSize: 40, color: MUTED, letterSpacing: 4, marginRight: 22 }}>{ownerLabel(fire)}</span>
           {gradePill(fire, 42)}
         </div>
         <div style={{ width: 700, height: 700, marginTop: 30, display: "flex", alignItems: "center", justifyContent: "center", backgroundImage: glow(fire.color) }}>
@@ -125,10 +130,12 @@ export async function fireCard(fire: FireRecord, host: string) {
         </div>
         {fire.card ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 34, width: "100%" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", background: INK, color: "#fff", borderRadius: 28, padding: "22px 30px", fontSize: 34, width: "100%" }}>
-              <span>{fire.card.rarityLine}</span>
-              <span style={{ fontWeight: 700, marginTop: 6 }}>{fire.card.peakLine}</span>
-            </div>
+            {(fire.card.rarityLine || fire.card.peakLine) && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", background: INK, color: "#fff", borderRadius: 28, padding: "22px 30px", fontSize: 34, width: "100%" }}>
+                {fire.card.rarityLine && <span>{fire.card.rarityLine}</span>}
+                {fire.card.peakLine && <span style={{ fontWeight: 700, marginTop: 6 }}>{fire.card.peakLine}</span>}
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", background: SURFACE, border: `2px solid ${LINE}`, borderRadius: "10px 40px 40px 40px", padding: "26px 34px", marginTop: 28, width: "100%" }}>
               <span style={{ fontSize: 30, color: MUTED }}>도깨비 한 줄 평</span>
               <span style={{ fontFamily: "Jua", fontSize: 46, color: INK, marginTop: 8 }}>{fire.card.roast.head}</span>

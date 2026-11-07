@@ -39,7 +39,7 @@ export default async function SharedFire({ params, searchParams }: Props) {
         <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>친구가 찾은 도깨비불</div>
         {fire.card ? (
           <>
-            <FireCardView name={fire.name} peak={fire.peak} kind={fire.reactKind as never} card={fire.card} />
+            <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} kind={fire.reactKind as never} card={fire.card} />
             <Roast head={fire.card.roast.head} body={fire.card.roast.body} kind={fire.reactKind as never} />
           </>
         ) : (

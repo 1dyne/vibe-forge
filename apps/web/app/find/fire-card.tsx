@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { fireLabel, type ReactKind } from "../../lib/find/chips";
 import type { FireCard } from "../../lib/find/card";
+import { NAMELESS } from "../../lib/find/nickname";
 import Dokkaebi from "./dokkaebi";
 
 const STAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
 
 /** 도깨비불 트레이딩 카드. 누르면 뒤집혀서 설계 정보(어림)를 보여준다. */
-export default function FireCardView({ name, peak, kind, card }: { name: string; peak: number; kind: ReactKind; card: FireCard }) {
+export default function FireCardView({ name, owner, peak, kind, card }: { name: string; owner?: string; peak: number; kind: ReactKind; card: FireCard }) {
   const [flipped, setFlipped] = useState(false);
   const stars = "★".repeat(card.build.difficulty) + "☆".repeat(5 - card.build.difficulty);
   return (
@@ -22,9 +23,12 @@ export default function FireCardView({ name, peak, kind, card }: { name: string;
             <span className="grade">{card.grade}</span>
           </div>
           <div className="art"><Dokkaebi motion="blaze" fire={peak} width={180} kind={kind} /></div>
+          {owner && owner !== NAMELESS && <div className="owner"><b>{owner}</b>의 도깨비불</div>}
           <div className="fname">{name}</div>
           <div className="fsub">화력 <b>{peak}</b> · {fireLabel(peak)}</div>
-          <div className="rare-line">{card.rarityLine}<br /><b>{card.peakLine}</b></div>
+          {(card.rarityLine || card.peakLine) && (
+            <div className="rare-line">{card.rarityLine}{card.rarityLine && card.peakLine && <br />}{card.peakLine && <b>{card.peakLine}</b>}</div>
+          )}
           <div className="stats">
             {card.stats.map((s) => (
               <div key={s.cat} className="stat"><span>{s.cat}</span><div className="sbar"><i style={{ width: `${Math.max(6, (s.value / 3) * 100)}%`, background: STAT_COLOR[s.cat] }} /></div><b>{s.value}</b></div>

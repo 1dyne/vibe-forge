@@ -179,6 +179,44 @@ body:has(.find){background:#fff}
 .find .roast-bubble{background:var(--surface);border:1px solid var(--line);border-radius:4px 18px 18px 18px;padding:12px 14px;font-size:15px;line-height:1.55}
 .find .roast-bubble b{font-family:var(--font-display);font-weight:400;font-size:17px}
 
+/* 첫 만남 (오프닝) */
+.find .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.find .opening{gap:12px;cursor:default}
+.find .op-stage{height:74dvh;min-height:360px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;margin:0 -20px}
+.find .op-face{position:relative;width:240px;aspect-ratio:1;transform:scale(2.7);transform-origin:46% 52%;transition:transform .95s cubic-bezier(.6,0,.3,1)}
+.find .st-zoom .op-face{transform:scale(1)}
+.find .op-face img{position:absolute;inset:0;width:100%;height:100%;transition:opacity .04s}
+.find .op-face img.gone{opacity:0}
+.find .op-body{display:flex;flex-direction:column;align-items:center;gap:10px;animation:fd-in .3s ease-out}
+.find .op-hi{background:#1B2433;color:#fff;font-family:var(--font-display);font-size:19px;padding:10px 16px;border-radius:14px;position:relative;animation:fd-in .35s ease-out}
+.find .op-hi::after{content:"";position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:#1B2433;transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.find .op-wave{transform-origin:50% 95%;animation:fd-wave .7s ease-in-out 3}
+.find .st-talk .op-wave,.find .st-name .op-wave{animation:none}
+@keyframes fd-wave{0%,100%{transform:rotate(0)}25%{transform:rotate(-9deg)}75%{transform:rotate(9deg)}}
+.find .st-talk,.find .st-name{height:auto;min-height:0;margin-bottom:-4px}
+.find .op-talk{display:flex;flex-direction:column;gap:8px}
+.find .op-line{align-self:flex-start;max-width:92%;background:var(--surface);border:1px solid var(--line);border-radius:4px 18px 18px 18px;padding:11px 15px;font-size:16px;line-height:1.55;animation:fd-in .3s ease-out}
+.find .op-line:last-child{font-family:var(--font-display);font-size:19px}
+.find .op-name{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.find .op-name input{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:14px;font-size:17px;outline:none;min-height:54px}
+.find .op-name input:focus{border-color:var(--ink)}
+.find .fine-left{margin:-4px 0 0;font-size:12px;color:#8C8F98}
+.find .op-skip{margin-top:auto;text-align:center;font-size:12px;color:#A3A6AE}
+.find .owner{font-size:12.5px;color:var(--muted);text-align:center;margin-top:6px}
+.find .owner b{color:var(--ink)}
+
+/* 결과 화면 접는 칸 */
+.find .fold{border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.find .fold>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:14px 16px;font-family:var(--font-display);font-size:18px}
+.find .fold>summary::-webkit-details-marker{display:none}
+.find .fold>summary::after{content:"펼치기";font-family:var(--font-body);font-size:12px;color:var(--muted)}
+.find .fold[open]>summary::after{content:"접기"}
+.find .fold-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.find .fold .growth{border:none;padding:0}
+.find .blueprint-cta{background:var(--ink);color:#fff;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.find .blueprint-cta .display{font-size:20px;line-height:1.35}
+.find .blueprint-cta p{margin:0;font-size:13px;line-height:1.6;color:#C9CBD1}
+
 /* 공유 시트 */
 .find .overlay{position:fixed;inset:0;background:rgba(20,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fd-in .2s}
 .find .sheet{width:min(360px,100%);max-height:calc(100dvh - 40px);overflow:auto;background:#fff;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}
