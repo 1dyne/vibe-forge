@@ -8,6 +8,9 @@ import Dokkaebi from "./dokkaebi";
 import FireCardView, { Roast } from "./fire-card";
 import type { FireCard } from "../../lib/find/card";
 import Opening from "./opening";
+import ForgeSignup from "./waitlist";
+import Mailbox from "./mailbox";
+import VillageNews from "./village-news";
 import { track } from "./track";
 
 const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
@@ -18,8 +21,8 @@ const VIBE_PROMPT = (idea: string) => `나는 개발자가 아니야. "${idea.tr
 
 type Screen = "opening" | "intro" | "thinking" | "software" | "unsafe" | "stoke" | "reveal" | "forge";
 type Fire = { id: string; name: string; nickname?: string; sentence: string; color: string; reactKind: string; peak: number; labels: string[]; card: FireCard | null };
-type Result = { fire: Fire; matches: ProjectMatch[]; unique: string[]; maturity: Maturity };
-type Standing = { code: string; position: number; total: number; referrals: number; alreadyJoined: boolean; fireName: string | null };
+type ForgeSummary = { id: string; isNew: boolean; alley: string; plotNo: number; line: string };
+type Result = { fire: Fire; matches: ProjectMatch[]; unique: string[]; maturity: Maturity; forge: ForgeSummary | null };
 
 const EMPTY_TREE: ChipTree = { root: [], follow: {} };
 
@@ -178,6 +181,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
 
       {screen === "intro" && (
         <section className="screen">
+          <VillageNews />
           <div className="intro-head">
             <Dokkaebi motion="idle" fire={30} width={112} />
             <div className="bubble">좋아, {nickname || "인간"}!<br />만들고 싶은 거, 아니면<br />요즘 귀찮은 거 하나만 말해줘.</div>
@@ -273,10 +277,11 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       )}
 
       {screen === "forge" && (
-        <Forge fire={result?.fire ?? null} refCode={ref} couponText={couponText} onRestart={() => { setIdea(""); setAnalysis(null); setTree(EMPTY_TREE); resetFire(); go("intro"); }} />
+        <ForgeSignup fire={result?.fire ?? null} refCode={ref} couponText={couponText} onRestart={() => { setIdea(""); setAnalysis(null); setTree(EMPTY_TREE); resetFire(); go("intro"); }} />
       )}
 
       {shareOpen && result && <ShareSheet fire={result.fire} onClose={() => setShareOpen(false)} />}
+      {screen !== "opening" && screen !== "stoke" && <Mailbox screen={`find:${screen}`} />}
     </main>
   );
 }
@@ -309,7 +314,7 @@ function VibeGuide({ idea }: { idea: string }) {
 function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge }: {
   result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
 }) {
-  const { fire, matches, unique, maturity } = result;
+  const { fire, matches, unique, maturity, forge } = result;
   return (
     <section className="screen">
       <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 도깨비불이 태어났어</div>
@@ -329,10 +334,17 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
         <div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div>
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
       </div>
+      {forge && (
+        <div className="forge-made">
+          <span className="tiny muted">{forge.isNew ? "도깨비 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span>
+          <b>{forge.line}</b>
+          <a className="btn btn-fire" href={`/f/${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }} onClick={() => track(forge.isNew ? "forge_created" : "forge_open")}>{forge.isNew ? "내 대장간 짓기" : "내 대장간 가기"}</a>
+        </div>
+      )}
       <div className="blueprint-cta">
         <div className="display">말하면, 회로도부터 조립까지.</div>
         <p>대장간이 열리면 네 도깨비불의 회로도 첫 장을 보내줄게.</p>
-        <button className="btn btn-fire" type="button" onClick={onForge}>이 도깨비불의 회로도 받기</button>
+        <button className="btn" type="button" style={{ background: "#fff", color: "var(--ink)" }} onClick={onForge}>이 도깨비불의 회로도 받기</button>
       </div>
       <details className="fold">
         <summary>지금 더 해보면 좋은 것</summary>
@@ -431,79 +443,5 @@ function ShareSheet({ fire, onClose }: { fire: Fire; onClose: () => void }) {
         <button className="link" type="button" onClick={onClose}>닫기</button>
       </div>
     </div>
-  );
-}
-
-function Forge({ fire, refCode, couponText, onRestart }: { fire: Fire | null; refCode: string | null; couponText: string | null; onRestart: () => void }) {
-  const [email, setEmail] = useState("");
-  const [privacy, setPrivacy] = useState(false);
-  const [marketing, setMarketing] = useState(false);
-  const [honeypot, setHoneypot] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [standing, setStanding] = useState<Standing | null>(null);
-  const [copied, setCopied] = useState(false);
-  const steps: Array<[string, string]> = [["아이디어", "도깨비불 찾기 완료"], ["부품", "실제로 살 수 있는 부품 추천"], ["회로", "회로도와 연결 순서"], ["하우징", "케이스 설계와 대안"], ["조립", "레고 설명서처럼 단계별로"]];
-
-  async function join() {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/find/waitlist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, fireId: fire?.id ?? null, privacyConsent: privacy, marketingConsent: marketing, ref: refCode, website: honeypot }) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "신청하지 못했어.");
-      setStanding(body.standing);
-      track("waitlist_join", { referred: Boolean(refCode) });
-      if (refCode && !body.standing.alreadyJoined) track("referral_join");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "신청하지 못했어.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  const invite = typeof window === "undefined" || !standing ? "" : `${window.location.origin}${fire ? `/f/${fire.id}` : "/find"}?ref=${standing.code}`;
-
-  return (
-    <section className="screen">
-      <h2>불은 찾았어.<br />이제 몸을 만들어줄 차례야.</h2>
-      {steps.map(([t, d], i) => (
-        <div key={t} className={`finger-step ${i === 0 ? "on" : ""}`}>
-          <div className="dot">{i + 1}</div>
-          <div style={{ flex: 1 }}><div className="step-title" style={i ? { color: "var(--muted)" } : undefined}>{t}</div><div className="muted tiny">{d}</div></div>
-          <div className="tiny" style={i ? { color: "#8C8F98" } : { fontWeight: 700 }}>{i ? "오픈하면 켜져" : "불 켜짐"}</div>
-        </div>
-      ))}
-      <div className="pitch">
-        <div className="display" style={{ fontSize: 22, lineHeight: 1.4 }}>말하면, 회로도부터 조립까지.<br />하드웨어 올인원 대장간.</div>
-        <div className="muted tiny" style={{ lineHeight: 1.6 }}>이미 구독 중인 AI에 커넥터로 연결해서 추가 비용 없이 써요. 부품 불량으로 바꾸는 부품값만 해도 서러우니까.</div>
-      </div>
-      {standing ? (
-        <>
-          <div className="queue">
-            <div className="muted small">{standing.alreadyJoined ? "이미 줄 서 있어! 대장간 대기 순번" : "대장간 대기 순번"}</div>
-            <b>#{standing.position}</b>
-            <div className="muted tiny">{standing.fireName ?? "네 도깨비불"} 자리 맡아둘게 · 지금까지 메밀묵 {standing.referrals}그릇</div>
-          </div>
-          <div className="note">
-            <div className="display" style={{ fontSize: 18 }}>도깨비한테 메밀묵 갖다주기</div>
-            <div className="small body">친구가 이 링크로 도깨비불을 찾고 줄을 서면 메밀묵 한 그릇. 한 그릇마다 순번이 3칸 앞당겨져.{couponText ? ` 그리고 ${couponText}` : ""}</div>
-            <button className="btn btn-ghost" type="button" onClick={async () => { try { await navigator.clipboard.writeText(invite); setCopied(true); track("invite_copy"); } catch { /* 직접 복사 */ } }}>{copied ? "복사했어!" : "초대 링크 복사"}</button>
-            <div className="tiny muted" style={{ wordBreak: "break-all" }}>{invite}</div>
-          </div>
-        </>
-      ) : (
-        <form className="join" onSubmit={(e) => { e.preventDefault(); if (privacy) join(); }}>
-          <label htmlFor="email">오픈하면 네 도깨비불의 설계도 첫 장을 보내줄게</label>
-          <input id="email" type="email" required autoComplete="email" placeholder="이메일 주소" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="hp" tabIndex={-1} autoComplete="off" aria-hidden name="website" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
-          <label className="check"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} required /><span><b>[필수]</b> 개인정보 수집·이용 동의</span></label>
-          <p className="fine">수집 항목: 이메일, 네 도깨비불(처음 적은 문장·고른 장작·화력) · 목적: 대장간 오픈 알림과 설계도 첫 장 발송, 추천 순번 계산 · 보관: 오픈 안내 후 6개월 또는 삭제 요청 시까지</p>
-          <label className="check"><input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} /><span><b>[선택]</b> 오픈 이후 새 소식·이벤트 받기</span></label>
-          {refCode && <p className="fine">초대 코드 {refCode}로 줄 서는 중</p>}
-          {error && <p className="error" role="alert">{error}</p>}
-          <button className="btn" type="submit" disabled={busy || !privacy || !email}>{busy ? "줄 서는 중…" : "오픈 알림 받기"}</button>
-        </form>
-      )}
-      <button className="link" type="button" onClick={onRestart}>처음부터 다시</button>
-    </section>
   );
 }

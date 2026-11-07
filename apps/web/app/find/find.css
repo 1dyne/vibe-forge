@@ -232,6 +232,44 @@ body:has(.find){background:#fff}
 .find .blueprint-cta .display{font-size:20px;line-height:1.35}
 .find .blueprint-cta p{margin:0;font-size:13px;line-height:1.6;color:#C9CBD1}
 
+/* 내 대장간 (방 그림은 다인 그림이 오기 전 임시 도형) */
+.find .forge-head{text-align:center;display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.find .room{position:relative;width:100%;aspect-ratio:1/1;margin:4px 0}
+.find .room-bg{position:absolute;inset:0;width:100%;height:100%}
+.find .obj{position:absolute;transform:translate(-50%,-50%);background:none;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+.find .obj em{font-style:normal;font-size:11px;font-weight:700;background:#fff;border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.find .obj:active{transform:translate(-50%,-50%) scale(.95)}
+.find .obj-blueprint{left:26%;top:33%}
+.find .bp-paper{width:62px;height:46px;background:#fff;border:2px solid var(--outline);border-radius:4px;display:flex;align-items:center;justify-content:center;gap:4px;transform:skewY(-24deg)}
+.find .bp-paper i{width:7px;height:7px;border-radius:50%;background:var(--surface-2);border:1px solid #bbb}
+.find .bp-paper i.on{background:var(--fire);border-color:var(--outline)}
+.find .obj-shelf{left:74%;top:31%}
+.find .shelf-board{min-width:70px;height:24px;border-bottom:5px solid #8B6A4A;display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:0 4px;transform:skewY(24deg)}
+.find .shelf-board i{width:10px;height:14px;border-radius:50% 50% 45% 45%;border:1.5px solid var(--outline)}
+.find .shelf-board b{font-size:10px}
+.find .obj-hearth{left:50%;top:60%}
+.find .obj-hearth .dk{filter:drop-shadow(0 6px 6px rgba(0,0,0,.12))}
+.find .obj-invention{left:24%;top:73%}
+.find .inv-stack{display:flex;flex-direction:column;gap:2px;align-items:center}
+.find .inv-stack span{font-size:10px;background:#fff;border:1.5px solid var(--outline);border-radius:6px;padding:2px 6px;white-space:nowrap}
+.find .obj-mailbox{left:77%;top:74%}
+.find .mb-box{width:34px;height:30px;background:#E2574C;border:2px solid var(--outline);border-radius:14px 14px 4px 4px}
+.find .owner-bar{display:flex;flex-direction:column;gap:10px}
+.find .vis select{width:100%;min-height:50px;border:1.5px solid var(--line);border-radius:16px;padding:0 12px;font-size:14px;background:#fff}
+.find .sheet.tall{width:min(400px,100%)}
+.find .shelf-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px dashed var(--line);color:var(--ink);text-decoration:none}
+.find .shelf-row i{width:14px;height:18px;border-radius:50% 50% 45% 45%;border:1.5px solid var(--outline);flex-shrink:0}
+.find .shelf-row span{flex:1;font-weight:700;font-size:14px}
+.find .shelf-row small{font-size:12px;color:var(--muted)}
+.find .forge-made{border:1.5px dashed var(--fire);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;text-align:center}
+.find .forge-made b{font-family:var(--font-display);font-weight:400;font-size:19px}
+.find:has(.mailbox-fab) .screen{padding-bottom:84px}
+.find .mailbox-fab{position:fixed;right:max(14px,calc(50vw - 215px + 14px));bottom:18px;z-index:5;width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line);background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.12);cursor:pointer}
+.find .news{position:relative;background:var(--ink);color:#fff;border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;font-size:14px;line-height:1.5;animation:fd-in .3s ease-out}
+.find .news b{font-family:var(--font-display);font-weight:400;font-size:17px}
+.find .news .link{color:#C9CBD1;align-self:flex-end;min-height:32px}
+.find .news .muted{color:#A3A6AE}
+
 /* 공유 시트 */
 .find .overlay{position:fixed;inset:0;background:rgba(20,20,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10;animation:fd-in .2s}
 .find .sheet{width:min(360px,100%);max-height:calc(100dvh - 40px);overflow:auto;background:#fff;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}

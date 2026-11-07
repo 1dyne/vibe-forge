@@ -161,3 +161,28 @@ export async function fireCard(fire: FireRecord, host: string) {
     { width: 1080, height: 1920, fonts: await fonts(), headers: CACHE }
   );
 }
+
+export async function forgeOg(input: { nickname: string; alley: string; plotNo: number; fires: number; color: string; reactKind: string }, host: string) {
+  const img = await dokkaebi(input.reactKind as ReactKind);
+  return new ImageResponse(
+    (
+      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", background: "#fff", padding: "0 80px", fontFamily: "Plex" }}>
+        <div style={{ width: 430, height: 430, display: "flex", alignItems: "center", justifyContent: "center", backgroundImage: glow(input.color) }}>
+          <img src={img} width={330} height={330} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", marginLeft: 36, flex: 1 }}>
+          <div style={{ fontSize: 30, color: MUTED }}>{`${input.alley} · ${input.plotNo}번 터`}</div>
+          <div style={{ display: "flex", flexDirection: "column", fontFamily: "Jua", fontSize: 74, color: INK, lineHeight: 1.18, marginTop: 8 }}>
+            <span>{`${input.nickname}의`}</span>
+            <span>대장간</span>
+          </div>
+          <div style={{ fontSize: 30, color: MUTED, marginTop: 14 }}>{`도깨비불 ${input.fires}개가 머무는 중`}</div>
+          <div style={{ display: "flex", marginTop: 22, alignSelf: "flex-start", background: input.color, borderRadius: 999, padding: "14px 28px", fontFamily: "Jua", fontSize: 34, color: INK }}>놀러 와!</div>
+          <div style={{ fontSize: 22, color: MUTED, marginTop: 18 }}>{`달그락 대장간 · ${host}`}</div>
+        </div>
+      </div>
+    ),
+    { width: 1200, height: 600, fonts: await fonts(), headers: { "cache-control": "public, max-age=600" } }
+  );
+}
+

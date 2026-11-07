@@ -5,6 +5,9 @@ import { FIRE, REACT_FIRE, ROOTS, compose, fireName, reactKind, type Chip } from
 import { assessMaturity } from "../../../../lib/find/maturity";
 import { buildCard, comboKey } from "../../../../lib/find/card";
 import { cleanNickname } from "../../../../lib/find/nickname";
+import { newOwnerToken, ownerTokenFrom, OWNER_COOKIE, setOwnerCookie } from "../../../../lib/find/owner";
+import { alleyName, plotLine } from "../../../../lib/find/village";
+import { ensureForge, hashToken } from "../../../../lib/find/village-store";
 import { matchProjects, uniqueToIdea } from "../../../../lib/find/projects";
 import { fireRarity, newId, saveFire } from "../../../../lib/find/store";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
@@ -38,6 +41,16 @@ export async function POST(request: NextRequest) {
     console.error("find rarity failed", error instanceof Error ? error.message : "unknown");
   }
   const card = buildCard([...chips.values()], Math.round(peak), rarity, matches);
+  const nickname = cleanNickname(parsed.data.nickname);
+  // 이 기기의 대장간: 처음이면 장작과 맞는 골목의 다음 빈 터에 짓고, 있으면 선반에 불을 하나 더 얹는다
+  const existingToken = ownerTokenFrom(request.cookies.get(OWNER_COOKIE)?.value);
+  const token = existingToken ?? newOwnerToken();
+  let forge: Awaited<ReturnType<typeof ensureForge>> | null = null;
+  try {
+    forge = await ensureForge(hashToken(token), nickname, ids);
+  } catch (error) {
+    console.error("find forge failed", error instanceof Error ? error.message : "unknown");
+  }
   const fire = {
     id: newId(),
     idea,
@@ -51,7 +64,8 @@ export async function POST(request: NextRequest) {
     matches: matches.map((m) => ({ id: m.id, match: m.match })),
     comboKey: key,
     card,
-    nickname: cleanNickname(parsed.data.nickname),
+    nickname,
+    forgeId: forge?.forge.id ?? null,
     createdAt: new Date().toISOString()
   };
   try {
@@ -63,5 +77,12 @@ export async function POST(request: NextRequest) {
   const unique = uniqueToIdea(ids, find, matches);
   const followIds = new Set(ids.filter((id) => !ROOTS.some((r) => r.id === id)));
   const maturity = assessMaturity([...chips.values()], followIds, matches, unique);
-  return NextResponse.json({ fire, matches, unique, maturity }, { status: 201 });
+  const f = forge?.forge;
+  const forgeSummary = f ? {
+    id: f.id, isNew: forge!.isNew, alley: alleyName(f.theme, f.alleySeq), plotNo: f.plotNo,
+    line: forge!.isNew ? plotLine(f.theme, f.alleySeq, f.plotNo, forge!.left) : `${alleyName(f.theme, f.alleySeq)} ${f.plotNo}번 터`
+  } : null;
+  const response = NextResponse.json({ fire, matches, unique, maturity, forge: forgeSummary }, { status: 201 });
+  if (!existingToken && f) setOwnerCookie(response, token);
+  return response;
 }

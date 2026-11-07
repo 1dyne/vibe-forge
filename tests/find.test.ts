@@ -287,3 +287,104 @@ describe.skipIf(!pgUrl)("Postgres 저장소", () => {
     expect(second.standing.alreadyJoined).toBe(true);
   });
 });
+
+describe("도깨비 마을 (Phase 2)", () => {
+  it("장작과 가장 많이 겹치는 골목, 같으면 덜 찬 골목으로 간다", async () => {
+    const { pickTheme, plotFor, plotLine, alleyName } = await import("../apps/web/lib/find/village");
+    expect(pickTheme(["w_cat", "f_bowl", "r_light"], {}).id).toBe("cat");
+    expect(pickTheme(["f_cup", "s_cup"], {}).id).toBe("water");
+    expect(pickTheme(["r_light"], { cat: 3, dog: 0, water: 1 }).id).not.toBe("cat"); // 안 겹치면 한산한 골목
+    expect(plotFor(0)).toEqual({ seq: 1, plotNo: 1, left: 99 });
+    expect(plotFor(100)).toEqual({ seq: 2, plotNo: 1, left: 99 });
+    expect(alleyName("cat", 2)).toBe("냥집사 2골목");
+    expect(plotLine("cat", 1, 97, 3)).toBe("냥집사 골목 마지막 3터 남았어");
+    expect(plotLine("cat", 1, 1, 99)).toBe("너는 냥집사 골목의 1번째 주민이야");
+  });
+});
+
+describe("내 대장간·우체통 (파일 저장)", () => {
+  let dir = "";
+  beforeEach(async () => {
+    resetRateLimits();
+    dir = await mkdtemp(path.join(os.tmpdir(), "find-village-"));
+    vi.stubEnv("FIND_TEST_DATA_FILE", path.join(dir, "find.json"));
+    vi.stubEnv("DATABASE_URL", ""); vi.stubEnv("DATABASE_URL_WEB", ""); vi.stubEnv("NOTION_TOKEN", "");
+  });
+  afterEach(async () => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); await rm(dir, { recursive: true, force: true }); });
+
+  const lock = async (cookie: string | null, ids: string[], nickname = "다인") => {
+    const tree = chipTree("고양이가 밥 먹었는지 모르겠어");
+    const find = lookup(tree);
+    return fireRoute(post("/api/find/fires", { idea: "고양이가 밥 먹었는지 모르겠어", picked: ids.map((id) => find(id)), peak: 70, nickname }, cookie ? { cookie: `find_owner=${cookie}` } : {}));
+  };
+
+  it("첫 불에 대장간이 생기고, 같은 기기의 다음 불은 같은 대장간 선반에 쌓인다", async () => {
+    const first = await lock(null, ["f_bowl", "s_weight", "w_pet"]);
+    const body = await first.json();
+    expect(body.forge.isNew).toBe(true);
+    expect(body.forge.alley).toBe("냥집사 골목");
+    expect(body.forge.line).toBe("너는 냥집사 골목의 1번째 주민이야");
+    const cookie = first.cookies.get("find_owner")?.value;
+    expect(cookie).toBeTruthy();
+    const second = await (await lock(cookie!, ["r_light", "s_time"])).json();
+    expect(second.forge.isNew).toBe(false);
+    expect(second.forge.id).toBe(body.forge.id);
+    const { forgeFires, getForge } = await import("../apps/web/lib/find/village-store");
+    expect((await forgeFires(body.forge.id)).map((f) => f.id)).toEqual([second.fire.id, body.fire.id]);
+    expect((await getForge(body.forge.id))?.nickname).toBe("다인");
+    // 다른 기기는 다른 대장간(같은 골목 2번 터)
+    const other = await (await lock(null, ["f_bowl", "w_cat"], "미미")).json();
+    expect(other.forge.id).not.toBe(body.forge.id);
+    expect(other.forge.plotNo).toBe(2);
+  });
+
+  it("공개 범위는 주인만 바꿀 수 있다", async () => {
+    const first = await lock(null, ["f_bowl", "w_pet"]);
+    const cookie = first.cookies.get("find_owner")!.value;
+    const { PATCH } = await import("../apps/web/app/api/find/forge/route");
+    const patch = (c: string | null) => PATCH(new NextRequest(`${origin}/api/find/forge`, { method: "PATCH", headers: { origin, "content-type": "application/json", ...(c ? { cookie: `find_owner=${c}` } : {}) }, body: JSON.stringify({ visibility: "private" }) }));
+    expect((await patch(null)).status).toBe(403);
+    expect((await patch(cookie)).status).toBe(200);
+  });
+
+  it("우체통 편지는 저장되고, 반영 완료 답장은 주인의 다음 접속 때 한 번 보인다", async () => {
+    const first = await lock(null, ["f_bowl", "w_pet"]);
+    const cookie = first.cookies.get("find_owner")!.value;
+    const { POST: mailPost } = await import("../apps/web/app/api/find/mail/route");
+    const sent = await mailPost(post("/api/find/mail", { kind: "bug", body: "공유 버튼이 안 눌려요", screen: "find:reveal" }, { cookie: `find_owner=${cookie}` }));
+    expect(sent.status).toBe(201);
+    const { listMail, updateMail } = await import("../apps/web/lib/find/village-store");
+    const [mail] = await listMail();
+    expect(mail.forgeId).toBeTruthy();
+    expect(mail.notionSynced).toBe(false); // 토큰이 없으면 앱 DB에만
+    await updateMail(mail.id, { status: "done", reply: "고쳐놨어!" });
+    const { GET: meGet, POST: mePost } = await import("../apps/web/app/api/find/me/route");
+    const me = await (await meGet(new NextRequest(`${origin}/api/find/me`, { headers: { cookie: `find_owner=${cookie}` } }))).json();
+    expect(me.replies).toEqual([{ id: mail.id, asked: "공유 버튼이 안 눌려요", reply: "고쳐놨어!" }]);
+    await mePost(post("/api/find/me", { replyIds: [mail.id] }, { cookie: `find_owner=${cookie}` }));
+    const again = await (await meGet(new NextRequest(`${origin}/api/find/me`, { headers: { cookie: `find_owner=${cookie}` } }))).json();
+    expect(again.replies).toEqual([]);
+  });
+
+  it("노션 토큰이 있으면 편지를 노션에 만들고, 노션에서 바꾼 상태·답장을 가져온다", async () => {
+    vi.stubEnv("NOTION_TOKEN", "test-token");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    let appMailId = "";
+    vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+      const body = JSON.parse(init.body);
+      calls.push({ url, body });
+      if (url.endsWith("/pages")) { appMailId = body.properties["앱 편지 ID"].rich_text[0].text.content; return new Response(JSON.stringify({ id: "page-1" }), { status: 200 }); }
+      return new Response(JSON.stringify({ results: [{ properties: { "앱 편지 ID": { rich_text: [{ plain_text: appMailId }] }, 상태: { status: { name: "반영 완료" } }, 답장: { rich_text: [{ plain_text: "고쳐놨어!" }] } } }] }), { status: 200 });
+    });
+    const { POST: mailPost } = await import("../apps/web/app/api/find/mail/route");
+    await mailPost(post("/api/find/mail", { kind: "feature", body: "밤 테마 골목 있었으면" }));
+    expect(calls[0].url).toBe("https://api.notion.com/v1/pages");
+    expect(calls[0].body.parent).toEqual({ type: "data_source_id", data_source_id: "979627f3-46da-4900-90dc-0047eb96fce3" });
+    expect((calls[0].body.properties as Record<string, { select?: { name: string } }>)["종류"].select?.name).toBe("기능 제안");
+    const { syncMailbox } = await import("../apps/web/lib/find/notion");
+    expect(await syncMailbox(true)).toEqual({ pushed: 0, pulled: 1 });
+    const { listMail } = await import("../apps/web/lib/find/village-store");
+    const [mail] = await listMail();
+    expect(mail).toMatchObject({ status: "done", reply: "고쳐놨어!", notionSynced: true, notionPageId: "page-1" });
+  });
+});
