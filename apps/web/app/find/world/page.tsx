@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { siteOrigin } from "../../../lib/find/site";
 import { ALLEY_THEMES, VILLAGES, hallProgress } from "../../../lib/find/village";
-import { forgeForOwner, hashToken, worldHouses } from "../../../lib/find/village-store";
+import { forgeForOwner, hashToken, touchForge, worldHouses } from "../../../lib/find/village-store";
 import "../fonts";
 import WorldView from "./world-view";
 
@@ -18,6 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function World() {
   const token = ownerTokenFrom((await cookies()).get(OWNER_COOKIE)?.value);
   const [me, world] = await Promise.all([token ? forgeForOwner(hashToken(token)) : Promise.resolve(null), worldHouses()]);
+  if (me) await touchForge(me.id).catch(() => undefined);
   const hall = hallProgress(world.totalFuel);
   const alleyNames = Object.fromEntries(ALLEY_THEMES.map((t) => [t.id, `${t.name} 골목`]));
   return (

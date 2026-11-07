@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS find_forges (
   id text PRIMARY KEY, owner_hash text NOT NULL UNIQUE, nickname text NOT NULL, theme text NOT NULL, alley_seq integer NOT NULL, plot_no integer NOT NULL,
   visibility text NOT NULL DEFAULT 'public', created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (theme, alley_seq, plot_no)
 );
+ALTER TABLE find_forges ADD COLUMN IF NOT EXISTS last_seen timestamptz;
 CREATE TABLE IF NOT EXISTS find_mail (
   id text PRIMARY KEY, forge_id text, kind text NOT NULL, body text NOT NULL, context jsonb NOT NULL DEFAULT '{}', status text NOT NULL DEFAULT 'new', reply text,
   reply_seen boolean NOT NULL DEFAULT false, notion_page_id text, notion_synced boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()

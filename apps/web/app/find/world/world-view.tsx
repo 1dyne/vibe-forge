@@ -43,6 +43,15 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
 
       const world = buildWorld(three, scene, { houses, villages, alleyNames, hallStage, hallPct, myForgeId, hasForge: !!myForgeId });
 
+      // 마을의 기척: 1분 반마다 '지금 마을에 있는 집'을 받아 연기·창문 불빛을 바꾼다 (내 집도 '마을에 있음'으로 기록됨)
+      const beat = async () => {
+        if (document.visibilityState !== "visible") return;
+        const res = await fetch("/api/find/presence", { method: "POST" }).catch(() => null);
+        const json = res?.ok ? await res.json().catch(() => null) : null;
+        if (json?.active) world.setActive(new Set<string>(json.active));
+      };
+      const beatId = window.setInterval(beat, 90_000);
+
       // ── 달그락 (스프라이트 종이 인형) ──
       const loader = new three.TextureLoader();
       const [idleTex, walkTex] = await Promise.all([loader.loadAsync("/find/sprites/idle.webp"), loader.loadAsync("/find/sprites/stoke.webp")]);
@@ -138,6 +147,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       tick();
       cleanup = () => {
         cancelAnimationFrame(raf);
+        clearInterval(beatId);
         window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); window.removeEventListener("resize", onResize);
         renderer.dispose(); el.removeChild(renderer.domElement);
       };

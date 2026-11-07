@@ -294,6 +294,10 @@ describe("도깨비 마을 (Phase 2)", () => {
     expect(pickTheme(["w_cat", "f_bowl", "r_light"], {}).id).toBe("cat");
     expect(pickTheme(["f_cup", "s_cup"], {}).id).toBe("water");
     expect(pickTheme(["r_light"], { cat: 3, dog: 0, water: 1 }).id).not.toBe("cat"); // 안 겹치면 한산한 골목
+    // 새 골목: 와글마을 장난감·꼬마, 깜빡마을 공기
+    expect(pickTheme(["r_dance", "f_soft", "w_me"], {}).id).toBe("toy");
+    expect(pickTheme(["w_kid", "r_face"], {}).id).toBe("kid");
+    expect(pickTheme(["s_air", "r_traffic", "f_wall"], {}).id).toBe("air");
     expect(plotFor(0)).toEqual({ seq: 1, plotNo: 1, left: 99 });
     expect(plotFor(100)).toEqual({ seq: 2, plotNo: 1, left: 99 });
     expect(alleyName("cat", 2)).toBe("냥집사 2골목");
@@ -541,5 +545,19 @@ describe("손바닥 마을 (Phase 4)", () => {
     await setVisibility(a.forgeId, "private"); await resolveReport(r.id);
     expect((await getForge(a.forgeId))?.visibility).toBe("private");
     expect((await listReports())[0].resolved).toBe(true);
+  });
+});
+
+describe("마을의 기척", () => {
+  it("주인이 마을에 들어오면 그 집이 '지금 기척 있음'이 되고, 걷는 마을 집 정보에 실린다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const { forge } = await vs.ensureForge(vs.hashToken(`presence-${Date.now()}`), "기척", ["w_kid", "r_face"]);
+    expect(await vs.activeForgeIds()).not.toContain(forge.id);
+    await vs.touchForge(forge.id);
+    await vs.touchForge(forge.id); // 2분 안에 다시 불러도 괜찮다
+    expect(await vs.activeForgeIds()).toContain(forge.id);
+    const world = await vs.worldHouses();
+    const house = world.houses.find((h) => h.id === forge.id)!;
+    expect(house).toMatchObject({ active: true, recent: true, lit: true, theme: "kid", fires: 0, stage: 1 });
   });
 });

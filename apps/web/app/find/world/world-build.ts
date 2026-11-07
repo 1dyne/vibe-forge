@@ -3,7 +3,7 @@ import type * as T from "three";
 // 도깨비 마을 3D 세계를 짓는다. 가운데 광장(본관 공사장)과 그 둘레 다섯 마을이 하나로 이어진 섬.
 // 미술 규칙은 하나(로우폴리·납작한 색·둥근 비율)로 통일하고, 마을마다 색·재료·집 양식·랜드마크·자연물만 바꾼다.
 
-export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number };
+export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean };
 export type WorldVillage = { id: string; name: string; topics: string; mood: string; themes: string[] };
 export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot"; house?: WorldHouse; village?: string; label: string };
 export type NameTag = { s: T.Sprite; x: number; z: number; always: boolean };
@@ -261,23 +261,54 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   }
 
   // ── 집: 마을 양식 5종 × 성장 3단계 ──
-  function chimney(g: T.Group, x: number, y: number, z: number, color: string, h: WorldHouse) {
-    part(BOX, mat(color), 0.38, 0.9, 0.38, x, y, z, g);
-    const fl = part(BALL, mat("#FF8F3F", { emissive: "#FF6A1F", ei: 0.9 }), 0.18, 0.28, 0.18, x, y + 0.6, z, g);
-    const ph = (h.peak % 7);
-    anim.push((t) => { fl.scale.y = 0.28 + Math.sin(t * 6 + ph) * 0.05; });
-    if (h.fuel > 0) {
-      // 받은 장작이 있으면 굴뚝 연기
-      const puffs = Array.from({ length: Math.min(4, 1 + h.fuel) }, (_, i) => ({ m: part(BALL, mat("#F4F1EA", { opacity: 0.75 }), 0.22, 0.22, 0.22, x, y + 0.8, z, g), o: i * 0.9 }));
-      anim.push((t) => { for (const p of puffs) { const k = ((t * 0.45 + p.o) % 3.6) / 3.6; p.m.position.set(x + k * 0.5, y + 0.8 + k * 2.2, z); p.m.scale.setScalar(0.18 + k * 0.35); (p.m.material as T.MeshStandardMaterial).opacity = 0.75 * (1 - k); } });
-    }
+  // 집의 기척 상태(1분 반마다 바뀔 수 있다)
+  const houseState = new Map<string, { active: boolean }>();
+  const smokeMat = () => new three.MeshStandardMaterial({ color: "#F4F1EA", roughness: 1, transparent: true, opacity: 0.7, depthWrite: false });
+
+  /** 굴뚝: 불꽃 크기 = 받은 장작, 연기 = 쌓인 아이디어(가늘게) · 주인이 마을에 있으면(굵고 빠르게) */
+  function chimney(g: T.Group, x: number, y: number, z: number, color: string, h: WorldHouse, st: number) {
+    const state = houseState.get(h.id)!;
+    if (st >= 2) part(BOX, mat(color), 0.38, 0.9, 0.38, x, y, z, g);
+    else { part(CYL6, mat("#8D9599"), 0.1, 0.8, 0.1, x, y - 0.1, z, g); part(CYL6, mat("#6E777B"), 0.15, 0.08, 0.15, x, y + 0.3, z, g); }
+    const top = st >= 2 ? y + 0.45 : y + 0.34;
+    const fs = 0.13 + Math.min(0.2, h.fuel * 0.04);
+    const fl = part(BALL, mat("#FF8F3F", { emissive: "#FF6A1F", ei: 0.9 }), fs, fs * 1.5, fs, x, top + 0.12, z, g);
+    const ph = h.peak % 7;
+    const puffs = Array.from({ length: 5 }, (_, i) => ({ m: part(BALL, smokeMat(), 0.2, 0.2, 0.2, x, top, z, g), o: i / 5 }));
+    anim.push((t) => {
+      fl.visible = st >= 2 || h.fuel > 0 || state.active;
+      fl.scale.y = fs * 1.5 + Math.sin(t * (state.active ? 11 : 6) + ph) * 0.05;
+      const n = state.active ? 5 : h.fires >= 2 ? Math.min(3, h.fires) : 0;
+      const speed = state.active ? 0.32 : 0.16;
+      puffs.forEach((p, i) => {
+        p.m.visible = i < n;
+        if (!p.m.visible) return;
+        const k = (t * speed + p.o + ph) % 1;
+        p.m.position.set(x + k * 0.7 + Math.sin(t + i) * 0.05, top + 0.25 + k * (state.active ? 3 : 2.2), z);
+        p.m.scale.setScalar((state.active ? 0.25 : 0.15) + k * (state.active ? 0.55 : 0.35));
+        (p.m.material as T.MeshStandardMaterial).opacity = (state.active ? 0.85 : 0.5) * (1 - k);
+      });
+    });
   }
+  /** 창문: 주인이 마을에 있으면 화롯불처럼 일렁이고, 최근에 누가 다녀갔으면 은은하게 켜져 있다 */
   function windowsOf(h: WorldHouse) {
-    const glow = h.lit || h.fuel > 0;
-    return glow ? mat("#FFD983", { emissive: "#FFB84D", ei: Math.min(1, 0.35 + h.fuel * 0.15) }) : mat("#D8E2E6");
+    const state = houseState.get(h.id)!;
+    const m = new three.MeshStandardMaterial({ color: "#D8E2E6", roughness: 0.6, flatShading: true });
+    const ph = (h.peak * 1.7) % 6;
+    const on = new three.Color("#FFD983"), off = new three.Color("#D8E2E6");
+    anim.push((t) => {
+      if (state.active) {
+        m.color.copy(on); m.emissive.set("#FF9E3D");
+        m.emissiveIntensity = 0.55 + Math.sin(t * 7 + ph) * 0.18 + Math.sin(t * 13.3 + ph) * 0.12;
+      } else if (h.lit) { m.color.copy(on); m.emissive.set("#FFB84D"); m.emissiveIntensity = 0.4; }
+      else { m.color.copy(off); m.emissiveIntensity = 0; }
+    });
+    return m;
   }
 
   function house(h: WorldHouse, style: string, x: number, z: number, face: number) {
+    houseState.set(h.id, { active: h.active });
+    const state = houseState.get(h.id)!;
     const look = LOOKS[style];
     const st = h.stage;
     const g = new three.Group();
@@ -295,7 +326,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       part(BOX, door, 0.6, 1.0, 0.06, 0.5, 0.5, 1.11, g);
       part(CYL, win, 0.28, 0.06, 0.28, -0.55, 1.0, 1.11, g).rotation.x = Math.PI / 2;
       localFence(g, 0, 2.4, 3.2, look.trim); // 앞마당 울타리
-      if (st >= 2) { chimney(g, -0.75, 2.2, -0.4, "#D9CBB5", h); part(BOX, mat(look.wood), 0.9, 0.2, 0.25, -0.55, 0.62, 1.2, g); for (let i = 0; i < 3; i++) part(BALL, mat(["#F2A3B3", "#FFD27A", "#B9A3E3"][i]), 0.1, 0.1, 0.1, -0.85 + i * 0.3, 0.78, 1.2, g); }
+      chimney(g, -0.75, 2.2, -0.4, "#D9CBB5", h, st); if (st >= 2) { part(BOX, mat(look.wood), 0.9, 0.2, 0.25, -0.55, 0.62, 1.2, g); for (let i = 0; i < 3; i++) part(BALL, mat(["#F2A3B3", "#FFD27A", "#B9A3E3"][i]), 0.1, 0.1, 0.1, -0.85 + i * 0.3, 0.78, 1.2, g); }
       if (st >= 3) { part(BOX, mat(wallTint), 1.4, 1.2, 1.7, 1.85, 0.6, -0.1, g); part(GABLE, mat(roofTint), 1.7, 0.8, 1.9, 1.85, 1.2, -0.1, g); part(BOX, mat("#BFE3D6", { opacity: 0.7 }), 1.0, 0.7, 1.2, -1.8, 0.35, 0.2, g); }
     } else if (style === "ttukttak") {
       part(BOX, mat(wallTint), 2.7, 1.9, 2.2, 0, 0.95, 0, g);
@@ -306,7 +337,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       const awn = part(BOX, mat(look.trim), 2.4, 0.06, 0.8, 0, 1.55, 1.45, g); awn.rotation.x = 0.35;
       const gear = part(TORUS, mat(look.accent), 0.3, 0.3, 0.3, 0, 1.75, 1.14, g);
       anim.push((t) => { gear.rotation.z = t * 0.8; });
-      if (st >= 2) { chimney(g, 0.95, 2.3, -0.6, "#8E4B37", h); part(BOX, mat(look.wood), 0.5, 0.45, 0.5, 1.6, 0.23, 1.3, g); part(BOX, mat(look.wood), 0.4, 0.38, 0.4, 1.65, 0.65, 1.3, g); }
+      chimney(g, 0.95, 2.3, -0.6, "#8E4B37", h, st); if (st >= 2) { part(BOX, mat(look.wood), 0.5, 0.45, 0.5, 1.6, 0.23, 1.3, g); part(BOX, mat(look.wood), 0.4, 0.38, 0.4, 1.65, 0.65, 1.3, g); }
       if (st >= 3) { part(BOX, mat(wallTint), 1.7, 1.1, 1.5, -0.4, 2.6, -0.3, g); const r2 = part(BOX, mat(roofTint), 2.0, 0.12, 1.8, -0.4, 3.25, -0.3, g); r2.rotation.x = -0.18; const g2 = part(TORUS, mat(look.accent), 0.45, 0.45, 0.45, -0.4, 2.7, 0.47, g); anim.push((t) => { g2.rotation.z = -t; }); }
     } else if (style === "jjaekkak") {
       part(BOX, mat(wallTint), 2.0, 2.5, 2.0, 0, 1.25, 0, g);
@@ -316,7 +347,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       const face = part(CYL, mat("#F6F1E4"), 0.3, 0.05, 0.3, 0, 2.2, 1.02, g); face.rotation.x = Math.PI / 2;
       const hand = part(BOX, mat("#34446E"), 0.04, 0.22, 0.03, 0, 2.27, 1.06, g);
       anim.push((t) => { hand.rotation.z = -t * 0.5; hand.position.set(Math.sin(t * 0.5) * 0.08, 2.2 + Math.cos(t * 0.5) * 0.08, 1.06); });
-      if (st >= 2) { chimney(g, 0.6, 3.1, -0.5, "#7D8794", h); part(CYL6, mat(look.trim), 0.06, 1.9, 0.06, -1.3, 0.95, 1.5, g); part(BALL, mat("#FFE6A3", { emissive: "#FFD27A", ei: 0.7 }), 0.17, 0.2, 0.17, -1.3, 2.0, 1.5, g); }
+      chimney(g, 0.6, 3.1, -0.5, "#7D8794", h, st); if (st >= 2) { part(CYL6, mat(look.trim), 0.06, 1.9, 0.06, -1.3, 0.95, 1.5, g); part(BALL, mat("#FFE6A3", { emissive: "#FFD27A", ei: 0.7 }), 0.17, 0.2, 0.17, -1.3, 2.0, 1.5, g); }
       if (st >= 3) { part(CYL, mat(wallTint), 0.6, 3.6, 0.6, 1.35, 1.8, -0.3, g); part(CONE, mat(roofTint), 0.75, 1.4, 0.75, 1.35, 4.3, -0.3, g); }
     } else if (style === "wagle") {
       part(CYL, mat(wallTint), 1.35, 1.8, 1.35, 0, 0.9, 0, g);
@@ -327,7 +358,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       const wheel = new three.Group(); wheel.position.set(0, 3.25, 0.1); g.add(wheel);
       ["#6FC3E8", "#FFD27A", "#FF8C7A", "#9ED36A"].forEach((c, i) => { const b = part(BOX, mat(c), 0.12, 0.5, 0.04, 0, 0.25, 0, wheel); const holder = new three.Group(); holder.rotation.z = (i * Math.PI) / 2; holder.add(b); wheel.add(holder); });
       anim.push((t) => { wheel.rotation.z = t * 2.4; });
-      if (st >= 2) chimney(g, 0.7, 2.4, -0.5, "#E7A56B", h);
+      chimney(g, 0.7, 2.4, -0.5, "#E7A56B", h, st);
       if (st >= 3) {
         part(CYL, mat(look.roof), 0.7, 2.6, 0.7, 1.65, 1.3, -0.2, g); part(CONE, mat(look.wall), 0.9, 0.9, 0.9, 1.65, 3.05, -0.2, g);
         const balloon = part(BALL, mat("#6FC3E8"), 0.35, 0.42, 0.35, -1.4, 3.4, 0.6, g); part(CYL6, mat("#FFFFFF"), 0.01, 1.6, 0.01, -1.4, 2.4, 0.6, g);
@@ -344,7 +375,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       const blink = part(BALL, mat(look.accent, { emissive: look.accent, ei: 1 }), 0.1, 0.1, 0.1, -0.9, 2.65, -0.7, g);
       const off = rnd() * 3;
       anim.push((t) => { blink.visible = Math.sin(t * 3 + off) > -0.2; });
-      if (st >= 2) chimney(g, 0.9, 1.9, -0.6, look.trim, h);
+      chimney(g, 0.9, 1.9, -0.6, look.trim, h, st);
       if (st >= 3) { const scope = part(CYL, mat(look.trim), 0.16, 1.5, 0.16, -0.3, 2.4, 0.1, g); scope.rotation.x = -0.9; part(BOX, mat("#CFEDEA", { opacity: 0.6 }), 1.3, 0.9, 1.3, 1.95, 0.45, 0.2, g); }
     }
 
@@ -353,7 +384,13 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     part(BOX, mat(look.trim), 0.7, 0.4, 0.06, 1.45, 0.95, 1.6, g);
     const orb = part(BALL, mat(h.color, { emissive: h.color, ei: 0.9 }), 0.16, 0.2, 0.16, 1.45, 1.55, 1.6, g);
     const ph = rnd() * 6;
-    anim.push((t) => { orb.position.y = 1.55 + Math.sin(t * 2 + ph) * 0.1; });
+    const orbMat = orb.material as T.MeshStandardMaterial;
+    const doorGlow = part(DISC, new three.MeshBasicMaterial({ color: "#FFC46B", transparent: true, opacity: 0.35, depthWrite: false }), 0.9, 1, 0.6, style === "wagle" ? 0 : style === "jjaekkak" ? 0 : 0.5, 0.03, 1.9, g);
+    anim.push((t) => {
+      orb.position.y = 1.55 + Math.sin(t * (state.active ? 4 : 2) + ph) * (state.active ? 0.18 : 0.1);
+      orbMat.emissiveIntensity = state.active ? 1.3 + Math.sin(t * 5 + ph) * 0.3 : 0.9;
+      doorGlow.visible = state.active;
+    });
     if (h.wants >= 5) { part(CYL6, mat("#555"), 0.03, 1.5, 0.03, -1.3, 2.4, 0.9, g); part(BOX, mat("#9B7BFF", { side: true }), 0.6, 0.35, 0.02, -1.0, 2.95, 0.9, g); }
 
     const mine = h.id === myForgeId;
@@ -637,5 +674,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     return best < 0 ? null : villages[best];
   }
 
-  return { spots, anim, nameTags, fades, heightAt, walkable, villageAt };
+    /** 1분 반마다 받아오는 '지금 기척이 있는 집' 목록으로 바꾼다 */
+  function setActive(ids: Set<string>) { for (const [id, st] of houseState) st.active = ids.has(id); }
+  return { spots, anim, nameTags, fades, heightAt, walkable, villageAt, setActive };
 }

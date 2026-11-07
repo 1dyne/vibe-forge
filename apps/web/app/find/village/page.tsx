@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
 import { ALLEY_CAPACITY, ALLEY_THEMES, HALL_GOAL, VILLAGES, alleyName, hallProgress } from "../../../lib/find/village";
-import { forgeFires, forgeForOwner, hashToken, latestNotices, listPlans, villageOverview, voteBudget } from "../../../lib/find/village-store";
+import { forgeFires, forgeForOwner, hashToken, touchForge, latestNotices, listPlans, villageOverview, voteBudget } from "../../../lib/find/village-store";
 import Mailbox from "../mailbox";
 import "../fonts";
 import VillageMap from "./village-map";
@@ -19,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function Village() {
   const token = ownerTokenFrom((await cookies()).get(OWNER_COOKIE)?.value);
   const me = token ? await forgeForOwner(hashToken(token)) : null;
+  if (me) await touchForge(me.id).catch(() => undefined);
   const [overview, notices, plans, budget, myFires] = await Promise.all([
     villageOverview(), latestNotices(3), listPlans(me?.id ?? null), me ? voteBudget(me.id) : Promise.resolve(null), me ? forgeFires(me.id) : Promise.resolve([])
   ]);
