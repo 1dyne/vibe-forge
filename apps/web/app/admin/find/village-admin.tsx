@@ -52,3 +52,38 @@ export function SyncButton({ enabled }: { enabled: boolean }) {
   if (!enabled) return <small style={{ color: "#996c22" }}>노션 연동 꺼짐 — Railway에 NOTION_TOKEN을 넣으면 켜져요. 그전 편지는 여기 쌓였다가 켜지면 노션으로 옮겨져요.</small>;
   return <><button type="button" style={{ fontSize: 12 }} onClick={async () => { const r = await fetch("/api/admin/find/sync", { method: "POST" }); const j = await r.json(); setMsg(r.ok ? `보냄 ${j.result?.pushed ?? 0} · 가져옴 ${j.result?.pulled ?? 0}` : j.error); }}>노션과 지금 맞추기</button> <small>{msg}</small></>;
 }
+
+export function PlanAdmin({ plans }: { plans: Array<{ id: number; title: string; status: string; fuel: number }> }) {
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [msg, setMsg] = useState("");
+  return (
+    <div style={{ display: "grid", gap: 6, maxWidth: 560 }}>
+      {plans.map((p) => (
+        <div key={p.id} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <b style={{ flex: 1 }}>{p.title}</b><small>장작 {p.fuel}</small>
+          <select defaultValue={p.status} onChange={async (e) => { await fetch("/api/admin/find/plans", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: p.id, status: e.target.value }) }); setMsg("상태 바꿈"); }}>
+            <option value="voting">투표 중</option><option value="building">짓는 중</option><option value="done">완공</option>
+          </select>
+        </div>
+      ))}
+      <input placeholder="새 후보 제목 (예: 밤 테마 골목)" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <input placeholder="짧은 설명 (선택)" value={desc} onChange={(e) => setDesc(e.target.value)} />
+      <button type="button" disabled={!title} onClick={async () => { const r = await fetch("/api/admin/find/plans", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, description: desc }) }); setMsg(r.ok ? "올렸어요. 새로고침하면 보여요." : "실패"); if (r.ok) { setTitle(""); setDesc(""); } }}>후보 올리기</button>
+      <small>{msg}</small>
+    </div>
+  );
+}
+
+export function ReportRow({ report }: { report: { id: number; forgeId: string; reason: string; resolved: boolean; at: string } }) {
+  const [state, setState] = useState(report.resolved ? "처리됨" : "");
+  const act = async (hide: boolean) => { const r = await fetch("/api/admin/find/reports", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: report.id, forgeId: report.forgeId, hide }) }); setState(r.ok ? (hide ? "숨김" : "처리됨") : "실패"); };
+  return (
+    <tr>
+      <td style={{ padding: 6 }}>{report.at.slice(0, 16).replace("T", " ")}</td>
+      <td style={{ padding: 6 }}><a href={`/f/${report.forgeId}`}>{report.forgeId}</a></td>
+      <td style={{ padding: 6 }}>{report.reason}</td>
+      <td style={{ padding: 6 }}>{state || <><button type="button" style={{ fontSize: 12 }} onClick={() => act(true)}>집 숨기기</button> <button type="button" style={{ fontSize: 12 }} onClick={() => act(false)}>문제없음</button></>}</td>
+    </tr>
+  );
+}

@@ -195,6 +195,9 @@ CREATE TABLE IF NOT EXISTS find_neighbor (follower text NOT NULL, followee text 
 CREATE TABLE IF NOT EXISTS find_dex (owner_forge text NOT NULL, fire_id text NOT NULL, first_seen_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (owner_forge, fire_id));
 CREATE TABLE IF NOT EXISTS find_visit (id bigserial PRIMARY KEY, visitor_forge text, host_forge text NOT NULL, at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS find_visit_host ON find_visit(host_forge, at);
+CREATE TABLE IF NOT EXISTS find_plan (id bigserial PRIMARY KEY, title text NOT NULL, description text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'voting', created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS find_plan_vote (plan_id bigint NOT NULL, forge_id text NOT NULL, fuel integer NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (plan_id, forge_id));
+CREATE TABLE IF NOT EXISTS find_report (id bigserial PRIMARY KEY, forge_id text NOT NULL, reporter text, reason text NOT NULL, resolved boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS find_fires_combo ON find_fires(combo_key);
 `;
 

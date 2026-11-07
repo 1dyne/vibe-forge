@@ -167,6 +167,8 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </div>
       )}
 
+      <a className="btn btn-ghost" href="/find/village" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>손바닥 마을 지도 보기</a>
+      {!isOwner && <ReportLink forgeId={forge.id} />}
       <nav className="town-tabs" aria-label="마을 길">
         <a href="/find/home">내 집</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 집이나</a>
       </nav>
@@ -214,4 +216,16 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       )}
     </section>
   );
+}
+
+const REASONS = ["불쾌한 이름", "개인정보가 보여요", "광고·도배", "기타"];
+function ReportLink({ forgeId }: { forgeId: string }) {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+  if (done) return <p className="fine-left" style={{ textAlign: "center" }}>신고했어. 다인이 확인할게.</p>;
+  return open ? (
+    <div className="report-row">
+      {REASONS.map((r) => <button key={r} type="button" className="chip" onClick={async () => { await fetch("/api/find/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ host: forgeId, reason: r }) }).catch(() => undefined); track("report_sent"); setDone(true); }}>{r}</button>)}
+    </div>
+  ) : <button className="link" type="button" style={{ fontSize: 12 }} onClick={() => setOpen(true)}>이 집 신고하기</button>;
 }

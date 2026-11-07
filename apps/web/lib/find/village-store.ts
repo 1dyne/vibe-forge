@@ -293,3 +293,177 @@ export async function fuelByFire(fireIds: string[]): Promise<Map<string, number>
   const counts = await fileSocial((s) => { const m = new Map<string, number>(); for (const f of s.fuel) m.set(f.to, (m.get(f.to) ?? 0) + 1); return m; });
   return new Map(fireIds.map((id) => [id, counts.get(fires.find((f) => f.id === id)?.forgeId ?? "") ?? 0]));
 }
+
+// ── Phase 4: 손바닥 마을 ─────────────────────────────────
+export type HouseView = {
+  forgeId: string | null; plotNo: number; nickname: string; locked: boolean;
+  color: string; reactKind: string; peak: number; fuel: number; wants: number; visits7: number; fires: number;
+};
+
+type AllSocial = { forges: ForgeRecord[]; fires: FireRecord[]; fuel: Array<{ to: string; from: string }>; want: Array<{ to: string; at: string }>; visit: Array<{ host: string; visitor: string | null; at: string }>; neighbor: Array<{ follower: string; followee: string }> };
+
+async function snapshot(): Promise<AllSocial> {
+  if (pg()) {
+    const pool = await db();
+    const [forges, fires, fuel, want, visit, neighbor] = await Promise.all([
+      pool.query("SELECT * FROM find_forges"),
+      pool.query("SELECT DISTINCT ON (forge_id) * FROM find_fires WHERE forge_id IS NOT NULL ORDER BY forge_id, created_at DESC"),
+      pool.query("SELECT from_forge, to_forge FROM find_fuel"),
+      pool.query("SELECT to_forge, created_at FROM find_want"),
+      pool.query("SELECT host_forge, visitor_forge, at FROM find_visit WHERE at > now() - interval '7 days'"),
+      pool.query("SELECT follower, followee FROM find_neighbor")
+    ]);
+    return {
+      forges: forges.rows.map(toForge), fires: fires.rows.map(rowToFire),
+      fuel: fuel.rows.map((r) => ({ from: r.from_forge, to: r.to_forge })), want: want.rows.map((r) => ({ to: r.to_forge, at: new Date(r.created_at).toISOString() })),
+      visit: visit.rows.map((r) => ({ host: r.host_forge, visitor: r.visitor_forge, at: new Date(r.at).toISOString() })), neighbor: neighbor.rows
+    };
+  }
+  return serial(async () => {
+    const d = await readData();
+    const social = (d.social ?? {}) as Partial<Social>;
+    const latest = new Map<string, FireRecord>();
+    for (const f of d.fires) if (f.forgeId) latest.set(f.forgeId, f);
+    const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+    return {
+      forges: (d.forges as ForgeRecord[] | undefined) ?? [], fires: [...latest.values()],
+      fuel: (social.fuel ?? []).map((f) => ({ from: f.from, to: f.to })), want: (social.want ?? []).map((w) => ({ to: w.to, at: w.at })),
+      visit: (social.visit ?? []).filter((v) => v.at > weekAgo), neighbor: social.neighbor ?? []
+    };
+  });
+}
+
+function countBy<T>(list: T[], key: (x: T) => string) {
+  const m = new Map<string, number>();
+  for (const x of list) m.set(key(x), (m.get(key(x)) ?? 0) + 1);
+  return m;
+}
+
+/** 마을 전체: 골목별 주민 수, 마을 장작 총합, 이번 주 가장 갖고 싶은 발명품 */
+export async function villageOverview() {
+  const s = await snapshot();
+  const alleys = new Map<string, { theme: string; seq: number; residents: number }>();
+  for (const f of s.forges) {
+    const key = `${f.theme}:${f.alleySeq}`;
+    const a = alleys.get(key) ?? { theme: f.theme, seq: f.alleySeq, residents: 0 };
+    a.residents++; alleys.set(key, a);
+  }
+  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const wantsWeek = countBy(s.want.filter((w) => w.at > weekAgo), (w) => w.to);
+  const top = [...wantsWeek.entries()].sort((a, b) => b[1] - a[1])[0];
+  const topForge = top ? s.forges.find((f) => f.id === top[0] && f.visibility === "public") : null;
+  const topFire = topForge ? s.fires.find((f) => f.forgeId === topForge.id) : null;
+  const activeVisitors = new Set(s.visit.filter((v) => v.at > new Date(Date.now() - 30 * 60_000).toISOString()).map((v) => v.visitor ?? `anon:${v.host}`)).size;
+  return {
+    alleys: [...alleys.values()].sort((a, b) => a.theme.localeCompare(b.theme) || a.seq - b.seq),
+    totalFuel: s.fuel.length,
+    totalForges: s.forges.length,
+    totalFires: s.fires.length,
+    // "지금 마을에 떠 있는 도깨비불" 근사치: 최근 30분 방문자 + 최근 활동한 집 (실시간 위치 동기화 아님)
+    floating: Math.max(activeVisitors, Math.min(s.forges.length, 3 + activeVisitors * 2)),
+    topWant: topForge && topFire ? { forgeId: topForge.id, nickname: topForge.nickname, fireName: topFire.name, color: topFire.color, wants: top![1] } : null
+  };
+}
+
+/** 골목 지도: 터 번호 순서대로 집들 + 이웃 끈. 비공개·링크 전용 집은 '잠긴 집'으로 자리만 보인다. */
+export async function alleyHouses(theme: string, seq: number) {
+  const s = await snapshot();
+  const fuel = countBy(s.fuel, (f) => f.to);
+  const wants = countBy(s.want, (w) => w.to);
+  const visits = countBy(s.visit.filter((v) => v.visitor !== v.host), (v) => v.host);
+  const forges = s.forges.filter((f) => f.theme === theme && f.alleySeq === seq).sort((a, b) => a.plotNo - b.plotNo);
+  const ids = new Set(forges.map((f) => f.id));
+  const houses: HouseView[] = forges.map((f) => {
+    const fire = s.fires.find((x) => x.forgeId === f.id);
+    const locked = f.visibility !== "public";
+    return {
+      forgeId: locked ? null : f.id, plotNo: f.plotNo, nickname: locked ? "잠긴 집" : f.nickname, locked,
+      color: fire?.color ?? "#4FB3A6", reactKind: fire?.reactKind ?? "none", peak: fire?.peak ?? 20,
+      fuel: fuel.get(f.id) ?? 0, wants: wants.get(f.id) ?? 0, visits7: visits.get(f.id) ?? 0, fires: 0
+    };
+  });
+  const publicIds = new Set(houses.filter((h) => h.forgeId).map((h) => h.forgeId!));
+  const strings = s.neighbor.filter((n) => ids.has(n.follower) && ids.has(n.followee) && publicIds.has(n.follower) && publicIds.has(n.followee)).map((n) => ({ follower: n.follower, followee: n.followee }));
+  return { houses, strings };
+}
+
+// ── 공사 계획판: 다인이 후보를 올리면 주민이 자기 장작으로 투표 ─────
+export type PlanView = { id: number; title: string; description: string; status: "voting" | "building" | "done"; fuel: number; mine: number };
+export const PLAN_MAX_PER_PLAN = Math.max(1, Number(process.env.FIND_PLAN_MAX ?? 3));
+
+export async function listPlans(viewer: string | null): Promise<PlanView[]> {
+  if (pg()) {
+    const { rows } = await (await db()).query(`SELECT p.*, COALESCE(sum(v.fuel), 0)::int AS fuel, COALESCE(max(CASE WHEN v.forge_id = $1 THEN v.fuel END), 0)::int AS mine
+      FROM find_plan p LEFT JOIN find_plan_vote v ON v.plan_id = p.id GROUP BY p.id ORDER BY p.status = 'voting' DESC, fuel DESC, p.id DESC`, [viewer]);
+    return rows.map((r) => ({ id: Number(r.id), title: r.title, description: r.description, status: r.status, fuel: r.fuel, mine: r.mine }));
+  }
+  return serial(async () => {
+    const d = await readData();
+    const plans = ((d.social?.plan ?? []) as Array<{ id: number; title: string; description: string; status: PlanView["status"] }>);
+    const votes = ((d.social?.planVote ?? []) as Array<{ planId: number; forgeId: string; fuel: number }>);
+    return plans.map((p) => ({ ...p, fuel: votes.filter((v) => v.planId === p.id).reduce((n, v) => n + v.fuel, 0), mine: votes.find((v) => v.planId === p.id && v.forgeId === viewer)?.fuel ?? 0 }))
+      .sort((a, b) => Number(b.status === "voting") - Number(a.status === "voting") || b.fuel - a.fuel);
+  });
+}
+
+/** 투표에 쓸 수 있는 장작 = 1 + 내 대장간이 받은 장작. 후보 하나에 최대 PLAN_MAX_PER_PLAN개 */
+export async function voteBudget(forgeId: string): Promise<{ total: number; used: number }> {
+  if (pg()) {
+    const { rows } = await (await db()).query("SELECT (SELECT count(*)::int FROM find_fuel WHERE to_forge = $1) AS got, (SELECT COALESCE(sum(fuel), 0)::int FROM find_plan_vote WHERE forge_id = $1) AS used", [forgeId]);
+    return { total: 1 + rows[0].got, used: rows[0].used };
+  }
+  return serial(async () => {
+    const d = await readData();
+    const got = ((d.social?.fuel ?? []) as Array<{ to: string }>).filter((f) => f.to === forgeId).length;
+    const used = ((d.social?.planVote ?? []) as Array<{ forgeId: string; fuel: number }>).filter((v) => v.forgeId === forgeId).reduce((n, v) => n + v.fuel, 0);
+    return { total: 1 + got, used };
+  });
+}
+
+export async function setPlanVote(planId: number, forgeId: string, fuel: number): Promise<{ ok: boolean; reason?: string }> {
+  const plans = await listPlans(forgeId);
+  const plan = plans.find((p) => p.id === planId);
+  if (!plan || plan.status !== "voting") return { ok: false, reason: "투표 중인 후보가 아니야." };
+  const want = Math.max(0, Math.min(PLAN_MAX_PER_PLAN, Math.floor(fuel)));
+  const budget = await voteBudget(forgeId);
+  if (budget.used - plan.mine + want > budget.total) return { ok: false, reason: `장작이 모자라. 친구가 네 대장간에 장작을 넣어주면 더 쓸 수 있어. (가진 장작 ${budget.total}개)` };
+  if (pg()) {
+    if (want === 0) await (await db()).query("DELETE FROM find_plan_vote WHERE plan_id = $1 AND forge_id = $2", [planId, forgeId]);
+    else await (await db()).query("INSERT INTO find_plan_vote (plan_id, forge_id, fuel) VALUES ($1,$2,$3) ON CONFLICT (plan_id, forge_id) DO UPDATE SET fuel = EXCLUDED.fuel, updated_at = now()", [planId, forgeId, want]);
+    return { ok: true };
+  }
+  await serial(async () => {
+    const d = await readData();
+    const social = (d.social ??= {}) as Record<string, unknown[]>;
+    const votes = ((social.planVote ??= []) as Array<{ planId: number; forgeId: string; fuel: number }>).filter((v) => !(v.planId === planId && v.forgeId === forgeId));
+    if (want > 0) votes.push({ planId, forgeId, fuel: want });
+    social.planVote = votes;
+    await writeData(d);
+  });
+  return { ok: true };
+}
+
+export async function createPlan(title: string, description: string) {
+  if (pg()) { await (await db()).query("INSERT INTO find_plan (title, description) VALUES ($1,$2)", [title, description]); return; }
+  await serial(async () => { const d = await readData(); const plans = ((d.social ??= {}).plan ??= []) as Array<{ id: number }>; plans.push({ id: (plans.at(-1)?.id ?? 0) + 1, title, description, status: "voting" } as never); await writeData(d); });
+}
+
+export async function setPlanStatus(id: number, status: PlanView["status"]) {
+  if (pg()) { await (await db()).query("UPDATE find_plan SET status = $2 WHERE id = $1", [id, status]); return; }
+  await serial(async () => { const d = await readData(); const p = ((d.social?.plan ?? []) as Array<{ id: number; status: string }>).find((x) => x.id === id); if (p) p.status = status; await writeData(d); });
+}
+
+// ── 집 신고 ─────────────────────────────────────────────
+export const REPORT_REASONS = ["불쾌한 이름", "개인정보가 보여요", "광고·도배", "기타"] as const;
+export async function createReport(forgeId: string, reporter: string | null, reason: string) {
+  if (pg()) { await (await db()).query("INSERT INTO find_report (forge_id, reporter, reason) VALUES ($1,$2,$3)", [forgeId, reporter, reason]); return; }
+  await serial(async () => { const d = await readData(); ((d.social ??= {}).report ??= []).push({ id: Date.now(), forgeId, reporter, reason, resolved: false, at: new Date().toISOString() }); await writeData(d); });
+}
+export async function listReports(): Promise<Array<{ id: number; forgeId: string; reason: string; resolved: boolean; at: string }>> {
+  if (pg()) return (await (await db()).query("SELECT * FROM find_report ORDER BY created_at DESC LIMIT 200")).rows.map((r) => ({ id: Number(r.id), forgeId: r.forge_id, reason: r.reason, resolved: r.resolved, at: new Date(r.created_at).toISOString() }));
+  return serial(async () => [...(((await readData()).social?.report ?? []) as Array<{ id: number; forgeId: string; reason: string; resolved: boolean; at: string }>)].reverse());
+}
+export async function resolveReport(id: number) {
+  if (pg()) { await (await db()).query("UPDATE find_report SET resolved = true WHERE id = $1", [id]); return; }
+  await serial(async () => { const d = await readData(); const r = ((d.social?.report ?? []) as Array<{ id: number; resolved: boolean }>).find((x) => x.id === id); if (r) r.resolved = true; await writeData(d); });
+}
