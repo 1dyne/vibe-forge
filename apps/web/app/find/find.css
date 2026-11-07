@@ -11,6 +11,9 @@ body:has(.find){background:#fff}
   background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased
 }
 .find *{box-sizing:border-box}
+/* 대장간 본체의 전역 details/summary 스타일이 새어 들어오지 않게 */
+.find details{margin:0;padding:0;border:0;font-size:inherit;border-radius:0}
+.find summary{color:var(--ink);font-size:inherit}
 .find button,.find input,.find textarea{font-family:inherit}
 .find .top{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 6px}
 .find .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);text-decoration:none}
@@ -170,6 +173,18 @@ body:has(.find){background:#fff}
 .find .brow.last{border:0;padding-bottom:0}
 .find .stars{color:var(--fire);letter-spacing:2px;filter:saturate(1.4)}
 .find .bparts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.find .bparts span{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:#fff}
+.find .roles{display:flex;flex-direction:column;gap:6px;margin-top:8px;cursor:auto}
+.find .prole{border:1px solid var(--line);border-radius:12px;background:#fff;font-size:13.5px;line-height:1.45;margin:0;padding:0}
+.find .prole>summary b{color:var(--ink);font-weight:700}
+.find details.fold,.find details.prole{margin:0}
+.find .prole.plain{padding:8px 12px}
+.find .prole>summary{list-style:none;cursor:pointer;padding:9px 30px 9px 12px !important;margin:0 !important;position:relative;font-size:13.5px !important;font-family:var(--font-body) !important;background:none !important;border:0 !important;min-height:0 !important}
+.find .prole>summary::-webkit-details-marker{display:none}
+.find .prole>summary::after{content:"▸";position:absolute;right:12px;top:9px;color:var(--muted);transition:transform .15s}
+.find .prole[open]>summary::after{transform:rotate(90deg)}
+.find .prole>summary span{color:#4A4D55}
+.find .prole-parts{padding:0 12px 10px;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.find .prole-parts small{font-size:11px;color:var(--muted)}
 .find .basis{display:flex;gap:10px;align-items:center;margin-top:12px;background:var(--surface);border-radius:12px;padding:8px;font-size:12.5px;line-height:1.45}
 .find .basis img,.find .basis-ph{width:64px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--surface-2)}
 .find .bnote{font-size:11.5px;color:#8C8F98;line-height:1.5;margin-top:10px}

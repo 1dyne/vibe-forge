@@ -3,6 +3,7 @@ import { useState } from "react";
 import { fireLabel, type ReactKind } from "../../lib/find/chips";
 import type { FireCard } from "../../lib/find/card";
 import { NAMELESS } from "../../lib/find/nickname";
+import { PARTS_NOTE } from "../../lib/find/parts";
 import Dokkaebi from "./dokkaebi";
 
 const STAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
@@ -45,15 +46,27 @@ export default function FireCardView({ name, owner, peak, kind, card }: { name: 
           <div className="brow"><span>난이도</span><span className="stars" aria-label={`5점 중 ${card.build.difficulty}점`}>{stars}</span></div>
           <div className="brow"><span>예상 제작 시간</span><b>{card.build.time}</b></div>
           <div className="brow"><span>부품 수</span><b>{card.build.partsRange}</b></div>
-          <div className="brow last"><span>아마 필요한 부품</span></div>
-          <div className="bparts">{card.build.parts.map((p) => <span key={p}>{p}</span>)}</div>
+          <div className="brow last"><span>이런 것들이 모이면 돼</span></div>
+          <div className="roles" onClick={(e) => e.stopPropagation()}>
+            {card.build.parts.map((p) => typeof p === "string" ? (
+              <div key={p} className="prole plain">{p}</div>
+            ) : (
+              <details key={p.key} className="prole">
+                <summary><b>{p.role}</b><span> — {p.does}</span></summary>
+                <div className="prole-parts">
+                  <small>준비할 것</small>
+                  {p.parts.map((x) => <div key={x.name}>{x.name} <span className="muted">· {x.spec}</span></div>)}
+                </div>
+              </details>
+            ))}
+          </div>
           {card.build.basis && (
             <div className="basis">
               {card.build.basis.image ? <img src={card.build.basis.image} alt="" /> : <div className="basis-ph" />}
               <div><span className="muted">기준</span> <b>{card.build.basis.title}</b><br /><span className="muted">{card.build.basis.source} · 일치율 {card.build.basis.match}%</span></div>
             </div>
           )}
-          <div className="bnote">고른 장작과 닮은 프로젝트로 어림한 값이야. 정확한 부품과 가격은 대장간에서 같이 정해.</div>
+          <div className="bnote">고른 장작으로 어림한 거야. {PARTS_NOTE}</div>
           <div className="flip-hint">다시 누르면 앞면 ↻</div>
         </div>
       </div>
