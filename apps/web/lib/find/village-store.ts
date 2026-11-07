@@ -467,3 +467,17 @@ export async function resolveReport(id: number) {
   if (pg()) { await (await db()).query("UPDATE find_report SET resolved = true WHERE id = $1", [id]); return; }
   await serial(async () => { const d = await readData(); const r = ((d.social?.report ?? []) as Array<{ id: number; resolved: boolean }>).find((x) => x.id === id); if (r) r.resolved = true; await writeData(d); });
 }
+
+// ── 3D 걷는 마을용: 공개된 집 전부 (마을·골목·터 순서) ─────────
+export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean };
+export async function worldHouses(): Promise<{ houses: WorldHouse[]; totalFuel: number }> {
+  const s = await snapshot();
+  const fuel = countBy(s.fuel, (f) => f.to);
+  const wants = countBy(s.want, (w) => w.to);
+  const visits = countBy(s.visit.filter((v) => v.visitor !== v.host), (v) => v.host);
+  const houses = s.forges.filter((f) => f.visibility === "public").map((f) => {
+    const fire = s.fires.find((x) => x.forgeId === f.id);
+    return { id: f.id, nickname: f.nickname, theme: f.theme, alleySeq: f.alleySeq, plotNo: f.plotNo, color: fire?.color ?? "#4FB3A6", peak: fire?.peak ?? 20, fuel: fuel.get(f.id) ?? 0, wants: wants.get(f.id) ?? 0, lit: (visits.get(f.id) ?? 0) > 0 };
+  }).sort((a, b) => a.theme.localeCompare(b.theme) || a.alleySeq - b.alleySeq || a.plotNo - b.plotNo);
+  return { houses, totalFuel: s.fuel.length };
+}
