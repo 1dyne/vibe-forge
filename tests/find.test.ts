@@ -480,15 +480,19 @@ describe("손바닥 마을 (Phase 4)", () => {
   };
 
   it("본관 공사는 마을 장작 총합으로 25%마다 한 단계, 집 굴뚝 불은 화력+장작", async () => {
-    const { hallProgress, chimneyLevel, STREETS, ALLEY_THEMES } = await import("../apps/web/lib/find/village");
+    const { hallProgress, chimneyLevel, VILLAGES, ALLEY_THEMES, houseStage } = await import("../apps/web/lib/find/village");
     expect(hallProgress(0)).toMatchObject({ pct: 0, stage: 0, label: "터" });
     expect(hallProgress(500)).toMatchObject({ pct: 50, stage: 2, label: "지붕" });
     expect(hallProgress(5000)).toMatchObject({ pct: 100, stage: 4, label: "완공" });
     expect(chimneyLevel(30, 0)).toBe(1);
     expect(chimneyLevel(60, 10)).toBe(2);
     expect(chimneyLevel(90, 10)).toBe(3);
-    // 모든 골목은 큰길 하나에 속한다
-    for (const t of ALLEY_THEMES) expect(STREETS.filter((s) => s.themes.includes(t.id)).length, t.id).toBe(1);
+    // 모든 골목은 마을 하나에 속한다
+    for (const t of ALLEY_THEMES) expect(VILLAGES.filter((s) => s.themes.includes(t.id)).length, t.id).toBe(1);
+    expect(VILLAGES.map((v) => v.name)).toEqual(["꼬물마을", "뚝딱마을", "째깍마을", "와글마을", "깜빡마을"]);
+    expect(houseStage(["w_cat"])).toBe(1);
+    expect(houseStage(["f_bowl", "s_count", "w_cat"])).toBe(2);
+    expect(houseStage(["f_bowl", "s_count", "r_press", "w_cat"])).toBe(3);
   });
 
   it("골목 지도는 터 순서대로, 비공개 집은 잠긴 집으로, 이웃은 끈으로", async () => {

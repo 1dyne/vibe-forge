@@ -354,3 +354,9 @@ body:has(.find){background:#fff}
 .world-knob { width: 50px; height: 50px; border-radius: 50%; background: #1E1F24; opacity: .8; pointer-events: none; }
 .world-enter { position: absolute; right: 16px; bottom: calc(46px + env(safe-area-inset-bottom)); max-width: calc(100% - 170px); background: #FF8F3F; color: #1E1F24; border: 2px solid #232323; border-radius: 16px; padding: 14px 16px; font-family: var(--font-display, Jua), sans-serif; font-size: 17px; text-decoration: none; box-shadow: 0 3px 0 #232323; }
 .world-fallback { padding: 40px 20px; display: grid; gap: 16px; }
+.world-top span { color: inherit; }
+.world-banner { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; background: rgba(255,255,255,.92); border: 2px solid #232323; border-radius: 18px; padding: 10px 18px; animation: world-banner 3.5s ease forwards; pointer-events: none; white-space: nowrap; }
+.world-banner b { font-family: var(--font-display, Jua), sans-serif; font-size: 22px; font-weight: 400; }
+.world-banner span { font-size: 12px; color: #5b5d66; }
+@keyframes world-banner { 0% { opacity: 0; transform: translate(-50%, -8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+.world-link { display: inline-block; margin-top: 6px; background: #1E1F24; color: #fff; padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: 14px; }

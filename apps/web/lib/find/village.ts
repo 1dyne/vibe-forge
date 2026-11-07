@@ -3,16 +3,16 @@
 
 export type AlleyTheme = { id: string; name: string; street: string; chips: string[] };
 
-// 초기 8개 골목(이름은 다인이 확정 전 가제). street = Phase 4 손바닥 마을의 큰길
+// 초기 8개 골목(이름은 다인이 확정 전 가제). street = 골목이 속한 마을
 export const ALLEY_THEMES: AlleyTheme[] = [
-  { id: "cat", name: "냥집사", street: "반려길", chips: ["w_cat", "w_cats", "w_pet", "f_bowl", "f_tough", "f_wash", "s_count", "s_when"] },
-  { id: "dog", name: "멍집사", street: "반려길", chips: ["w_dog", "w_walk"] },
-  { id: "water", name: "물 한 잔", street: "일길", chips: ["f_cup", "f_thin", "f_wood", "s_cup", "s_goal", "s_weight"] },
-  { id: "sleep", name: "잠", street: "쉼길", chips: ["f_bed", "f_dim", "f_soft", "s_dark", "s_night", "s_motion", "r_press", "f_switch", "f_clean", "r_morning", "r_breathe"] },
-  { id: "plant", name: "식물", street: "집길", chips: ["f_pot", "f_splash", "f_solar", "s_soil", "s_sun", "s_season", "w_plant", "w_many", "w_vacation"] },
-  { id: "desk", name: "책상", street: "일길", chips: ["f_desk", "f_tiny", "f_round", "s_sit", "s_posture", "s_standup", "s_reset", "s_streak", "r_screen", "r_big", "r_count", "s_noise", "s_level", "s_classroom"] },
-  { id: "door", name: "현관", street: "집길", chips: ["f_door", "f_noglue", "f_battery", "s_door", "s_lock", "s_away", "s_dist", "r_phone", "r_fam"] },
-  { id: "kitchen", name: "부엌", street: "집길", chips: ["f_wall", "f_mag", "f_fridge", "s_air", "s_co2", "s_window", "s_humid", "s_htemp", "s_humidifier"] }
+  { id: "cat", name: "냥집사", street: "꼬물마을", chips: ["w_cat", "w_cats", "w_pet", "f_bowl", "f_tough", "f_wash", "s_count", "s_when"] },
+  { id: "dog", name: "멍집사", street: "꼬물마을", chips: ["w_dog", "w_walk"] },
+  { id: "water", name: "물 한 잔", street: "째깍마을", chips: ["f_cup", "f_thin", "f_wood", "s_cup", "s_goal", "s_weight"] },
+  { id: "sleep", name: "잠", street: "째깍마을", chips: ["f_bed", "f_dim", "f_soft", "s_dark", "s_night", "s_motion", "r_press", "f_switch", "f_clean", "r_morning", "r_breathe"] },
+  { id: "plant", name: "식물", street: "꼬물마을", chips: ["f_pot", "f_splash", "f_solar", "s_soil", "s_sun", "s_season", "w_plant", "w_many", "w_vacation"] },
+  { id: "desk", name: "책상", street: "째깍마을", chips: ["f_desk", "f_tiny", "f_round", "s_sit", "s_posture", "s_standup", "s_reset", "s_streak", "r_screen", "r_big", "r_count", "s_noise", "s_level", "s_classroom"] },
+  { id: "door", name: "현관", street: "깜빡마을", chips: ["f_door", "f_noglue", "f_battery", "s_door", "s_lock", "s_away", "s_dist", "r_phone", "r_fam"] },
+  { id: "kitchen", name: "부엌", street: "뚝딱마을", chips: ["f_wall", "f_mag", "f_fridge", "s_air", "s_co2", "s_window", "s_humid", "s_htemp", "s_humidifier"] }
 ];
 
 export const ALLEY_CAPACITY = Math.max(1, Number(process.env.FIND_ALLEY_CAPACITY ?? 100));
@@ -47,16 +47,29 @@ export function plotLine(themeId: string, seq: number, plotNo: number, left: num
   return `${name} ${plotNo}번 터`;
 }
 
-// ── Phase 4: 손바닥 마을 ─────────────────────────────────
-// 손가락 5개 = 관심사 큰길, 손바닥 = 광장(달그락 대장간 본관 공사 중). 이름은 다인 확정 전 가제.
-export type Street = { id: string; name: string; finger: string; topics: string; themes: string[] };
-export const STREETS: Street[] = [
-  { id: "heart", name: "마음길", finger: "엄지", topics: "선물 · 가족 · 기념", themes: [] },
-  { id: "rest", name: "쉼길", finger: "검지", topics: "잠 · 휴식", themes: ["sleep"] },
-  { id: "work", name: "일길", finger: "중지", topics: "책상 · 공부 · 집중 · 물 한 잔", themes: ["desk", "water"] },
-  { id: "home", name: "집길", finger: "약지", topics: "현관 · 부엌 · 식물", themes: ["door", "kitchen", "plant"] },
-  { id: "pet", name: "반려길", finger: "새끼", topics: "냥집사 · 멍집사", themes: ["cat", "dog"] }
+// ── 마을 5개 ─────────────────────────────────
+// 마을 = 큰 제작 분야, 골목 = 그 안의 구체적인 용도. 가운데 광장엔 공사 중인 달그락 대장간 본관.
+// 골목 세부 구성은 미정이라 기존 골목을 가장 가까운 마을에 임시로 넣어뒀다(와글마을은 아직 골목 없음).
+export type VillageId = "kkomul" | "ttukttak" | "jjaekkak" | "wagle" | "kkambbak";
+export type Village = { id: VillageId; name: string; topics: string; mood: string; themes: string[] };
+export const VILLAGES: Village[] = [
+  { id: "kkomul", name: "꼬물마을", topics: "돌봄 · 반려동물 · 식물 · 가족", mood: "식물과 작은 생명들이 함께 사는 정원 마을", themes: ["cat", "dog", "plant"] },
+  { id: "ttukttak", name: "뚝딱마을", topics: "생활 편의 · 살림 · 자동화", mood: "기계 장치와 공구들이 곳곳에 놓인 공방 마을", themes: ["kitchen"] },
+  { id: "jjaekkak", name: "째깍마을", topics: "시간 · 습관 · 집중 · 업무", mood: "작은 종소리가 하루의 리듬을 알려주는 차분한 마을", themes: ["desk", "sleep", "water"] },
+  { id: "wagle", name: "와글마을", topics: "놀이 · 장난감 · 상호작용", mood: "장난감과 작은 로봇들이 움직이는 놀이 마을", themes: [] },
+  { id: "kkambbak", name: "깜빡마을", topics: "관찰 · 감지 · 상태 확인", mood: "눈에 보이지 않는 변화를 발견하는 관측 마을", themes: ["door"] }
 ];
+export function villageOf(themeId: string) {
+  return VILLAGES.find((v) => v.themes.includes(themeId)) ?? null;
+}
+
+/** 대장간 성장 단계: 도깨비불의 구상 수준(장작이 채운 갈래 수·개수)으로 정한다. 1 불씨 → 2 타오름 → 3 활활 */
+export const HOUSE_STAGES = ["불씨", "타오름", "활활"] as const;
+export function houseStage(picked: string[]): 1 | 2 | 3 {
+  const cats = new Set(picked.map((id) => id.split("_")[0]));
+  if (cats.size <= 1 || picked.length <= 2) return 1;
+  return cats.size < 4 ? 2 : 3;
+}
 
 // 주민 모두가 넣은 장작의 총합 = 본관 공사 진행도
 export const HALL_GOAL = Math.max(1, Number(process.env.FIND_HALL_GOAL ?? 1000));

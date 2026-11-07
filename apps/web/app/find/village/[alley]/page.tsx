@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { OWNER_COOKIE, ownerTokenFrom } from "../../../../lib/find/owner";
-import { ALLEY_CAPACITY, ALLEY_THEMES, FLAG_WANTS, STREETS, alleyName, chimneyLevel } from "../../../../lib/find/village";
+import { ALLEY_CAPACITY, ALLEY_THEMES, FLAG_WANTS, VILLAGES, alleyName, chimneyLevel } from "../../../../lib/find/village";
 import { alleyHouses, forgeForOwner, hashToken } from "../../../../lib/find/village-store";
 import Mailbox from "../../mailbox";
 import "../../fonts";
@@ -13,7 +13,7 @@ type Props = { params: Promise<{ alley: string }> };
 export async function generateMetadata({ params }: Props) {
   const m = (await params).alley.match(/^([a-z]+)-(\d{1,3})$/);
   const theme = m && ALLEY_THEMES.find((t) => t.id === m[1]);
-  return { title: theme ? `${alleyName(theme.id, Number(m![2]))} · 손바닥 마을` : "손바닥 마을" };
+  return { title: theme ? `${alleyName(theme.id, Number(m![2]))} · 도깨비 마을` : "도깨비 마을" };
 }
 
 // 골목 (줌 2단계): 등축 집들이 줄지어 있고, 내 집은 표식, 이웃은 끈으로 이어진다
@@ -25,7 +25,7 @@ export default async function Alley({ params }: Props) {
   const token = ownerTokenFrom((await cookies()).get(OWNER_COOKIE)?.value);
   const me = token ? await forgeForOwner(hashToken(token)) : null;
   const { houses, strings } = await alleyHouses(theme.id, seq);
-  const street = STREETS.find((s) => s.themes.includes(theme.id));
+  const street = VILLAGES.find((s) => s.themes.includes(theme.id));
   return (
     <main className="find">
       <header className="top"><a className="brand" href="/find/village">← 마을 지도</a><div className="step">{street?.name ?? ""}</div></header>

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { db, newId, readData, rowToFire, serial, storageKind, writeData, type FireRecord } from "./store";
-import { pickTheme, plotFor } from "./village";
+import { houseStage, pickTheme, plotFor } from "./village";
 
 // 내 대장간 · 우체통 · 마을 소식. store.ts와 같이 Postgres가 있으면 Postgres, 없으면 .data/find.json.
 
@@ -294,7 +294,7 @@ export async function fuelByFire(fireIds: string[]): Promise<Map<string, number>
   return new Map(fireIds.map((id) => [id, counts.get(fires.find((f) => f.id === id)?.forgeId ?? "") ?? 0]));
 }
 
-// ── Phase 4: 손바닥 마을 ─────────────────────────────────
+// ── Phase 4: 도깨비 마을 ─────────────────────────────────
 export type HouseView = {
   forgeId: string | null; plotNo: number; nickname: string; locked: boolean;
   color: string; reactKind: string; peak: number; fuel: number; wants: number; visits7: number; fires: number;
@@ -469,15 +469,17 @@ export async function resolveReport(id: number) {
 }
 
 // ── 3D 걷는 마을용: 공개된 집 전부 (마을·골목·터 순서) ─────────
-export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean };
+export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number };
 export async function worldHouses(): Promise<{ houses: WorldHouse[]; totalFuel: number }> {
   const s = await snapshot();
   const fuel = countBy(s.fuel, (f) => f.to);
   const wants = countBy(s.want, (w) => w.to);
   const visits = countBy(s.visit.filter((v) => v.visitor !== v.host), (v) => v.host);
   const houses = s.forges.filter((f) => f.visibility === "public").map((f) => {
-    const fire = s.fires.find((x) => x.forgeId === f.id);
-    return { id: f.id, nickname: f.nickname, theme: f.theme, alleySeq: f.alleySeq, plotNo: f.plotNo, color: fire?.color ?? "#4FB3A6", peak: fire?.peak ?? 20, fuel: fuel.get(f.id) ?? 0, wants: wants.get(f.id) ?? 0, lit: (visits.get(f.id) ?? 0) > 0 };
+    const mine = s.fires.filter((x) => x.forgeId === f.id);
+    const fire = mine[0];
+    const stage = mine.reduce<1 | 2 | 3>((best, x) => Math.max(best, houseStage(x.picked)) as 1 | 2 | 3, 1);
+    return { id: f.id, nickname: f.nickname, theme: f.theme, alleySeq: f.alleySeq, plotNo: f.plotNo, color: fire?.color ?? "#4FB3A6", peak: fire?.peak ?? 20, fuel: fuel.get(f.id) ?? 0, wants: wants.get(f.id) ?? 0, lit: (visits.get(f.id) ?? 0) > 0, stage, fires: mine.length };
   }).sort((a, b) => a.theme.localeCompare(b.theme) || a.alleySeq - b.alleySeq || a.plotNo - b.plotNo);
   return { houses, totalFuel: s.fuel.length };
 }

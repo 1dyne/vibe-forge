@@ -4,7 +4,7 @@ import { track } from "../track";
 import ForgeSignup from "../waitlist";
 
 type Alley = { theme: string; themeName: string; seq: number; name: string; residents: number };
-type Street = { id: string; name: string; finger: string; topics: string; alleys: Alley[] };
+type Street = { id: string; name: string; topics: string; alleys: Alley[] };
 type Plan = { id: number; title: string; description: string; status: "voting" | "building" | "done"; fuel: number; mine: number };
 type Props = {
   streets: Street[];
@@ -20,13 +20,13 @@ type Props = {
   couponText: string | null;
 };
 
-// 손가락 5개(큰길) 위치: 엄지는 왼쪽 아래로 비스듬히, 나머지는 손바닥 위로
+// 마을 5개 자리 (3D 마을이 안 열리는 기기용 간단 지도)
 const FINGERS: Record<string, { x: number; y: number; w: number; h: number; rot: number }> = {
-  heart: { x: 66, y: 296, w: 50, h: 112, rot: -40 },
-  rest: { x: 70, y: 70, w: 52, h: 200, rot: -6 },
-  work: { x: 132, y: 30, w: 54, h: 230, rot: 0 },
-  home: { x: 196, y: 52, w: 52, h: 210, rot: 5 },
-  pet: { x: 254, y: 118, w: 48, h: 160, rot: 13 }
+  kkomul: { x: 66, y: 296, w: 50, h: 112, rot: -40 },
+  ttukttak: { x: 70, y: 70, w: 52, h: 200, rot: -6 },
+  jjaekkak: { x: 132, y: 30, w: 54, h: 230, rot: 0 },
+  wagle: { x: 196, y: 52, w: 52, h: 210, rot: 5 },
+  kkambbak: { x: 254, y: 118, w: 48, h: 160, rot: 13 }
 };
 const DOT_COLORS = ["#9B7BFF", "#FF8F3F", "#3FBF6E", "#4FB3A6"];
 
@@ -61,12 +61,13 @@ export default function VillageMap(props: Props) {
   return (
     <section className="screen village">
       <div className="village-head">
-        <h1 style={{ fontSize: 26 }}>손바닥 마을</h1>
+        <h1 style={{ fontSize: 26 }}>도깨비 마을</h1>
+        <a className="world-link" href="/find/world">3D로 걸어보기</a>
         <div className="muted small">지금 마을에 도깨비불 <b>{floating}</b>개가 떠 있어 · 대장간 {totalForges}채</div>
       </div>
 
       <div className="palm-wrap">
-        <svg viewBox="0 0 360 500" className="palm" role="img" aria-label="손바닥 마을 지도">
+        <svg viewBox="0 0 360 500" className="palm" role="img" aria-label="도깨비 마을 지도">
           <rect x="62" y="250" width="240" height="230" rx="96" fill="#EAF5F2" stroke="#232323" strokeWidth="2.5" />
           {streets.map((s) => {
             const f = FINGERS[s.id];
@@ -93,7 +94,7 @@ export default function VillageMap(props: Props) {
           </g>
         </svg>
       </div>
-      <div className="muted small" style={{ textAlign: "center" }}>마을 장작 <b>{hall.pct}%</b> · 본관 공사: {hall.label} ({hall.totalFuel}/{hall.goal})<br />손가락(큰길)이나 본관을 눌러봐</div>
+      <div className="muted small" style={{ textAlign: "center" }}>마을 장작 <b>{hall.pct}%</b> · 본관 공사: {hall.label} ({hall.totalFuel}/{hall.goal})<br />마을이나 본관을 눌러봐</div>
 
       {topWant && (
         <a className="board-card" href={`/f/${topWant.forgeId}`} style={{ borderColor: topWant.color }}>
@@ -128,15 +129,15 @@ export default function VillageMap(props: Props) {
         {planMsg && <div className="error">{planMsg}</div>}
       </div>
 
-      <nav className="town-tabs" aria-label="마을 길"><a href="/find/home">내 집</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 집이나</a></nav>
+      <nav className="town-tabs" aria-label="마을 메뉴"><a href="/find/home">내 집</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 집이나</a></nav>
 
       {sheet && (
         <div className="overlay" role="dialog" aria-label={sheet.kind === "hall" ? "본관" : sheet.street.name} onClick={(e) => { if (e.target === e.currentTarget) setSheet(null); }}>
           <div className="sheet tall">
             {sheet.kind === "street" ? (
               <>
-                <div className="display" style={{ fontSize: 22 }}>{sheet.street.name} <span className="muted small">{sheet.street.finger} · {sheet.street.topics}</span></div>
-                {sheet.street.alleys.length === 0 && <p className="body">아직 이 큰길엔 골목이 없어. 곧 열릴 거야.</p>}
+                <div className="display" style={{ fontSize: 22 }}>{sheet.street.name} <span className="muted small">{sheet.street.topics}</span></div>
+                {sheet.street.alleys.length === 0 && <p className="body">아직 이 마을엔 골목이 없어. 곧 열릴 거야.</p>}
                 {sheet.street.alleys.map((a) => (
                   <a key={`${a.theme}-${a.seq}`} className="shelf-row" href={`/find/village/${a.theme}-${a.seq}`}>
                     <i style={{ background: "#4FB3A6" }} /><span>{a.name}</span>
