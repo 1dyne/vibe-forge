@@ -277,7 +277,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       )}
 
       {screen === "forge" && (
-        <ForgeSignup fire={result?.fire ?? null} refCode={ref} couponText={couponText} onRestart={() => { setIdea(""); setAnalysis(null); setTree(EMPTY_TREE); resetFire(); go("intro"); }} />
+        <ForgeSignup fire={result?.fire ?? null} forgeId={result?.forge?.id ?? null} refCode={ref} couponText={couponText} onRestart={() => { setIdea(""); setAnalysis(null); setTree(EMPTY_TREE); resetFire(); go("intro"); }} />
       )}
 
       {shareOpen && result && <ShareSheet fire={result.fire} onClose={() => setShareOpen(false)} />}

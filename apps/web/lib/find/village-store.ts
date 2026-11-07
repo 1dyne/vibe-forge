@@ -145,3 +145,151 @@ export async function setMeta(key: string, value: string) {
   if (pg()) { await (await db()).query("INSERT INTO find_meta (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [key, value]); return; }
   await serial(async () => { const d = await readData(); (d.meta ??= {})[key] = value; await writeData(d); });
 }
+
+// ── 놀러 가기: 장작 · 나도 갖고 싶어 · 정해진 말 · 이웃 · 도감 · 방문 ─────────
+// 자유 입력·DM은 없다. 정해진 말만 남길 수 있다 (2차 피해 방지).
+export const PHRASES = ["나도 갖고 싶어", "이거 천재다", "만들면 알려줘!", "장작 넣고 감", "응원해"] as const;
+
+type Social = { fuel: Array<{ from: string; to: string; day: string; at: string }>; want: Array<{ from: string; to: string; at: string }>; note: Array<{ from: string; to: string; phrase: string; day: string; at: string }>; neighbor: Array<{ follower: string; followee: string; at: string }>; dex: Array<{ owner: string; fireId: string; at: string }>; visit: Array<{ visitor: string | null; host: string; at: string }> };
+const today = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10); // 한국 날짜 기준 하루 1번
+
+async function fileSocial<T>(op: (s: Social) => T, save = false): Promise<T> {
+  return serial(async () => {
+    const d = await readData();
+    const raw = (d.social ??= {}) as Record<string, unknown[]>;
+    for (const k of ["fuel", "want", "note", "neighbor", "dex", "visit"]) raw[k] ??= [];
+    const out = op(raw as unknown as Social);
+    if (save) await writeData(d);
+    return out;
+  });
+}
+
+/** 장작 넣기: 같은 방문자는 같은 집에 하루 1번. 이미 넣었으면 false */
+export async function giveFuel(from: string, to: string): Promise<boolean> {
+  if (from === to) return false;
+  const day = today();
+  if (pg()) return ((await (await db()).query("INSERT INTO find_fuel (from_forge, to_forge, day) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING", [from, to, day])).rowCount ?? 0) > 0;
+  return fileSocial((s) => { if (s.fuel.some((f) => f.from === from && f.to === to && f.day === day)) return false; s.fuel.push({ from, to, day, at: new Date().toISOString() }); return true; }, true);
+}
+
+export async function giveWant(from: string, to: string): Promise<boolean> {
+  if (from === to) return false;
+  if (pg()) return ((await (await db()).query("INSERT INTO find_want (from_forge, to_forge) VALUES ($1,$2) ON CONFLICT DO NOTHING", [from, to])).rowCount ?? 0) > 0;
+  return fileSocial((s) => { if (s.want.some((w) => w.from === from && w.to === to)) return false; s.want.push({ from, to, at: new Date().toISOString() }); return true; }, true);
+}
+
+/** 정해진 말 남기기: 같은 집에 하루 한 마디 */
+export async function leaveNote(from: string, to: string, phrase: string): Promise<boolean> {
+  if (from === to || !(PHRASES as readonly string[]).includes(phrase)) return false;
+  const day = today();
+  if (pg()) return ((await (await db()).query("INSERT INTO find_note (from_forge, to_forge, phrase, day) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING", [from, to, phrase, day])).rowCount ?? 0) > 0;
+  return fileSocial((s) => { if (s.note.some((n) => n.from === from && n.to === to && n.day === day)) return false; s.note.push({ from, to, phrase, day, at: new Date().toISOString() }); return true; }, true);
+}
+
+export async function setNeighbor(follower: string, followee: string, on: boolean) {
+  if (follower === followee) return;
+  if (pg()) {
+    if (on) await (await db()).query("INSERT INTO find_neighbor (follower, followee) VALUES ($1,$2) ON CONFLICT DO NOTHING", [follower, followee]);
+    else await (await db()).query("DELETE FROM find_neighbor WHERE follower = $1 AND followee = $2", [follower, followee]);
+    return;
+  }
+  await fileSocial((s) => { s.neighbor = s.neighbor.filter((n) => !(n.follower === follower && n.followee === followee)); if (on) s.neighbor.push({ follower, followee, at: new Date().toISOString() }); }, true);
+}
+
+/** 들른 집의 도깨비불을 내 도감에 한 칸 추가 + 방문 기록. 새로 들어간 도감 칸 수를 돌려준다. */
+export async function recordVisit(visitor: string | null, host: string, fireIds: string[]): Promise<number> {
+  if (pg()) {
+    const pool = await db();
+    await pool.query("INSERT INTO find_visit (visitor_forge, host_forge) VALUES ($1,$2)", [visitor, host]);
+    if (!visitor || visitor === host || !fireIds.length) return 0;
+    const r = await pool.query("INSERT INTO find_dex (owner_forge, fire_id) SELECT $1, unnest($2::text[]) ON CONFLICT DO NOTHING", [visitor, fireIds]);
+    return r.rowCount ?? 0;
+  }
+  return fileSocial((s) => {
+    s.visit.push({ visitor, host, at: new Date().toISOString() });
+    if (!visitor || visitor === host) return 0;
+    let added = 0;
+    for (const fireId of fireIds) if (!s.dex.some((x) => x.owner === visitor && x.fireId === fireId)) { s.dex.push({ owner: visitor, fireId, at: new Date().toISOString() }); added++; }
+    return added;
+  }, true);
+}
+
+export type SocialState = { fuelToday: number; fuelTotal: number; wants: number; notes: Array<{ phrase: string; from: string; nickname: string; at: string }>; neighbors: number; visitsWeek: number; mine: { fuelGivenToday: boolean; wanted: boolean; notedToday: boolean; neighbor: boolean } };
+
+export async function socialState(host: string, viewer: string | null): Promise<SocialState> {
+  const day = today();
+  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+  if (pg()) {
+    const pool = await db();
+    const [counts, notes, mine] = await Promise.all([
+      pool.query(`SELECT
+        (SELECT count(*)::int FROM find_fuel WHERE to_forge = $1 AND day = $2) AS fuel_today,
+        (SELECT count(*)::int FROM find_fuel WHERE to_forge = $1) AS fuel_total,
+        (SELECT count(*)::int FROM find_want WHERE to_forge = $1) AS wants,
+        (SELECT count(*)::int FROM find_neighbor WHERE followee = $1) AS neighbors,
+        (SELECT count(*)::int FROM find_visit WHERE host_forge = $1 AND at > $3 AND visitor_forge IS DISTINCT FROM $1) AS visits`, [host, day, weekAgo]),
+      pool.query("SELECT n.phrase, n.from_forge, n.created_at, f.nickname FROM find_note n LEFT JOIN find_forges f ON f.id = n.from_forge WHERE n.to_forge = $1 ORDER BY n.created_at DESC LIMIT 20", [host]),
+      viewer ? pool.query(`SELECT
+        EXISTS(SELECT 1 FROM find_fuel WHERE from_forge = $1 AND to_forge = $2 AND day = $3) AS fuel,
+        EXISTS(SELECT 1 FROM find_want WHERE from_forge = $1 AND to_forge = $2) AS want,
+        EXISTS(SELECT 1 FROM find_note WHERE from_forge = $1 AND to_forge = $2 AND day = $3) AS note,
+        EXISTS(SELECT 1 FROM find_neighbor WHERE follower = $1 AND followee = $2) AS neighbor`, [viewer, host, day]) : null
+    ]);
+    const c = counts.rows[0], m = mine?.rows[0];
+    return {
+      fuelToday: c.fuel_today, fuelTotal: c.fuel_total, wants: c.wants, neighbors: c.neighbors, visitsWeek: c.visits,
+      notes: notes.rows.map((r) => ({ phrase: r.phrase, from: r.from_forge, nickname: r.nickname ?? "이름 없는 도깨비", at: new Date(r.created_at).toISOString() })),
+      mine: { fuelGivenToday: Boolean(m?.fuel), wanted: Boolean(m?.want), notedToday: Boolean(m?.note), neighbor: Boolean(m?.neighbor) }
+    };
+  }
+  const forges = (await serial(async () => (await readData()).forges as ForgeRecord[] | undefined)) ?? [];
+  return fileSocial((s) => ({
+    fuelToday: s.fuel.filter((f) => f.to === host && f.day === day).length,
+    fuelTotal: s.fuel.filter((f) => f.to === host).length,
+    wants: s.want.filter((w) => w.to === host).length,
+    neighbors: s.neighbor.filter((n) => n.followee === host).length,
+    visitsWeek: s.visit.filter((v) => v.host === host && v.at > weekAgo && v.visitor !== host).length,
+    notes: s.note.filter((n) => n.to === host).reverse().slice(0, 20).map((n) => ({ phrase: n.phrase, from: n.from, nickname: forges.find((f) => f.id === n.from)?.nickname ?? "이름 없는 도깨비", at: n.at })),
+    mine: {
+      fuelGivenToday: Boolean(viewer && s.fuel.some((f) => f.from === viewer && f.to === host && f.day === day)),
+      wanted: Boolean(viewer && s.want.some((w) => w.from === viewer && w.to === host)),
+      notedToday: Boolean(viewer && s.note.some((n) => n.from === viewer && n.to === host && n.day === day)),
+      neighbor: Boolean(viewer && s.neighbor.some((n) => n.follower === viewer && n.followee === host))
+    }
+  }));
+}
+
+/** 내 이웃 대장간들 */
+export async function neighborsOf(forgeId: string): Promise<ForgeRecord[]> {
+  if (pg()) return (await (await db()).query("SELECT f.* FROM find_neighbor n JOIN find_forges f ON f.id = n.followee WHERE n.follower = $1 ORDER BY n.created_at DESC", [forgeId])).rows.map(toForge);
+  const ids = await fileSocial((s) => s.neighbor.filter((n) => n.follower === forgeId).map((n) => n.followee));
+  const forges = (await serial(async () => (await readData()).forges as ForgeRecord[] | undefined)) ?? [];
+  return ids.map((id) => forges.find((f) => f.id === id)).filter((f): f is ForgeRecord => Boolean(f));
+}
+
+/** 내 도감: 들른 집에서 만난 도깨비불들 */
+export async function dexOf(forgeId: string): Promise<FireRecord[]> {
+  if (pg()) return (await (await db()).query("SELECT f.* FROM find_dex d JOIN find_fires f ON f.id = d.fire_id WHERE d.owner_forge = $1 ORDER BY d.first_seen_at DESC LIMIT 300", [forgeId])).rows.map(rowToFire);
+  const ids = await fileSocial((s) => s.dex.filter((x) => x.owner === forgeId).map((x) => x.fireId).reverse());
+  const fires = await serial(async () => (await readData()).fires);
+  return ids.map((id) => fires.find((f) => f.id === id)).filter((f): f is FireRecord => Boolean(f));
+}
+
+/** 아무 집이나: 공개된 대장간 하나 (나 빼고) */
+export async function randomForge(except: string | null): Promise<ForgeRecord | null> {
+  if (pg()) { const { rows } = await (await db()).query("SELECT * FROM find_forges WHERE visibility = 'public' AND id IS DISTINCT FROM $1 ORDER BY random() LIMIT 1", [except]); return rows[0] ? toForge(rows[0]) : null; }
+  const forges = ((await serial(async () => (await readData()).forges as ForgeRecord[] | undefined)) ?? []).filter((f) => f.visibility === "public" && f.id !== except);
+  return forges.length ? forges[Math.floor(Math.random() * forges.length)] : null;
+}
+
+/** 대기 순번용: 도깨비불별로 그 불이 사는 대장간이 받은 장작 수 */
+export async function fuelByFire(fireIds: string[]): Promise<Map<string, number>> {
+  if (!fireIds.length) return new Map();
+  if (pg()) {
+    const { rows } = await (await db()).query("SELECT f.id, count(fu.*)::int AS n FROM find_fires f JOIN find_fuel fu ON fu.to_forge = f.forge_id WHERE f.id = ANY($1::text[]) GROUP BY f.id", [fireIds]);
+    return new Map(rows.map((r) => [r.id as string, r.n as number]));
+  }
+  const fires = await serial(async () => (await readData()).fires);
+  const counts = await fileSocial((s) => { const m = new Map<string, number>(); for (const f of s.fuel) m.set(f.to, (m.get(f.to) ?? 0) + 1); return m; });
+  return new Map(fireIds.map((id) => [id, counts.get(fires.find((f) => f.id === id)?.forgeId ?? "") ?? 0]));
+}

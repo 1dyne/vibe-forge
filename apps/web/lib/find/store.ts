@@ -46,7 +46,7 @@ export type WaitlistRecord = {
 
 export type EventRecord = { name: string; session: string | null; props: Record<string, unknown>; createdAt: string };
 
-export type Standing = { code: string; position: number; total: number; referrals: number; alreadyJoined: boolean; fireName: string | null };
+export type Standing = { code: string; position: number; total: number; referrals: number; fuel: number; alreadyJoined: boolean; fireName: string | null };
 
 // 친구 1명(메밀묵 한 그릇)마다 앞당기는 칸 수
 export const REFERRAL_BOOST = Number(process.env.FIND_REFERRAL_BOOST ?? 3);
@@ -61,11 +61,14 @@ function newCode(taken: Set<string>) {
   }
 }
 
-function rank(entries: Array<{ id: string; referralCode: string; referredBy: string | null }>, id: string) {
+// 내 대장간이 받은 장작 1개마다 앞당기는 칸 수 (메밀묵 추천과 함께 적용)
+export const FUEL_BOOST = Number(process.env.FIND_FUEL_BOOST ?? 1);
+
+function rank(entries: Array<{ id: string; referralCode: string; referredBy: string | null; fireId?: string | null }>, id: string, fuelByFire: Map<string, number> = new Map()) {
   const referrals = new Map<string, number>();
   for (const e of entries) if (e.referredBy) referrals.set(e.referredBy, (referrals.get(e.referredBy) ?? 0) + 1);
   const ordered = entries
-    .map((e, index) => ({ e, index, key: index - REFERRAL_BOOST * (referrals.get(e.referralCode) ?? 0) }))
+    .map((e, index) => ({ e, index, key: index - REFERRAL_BOOST * (referrals.get(e.referralCode) ?? 0) - FUEL_BOOST * (e.fireId ? fuelByFire.get(e.fireId) ?? 0 : 0) }))
     .sort((a, b) => a.key - b.key || a.index - b.index);
   const me = entries.find((e) => e.id === id)!;
   return { position: ordered.findIndex((r) => r.e.id === id) + 1, referrals: referrals.get(me.referralCode) ?? 0 };
@@ -87,7 +90,7 @@ interface Backend {
 }
 
 // ── JSON 파일 ────────────────────────────────────────────
-export type FileData = { version: 1; fires: FireRecord[]; waitlist: WaitlistRecord[]; events: EventRecord[]; forges?: unknown[]; mails?: unknown[]; notices?: unknown[]; meta?: Record<string, string> };
+export type FileData = { version: 1; fires: FireRecord[]; waitlist: WaitlistRecord[]; events: EventRecord[]; forges?: unknown[]; mails?: unknown[]; notices?: unknown[]; meta?: Record<string, string>; social?: Record<string, unknown[]> };
 let queue: Promise<unknown> = Promise.resolve();
 export function serial<T>(op: () => Promise<T>): Promise<T> {
   const next = queue.then(op, op);
@@ -183,6 +186,15 @@ CREATE TABLE IF NOT EXISTS find_mail (
 CREATE INDEX IF NOT EXISTS find_mail_forge ON find_mail(forge_id);
 CREATE TABLE IF NOT EXISTS find_notices (id bigserial PRIMARY KEY, title text NOT NULL, body text NOT NULL, kind text NOT NULL DEFAULT 'update', published_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS find_meta (key text PRIMARY KEY, value text NOT NULL);
+CREATE TABLE IF NOT EXISTS find_fuel (from_forge text NOT NULL, to_forge text NOT NULL, day date NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (from_forge, to_forge, day));
+CREATE INDEX IF NOT EXISTS find_fuel_to ON find_fuel(to_forge);
+CREATE TABLE IF NOT EXISTS find_want (from_forge text NOT NULL, to_forge text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (from_forge, to_forge));
+CREATE TABLE IF NOT EXISTS find_note (id bigserial PRIMARY KEY, from_forge text NOT NULL, to_forge text NOT NULL, phrase text NOT NULL, day date NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (from_forge, to_forge, day));
+CREATE INDEX IF NOT EXISTS find_note_to ON find_note(to_forge);
+CREATE TABLE IF NOT EXISTS find_neighbor (follower text NOT NULL, followee text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (follower, followee));
+CREATE TABLE IF NOT EXISTS find_dex (owner_forge text NOT NULL, fire_id text NOT NULL, first_seen_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (owner_forge, fire_id));
+CREATE TABLE IF NOT EXISTS find_visit (id bigserial PRIMARY KEY, visitor_forge text, host_forge text NOT NULL, at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS find_visit_host ON find_visit(host_forge, at);
 CREATE INDEX IF NOT EXISTS find_fires_combo ON find_fires(combo_key);
 `;
 
@@ -281,9 +293,11 @@ export async function joinWaitlist(input: Parameters<Backend["join"]>[0]): Promi
   const b = backend();
   const { record, alreadyJoined } = await b.join({ ...input, email: input.email.trim().toLowerCase() });
   const all = await b.allWaitlist();
-  const { position, referrals } = rank(all, record.id);
+  const { fuelByFire } = await import("./village-store");
+  const fuel = await fuelByFire(all.map((e) => e.fireId).filter((x): x is string => Boolean(x)));
+  const { position, referrals } = rank(all, record.id, fuel);
   const fire = record.fireId ? await b.getFire(record.fireId) : null;
-  return { code: record.referralCode, position, total: all.length, referrals, alreadyJoined, fireName: fire?.name ?? null };
+  return { code: record.referralCode, position, total: all.length, referrals, fuel: record.fireId ? fuel.get(record.fireId) ?? 0 : 0, alreadyJoined, fireName: fire?.name ?? null };
 }
 
 export async function endPool() {

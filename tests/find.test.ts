@@ -388,3 +388,76 @@ describe("내 대장간·우체통 (파일 저장)", () => {
     expect(mail).toMatchObject({ status: "done", reply: "고쳐놨어!", notionSynced: true, notionPageId: "page-1" });
   });
 });
+
+describe("놀러 가기 (Phase 3, 파일 저장)", () => {
+  let dir = "";
+  beforeEach(async () => {
+    resetRateLimits();
+    dir = await mkdtemp(path.join(os.tmpdir(), "find-social-"));
+    vi.stubEnv("FIND_TEST_DATA_FILE", path.join(dir, "find.json"));
+    vi.stubEnv("DATABASE_URL", ""); vi.stubEnv("DATABASE_URL_WEB", ""); vi.stubEnv("NOTION_TOKEN", "");
+  });
+  afterEach(async () => { vi.unstubAllEnvs(); await rm(dir, { recursive: true, force: true }); });
+
+  const makeForge = async (nickname: string, ids = ["f_bowl", "w_pet", "r_light"]) => {
+    const find = lookup(chipTree("고양이가 밥 먹었는지 모르겠어"));
+    const res = await fireRoute(post("/api/find/fires", { idea: "고양이 밥", picked: ids.map((id) => find(id)), peak: 60, nickname }));
+    const body = await res.json();
+    return { cookie: res.cookies.get("find_owner")!.value, forgeId: body.forge.id as string, fireId: body.fire.id as string };
+  };
+  const visit = async (cookie: string | null, host: string, action: string, extra: Record<string, unknown> = {}) => {
+    const { POST } = await import("../apps/web/app/api/find/visit/route");
+    return POST(post("/api/find/visit", { host, action, ...extra }, cookie ? { cookie: `find_owner=${cookie}` } : {}));
+  };
+
+  it("내 대장간이 없으면 행동 대신 도깨비불 찾기로 안내한다", async () => {
+    const host = await makeForge("주인");
+    const res = await visit(null, host.forgeId, "fuel");
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe("need_forge");
+  });
+
+  it("장작은 같은 집에 하루 1번, 나도 갖고 싶어는 한 번, 정해진 말만 하루 한 마디", async () => {
+    const host = await makeForge("주인");
+    const guest = await makeForge("손님");
+    expect((await (await visit(guest.cookie, host.forgeId, "fuel")).json()).changed).toBe(true);
+    expect((await (await visit(guest.cookie, host.forgeId, "fuel")).json()).changed).toBe(false);
+    expect((await (await visit(guest.cookie, host.forgeId, "want")).json()).changed).toBe(true);
+    expect((await (await visit(guest.cookie, host.forgeId, "want")).json()).changed).toBe(false);
+    expect((await visit(guest.cookie, host.forgeId, "note", { phrase: "아무 말이나" })).status).toBe(400);
+    const noted = await (await visit(guest.cookie, host.forgeId, "note", { phrase: "이거 천재다" })).json();
+    expect(noted.state.notes).toEqual([expect.objectContaining({ phrase: "이거 천재다", nickname: "손님" })]);
+    expect((await (await visit(guest.cookie, host.forgeId, "note", { phrase: "응원해" })).json()).changed).toBe(false);
+    const after = (await (await visit(guest.cookie, host.forgeId, "neighbor", { on: true })).json()).state;
+    expect(after).toMatchObject({ fuelToday: 1, fuelTotal: 1, wants: 1, neighbors: 1, mine: { fuelGivenToday: true, wanted: true, notedToday: true, neighbor: true } });
+    expect((await visit(host.cookie, host.forgeId, "fuel")).status).toBe(400); // 내 집엔 못 넣음
+    const { neighborsOf } = await import("../apps/web/lib/find/village-store");
+    expect((await neighborsOf(guest.forgeId)).map((f) => f.id)).toEqual([host.forgeId]);
+  });
+
+  it("들른 집의 도깨비불은 내 도감에 한 칸씩 (같은 불은 한 번만)", async () => {
+    const host = await makeForge("주인");
+    const guest = await makeForge("손님");
+    const { recordVisit, dexOf } = await import("../apps/web/lib/find/village-store");
+    expect(await recordVisit(guest.forgeId, host.forgeId, [host.fireId])).toBe(1);
+    expect(await recordVisit(guest.forgeId, host.forgeId, [host.fireId])).toBe(0);
+    expect(await recordVisit(null, host.forgeId, [host.fireId])).toBe(0);
+    expect((await dexOf(guest.forgeId)).map((f) => f.id)).toEqual([host.fireId]);
+  });
+
+  it("받은 장작만큼 대기 순번이 앞당겨진다", async () => {
+    vi.stubEnv("FIND_FUEL_BOOST", "1");
+    const a = await makeForge("가");
+    const b = await makeForge("나");
+    const c = await makeForge("다");
+    const join = async (email: string, fireId: string) => (await (await waitlistRoute(post("/api/find/waitlist", { email, fireId, privacyConsent: true, marketingConsent: false, ref: null }))).json()).standing;
+    await join("a@example.com", a.fireId);
+    await join("b@example.com", b.fireId);
+    expect((await join("c@example.com", c.fireId)).position).toBe(3);
+    await visit(a.cookie, c.forgeId, "fuel");
+    await visit(b.cookie, c.forgeId, "fuel");
+    const again = await join("c@example.com", c.fireId);
+    expect(again.fuel).toBe(2);
+    expect(again.position).toBe(2); // 3번째 - 장작 2개 = 1번째와 같은 자리, 같으면 먼저 신청한 사람이 앞
+  });
+});

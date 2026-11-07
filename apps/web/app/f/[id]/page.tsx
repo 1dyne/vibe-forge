@@ -6,7 +6,7 @@ import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
 import { getFire } from "../../../lib/find/store";
 import { alleyName } from "../../../lib/find/village";
-import { forgeFires, getForge, hashToken, type ForgeRecord } from "../../../lib/find/village-store";
+import { forgeFires, forgeForOwner, getForge, hashToken, recordVisit, socialState } from "../../../lib/find/village-store";
 import Dokkaebi from "../../find/dokkaebi";
 import FireCardView, { Roast } from "../../find/fire-card";
 import ForgeView from "../../find/forge-view";
@@ -17,9 +17,10 @@ import "../../find/fonts";
 export const dynamic = "force-dynamic";
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ ref?: string }> };
 
-async function isOwnerOf(forge: ForgeRecord) {
+/** 이 기기 주인의 대장간 (없으면 null) */
+async function viewerForge() {
   const token = ownerTokenFrom((await cookies()).get(OWNER_COOKIE)?.value);
-  return Boolean(token && hashToken(token) === forge.ownerHash);
+  return token ? forgeForOwner(hashToken(token)) : null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -57,14 +58,18 @@ export default async function SharedPage({ params, searchParams }: Props) {
   const id = (await params).id;
   const forge = await getForge(id);
   if (forge) {
-    const owner = await isOwnerOf(forge);
+    const viewer = await viewerForge();
+    const owner = viewer?.id === forge.id;
     if (forge.visibility === "private" && !owner) notFound();
     const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, peak: f.peak, sentence: f.sentence, card: f.card }));
+    // 놀러 온 사람: 방문 기록 + 이 집 도깨비불을 내 도감에 한 칸씩
+    const dexAdded = owner ? 0 : await recordVisit(viewer?.id ?? null, forge.id, fires.slice(0, 5).map((f) => f.id)).catch(() => 0);
+    const social = await socialState(forge.id, viewer?.id ?? null);
     return (
       <main className="find" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
         <header className="top"><a className="brand" href="/find">달그락 대장간</a><div className="step">{owner ? "내 대장간" : "놀러 온 대장간"}</div></header>
         {owner && <div style={{ padding: "0 20px" }}><VillageNews /></div>}
-        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} />
+        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
         <Mailbox screen={`forge:${forge.id}`} />
       </main>
     );
