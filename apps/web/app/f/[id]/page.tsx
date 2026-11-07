@@ -5,8 +5,8 @@ import { fireLabel } from "../../../lib/find/chips";
 import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
 import { getFire } from "../../../lib/find/store";
-import { alleyName } from "../../../lib/find/village";
-import { forgeFires, forgeForOwner, getForge, hashToken, recordVisit, socialState } from "../../../lib/find/village-store";
+import { alleyName, houseStage, villageOf } from "../../../lib/find/village";
+import { forgeFires, forgeForOwner, getForge, hashToken, recordVisit, socialState, touchForge } from "../../../lib/find/village-store";
 import Dokkaebi from "../../find/dokkaebi";
 import FireCardView, { Roast } from "../../find/fire-card";
 import ForgeView from "../../find/forge-view";
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const forge = await getForge(id);
   if (forge) {
     if (forge.visibility === "private") return { title: "달그락 대장간", robots: { index: false } };
-    const title = `${forge.nickname}의 대장간 · ${alleyName(forge.theme, forge.alleySeq)} ${forge.plotNo}번 터`;
+    const title = `${forge.nickname}의 대장간 · ${alleyName(forge.theme)}`;
     const description = "도깨비 마을에 놀러 와. 너만의 도깨비불도 찾아볼래?";
     const image = `${origin}/f/${forge.id}/og.png`;
     return {
@@ -61,7 +61,9 @@ export default async function SharedPage({ params, searchParams }: Props) {
     const viewer = await viewerForge();
     const owner = viewer?.id === forge.id;
     if (forge.visibility === "private" && !owner) notFound();
-    const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, peak: f.peak, sentence: f.sentence, card: f.card }));
+    if (owner) await touchForge(forge.id).catch(() => undefined);
+    const CAT: Record<string, string> = { f: "형태", r: "반응", s: "감지", w: "누구" };
+    const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, peak: f.peak, sentence: f.sentence, card: f.card, stage: houseStage(f.picked), cats: [...new Set(f.picked.map((c) => CAT[c.split("_")[0]]).filter(Boolean))] }));
     // 놀러 온 사람: 방문 기록 + 이 집 도깨비불을 내 도감에 한 칸씩
     const dexAdded = owner ? 0 : await recordVisit(viewer?.id ?? null, forge.id, fires.slice(0, 5).map((f) => f.id)).catch(() => 0);
     const social = await socialState(forge.id, viewer?.id ?? null);
@@ -69,7 +71,7 @@ export default async function SharedPage({ params, searchParams }: Props) {
       <main className="find" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
         <header className="top"><a className="brand" href="/find">달그락 대장간</a><div className="step">{owner ? "내 대장간" : "놀러 온 대장간"}</div></header>
         {owner && <div style={{ padding: "0 20px" }}><VillageNews /></div>}
-        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
+        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
         <Mailbox screen={`forge:${forge.id}`} />
       </main>
     );

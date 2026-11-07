@@ -294,11 +294,16 @@ describe("도깨비 마을 (Phase 2)", () => {
     expect(pickTheme(["w_cat", "f_bowl", "r_light"], {}).id).toBe("cat");
     expect(pickTheme(["f_cup", "s_cup"], {}).id).toBe("water");
     expect(pickTheme(["r_light"], { cat: 3, dog: 0, water: 1 }).id).not.toBe("cat"); // 안 겹치면 한산한 골목
+    // 새 골목: 와글마을 장난감·꼬마, 깜빡마을 공기
+    expect(pickTheme(["r_dance", "f_soft", "w_me"], {}).id).toBe("toy");
+    expect(pickTheme(["w_kid", "r_face"], {}).id).toBe("kid");
+    expect(pickTheme(["s_air", "r_traffic", "f_wall"], {}).id).toBe("air");
     expect(plotFor(0)).toEqual({ seq: 1, plotNo: 1, left: 99 });
     expect(plotFor(100)).toEqual({ seq: 2, plotNo: 1, left: 99 });
-    expect(alleyName("cat", 2)).toBe("냥집사 2골목");
-    expect(plotLine("cat", 1, 97, 3)).toBe("냥집사 골목 마지막 3터 남았어");
-    expect(plotLine("cat", 1, 1, 99)).toBe("너는 냥집사 골목의 1번째 주민이야");
+    // 골목은 이름 없이 배치에만 쓰이고, 보이는 주소는 마을 이름
+    expect(alleyName("cat", 2)).toBe("꼬물마을");
+    expect(alleyName("toy")).toBe("와글마을");
+    expect(plotLine("cat", 1, 1, 99)).toBe("꼬물마을에 네 대장간 터가 생겼어");
   });
 });
 
@@ -322,8 +327,8 @@ describe("내 대장간·우체통 (파일 저장)", () => {
     const first = await lock(null, ["f_bowl", "s_weight", "w_pet"]);
     const body = await first.json();
     expect(body.forge.isNew).toBe(true);
-    expect(body.forge.alley).toBe("냥집사 골목");
-    expect(body.forge.line).toBe("너는 냥집사 골목의 1번째 주민이야");
+    expect(body.forge.alley).toBe("꼬물마을");
+    expect(body.forge.line).toBe("꼬물마을에 네 대장간 터가 생겼어");
     const cookie = first.cookies.get("find_owner")?.value;
     expect(cookie).toBeTruthy();
     const second = await (await lock(cookie!, ["r_light", "s_time"])).json();
@@ -480,15 +485,19 @@ describe("손바닥 마을 (Phase 4)", () => {
   };
 
   it("본관 공사는 마을 장작 총합으로 25%마다 한 단계, 집 굴뚝 불은 화력+장작", async () => {
-    const { hallProgress, chimneyLevel, STREETS, ALLEY_THEMES } = await import("../apps/web/lib/find/village");
+    const { hallProgress, chimneyLevel, VILLAGES, ALLEY_THEMES, houseStage } = await import("../apps/web/lib/find/village");
     expect(hallProgress(0)).toMatchObject({ pct: 0, stage: 0, label: "터" });
     expect(hallProgress(500)).toMatchObject({ pct: 50, stage: 2, label: "지붕" });
     expect(hallProgress(5000)).toMatchObject({ pct: 100, stage: 4, label: "완공" });
     expect(chimneyLevel(30, 0)).toBe(1);
     expect(chimneyLevel(60, 10)).toBe(2);
     expect(chimneyLevel(90, 10)).toBe(3);
-    // 모든 골목은 큰길 하나에 속한다
-    for (const t of ALLEY_THEMES) expect(STREETS.filter((s) => s.themes.includes(t.id)).length, t.id).toBe(1);
+    // 모든 골목은 마을 하나에 속한다
+    for (const t of ALLEY_THEMES) expect(VILLAGES.filter((s) => s.themes.includes(t.id)).length, t.id).toBe(1);
+    expect(VILLAGES.map((v) => v.name)).toEqual(["꼬물마을", "뚝딱마을", "째깍마을", "와글마을", "깜빡마을"]);
+    expect(houseStage(["w_cat"])).toBe(1);
+    expect(houseStage(["f_bowl", "s_count", "w_cat"])).toBe(2);
+    expect(houseStage(["f_bowl", "s_count", "r_press", "w_cat"])).toBe(3);
   });
 
   it("골목 지도는 터 순서대로, 비공개 집은 잠긴 집으로, 이웃은 끈으로", async () => {
@@ -537,5 +546,55 @@ describe("손바닥 마을 (Phase 4)", () => {
     await setVisibility(a.forgeId, "private"); await resolveReport(r.id);
     expect((await getForge(a.forgeId))?.visibility).toBe("private");
     expect((await listReports())[0].resolved).toBe(true);
+  });
+});
+
+describe("마을의 기척", () => {
+  it("주인이 마을에 들어오면 그 집이 '지금 기척 있음'이 되고, 걷는 마을 집 정보에 실린다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const { forge } = await vs.ensureForge(vs.hashToken(`presence-${Date.now()}`), "기척", ["w_kid", "r_face"]);
+    expect(await vs.activeForgeIds()).not.toContain(forge.id);
+    await vs.touchForge(forge.id);
+    await vs.touchForge(forge.id); // 2분 안에 다시 불러도 괜찮다
+    expect(await vs.activeForgeIds()).toContain(forge.id);
+    const world = await vs.worldHouses();
+    const house = world.houses.find((h) => h.id === forge.id)!;
+    expect(house).toMatchObject({ active: true, recent: true, lit: true, theme: "kid", fires: 0, stage: 1 });
+  });
+});
+
+describe("대장간 꾸미기", () => {
+  it("모르는 값과 안 열린 꾸미기는 저장 전에 걸러진다", async () => {
+    const { cleanDecor } = await import("../apps/web/lib/find/decor");
+    const none = { neighbors: 0, fuel: 0, wants: 0, notes: 0 };
+    expect(cleanDecor({ roof: "#123456", sign: "plank", yard: ["pot", "bench", "lamp"] }, none)).toEqual({ sign: "plank", yard: ["pot"] });
+    expect(cleanDecor({ roof: "#9B7BFF", yard: ["pot", "pot", "bench", "mailbox", "fence"] }, { ...none, neighbors: 3 })).toEqual({ roof: "#9B7BFF", yard: ["pot", "bench", "mailbox"] });
+    expect(cleanDecor({ hidePresence: true }, none)).toEqual({ hidePresence: true });
+  });
+
+  it("기척을 숨긴 집은 마을에 있어도 연기·불빛으로 드러나지 않고, 비공개 집도 주인에겐 보인다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const { forge } = await vs.ensureForge(vs.hashToken(`decor-${Date.now()}`), "숨김", ["s_air"]);
+    await vs.setDecor(forge.id, { hidePresence: true, roof: "#E2574C" });
+    await vs.touchForge(forge.id);
+    expect(await vs.activeForgeIds()).not.toContain(forge.id);
+    const house = (await vs.worldHouses()).houses.find((h) => h.id === forge.id)!;
+    expect(house).toMatchObject({ active: false, decor: { hidePresence: true, roof: "#E2574C" } });
+    await vs.setVisibility(forge.id, "private");
+    expect((await vs.worldHouses()).houses.some((h) => h.id === forge.id)).toBe(false);
+    expect((await vs.worldHouses(forge.id)).houses.some((h) => h.id === forge.id)).toBe(true);
+  });
+});
+
+describe("마을 문", () => {
+  it("대장간 오픈 알림 이메일을 남긴 대장간에만 마을 문이 열린다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const store = await import("../apps/web/lib/find/store");
+    const { forge } = await vs.ensureForge(vs.hashToken(`gate-${Date.now()}`), "문지기", ["w_kid"]);
+    expect(await vs.villageOpenFor(forge.id)).toBe(false);
+    const fire = { id: `gatefire${Date.now()}`, idea: "(테스트)", sentence: "테스트", picked: ["w_kid"], labels: [], peak: 30, color: "#4FB3A6", reactKind: "none", name: "문지기 불", matches: [], comboKey: "x", card: null, nickname: "문지기", forgeId: forge.id, createdAt: new Date().toISOString() };
+    await store.backend().saveFire(fire);
+    await store.joinWaitlist({ email: `gate-${Date.now()}@example.com`, fireId: fire.id, idea: null, sentence: null, picked: [], peakFire: null, fireColor: null, referredBy: null, marketingConsent: false });
+    expect(await vs.villageOpenFor(forge.id)).toBe(true);
   });
 });

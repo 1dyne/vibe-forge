@@ -171,7 +171,7 @@ export async function forgeOg(input: { nickname: string; alley: string; plotNo: 
           <img src={img} width={330} height={330} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginLeft: 36, flex: 1 }}>
-          <div style={{ fontSize: 30, color: MUTED }}>{`${input.alley} · ${input.plotNo}번 터`}</div>
+          <div style={{ fontSize: 30, color: MUTED }}>{input.alley}</div>
           <div style={{ display: "flex", flexDirection: "column", fontFamily: "Jua", fontSize: 74, color: INK, lineHeight: 1.18, marginTop: 8 }}>
             <span>{`${input.nickname}의`}</span>
             <span>대장간</span>

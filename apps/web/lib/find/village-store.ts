@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { db, newId, readData, rowToFire, serial, storageKind, writeData, type FireRecord } from "./store";
-import { pickTheme, plotFor } from "./village";
+import type { Decor } from "./decor";
+import { houseStage, pickTheme, plotFor } from "./village";
 
 // 내 대장간 · 우체통 · 마을 소식. store.ts와 같이 Postgres가 있으면 Postgres, 없으면 .data/find.json.
 
 export type Visibility = "public" | "link" | "private";
-export type ForgeRecord = { id: string; ownerHash: string; nickname: string; theme: string; alleySeq: number; plotNo: number; visibility: Visibility; createdAt: string };
+export type ForgeRecord = { id: string; ownerHash: string; nickname: string; theme: string; alleySeq: number; plotNo: number; visibility: Visibility; createdAt: string; lastSeen?: string | null; decor?: Decor };
 export type MailStatus = "new" | "reading" | "planned" | "done" | "wontdo";
 export type MailKind = "feature" | "bug" | "decor" | "chat";
 export type MailRecord = {
@@ -17,7 +18,7 @@ export type NoticeRecord = { id: number; title: string; body: string; kind: "upd
 export const hashToken = (token: string) => createHash("sha256").update(`find-owner:${token}`).digest("hex");
 
 const pg = () => storageKind() === "postgres";
-const toForge = (r: Record<string, unknown>): ForgeRecord => ({ id: r.id as string, ownerHash: r.owner_hash as string, nickname: r.nickname as string, theme: r.theme as string, alleySeq: r.alley_seq as number, plotNo: r.plot_no as number, visibility: r.visibility as Visibility, createdAt: new Date(r.created_at as string).toISOString() });
+const toForge = (r: Record<string, unknown>): ForgeRecord => ({ id: r.id as string, ownerHash: r.owner_hash as string, nickname: r.nickname as string, theme: r.theme as string, alleySeq: r.alley_seq as number, plotNo: r.plot_no as number, visibility: r.visibility as Visibility, createdAt: new Date(r.created_at as string).toISOString(), lastSeen: r.last_seen ? new Date(r.last_seen as string).toISOString() : null, decor: (r.decor as Decor | null) ?? {} });
 const toMail = (r: Record<string, unknown>): MailRecord => ({ id: r.id as string, forgeId: (r.forge_id as string) ?? null, kind: r.kind as MailKind, body: r.body as string, context: (r.context as Record<string, string>) ?? {}, status: r.status as MailStatus, reply: (r.reply as string) ?? null, replySeen: Boolean(r.reply_seen), notionPageId: (r.notion_page_id as string) ?? null, notionSynced: Boolean(r.notion_synced), createdAt: new Date(r.created_at as string).toISOString(), updatedAt: new Date(r.updated_at as string).toISOString() });
 const toNotice = (r: Record<string, unknown>): NoticeRecord => ({ id: Number(r.id), title: r.title as string, body: r.body as string, kind: r.kind as NoticeRecord["kind"], publishedAt: new Date(r.published_at as string).toISOString() });
 
@@ -85,6 +86,23 @@ export async function forgeFires(forgeId: string): Promise<FireRecord[]> {
 export async function setVisibility(forgeId: string, visibility: Visibility) {
   if (pg()) { await (await db()).query("UPDATE find_forges SET visibility = $2 WHERE id = $1", [forgeId, visibility]); return; }
   await serial(async () => { const d = await readData(); const f = (d.forges as ForgeRecord[] | undefined)?.find((x) => x.id === forgeId); if (f) f.visibility = visibility; await writeData(d); });
+}
+
+/** 꾸미기 저장 (열리지 않은 꾸미기는 cleanDecor가 이미 뺐다) */
+export async function setDecor(forgeId: string, decor: Decor) {
+  if (pg()) { await (await db()).query("UPDATE find_forges SET decor = $2 WHERE id = $1", [forgeId, JSON.stringify(decor)]); return; }
+  await serial(async () => { const d = await readData(); const f = (d.forges as ForgeRecord[] | undefined)?.find((x) => x.id === forgeId); if (f) f.decor = decor; await writeData(d); });
+}
+
+/** 마을 문: 이 대장간의 도깨비불로 대장간 오픈 알림(이메일)을 신청했으면 열린다 */
+export async function villageOpenFor(forgeId: string): Promise<boolean> {
+  if (pg()) {
+    const { rows } = await (await db()).query("SELECT 1 FROM find_waitlist w JOIN find_fires f ON f.id = w.fire_id WHERE f.forge_id = $1 LIMIT 1", [forgeId]);
+    return rows.length > 0;
+  }
+  const d = await readData();
+  const mine = new Set(d.fires.filter((f) => f.forgeId === forgeId).map((f) => f.id));
+  return d.waitlist.some((w) => w.fireId && mine.has(w.fireId));
 }
 
 // ── 우체통 ─────────────────────────────────────────────
@@ -294,7 +312,7 @@ export async function fuelByFire(fireIds: string[]): Promise<Map<string, number>
   return new Map(fireIds.map((id) => [id, counts.get(fires.find((f) => f.id === id)?.forgeId ?? "") ?? 0]));
 }
 
-// ── Phase 4: 손바닥 마을 ─────────────────────────────────
+// ── Phase 4: 도깨비 마을 ─────────────────────────────────
 export type HouseView = {
   forgeId: string | null; plotNo: number; nickname: string; locked: boolean;
   color: string; reactKind: string; peak: number; fuel: number; wants: number; visits7: number; fires: number;
@@ -466,4 +484,71 @@ export async function listReports(): Promise<Array<{ id: number; forgeId: string
 export async function resolveReport(id: number) {
   if (pg()) { await (await db()).query("UPDATE find_report SET resolved = true WHERE id = $1", [id]); return; }
   await serial(async () => { const d = await readData(); const r = ((d.social?.report ?? []) as Array<{ id: number; resolved: boolean }>).find((x) => x.id === id); if (r) r.resolved = true; await writeData(d); });
+}
+
+// ── 3D 걷는 마을용: 공개된 집 전부 (마을·골목·터 순서) ─────────
+// ── 마을의 기척: 주인이 마을에 들어와 있으면 그 집에 연기·불빛이 인다 (실시간 서버 없이 '마지막으로 본 시각'만 저장) ──
+export const ACTIVE_MINUTES = 10;
+const TOUCH_EVERY_MS = 2 * 60_000;
+
+/** 주인이 마을·대장간을 보고 있다고 기록. 2분에 한 번만 쓴다. */
+export async function touchForge(id: string) {
+  if (pg()) {
+    await (await db()).query("UPDATE find_forges SET last_seen = now() WHERE id = $1 AND (last_seen IS NULL OR last_seen < now() - interval '2 minutes')", [id]);
+    return;
+  }
+  await serial(async () => {
+    const d = await readData();
+    const f = ((d.forges as ForgeRecord[] | undefined) ?? []).find((x) => x.id === id);
+    if (!f || (f.lastSeen && Date.now() - Date.parse(f.lastSeen) < TOUCH_EVERY_MS)) return;
+    f.lastSeen = new Date().toISOString();
+    await writeData(d);
+  });
+}
+
+/** 지금 마을에 있는(최근 ACTIVE_MINUTES분 안에 기척이 있던) 공개 대장간 id */
+export async function activeForgeIds(): Promise<string[]> {
+  const since = Date.now() - ACTIVE_MINUTES * 60_000;
+  if (pg()) {
+    const { rows } = await (await db()).query("SELECT id FROM find_forges WHERE visibility = 'public' AND NOT coalesce((decor->>'hidePresence')::boolean, false) AND last_seen > now() - ($1 || ' minutes')::interval", [String(ACTIVE_MINUTES)]);
+    return rows.map((r) => r.id as string);
+  }
+  const d = await readData();
+  return ((d.forges as ForgeRecord[] | undefined) ?? []).filter((f) => f.visibility === "public" && !f.decor?.hidePresence && f.lastSeen && Date.parse(f.lastSeen) > since).map((f) => f.id);
+}
+
+/** 대장간마다 도깨비불 수와 가장 높은 성장 단계 */
+async function fireStats(): Promise<Map<string, { count: number; stage: 1 | 2 | 3 }>> {
+  const rows: Array<{ forgeId: string; picked: string[] }> = pg()
+    ? (await (await db()).query("SELECT forge_id, picked FROM find_fires WHERE forge_id IS NOT NULL")).rows.map((r) => ({ forgeId: r.forge_id, picked: r.picked ?? [] }))
+    : (await readData()).fires.filter((f) => f.forgeId).map((f) => ({ forgeId: f.forgeId!, picked: f.picked }));
+  const out = new Map<string, { count: number; stage: 1 | 2 | 3 }>();
+  for (const r of rows) {
+    const cur = out.get(r.forgeId) ?? { count: 0, stage: 1 as const };
+    out.set(r.forgeId, { count: cur.count + 1, stage: Math.max(cur.stage, houseStage(r.picked)) as 1 | 2 | 3 });
+  }
+  return out;
+}
+
+export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean; decor: Decor };
+/** 걷는 마을의 집들. 공개 집 + (보는 사람의 집이면 비공개·링크 전용이어도) 내 집 */
+export async function worldHouses(viewerForgeId: string | null = null): Promise<{ houses: WorldHouse[]; totalFuel: number }> {
+  const [s, stats] = await Promise.all([snapshot(), fireStats()]);
+  const now = Date.now();
+  const fuel = countBy(s.fuel, (f) => f.to);
+  const wants = countBy(s.want, (w) => w.to);
+  const visits = countBy(s.visit.filter((v) => v.visitor !== v.host), (v) => v.host);
+  const houses = s.forges.filter((f) => f.visibility === "public" || f.id === viewerForgeId).map((f) => {
+    const fire = s.fires.find((x) => x.forgeId === f.id);
+    const st = stats.get(f.id) ?? { count: 0, stage: 1 as const };
+    // 기척을 숨긴 집은 '지금 있음'·'최근에 왔음'을 드러내지 않는다
+    const seen = f.lastSeen && !f.decor?.hidePresence ? now - Date.parse(f.lastSeen) : Infinity;
+    return {
+      id: f.id, nickname: f.nickname, theme: f.theme, alleySeq: f.alleySeq, plotNo: f.plotNo, color: fire?.color ?? "#4FB3A6", peak: fire?.peak ?? 20,
+      fuel: fuel.get(f.id) ?? 0, wants: wants.get(f.id) ?? 0, stage: st.stage, fires: st.count,
+      active: seen < ACTIVE_MINUTES * 60_000, recent: seen < 86_400_000,
+      lit: (visits.get(f.id) ?? 0) > 0 || seen < 86_400_000, decor: f.decor ?? {}
+    };
+  }).sort((a, b) => a.theme.localeCompare(b.theme) || a.alleySeq - b.alleySeq || a.plotNo - b.plotNo);
+  return { houses, totalFuel: s.fuel.length };
 }

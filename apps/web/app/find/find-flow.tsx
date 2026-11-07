@@ -202,7 +202,6 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           {error && <p className="error" role="alert">{error}</p>}
           <div className="spacer" />
           <button className="btn" type="button" disabled={!idea.trim()} onClick={() => submitIdea()}>나와라, 뚝딱!</button>
-          <a className="link" href="/find/village" style={{ textAlign: "center" }}>먼저 손바닥 마을 구경하기</a>
         </section>
       )}
 
@@ -339,7 +338,7 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
         <div className="forge-made">
           <span className="tiny muted">{forge.isNew ? "도깨비 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span>
           <b>{forge.line}</b>
-          <a className="tiny" href="/find/village">손바닥 마을 지도에서 보기</a>
+          <a className="tiny" href={`/find/village?house=${forge.id}`} onClick={() => track("world_from_result")}>마을로 나가서 내 집 앞에 서보기</a>
           <a className="btn btn-fire" href={`/f/${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }} onClick={() => track(forge.isNew ? "forge_created" : "forge_open")}>{forge.isNew ? "내 대장간 짓기" : "내 대장간 가기"}</a>
         </div>
       )}
