@@ -1,20 +1,24 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type * as T from "three";
+import { hueSpriteMaterial } from "../three-hue";
+import { track } from "../track";
 import { buildWorld, villageCenter, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
 
 // 걷는 도깨비 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
 
-type Props = { houses: WorldHouse[]; villages: WorldVillage[]; alleyNames: Record<string, string>; hallStage: number; hallPct: number; myForgeId: string | null };
+type Props = { houses: WorldHouse[]; villages: WorldVillage[]; alleyNames: Record<string, string>; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number };
 
-export default function WorldView({ houses, villages, alleyNames, hallStage, hallPct, myForgeId }: Props) {
+export default function WorldView({ houses, villages, alleyNames, hallStage, hallPct, myForgeId, myHue }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const stick = useRef({ x: 0, y: 0, active: false });
   const [near, setNear] = useState<Spot | null>(null);
   const [here, setHere] = useState<WorldVillage | null>(null);
   const [failed, setFailed] = useState(false);
   const [hint, setHint] = useState(true);
+
+  useEffect(() => { track("world_enter"); }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -56,7 +60,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       const loader = new three.TextureLoader();
       const [idleTex, walkTex] = await Promise.all([loader.loadAsync("/find/sprites/idle.webp"), loader.loadAsync("/find/sprites/stoke.webp")]);
       for (const t of [idleTex, walkTex]) { t.colorSpace = three.SRGBColorSpace; t.repeat.set(1 / 25, 1); }
-      const playerMat = new three.SpriteMaterial({ map: idleTex, transparent: true });
+      const playerMat = hueSpriteMaterial(three, idleTex, myHue);
       const player = new three.Sprite(playerMat);
       player.scale.set(2.4, 2.4, 1);
       scene.add(player);
@@ -75,10 +79,20 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       // 개발 확인용: ?at=마을id 로 그 마을 문 앞에서 시작
       const at = process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("at") : null;
       const atIdx = villages.findIndex((v) => v.id === at);
-      if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 21); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
+      // ?house=집id (또는 me): 그 집 문 앞에 서서 집을 바라보며 시작
+      const houseParam = new URLSearchParams(location.search).get("house");
+      const target = houseParam ? world.spots.find((s) => s.kind === "house" && s.house!.id === (houseParam === "me" ? myForgeId : houseParam)) : null;
+      if (target) {
+        const v = world.villageAt(target.x, target.z);
+        const c = v ? villageCenter(villages.indexOf(v)) : { x: 0, z: 0 };
+        const dx = c.x - target.x, dz = c.z - target.z, len = Math.hypot(dx, dz) || 1;
+        pos.x = target.x + (dx / len) * 4.2; pos.z = target.z + (dz / len) * 4.2;
+        heading = Math.atan2(dx / len, -(dz / len));
+      } else if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 21); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
       let frame = 0, frameClock = 0, lastNear: Spot | null = null, lastVillage: WorldVillage | null = null;
       const clock = new three.Clock();
       const camPos = new three.Vector3();
+      const eye = new three.Vector3(), toCam = new three.Vector3(), camRay = new three.Raycaster();
       // 개발 확인용 하늘 시점 (배포본에는 없음)
       const topView = process.env.NODE_ENV !== "production" && new URLSearchParams(location.search).has("top");
       if (topView) scene.fog = null;
@@ -113,6 +127,13 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
 
         const back = { x: Math.sin(heading) * 8.5, z: -Math.cos(heading) * 8.5 };
         camPos.set(pos.x + back.x, ground + 5.6, pos.z + back.z);
+        // 달그락과 카메라 사이를 큰 것이 가리면 카메라를 그 앞으로 당긴다
+        eye.set(pos.x, ground + 1.6, pos.z);
+        toCam.subVectors(camPos, eye); const full = toCam.length(); toCam.normalize();
+        camRay.set(eye, toCam); camRay.far = full;
+        const near = world.occluders.filter((o) => Math.hypot(o.position.x - pos.x, o.position.z - pos.z) < full + 6);
+        const hitCam = camRay.intersectObjects(near, true)[0];
+        if (hitCam) camPos.copy(eye).addScaledVector(toCam, Math.max(1.6, hitCam.distance - 0.4));
         const camGround = world.heightAt(camPos.x, camPos.z);
         if (camPos.y < camGround + 2) camPos.y = camGround + 2;
         if (first) { camera.position.copy(camPos); first = false; } else camera.position.lerp(camPos, 0.12);
@@ -153,7 +174,7 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       };
     })().catch(() => setFailed(true));
     return () => { disposed = true; cleanup(); };
-  }, [houses, villages, alleyNames, hallStage, hallPct, myForgeId]);
+  }, [houses, villages, alleyNames, hallStage, hallPct, myForgeId, myHue]);
 
   // 마을에 들어서면 이름표를 잠깐 띄운다
   const [banner, setBanner] = useState<WorldVillage | null>(null);
@@ -201,10 +222,10 @@ export default function WorldView({ houses, villages, alleyNames, hallStage, hal
       <div className="world-pad" ref={pad} onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); setHint(false); move(e); }} onPointerMove={(e) => { if (stick.current.active) move(e); }} onPointerUp={end} onPointerCancel={end}>
         <div className="world-knob" ref={knob} />
       </div>
-      {near && <a className="world-enter" href={enterHref}>{enterText}</a>}
+      {near && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
       <div className="world-top">
         <a href="/find">달그락 대장간</a>
-        <span><a href="/find/village">지도</a><a href="/find/home">내 집</a></span>
+        <span><a href="/find/village">지도</a>{myForgeId ? <a href="/find/world?house=me">내 집 앞으로</a> : <a href="/find">내 집 짓기</a>}</span>
       </div>
     </div>
   );

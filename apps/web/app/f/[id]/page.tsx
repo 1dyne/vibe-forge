@@ -71,7 +71,7 @@ export default async function SharedPage({ params, searchParams }: Props) {
       <main className="find" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
         <header className="top"><a className="brand" href="/find">달그락 대장간</a><div className="step">{owner ? "내 대장간" : "놀러 온 대장간"}</div></header>
         {owner && <div style={{ padding: "0 20px" }}><VillageNews /></div>}
-        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul" }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
+        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
         <Mailbox screen={`forge:${forge.id}`} />
       </main>
     );

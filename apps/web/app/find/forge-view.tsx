@@ -1,9 +1,10 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { FireCard } from "../../lib/find/card";
-import type { ReactKind } from "../../lib/find/chips";
+import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
 import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
+import { ROOF_COLORS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../lib/find/decor";
 import FireCardView, { Roast } from "./fire-card";
 import { MailSheet } from "./mailbox";
 import { track } from "./track";
@@ -12,7 +13,7 @@ import ForgeSignup from "./waitlist";
 export type ForgeFire = { id: string; name: string; color: string; reactKind: string; peak: number; sentence: string; card: FireCard | null; stage: 1 | 2 | 3; cats: string[] };
 export type Social = { fuelToday: number; fuelTotal: number; wants: number; notes: Array<{ phrase: string; from: string; nickname: string; at: string }>; neighbors: number; visitsWeek: number; mine: { fuelGivenToday: boolean; wanted: boolean; notedToday: boolean; neighbor: boolean } };
 type Props = {
-  forge: { id: string; nickname: string; alley: string; plotNo: number; visibility: "public" | "link" | "private"; theme: string; village: string };
+  forge: { id: string; nickname: string; alley: string; plotNo: number; visibility: "public" | "link" | "private"; theme: string; village: string; decor: Decor };
   fires: ForgeFire[];
   isOwner: boolean;
   couponText: string | null;
@@ -21,7 +22,7 @@ type Props = {
   dexAdded: number;
 };
 const PHRASES = ["나도 갖고 싶어", "이거 천재다", "만들면 알려줘!", "장작 넣고 감", "응원해"];
-type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox";
+type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor";
 
 // 골목 테마별 방 색 (다인의 방 그림이 오기 전 임시)
 const ROOM_TINT: Record<string, [string, string, string]> = {
@@ -91,7 +92,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         <div className="muted small">도깨비불 {fires.length}개가 머무는 중 · 대장간 {STAGE_NAME[topStage - 1]} 단계</div>
       </div>
 
-      <ForgeRoom village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} onPick={pickRoom} fallback={
+      <ForgeRoom village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
       <div className="room" style={{ ["--wall" as string]: wall, ["--wall2" as string]: wall2, ["--floor" as string]: floor }}>
         <svg className="room-bg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           <polygon points="4,64 4,24 50,4 50,44" fill="var(--wall)" stroke="#232323" strokeWidth=".6" />
@@ -159,6 +160,10 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         <div className="owner-bar">
           <a className="btn btn-fire" href="/find" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>새 아이디어로 불 피우기</a>
           <div className="two">
+            <button className="btn btn-ghost" type="button" onClick={() => show("decor")}>대장간 꾸미기</button>
+            <a className="btn btn-ghost" href={`/find/world?house=${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을로 나가기</a>
+          </div>
+          <div className="two">
             <button className="btn btn-ghost" type="button" onClick={share}>{copied ? "링크 복사했어!" : "대장간 자랑하기"}</button>
             <label className="vis">
               <span className="sr-only">공개 범위</span>
@@ -186,7 +191,8 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       </nav>
 
       {open === "mailbox" && <MailSheet screen={`forge:${forge.id}`} onClose={() => setOpen(null)} />}
-      {open && open !== "mailbox" && (
+      {open === "decor" && <DecorSheet initial={forge.decor} village={forge.village} stats={{ neighbors: social.neighbors, fuel: social.fuelTotal, wants: social.wants, notes: social.notes.length }} houseId={forge.id} onClose={() => setOpen(null)} />}
+      {open && open !== "mailbox" && open !== "decor" && (
         <div className="overlay" role="dialog" aria-label="대장간 물건" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
           <div className="sheet tall">
             {open === "hearth" && (latest?.card ? (
@@ -227,6 +233,61 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </div>
       )}
     </section>
+  );
+}
+
+/** 대장간 꾸미기: 마을에서 보이는 집 겉모습 + 기척 공개 여부 */
+function DecorSheet({ initial, stats, houseId, onClose }: { initial: Decor; village: string; stats: { neighbors: number; fuel: number; wants: number; notes: number }; houseId: string; onClose: () => void }) {
+  const [d, setD] = useState<Decor>(initial ?? {});
+  const [msg, setMsg] = useState("");
+  const yard = d.yard ?? [];
+  function toggleYard(id: (typeof YARD)[number]["id"]) {
+    if (yard.includes(id)) setD({ ...d, yard: yard.filter((y) => y !== id) });
+    else if (yard.length >= YARD_MAX) setMsg(`집 앞엔 ${YARD_MAX}개까지 둘 수 있어. 하나를 빼고 골라줘.`);
+    else { setD({ ...d, yard: [...yard, id] }); setMsg(""); }
+  }
+  async function save() {
+    const res = await fetch("/api/find/forge", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ decor: d }) }).catch(() => null);
+    if (!res?.ok) { setMsg("저장하지 못했어. 잠시 뒤에 다시 해줘."); return; }
+    track("decor_saved", { roof: d.roof ?? "", sign: d.sign ?? "", yard: yard.join(","), hide: String(Boolean(d.hidePresence)) });
+    setMsg("저장했어! 마을에 나가면 바뀐 집이 보여.");
+  }
+  return (
+    <div className="overlay" role="dialog" aria-label="대장간 꾸미기" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet tall">
+        <div className="display" style={{ fontSize: 22 }}>대장간 꾸미기</div>
+        <div className="tiny muted">마을에서 보이는 내 집 겉모습이야.</div>
+        <div className="decor-group">
+          <b className="small">지붕 색</b>
+          <div className="swatches">
+            <button type="button" className={`swatch village ${!d.roof ? "on" : ""}`} onClick={() => setD({ ...d, roof: undefined })} aria-label="마을 기본 색">기본</button>
+            {ROOF_COLORS.map((c) => <button key={c} type="button" className={`swatch ${d.roof === c ? "on" : ""}`} style={{ background: c }} onClick={() => setD({ ...d, roof: c })} aria-label={`지붕 색 ${c}`} />)}
+          </div>
+        </div>
+        <div className="decor-group">
+          <b className="small">간판 모양</b>
+          <div className="phrases">{SIGNS.map((s) => <button key={s.id} type="button" className={`chip ${(d.sign ?? "plank") === s.id ? "on" : ""}`} onClick={() => setD({ ...d, sign: s.id })}>{s.name}</button>)}</div>
+        </div>
+        <div className="decor-group">
+          <b className="small">집 앞 꾸미기 <span className="tiny muted">({yard.length}/{YARD_MAX})</span></b>
+          <div className="phrases">
+            {YARD.map((y) => {
+              const open = yardUnlocked(y.id, stats);
+              return <button key={y.id} type="button" className={`chip ${yard.includes(y.id) ? "on" : ""}`} disabled={!open} title={open ? "" : y.hint} onClick={() => toggleYard(y.id)}>{open ? y.name : `🔒 ${y.name}`}</button>;
+            })}
+          </div>
+          <div className="tiny muted">잠긴 건 이웃과 어울리면 열려: 이웃 3명 → 벤치 · 장작 10개 → 가로등 · '나도 갖고 싶어' 5개 → 꽃 아치 · 남긴 말 5개 → 풍경</div>
+        </div>
+        <label className="decor-toggle">
+          <input type="checkbox" checked={!d.hidePresence} onChange={(e) => setD({ ...d, hidePresence: !e.target.checked })} />
+          <span><b className="small">마을에 내 기척 보이기</b><br /><span className="tiny muted">내가 마을에 있으면 집 창문이 일렁이고 굴뚝 연기가 굵어져. 이름이나 접속 여부는 따로 보여주지 않아.</span></span>
+        </label>
+        {msg && <div className="small" role="status">{msg}</div>}
+        <button className="btn btn-fire" type="button" onClick={save}>저장하기</button>
+        <a className="btn btn-ghost" href={`/find/world?house=${houseId}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을에 나가서 보기</a>
+        <button className="link" type="button" onClick={onClose}>닫기</button>
+      </div>
+    </div>
   );
 }
 

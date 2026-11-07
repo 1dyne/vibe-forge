@@ -561,3 +561,26 @@ describe("마을의 기척", () => {
     expect(house).toMatchObject({ active: true, recent: true, lit: true, theme: "kid", fires: 0, stage: 1 });
   });
 });
+
+describe("대장간 꾸미기", () => {
+  it("모르는 값과 안 열린 꾸미기는 저장 전에 걸러진다", async () => {
+    const { cleanDecor } = await import("../apps/web/lib/find/decor");
+    const none = { neighbors: 0, fuel: 0, wants: 0, notes: 0 };
+    expect(cleanDecor({ roof: "#123456", sign: "plank", yard: ["pot", "bench", "lamp"] }, none)).toEqual({ sign: "plank", yard: ["pot"] });
+    expect(cleanDecor({ roof: "#9B7BFF", yard: ["pot", "pot", "bench", "mailbox", "fence"] }, { ...none, neighbors: 3 })).toEqual({ roof: "#9B7BFF", yard: ["pot", "bench", "mailbox"] });
+    expect(cleanDecor({ hidePresence: true }, none)).toEqual({ hidePresence: true });
+  });
+
+  it("기척을 숨긴 집은 마을에 있어도 연기·불빛으로 드러나지 않고, 비공개 집도 주인에겐 보인다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const { forge } = await vs.ensureForge(vs.hashToken(`decor-${Date.now()}`), "숨김", ["s_air"]);
+    await vs.setDecor(forge.id, { hidePresence: true, roof: "#E2574C" });
+    await vs.touchForge(forge.id);
+    expect(await vs.activeForgeIds()).not.toContain(forge.id);
+    const house = (await vs.worldHouses()).houses.find((h) => h.id === forge.id)!;
+    expect(house).toMatchObject({ active: false, decor: { hidePresence: true, roof: "#E2574C" } });
+    await vs.setVisibility(forge.id, "private");
+    expect((await vs.worldHouses()).houses.some((h) => h.id === forge.id)).toBe(false);
+    expect((await vs.worldHouses(forge.id)).houses.some((h) => h.id === forge.id)).toBe(true);
+  });
+});

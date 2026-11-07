@@ -1,9 +1,10 @@
 import type * as T from "three";
+import type { Decor } from "../../../lib/find/decor";
 
 // 도깨비 마을 3D 세계를 짓는다. 가운데 광장(본관 공사장)과 그 둘레 다섯 마을이 하나로 이어진 섬.
 // 미술 규칙은 하나(로우폴리·납작한 색·둥근 비율)로 통일하고, 마을마다 색·재료·집 양식·랜드마크·자연물만 바꾼다.
 
-export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean };
+export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean; decor: Decor };
 export type WorldVillage = { id: string; name: string; topics: string; mood: string; themes: string[] };
 export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot"; house?: WorldHouse; village?: string; label: string };
 export type NameTag = { s: T.Sprite; x: number; z: number; always: boolean };
@@ -60,6 +61,8 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   const nameTags: NameTag[] = [];
   // 카메라가 가까이 지나가면 투명해지는 것(마을 문)
   const fades: Array<{ x: number; z: number; mats: T.Material[] }> = [];
+  // 카메라가 뒤로 물러날 때 부딪히는 큰 것들(나무·랜드마크·집)
+  const occluders: T.Object3D[] = [];
   const centers = villages.map((_, i) => villageCenter(i));
   const pond = (() => {
     const i = villages.findIndex((v) => v.id === "kkambbak");
@@ -224,7 +227,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   // ── 자연물·소품 ──
   function tree(x: number, z: number, kind: "round" | "apple" | "ginkgo" | "bush" | "pine", s = 1) {
     const y = heightAt(x, z);
-    const g = new three.Group(); g.position.set(x, y, z); g.scale.setScalar(s); g.rotation.y = (x * 13 + z * 7) % 6.28; scene.add(g);
+    const g = new three.Group(); g.position.set(x, y, z); g.scale.setScalar(s); g.rotation.y = (x * 13 + z * 7) % 6.28; scene.add(g); occluders.push(g);
     if (kind === "bush") { part(BALL, mat("#6DB57E"), 0.9, 0.7, 0.9, 0, 0.5, 0, g); part(BALL, mat("#7CC48B"), 0.6, 0.5, 0.6, 0.6, 0.45, 0.3, g); return; }
     part(CYL6, mat("#8B6A4A"), 0.18, 1.3, 0.18, 0, 0.65, 0, g);
     if (kind === "pine") { part(CONE, mat("#4E9A6E"), 1, 1.8, 1, 0, 1.9, 0, g); part(CONE, mat("#5DAF7C"), 0.75, 1.4, 0.75, 0, 2.7, 0, g); }
@@ -313,19 +316,20 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     const st = h.stage;
     const g = new three.Group();
     g.position.set(x, heightAt(x, z), z); g.rotation.y = face; g.scale.setScalar([0.86, 1, 1.12][st - 1]);
-    scene.add(g);
+    scene.add(g); occluders.push(g);
     const win = windowsOf(h);
     const door = mat(look.wood);
     const rnd = rng(hashOf(h.id));
     const wallTint = new three.Color(look.wall).offsetHSL(0, 0, (rnd() - 0.5) * 0.06).getStyle();
-    const roofTint = new three.Color(look.roof).offsetHSL((rnd() - 0.5) * 0.03, 0, (rnd() - 0.5) * 0.08).getStyle();
+    // 지붕 색: 주인이 골랐으면 그 색, 아니면 마을 지붕색에서 살짝 변주
+    const roofTint = h.decor?.roof ?? new three.Color(look.roof).offsetHSL((rnd() - 0.5) * 0.03, 0, (rnd() - 0.5) * 0.08).getStyle();
 
     if (style === "kkomul") {
       part(BOX, mat(wallTint), 2.5, 1.6, 2.2, 0, 0.8, 0, g);
       part(GABLE, mat(roofTint), 2.9, 1.25, 2.6, 0, 1.6, 0, g);
       part(BOX, door, 0.6, 1.0, 0.06, 0.5, 0.5, 1.11, g);
       part(CYL, win, 0.28, 0.06, 0.28, -0.55, 1.0, 1.11, g).rotation.x = Math.PI / 2;
-      localFence(g, 0, 2.4, 3.2, look.trim); // 앞마당 울타리
+      if (!h.decor?.yard?.length) localFence(g, 0, 2.4, 3.2, look.trim); // 꾸미기 전 기본 앞마당 울타리
       chimney(g, -0.75, 2.2, -0.4, "#D9CBB5", h, st); if (st >= 2) { part(BOX, mat(look.wood), 0.9, 0.2, 0.25, -0.55, 0.62, 1.2, g); for (let i = 0; i < 3; i++) part(BALL, mat(["#F2A3B3", "#FFD27A", "#B9A3E3"][i]), 0.1, 0.1, 0.1, -0.85 + i * 0.3, 0.78, 1.2, g); }
       if (st >= 3) { part(BOX, mat(wallTint), 1.4, 1.2, 1.7, 1.85, 0.6, -0.1, g); part(GABLE, mat(roofTint), 1.7, 0.8, 1.9, 1.85, 1.2, -0.1, g); part(BOX, mat("#BFE3D6", { opacity: 0.7 }), 1.0, 0.7, 1.2, -1.8, 0.35, 0.2, g); }
     } else if (style === "ttukttak") {
@@ -379,9 +383,14 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       if (st >= 3) { const scope = part(CYL, mat(look.trim), 0.16, 1.5, 0.16, -0.3, 2.4, 0.1, g); scope.rotation.x = -0.9; part(BOX, mat("#CFEDEA", { opacity: 0.6 }), 1.3, 0.9, 1.3, 1.95, 0.45, 0.2, g); }
     }
 
-    // 간판(모든 집) + 떠 있는 도깨비불
-    part(CYL6, mat(look.wood), 0.05, 0.9, 0.05, 1.45, 0.45, 1.6, g);
-    part(BOX, mat(look.trim), 0.7, 0.4, 0.06, 1.45, 0.95, 1.6, g);
+    // 간판(모든 집, 모양은 주인이 고른다) + 떠 있는 도깨비불
+    const sign = h.decor?.sign ?? "plank";
+    part(CYL6, mat(look.wood), 0.05, sign === "lantern" ? 1.3 : 0.9, 0.05, 1.45, sign === "lantern" ? 0.65 : 0.45, 1.6, g);
+    if (sign === "plank") part(BOX, mat(look.trim), 0.7, 0.4, 0.06, 1.45, 0.95, 1.6, g);
+    else if (sign === "round") { const d = part(CYL, mat(look.trim), 0.32, 0.06, 0.32, 1.45, 1.0, 1.6, g); d.rotation.x = Math.PI / 2; }
+    else if (sign === "banner") part(BOX, mat(roofTint, { side: true }), 0.5, 0.7, 0.03, 1.72, 0.95, 1.6, g);
+    else { part(BOX, mat(look.wood), 0.4, 0.05, 0.05, 1.62, 1.3, 1.6, g); const lan = part(BALL, mat("#FFD983", { emissive: "#FFB84D", ei: 0.8 }), 0.16, 0.2, 0.16, 1.8, 1.08, 1.6, g); anim.push((t) => { lan.rotation.z = Math.sin(t * 1.5) * 0.15; }); }
+    yard(g, h, look);
     const orb = part(BALL, mat(h.color, { emissive: h.color, ei: 0.9 }), 0.16, 0.2, 0.16, 1.45, 1.55, 1.6, g);
     const ph = rnd() * 6;
     const orbMat = orb.material as T.MeshStandardMaterial;
@@ -401,6 +410,22 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     nameTags.push({ s: tag, x, z, always: mine });
     solids.push({ x, z, r: 1.55 * g.scale.x });
     spots.push({ x, z, r: 3.2, kind: "house", house: h, label: mine ? "내 대장간" : `${h.nickname}의 대장간` });
+  }
+
+  /** 집 앞 꾸미기: 왼쪽 앞부터 한 자리씩 */
+  function yard(g: T.Group, h: WorldHouse, look: Look) {
+    const items = h.decor?.yard ?? [];
+    const slots: Array<[number, number]> = [[-1.4, 1.7], [-0.4, 2.3], [0.6, 2.4]];
+    items.slice(0, 3).forEach((id, i) => {
+      const [x, z] = slots[i];
+      if (id === "pot") { part(CYL, mat("#C0634A"), 0.22, 0.3, 0.22, x, 0.15, z, g); part(BALL, mat("#6DB57E"), 0.28, 0.28, 0.28, x, 0.45, z, g); part(BALL, mat(look.accent), 0.08, 0.08, 0.08, x + 0.1, 0.65, z, g); }
+      else if (id === "mailbox") { part(CYL6, mat(look.wood), 0.04, 0.8, 0.04, x, 0.4, z, g); part(BOX, mat("#E2574C"), 0.4, 0.28, 0.3, x, 0.88, z, g); }
+      else if (id === "fence") localFence(g, x + 0.2, z + 0.1, 1.4, look.trim);
+      else if (id === "bench") { part(BOX, mat(look.wood), 0.9, 0.08, 0.35, x, 0.38, z, g); part(BOX, mat(look.wood), 0.9, 0.3, 0.05, x, 0.6, z - 0.16, g); part(BOX, mat("#5A4636"), 0.07, 0.38, 0.3, x - 0.38, 0.19, z, g); part(BOX, mat("#5A4636"), 0.07, 0.38, 0.3, x + 0.38, 0.19, z, g); }
+      else if (id === "lamp") { part(CYL6, mat("#4A4A4A"), 0.05, 1.8, 0.05, x, 0.9, z, g); part(BALL, mat("#FFE6A3", { emissive: "#FFD27A", ei: 0.8 }), 0.17, 0.2, 0.17, x, 1.88, z, g); }
+      else if (id === "arch") { const a = part(TORUS, mat("#6DB57E"), 0.65, 0.65, 0.65, x, 0.1, z, g); a.scale.z = 0.4; for (let k = 0; k < 5; k++) { const q = (k / 4) * Math.PI; part(BALL, mat(["#F2A3B3", "#FFD27A", "#B9A3E3"][k % 3]), 0.09, 0.09, 0.09, x + Math.cos(q) * 0.65, 0.1 + Math.sin(q) * 0.65, z, g); } }
+      else if (id === "chime") { part(CYL6, mat(look.wood), 0.04, 1.4, 0.04, x, 0.7, z, g); part(BOX, mat(look.wood), 0.4, 0.04, 0.04, x + 0.2, 1.38, z, g); const bells = [0, 1, 2].map((k) => part(CYL6, mat("#C9D6DC"), 0.02, 0.3, 0.02, x + 0.12 + k * 0.1, 1.18, z, g)); anim.push((t) => bells.forEach((b, k) => { b.rotation.z = Math.sin(t * 2.2 + k) * 0.2; })); }
+    });
   }
 
   function vacantPlot(x: number, z: number, face: number, village: string) {
@@ -538,7 +563,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   // ── 랜드마크 ──
   function landmark(id: string, x: number, z: number, look: Look, a: number) {
     const y = heightAt(x, z);
-    const g = new three.Group(); g.position.set(x, y, z); g.rotation.y = a; scene.add(g); // 앞면이 광장을 본다
+    const g = new three.Group(); g.position.set(x, y, z); g.rotation.y = a; scene.add(g); occluders.push(g); // 앞면이 광장을 본다
     if (id === "kkomul") {
       // 거대한 나무 아래 둥근 공동 쉼터
       part(CYL, mat("#8B6A4A"), 1.0, 7, 1.0, 0, 3.5, 0, g);
@@ -676,5 +701,5 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
 
     /** 1분 반마다 받아오는 '지금 기척이 있는 집' 목록으로 바꾼다 */
   function setActive(ids: Set<string>) { for (const [id, st] of houseState) st.active = ids.has(id); }
-  return { spots, anim, nameTags, fades, heightAt, walkable, villageAt, setActive };
+  return { spots, anim, nameTags, fades, occluders, heightAt, walkable, villageAt, setActive };
 }

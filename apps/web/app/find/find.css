@@ -364,3 +364,13 @@ body:has(.find){background:#fff}
 /* ── 대장간 안 (3D) ── */
 .room3d { width: 100%; height: 360px; border-radius: 20px; overflow: hidden; background: linear-gradient(#f6efe2, #efe4d0); border: 2px solid #232323; }
 .room3d canvas { display: block; }
+
+/* ── 대장간 꾸미기 ── */
+.decor-group { display: grid; gap: 8px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #232323; padding: 0; cursor: pointer; }
+.swatch.village { width: auto; padding: 0 10px; border-radius: 999px; background: #F6F5F1; font-size: 13px; }
+.swatch.on { outline: 3px solid #FF8F3F; outline-offset: 2px; }
+.chip.on { background: #1E1F24; color: #fff; }
+.decor-toggle { display: flex; gap: 10px; align-items: flex-start; }
+.decor-toggle input { margin-top: 4px; width: 18px; height: 18px; }

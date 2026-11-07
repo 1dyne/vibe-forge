@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { siteOrigin } from "../../../lib/find/site";
 import { ALLEY_THEMES, VILLAGES, hallProgress } from "../../../lib/find/village";
-import { forgeForOwner, hashToken, touchForge, worldHouses } from "../../../lib/find/village-store";
+import { REACT_HUE, type ReactKind } from "../../../lib/find/chips";
+import { forgeFires, forgeForOwner, hashToken, touchForge, worldHouses } from "../../../lib/find/village-store";
 import "../fonts";
 import WorldView from "./world-view";
 
@@ -17,13 +18,17 @@ export async function generateMetadata(): Promise<Metadata> {
 // 걷는 도깨비 마을 (3D 프로토타입). 2D 지도(/find/village)는 3D가 안 되는 기기용으로 남긴다.
 export default async function World() {
   const token = ownerTokenFrom((await cookies()).get(OWNER_COOKIE)?.value);
-  const [me, world] = await Promise.all([token ? forgeForOwner(hashToken(token)) : Promise.resolve(null), worldHouses()]);
+  const me = token ? await forgeForOwner(hashToken(token)) : null;
+  const world = await worldHouses(me?.id ?? null);
   if (me) await touchForge(me.id).catch(() => undefined);
+  // 온보딩에서 받은 내 달그락 색 그대로 마을을 걷는다 (가장 최근 도깨비불의 반응 색)
+  const myKind = (me ? (await forgeFires(me.id))[0]?.reactKind : undefined) as ReactKind | undefined;
+  const myHue = myKind ? REACT_HUE[myKind] ?? 0 : 0;
   const hall = hallProgress(world.totalFuel);
   const alleyNames = Object.fromEntries(ALLEY_THEMES.map((t) => [t.id, `${t.name} 골목`]));
   return (
     <main className="find world-page">
-      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.topics, mood: v.mood, themes: v.themes }))} alleyNames={alleyNames} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} />
+      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.topics, mood: v.mood, themes: v.themes }))} alleyNames={alleyNames} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type * as T from "three";
+import { hueSpriteMaterial } from "./three-hue";
 
 // 대장간 안 (3D). 동물의 숲의 '내 집'처럼, 아이디어를 쌓을수록 방이 변한다.
 //  - 방 크기·구조: 가장 많이 자란 도깨비불의 단계 (불씨 = 작은 방 / 타오름 = 창문 둘·러그·매단 등 / 활활 = 넓은 방·다락·풀무)
@@ -22,6 +23,8 @@ type Props = {
   wants: number;
   notes: number;
   neighbors: number;
+  /** 집 주인 달그락 색 (온보딩 때 받은 색) */
+  hue: number;
   onPick: (o: RoomObj) => void;
   fallback: ReactNode;
 };
@@ -35,7 +38,7 @@ const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2
 };
 const LABEL: Record<RoomObj, string> = { hearth: "화로", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "우체통", woodpile: "장작더미", tools: "공구 걸이", display: "진열대" };
 
-export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, onPick, fallback }: Props) {
+export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, onPick, fallback }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -262,11 +265,11 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         for (let i = 0; i < 6; i++) part(BOX, mat(st.trim), 0.44, 0.05, 0.05, 0, 0.35 + i * 0.4, 0, ladder);
       }
 
-      // ── 집 도깨비: 달그락 스프라이트가 화로 옆을 지킨다 ──
+      // ── 집 도깨비: 이 집 주인의 달그락(온보딩 때 받은 색)이 화로 옆을 지킨다 ──
       const tex = await new three.TextureLoader().loadAsync("/find/sprites/idle.webp").catch(() => null);
       if (tex && !disposed) {
         tex.colorSpace = three.SRGBColorSpace; tex.repeat.set(1 / 25, 1);
-        const sp = new three.Sprite(new three.SpriteMaterial({ map: tex, transparent: true }));
+        const sp = new three.Sprite(hueSpriteMaterial(three, tex, hue));
         sp.scale.set(1.4, 1.4, 1); sp.position.set(hx + 0.9, 0.7, hz + 2.2); scene.add(sp);
         let f = 0, clockF = 0;
         anim.push((t) => { if (t - clockF > 0.09) { clockF = t; f = (f + 1) % 25; tex.offset.x = f / 25; } });
@@ -311,7 +314,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       };
     })().catch(() => setFailed(true));
     return () => { disposed = true; cleanup(); };
-  }, [village, fires, peak, fuel, wants, notes, neighbors]);
+  }, [village, fires, peak, fuel, wants, notes, neighbors, hue]);
 
   if (failed) return <>{fallback}</>;
   return <div className="room3d" ref={mount} role="img" aria-label="대장간 안. 화로, 도깨비불 선반, 설계도, 작업대, 우체통이 있어." />;
