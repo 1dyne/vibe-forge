@@ -20,6 +20,8 @@ export type FireRecord = {
   matches: Array<{ id: string; match: number }>;
   comboKey: string;
   card: FireCard | null;
+  /** 공개 닉네임 (욕설 필터를 거친 값, 없으면 "이름 없는 도깨비") */
+  nickname: string;
   createdAt: string;
 };
 
@@ -165,6 +167,7 @@ CREATE TABLE IF NOT EXISTS find_events (
 CREATE INDEX IF NOT EXISTS find_events_name ON find_events(name);
 ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS combo_key text;
 ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS card jsonb;
+ALTER TABLE find_fires ADD COLUMN IF NOT EXISTS nickname text;
 CREATE INDEX IF NOT EXISTS find_fires_combo ON find_fires(combo_key);
 `;
 
@@ -180,12 +183,12 @@ async function db() {
   return pool;
 }
 
-const rowToFire = (r: Record<string, unknown>): FireRecord => ({ id: r.id as string, idea: r.idea as string, sentence: r.sentence as string, picked: r.picked as string[], labels: r.labels as string[], peak: r.peak as number, color: r.color as string, reactKind: r.react_kind as string, name: r.name as string, matches: r.matches as FireRecord["matches"], comboKey: (r.combo_key as string) ?? "", card: (r.card as FireCard) ?? null, createdAt: new Date(r.created_at as string).toISOString() });
+const rowToFire = (r: Record<string, unknown>): FireRecord => ({ id: r.id as string, idea: r.idea as string, sentence: r.sentence as string, picked: r.picked as string[], labels: r.labels as string[], peak: r.peak as number, color: r.color as string, reactKind: r.react_kind as string, name: r.name as string, matches: r.matches as FireRecord["matches"], comboKey: (r.combo_key as string) ?? "", card: (r.card as FireCard) ?? null, nickname: (r.nickname as string) ?? "이름 없는 도깨비", createdAt: new Date(r.created_at as string).toISOString() });
 const rowToWait = (r: Record<string, unknown>): WaitlistRecord => ({ id: r.id as string, email: r.email as string, fireId: (r.fire_id as string) ?? null, idea: (r.idea as string) ?? null, sentence: (r.sentence as string) ?? null, picked: (r.picked as string[]) ?? [], peakFire: (r.peak_fire as number) ?? null, fireColor: (r.fire_color as string) ?? null, referralCode: r.referral_code as string, referredBy: (r.referred_by as string) ?? null, consentedAt: new Date(r.consented_at as string).toISOString(), marketingConsent: Boolean(r.marketing_consent), couponSentAt: r.coupon_sent_at ? new Date(r.coupon_sent_at as string).toISOString() : null, createdAt: new Date(r.created_at as string).toISOString() });
 
 const pgBackend: Backend = {
   async saveFire(f) {
-    await (await db()).query("INSERT INTO find_fires (id, idea, sentence, picked, labels, peak, color, react_kind, name, matches, combo_key, card, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", [f.id, f.idea, f.sentence, JSON.stringify(f.picked), JSON.stringify(f.labels), f.peak, f.color, f.reactKind, f.name, JSON.stringify(f.matches), f.comboKey, f.card ? JSON.stringify(f.card) : null, f.createdAt]);
+    await (await db()).query("INSERT INTO find_fires (id, idea, sentence, picked, labels, peak, color, react_kind, name, matches, combo_key, card, nickname, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)", [f.id, f.idea, f.sentence, JSON.stringify(f.picked), JSON.stringify(f.labels), f.peak, f.color, f.reactKind, f.name, JSON.stringify(f.matches), f.comboKey, f.card ? JSON.stringify(f.card) : null, f.nickname, f.createdAt]);
   },
   async rarity(key, peak) {
     const { rows } = await (await db()).query("SELECT count(*)::int AS total, count(*) FILTER (WHERE combo_key = $1)::int AS same, count(*) FILTER (WHERE peak > $2)::int AS higher FROM find_fires", [key, peak]);

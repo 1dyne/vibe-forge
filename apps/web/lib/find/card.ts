@@ -10,8 +10,9 @@ export type Rarity = { total: number; sameCombo: number; higherPeak: number };
 export type FireCard = {
   grade: Grade;
   attr: { kind: ReactKind; label: string };
-  rarityLine: string;
-  peakLine: string;
+  /** 도깨비불이 30개 미만이면 null (숫자가 작아서 비교가 의미 없다) */
+  rarityLine: string | null;
+  peakLine: string | null;
   stats: Array<{ cat: Cat; value: number }>;
   specialty: string;
   weakness: string;
@@ -40,13 +41,19 @@ export function gradeOf(rarity: Rarity, peak: number): Grade {
   return "흔함";
 }
 
-function rarityLines(rarity: Rarity) {
+export const MIN_FIRES_FOR_STATS = 30;
+
+function rarityLines(rarity: Rarity): { rarityLine: string | null; peakLine: string | null } {
   const all = rarity.total + 1;
+  if (all < MIN_FIRES_FOR_STATS) return { rarityLine: null, peakLine: null };
   const rarityLine = rarity.sameCombo === 0
-    ? all === 1 ? "세상에 처음 나온 도깨비불이야" : `이 조합은 지금까지 도깨비불 ${all.toLocaleString("ko-KR")}개 중 너만 찾았어`
+    ? `이 조합은 지금까지 도깨비불 ${all.toLocaleString("ko-KR")}개 중 너만 찾았어`
     : `이 조합, 너 말고 ${rarity.sameCombo.toLocaleString("ko-KR")}명이 더 찾았어`;
-  const top = Math.max(1, Math.ceil(((rarity.higherPeak + 1) / all) * 100));
-  return { rarityLine, peakLine: all === 1 ? "화력 1등 (아직 너뿐이지만)" : `화력 상위 ${top}%` };
+  // 순위 기준. 1위는 "1등", 위쪽 절반은 "상위 N%", 아래쪽 절반은 꼴찌처럼 읽히니 숨긴다.
+  const rank = rarity.higherPeak + 1;
+  const pct = Math.ceil((rank / all) * 100);
+  const peakLine = rank === 1 ? "화력 1등" : pct <= 50 ? `화력 상위 ${pct}%` : null;
+  return { rarityLine, peakLine };
 }
 
 // 약점: 앞에 있을수록 우선

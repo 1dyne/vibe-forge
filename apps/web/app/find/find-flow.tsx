@@ -7,23 +7,25 @@ import type { ProjectMatch } from "../../lib/find/projects";
 import Dokkaebi from "./dokkaebi";
 import FireCardView, { Roast } from "./fire-card";
 import type { FireCard } from "../../lib/find/card";
+import Opening from "./opening";
 import { track } from "./track";
 
 const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
 const DICE = ["현관문 잠갔는지 매번 불안해", "화분에 물 줄 때를 모르겠어", "밤에 불 끄러 일어나기 귀찮아", "택배 왔는지 자꾸 나가봐", "스트레칭을 자꾸 까먹어", "방이 건조한지 모르겠어", "공부할 때 폰을 자꾸 만져", "강아지가 물을 얼마나 마셨는지 궁금해"];
 const CAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
-const STEP: Record<Screen, string> = { intro: "1 / 4", thinking: "1 / 4", software: "1 / 4", unsafe: "1 / 4", stoke: "2 / 4", reveal: "3 / 4", forge: "4 / 4" };
+const STEP: Record<Screen, string> = { opening: "", intro: "1 / 4", thinking: "1 / 4", software: "1 / 4", unsafe: "1 / 4", stoke: "2 / 4", reveal: "3 / 4", forge: "4 / 4" };
 const VIBE_PROMPT = (idea: string) => `나는 개발자가 아니야. "${idea.trim().slice(0, 200)}" 이걸 해결하는 걸 만들고 싶어.\n1) 하루 만에 써볼 수 있는 가장 작은 버전을 기능 3개 이내로 제안해줘.\n2) 모르는 용어는 풀어서 설명하고, 정할 건 선택지로 물어봐줘.\n3) 동작하는 첫 화면부터 만들고 하나씩 붙여가자.`;
 
-type Screen = "intro" | "thinking" | "software" | "unsafe" | "stoke" | "reveal" | "forge";
-type Fire = { id: string; name: string; sentence: string; color: string; reactKind: string; peak: number; labels: string[]; card: FireCard | null };
+type Screen = "opening" | "intro" | "thinking" | "software" | "unsafe" | "stoke" | "reveal" | "forge";
+type Fire = { id: string; name: string; nickname?: string; sentence: string; color: string; reactKind: string; peak: number; labels: string[]; card: FireCard | null };
 type Result = { fire: Fire; matches: ProjectMatch[]; unique: string[]; maturity: Maturity };
 type Standing = { code: string; position: number; total: number; referrals: number; alreadyJoined: boolean; fireName: string | null };
 
 const EMPTY_TREE: ChipTree = { root: [], follow: {} };
 
 export default function FindFlow({ couponText }: { couponText: string | null }) {
-  const [screen, setScreen] = useState<Screen>("intro");
+  const [screen, setScreen] = useState<Screen>("opening");
+  const [nickname, setNickname] = useState("");
   const [idea, setIdea] = useState("");
   const [analysis, setAnalysis] = useState<FindAnalysis | null>(null);
   const [tree, setTree] = useState<ChipTree>(EMPTY_TREE);
@@ -54,6 +56,11 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       if (fromUrl && /^[A-Z0-9]{6}$/.test(fromUrl)) sessionStorage.setItem("find_ref", fromUrl);
       setRef(sessionStorage.getItem("find_ref"));
     } catch { /* 저장소를 못 쓰면 초대 코드 없이 진행 */ }
+    // 한 번 인사한 사람은 오프닝을 건너뛴다
+    try {
+      const saved = localStorage.getItem("find_name");
+      if (saved) { setNickname(saved); setScreen("intro"); }
+    } catch { /* 저장소를 못 쓰면 매번 인사 */ }
   }, []);
 
   const go = useCallback((next: Screen) => {
@@ -61,7 +68,14 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     window.scrollTo(0, 0);
     track("screen_view", { screen: next });
   }, []);
-  useEffect(() => { track("screen_view", { screen: "intro" }); }, []);
+  useEffect(() => { track("screen_view", { screen: "opening" }); }, []);
+
+  function finishOpening(name: string) {
+    setNickname(name);
+    try { localStorage.setItem("find_name", name); } catch { /* 저장 못 해도 진행 */ }
+    track("name_set", { skipped: name === "이름 없는 도깨비" });
+    go("intro");
+  }
 
   // 불이 사그라드는 시계 — 타이머 대신 시간 압박
   useEffect(() => {
@@ -132,7 +146,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     setError("");
     track("fire_locked", { peak: Math.round(peak), picked });
     try {
-      const response = await fetch("/api/find/fires", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: idea.trim(), picked: picked.map((id) => find(id)), peak }) });
+      const response = await fetch("/api/find/fires", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: idea.trim(), picked: picked.map((id) => find(id)), peak, nickname }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "불을 저장하지 못했어.");
       setResult(body as Result);
@@ -160,11 +174,13 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
         <div className="step">{STEP[screen]}</div>
       </header>
 
+      {screen === "opening" && <Opening onDone={finishOpening} />}
+
       {screen === "intro" && (
         <section className="screen">
           <div className="intro-head">
             <Dokkaebi motion="idle" fire={30} width={112} />
-            <div className="bubble">배고파…<br />만들고 싶은 거, 아니면<br />요즘 귀찮은 거 하나만 줘봐.</div>
+            <div className="bubble">좋아, {nickname || "인간"}!<br />만들고 싶은 거, 아니면<br />요즘 귀찮은 거 하나만 말해줘.</div>
           </div>
           <h1>내 도깨비불 찾기</h1>
           <div className="field">
@@ -299,7 +315,7 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
       <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 도깨비불이 태어났어</div>
       {fire.card ? (
         <>
-          <FireCardView name={fire.name} peak={fire.peak} kind={fire.reactKind as ReactKind} card={fire.card} />
+          <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} kind={fire.reactKind as ReactKind} card={fire.card} />
           <Roast head={fire.card.roast.head} body={fire.card.roast.body} kind={fire.reactKind as ReactKind} />
         </>
       ) : (
@@ -313,50 +329,63 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
         <div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div>
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
       </div>
-      <div className="growth">
-        <div className="growth-head">
-          <div><div className="tiny muted">지금 네 아이디어는</div><div className="display" style={{ fontSize: 21 }}>{maturity.label}</div></div>
-          <div className="growth-steps" aria-label={`4단계 중 ${maturity.level}단계`}>{[1, 2, 3, 4].map((n) => <i key={n} className={n <= maturity.level ? "on" : ""} />)}</div>
-        </div>
-        <div className="body">{maturity.summary}</div>
-        {maturity.next.length > 0 && <div className="tiny muted" style={{ marginTop: 4 }}>지금 더 해보면 좋은 것</div>}
-        <ol className="growth-next">
-          {maturity.next.map((n) => (
-            <li key={n.title}><b>{n.title}</b><span>{n.body}</span>{n.href && <a href={n.href} target="_blank" rel="noopener noreferrer">원문 열기 ↗</a>}</li>
-          ))}
-        </ol>
-        {maturity.level <= 2 && <button className="btn btn-ghost" type="button" onClick={onMore}>고른 장작 그대로, 더 넣으러 가기</button>}
+      <div className="blueprint-cta">
+        <div className="display">말하면, 회로도부터 조립까지.</div>
+        <p>대장간이 열리면 네 도깨비불의 회로도 첫 장을 보내줄게.</p>
+        <button className="btn btn-fire" type="button" onClick={onForge}>이 도깨비불의 회로도 받기</button>
       </div>
-      <div className="rail-head"><div className="display" style={{ fontSize: 19 }}>닮은 메이커 프로젝트</div>{matches.length > 0 && <span className="badge">일치율 = 갈래별 겹친 태그</span>}</div>
-      {matches.length ? (
-        <div className="rail" aria-label="닮은 프로젝트 목록">
-          {matches.map((p) => (
-            <a className="proj" key={p.id} href={p.source_url} target="_blank" rel="noopener noreferrer">
-              <div className="img">{p.image ? <img src={p.image.url} alt={`${p.title_ko} 작품 사진`} loading="lazy" /> : <span>사진은 원문에서 볼 수 있어 ↗</span>}</div>
-              <div className="meta">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="proj-title">{p.title_ko}</div>
-                  <div className="muted tiny" style={{ marginTop: 3 }}>닮은 점: {p.shared.slice(0, 3).join(" · ")}</div>
-                </div>
-                <div className="pct">{p.match}%</div>
-              </div>
-              <div className="credit">{p.source}{p.author ? ` · ${p.author}` : ""}{p.license ? ` · ${p.license}` : " · 라이선스 표기 없음(링크만)"}</div>
-            </a>
-          ))}
+      <details className="fold">
+        <summary>지금 더 해보면 좋은 것</summary>
+        <div className="fold-body">
+          <div className="growth">
+            <div className="growth-head">
+              <div><div className="tiny muted">지금 네 아이디어는</div><div className="display" style={{ fontSize: 21 }}>{maturity.label}</div></div>
+              <div className="growth-steps" aria-label={`4단계 중 ${maturity.level}단계`}>{[1, 2, 3, 4].map((n) => <i key={n} className={n <= maturity.level ? "on" : ""} />)}</div>
+            </div>
+            <div className="body">{maturity.summary}</div>
+            <ol className="growth-next">
+              {maturity.next.map((n) => (
+                <li key={n.title}><b>{n.title}</b><span>{n.body}</span>{n.href && <a href={n.href} target="_blank" rel="noopener noreferrer">원문 열기 ↗</a>}</li>
+              ))}
+            </ol>
+            {maturity.level <= 2 && <button className="btn btn-ghost" type="button" onClick={onMore}>고른 장작 그대로, 더 넣으러 가기</button>}
+          </div>
         </div>
-      ) : (
-        <div className="note small body">아직 닮은 프로젝트가 없어. 세상에 없는 도깨비불이야 — 처음부터 같이 설계해야 해.</div>
-      )}
-      <div className="note">
-        <div className="small" style={{ fontWeight: 700, color: "#B5591A" }}>네 아이디어에만 있는 것</div>
-        <div className="body">{unique.length ? unique.join(", ") : "장작을 한 단계 더 넣으면 여기에 네 것만의 특징이 나타나"}</div>
-        <div className="muted tiny">→ 이 부분은 닮은 프로젝트에 없어서 추가 설계가 필요해. 달그락이 같이 그려줄게.</div>
-      </div>
+      </details>
+      <details className="fold">
+        <summary>닮은 메이커 프로젝트 {matches.length}</summary>
+        <div className="fold-body">
+          {matches.length > 0 && <span className="badge" style={{ alignSelf: "flex-start" }}>일치율 = 갈래별 겹친 태그</span>}
+          {matches.length ? (
+            <div className="rail" aria-label="닮은 프로젝트 목록">
+              {matches.map((p) => (
+                <a className="proj" key={p.id} href={p.source_url} target="_blank" rel="noopener noreferrer">
+                  <div className="img">{p.image ? <img src={p.image.url} alt={`${p.title_ko} 작품 사진`} loading="lazy" /> : <span>사진은 원문에서 볼 수 있어 ↗</span>}</div>
+                  <div className="meta">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="proj-title">{p.title_ko}</div>
+                      <div className="muted tiny" style={{ marginTop: 3 }}>닮은 점: {p.shared.slice(0, 3).join(" · ")}</div>
+                    </div>
+                    <div className="pct">{p.match}%</div>
+                  </div>
+                  <div className="credit">{p.source}{p.author ? ` · ${p.author}` : ""}{p.license ? ` · ${p.license}` : " · 라이선스 표기 없음(링크만)"}</div>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="small body">아직 닮은 프로젝트가 없어. 세상에 없는 도깨비불이야 — 처음부터 같이 설계해야 해.</div>
+          )}
+          <div className="note">
+            <div className="small" style={{ fontWeight: 700, color: "#B5591A" }}>네 아이디어에만 있는 것</div>
+            <div className="body">{unique.length ? unique.join(", ") : "장작을 한 단계 더 넣으면 여기에 네 것만의 특징이 나타나"}</div>
+            <div className="muted tiny">→ 위의 닮은 프로젝트 어디에도 없어서 추가 설계가 필요해. 달그락이 같이 그려줄게.</div>
+          </div>
+        </div>
+      </details>
       <div className="two">
         <button className="btn btn-ghost" type="button" onClick={onShare}>카드 저장·공유</button>
         <button className="btn btn-ghost" type="button" onClick={onAgain}>다시 피우기</button>
       </div>
-      <button className="btn btn-fire" type="button" onClick={onForge}>내 도깨비 만들러 가기</button>
     </section>
   );
 }

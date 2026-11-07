@@ -7,6 +7,8 @@ import { CATS, FOLLOW, ROOTS, compose, fireName, lookup, reactKind, toChip, type
 import { analyzeFind, chipTree, classify } from "../apps/web/lib/find/classify";
 import { assessMaturity } from "../apps/web/lib/find/maturity";
 import { buildCard, comboKey, gradeOf } from "../apps/web/lib/find/card";
+import { NAMELESS, cleanNickname, nicknameProblem } from "../apps/web/lib/find/nickname";
+import { uniqueToIdea } from "../apps/web/lib/find/projects";
 import { PROJECTS, canShowImage, matchProjects, matchScore } from "../apps/web/lib/find/projects";
 import { resetRateLimits } from "../apps/web/lib/find/rate-limit";
 import { allWaitlist, clearEvents, endPool, getFire, recordEvent, removeEntry } from "../apps/web/lib/find/store";
@@ -110,20 +112,48 @@ describe("도깨비불 카드", () => {
     expect(gradeOf({ total: 300, sameCombo: 40, higherPeak: 150 }, 50)).toBe("흔함");
     expect(gradeOf({ total: 0, sameCombo: 0, higherPeak: 0 }, 60)).toBe("희귀");
   });
+  it("도깨비불이 30개 미만이면 희귀도 줄을 숨기고, 화력은 1등·위쪽 절반만 보여준다", () => {
+    const chips = ["s_time", "r_light"].map(chip);
+    expect(buildCard(chips, 50, { total: 10, sameCombo: 0, higherPeak: 0 }, []).rarityLine).toBeNull();
+    expect(buildCard(chips, 50, { total: 10, sameCombo: 0, higherPeak: 0 }, []).peakLine).toBeNull();
+    expect(buildCard(chips, 99, { total: 59, sameCombo: 3, higherPeak: 0 }, []).peakLine).toBe("화력 1등");
+    expect(buildCard(chips, 20, { total: 59, sameCombo: 3, higherPeak: 40 }, []).peakLine).toBeNull(); // 41위/60 → 꼴찌처럼 읽히니 숨김
+    expect(buildCard(chips, 60, { total: 59, sameCombo: 3, higherPeak: 5 }, []).rarityLine).toBe("이 조합, 너 말고 3명이 더 찾았어");
+  });
+  it("닉네임은 욕설·연락처를 거르고, 없거나 걸리면 이름 없는 도깨비", () => {
+    expect(nicknameProblem("시 발")).not.toBeNull();
+    expect(nicknameProblem("s.h.i.t")).not.toBeNull();
+    expect(nicknameProblem("me@mail.com")).not.toBeNull();
+    expect(nicknameProblem("다인")).toBeNull();
+    expect(cleanNickname("  다인  ")).toBe("다인");
+    expect(cleanNickname("병1신")).toBe(NAMELESS);
+    expect(cleanNickname("")).toBe(NAMELESS);
+  });
   it("같은 장작이면 고른 순서와 상관없이 같은 조합이다", () => {
     expect(comboKey(["r_light", "f_desk"])).toBe(comboKey(["f_desk", "r_light"]));
   });
   it("한 줄 평·특기·약점·부품을 고른 장작에서 만든다", () => {
     const picked = ["f_cup", "s_time", "s_cup", "r_light", "r_blink", "w_me"].map(chip);
-    const card = buildCard(picked, 85, { total: 10, sameCombo: 0, higherPeak: 0 }, matchProjects(picked.map((c) => c.id), all));
+    const card = buildCard(picked, 85, { total: 40, sameCombo: 0, higherPeak: 2 }, matchProjects(picked.map((c) => c.id), all));
     expect(card.grade).toBe("전설");
     expect(card.roast.head).toBe("컵 무게까지 재겠다고?");
     expect(card.specialty).toBe("컵 무게 재기 → 깜빡깜빡");
     expect(card.weakness).toBe("올려두지 않으면 아무것도 모름");
     expect(card.build.parts).toEqual(expect.arrayContaining(["로드셀 + HX711", "LED (WS2812)", "USB 전원"]));
-    expect(card.rarityLine).toBe("이 조합은 지금까지 도깨비불 11개 중 너만 찾았어");
-    expect(card.peakLine).toBe("화력 상위 10%");
+    expect(card.rarityLine).toBe("이 조합은 지금까지 도깨비불 41개 중 너만 찾았어");
+    expect(card.peakLine).toBe("화력 상위 8%"); // 3위 / 41개
     expect(card.stats.find((s) => s.cat === "감지")?.value).toBe(2);
+  });
+});
+
+describe("네 아이디어에만 있는 것", () => {
+  it("화면에 보이는 닮은 프로젝트 전체와 비교한다(1위에만 없다고 '없다'고 하지 않는다)", () => {
+    const picked = ["f_pot", "s_soil", "r_light", "r_blink"];
+    const matches = matchProjects(picked, all);
+    const tagsShown = new Set(matches.flatMap((m) => PROJECTS.find((p) => p.id === m.id)!.tags["반응"]));
+    const unique = uniqueToIdea(picked, all, matches);
+    if (tagsShown.has("빛")) expect(unique).not.toContain("빛으로 알려줘");
+    if (tagsShown.has("깜빡임")) expect(unique).not.toContain("깜빡깜빡");
   });
 });
 
@@ -200,9 +230,10 @@ describe("공개 API와 저장소 (파일 저장)", () => {
     const { fire, matches } = await made.json();
     expect(fire.name).toBe("깜빡이는 책상 도깨비불");
     expect(fire.sentence).toContain("정해진 시간마다 빛으로 알려줘.");
-    expect(fire.card.rarityLine).toBe("세상에 처음 나온 도깨비불이야");
+    expect(fire.card.rarityLine).toBeNull(); // 아직 30개 미만
+    expect(fire.nickname).toBe(NAMELESS);
     const sameCombo = await (await fireRoute(post("/api/find/fires", { idea: "물 마시는 걸 자꾸 까먹어", picked: [...picked].reverse(), peak: 30 }))).json();
-    expect(sameCombo.fire.card.rarityLine).toBe("이 조합, 너 말고 1명이 더 찾았어");
+    expect(sameCombo.fire.card.grade).toBe("흔함"); // 이미 나온 조합이고 화력도 더 낮다
     expect(matches.length).toBeGreaterThan(0);
 
     const join = (email: string, ref: string | null = null) => waitlistRoute(post("/api/find/waitlist", { email, fireId: fire.id, privacyConsent: true, marketingConsent: false, ref }));
