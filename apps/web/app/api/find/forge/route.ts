@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ownerHashFromRequest } from "../../../../lib/find/owner";
 import { hasValidOrigin } from "../../../../lib/request-security";
-import { cleanDecor, SIGNS, YARD } from "../../../../lib/find/decor";
+import { cleanDecor, ROOFS, SIGNS, YARD } from "../../../../lib/find/decor";
 import { forgeForOwner, setDecor, setVisibility, socialState } from "../../../../lib/find/village-store";
 
 const Body = z.object({
   visibility: z.enum(["public", "link", "private"]).optional(),
   decor: z.object({
-    roof: z.string().max(9).optional(),
+    roof: z.enum(ROOFS.map((r) => r.id) as [string, ...string[]]).optional(),
     sign: z.enum(SIGNS.map((s) => s.id) as [string, ...string[]]).optional(),
     yard: z.array(z.enum(YARD.map((y) => y.id) as [string, ...string[]])).max(8).optional(),
     hidePresence: z.boolean().optional()

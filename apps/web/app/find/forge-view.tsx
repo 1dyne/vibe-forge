@@ -4,7 +4,7 @@ import type { FireCard } from "../../lib/find/card";
 import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
 import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
-import { ROOF_COLORS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../lib/find/decor";
+import { ROOFS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../lib/find/decor";
 import FireCardView, { Roast } from "./fire-card";
 import { MailSheet } from "./mailbox";
 import { track } from "./track";
@@ -65,8 +65,8 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   const usedCats = [...new Set(fires.flatMap((f) => f.cats))];
   function pickRoom(o: RoomObj) {
     if (o === "woodpile") { setToast(social.fuelTotal ? `이웃들이 넣어준 장작 ${social.fuelTotal}개가 쌓여 있어. 장작이 많을수록 화로 불이 커져.` : "아직 장작더미가 비어 있어. 이웃이 장작을 넣어주면 여기 쌓여."); track("object_open", { object: o }); return; }
-    if (o === "tools") { setToast(`공구 걸이: ${usedCats.join("·")} 갈래를 채워봤어. 네 갈래를 다 채우면 공구가 다 걸려.`); track("object_open", { object: o }); return; }
-    if (o === "display") { setToast(`'나도 갖고 싶어' ${social.wants}개. 5개가 넘으면 트로피가 올라가.`); track("object_open", { object: o }); return; }
+    if (o === "tools") { setToast(`연장 걸이: ${usedCats.join("·")} 갈래를 채워봤어. 네 갈래를 다 채우면 연장이 다 걸려.`); track("object_open", { object: o }); return; }
+    if (o === "display") { setToast(`'나도 갖고 싶어' ${social.wants}개. 소반에 메밀묵이 올라가고, 5개가 넘으면 금빛 초롱이 켜져.`); track("object_open", { object: o }); return; }
     show(o);
   }
   async function share() {
@@ -258,14 +258,15 @@ function DecorSheet({ initial, stats, houseId, onClose }: { initial: Decor; vill
         <div className="display" style={{ fontSize: 22 }}>대장간 꾸미기</div>
         <div className="tiny muted">마을에서 보이는 내 집 겉모습이야.</div>
         <div className="decor-group">
-          <b className="small">지붕 색</b>
-          <div className="swatches">
-            <button type="button" className={`swatch village ${!d.roof ? "on" : ""}`} onClick={() => setD({ ...d, roof: undefined })} aria-label="마을 기본 색">기본</button>
-            {ROOF_COLORS.map((c) => <button key={c} type="button" className={`swatch ${d.roof === c ? "on" : ""}`} style={{ background: c }} onClick={() => setD({ ...d, roof: c })} aria-label={`지붕 색 ${c}`} />)}
+          <b className="small">지붕</b>
+          <div className="phrases">
+            <button type="button" className={`chip ${!d.roof ? "on" : ""}`} onClick={() => setD({ ...d, roof: undefined })}>마을 기본</button>
+            {ROOFS.map((r) => <button key={r.id} type="button" className={`chip roof-chip ${d.roof === r.id ? "on" : ""}`} onClick={() => setD({ ...d, roof: r.id })}><i style={{ background: r.color }} />{r.name}</button>)}
           </div>
+          <div className="tiny muted">네 색은 지붕이 아니라 창호지 불빛으로 보여. 마을에선 네 도깨비불 색으로 창이 켜져.</div>
         </div>
         <div className="decor-group">
-          <b className="small">간판 모양</b>
+          <b className="small">문패</b>
           <div className="phrases">{SIGNS.map((s) => <button key={s.id} type="button" className={`chip ${(d.sign ?? "plank") === s.id ? "on" : ""}`} onClick={() => setD({ ...d, sign: s.id })}>{s.name}</button>)}</div>
         </div>
         <div className="decor-group">
@@ -276,7 +277,7 @@ function DecorSheet({ initial, stats, houseId, onClose }: { initial: Decor; vill
               return <button key={y.id} type="button" className={`chip ${yard.includes(y.id) ? "on" : ""}`} disabled={!open} title={open ? "" : y.hint} onClick={() => toggleYard(y.id)}>{open ? y.name : `🔒 ${y.name}`}</button>;
             })}
           </div>
-          <div className="tiny muted">잠긴 건 이웃과 어울리면 열려: 이웃 3명 → 벤치 · 장작 10개 → 가로등 · '나도 갖고 싶어' 5개 → 꽃 아치 · 남긴 말 5개 → 풍경</div>
+          <div className="tiny muted">잠긴 건 이웃과 어울리면 열려: 이웃 3명 → 평상 · 장작 10개 → 초롱 걸이 · '나도 갖고 싶어' 5개 → 작은 솟대 · 남긴 말 5개 → 풍경</div>
         </div>
         <label className="decor-toggle">
           <input type="checkbox" checked={!d.hidePresence} onChange={(e) => setD({ ...d, hidePresence: !e.target.checked })} />

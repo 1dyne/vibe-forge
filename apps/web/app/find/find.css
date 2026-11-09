@@ -374,3 +374,10 @@ body:has(.find){background:#fff}
 .chip.on { background: #1E1F24; color: #fff; }
 .decor-toggle { display: flex; gap: 10px; align-items: flex-start; }
 .decor-toggle input { margin-top: 4px; width: 18px; height: 18px; }
+.roof-chip { display: inline-flex; align-items: center; gap: 6px; }
+.roof-chip i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #232323; display: inline-block; }
+.world-sound { font: inherit; color: #1E1F24; background: rgba(255,255,255,.85); border: 0; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.world-sound[aria-pressed="true"] { background: #1E1F24; color: #fff; }
+.world-top { gap: 8px; }
+.world-top a, .world-top .world-sound { white-space: nowrap; font-size: 15px; padding: 6px 11px; }
+.world-top span { gap: 5px; flex-shrink: 0; }
