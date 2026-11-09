@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { db, newId, readData, rowToFire, serial, storageKind, writeData, type FireRecord } from "./store";
-import type { Decor } from "./decor";
+import { readDecor, type Decor } from "./decor";
 import { houseStage, pickTheme, plotFor } from "./village";
 
 // 내 대장간 · 우체통 · 마을 소식. store.ts와 같이 Postgres가 있으면 Postgres, 없으면 .data/find.json.
@@ -18,7 +18,7 @@ export type NoticeRecord = { id: number; title: string; body: string; kind: "upd
 export const hashToken = (token: string) => createHash("sha256").update(`find-owner:${token}`).digest("hex");
 
 const pg = () => storageKind() === "postgres";
-const toForge = (r: Record<string, unknown>): ForgeRecord => ({ id: r.id as string, ownerHash: r.owner_hash as string, nickname: r.nickname as string, theme: r.theme as string, alleySeq: r.alley_seq as number, plotNo: r.plot_no as number, visibility: r.visibility as Visibility, createdAt: new Date(r.created_at as string).toISOString(), lastSeen: r.last_seen ? new Date(r.last_seen as string).toISOString() : null, decor: (r.decor as Decor | null) ?? {} });
+const toForge = (r: Record<string, unknown>): ForgeRecord => ({ id: r.id as string, ownerHash: r.owner_hash as string, nickname: r.nickname as string, theme: r.theme as string, alleySeq: r.alley_seq as number, plotNo: r.plot_no as number, visibility: r.visibility as Visibility, createdAt: new Date(r.created_at as string).toISOString(), lastSeen: r.last_seen ? new Date(r.last_seen as string).toISOString() : null, decor: readDecor(r.decor) });
 const toMail = (r: Record<string, unknown>): MailRecord => ({ id: r.id as string, forgeId: (r.forge_id as string) ?? null, kind: r.kind as MailKind, body: r.body as string, context: (r.context as Record<string, string>) ?? {}, status: r.status as MailStatus, reply: (r.reply as string) ?? null, replySeen: Boolean(r.reply_seen), notionPageId: (r.notion_page_id as string) ?? null, notionSynced: Boolean(r.notion_synced), createdAt: new Date(r.created_at as string).toISOString(), updatedAt: new Date(r.updated_at as string).toISOString() });
 const toNotice = (r: Record<string, unknown>): NoticeRecord => ({ id: Number(r.id), title: r.title as string, body: r.body as string, kind: r.kind as NoticeRecord["kind"], publishedAt: new Date(r.published_at as string).toISOString() });
 
@@ -547,7 +547,7 @@ export async function worldHouses(viewerForgeId: string | null = null): Promise<
       id: f.id, nickname: f.nickname, theme: f.theme, alleySeq: f.alleySeq, plotNo: f.plotNo, color: fire?.color ?? "#4FB3A6", peak: fire?.peak ?? 20,
       fuel: fuel.get(f.id) ?? 0, wants: wants.get(f.id) ?? 0, stage: st.stage, fires: st.count,
       active: seen < ACTIVE_MINUTES * 60_000, recent: seen < 86_400_000,
-      lit: (visits.get(f.id) ?? 0) > 0 || seen < 86_400_000, decor: f.decor ?? {}
+      lit: (visits.get(f.id) ?? 0) > 0 || seen < 86_400_000, decor: readDecor(f.decor)
     };
   }).sort((a, b) => a.theme.localeCompare(b.theme) || a.alleySeq - b.alleySeq || a.plotNo - b.plotNo);
   return { houses, totalFuel: s.fuel.length };

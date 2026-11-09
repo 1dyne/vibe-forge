@@ -5,13 +5,13 @@ import { hueSpriteMaterial } from "./three-hue";
 
 // 대장간 안 (3D). 동물의 숲의 '내 집'처럼, 아이디어를 쌓을수록 방이 변한다.
 //  - 방 크기·구조: 가장 많이 자란 도깨비불의 단계 (불씨 = 작은 방 / 타오름 = 창문 둘·러그·매단 등 / 활활 = 넓은 방·다락·풀무)
-//  - 선반: 도깨비불 하나 = 빛나는 유리병 하나 (선반 칸은 병 수만큼 늘어난다)
-//  - 작업대: 메모 쪽지(불씨) → 펼친 설계도(타오름) → 부품 상자 + 깜빡이는 시제품(활활)
+//  - 선반: 도깨비불 하나 = 그 불 색으로 빛나는 한지 초롱 하나 (선반 칸은 초롱 수만큼 늘어난다)
+//  - 작업대: 메모 쪽지(불씨) → 펼친 한지 설계도(타오름) → 부품 함 + 깜빡이는 시제품(활활)
 //  - 공구 걸이: 지금까지 채운 장작 갈래마다 공구 하나 (감지 = 돋보기, 반응 = 종, 형태 = 자, 누구 = 액자)
-//  - 화로: 불 크기 = 화력 + 받은 장작, 불 색 = 가장 최근 도깨비불 색. 옆에 장작더미(받은 장작 수만큼)
-//  - 진열대: '나도 갖고 싶어'가 쌓이면 리본 → 트로피
-//  - 우체통: 놀러 온 도깨비가 남긴 말만큼 편지가 꽂힌다 · 벽 액자 = 이웃 수
-//  벽·바닥 재료는 이 집이 있는 마을을 따른다.
+//  - 화덕(흙)과 풀무: 불 크기 = 화력 + 받은 장작, 불 색 = 가장 최근 도깨비불 색. 옆에 장작더미(받은 장작 수만큼)
+//  - 소반: '나도 갖고 싶어'가 쌓이면 메밀묵 한 그릇 → 금빛 초롱 (메밀묵은 도깨비가 가장 좋아하는 제물)
+//  - 편지함: 놀러 온 도깨비가 남긴 말만큼 편지가 꽂힌다 · 벽 족자 = 이웃 수
+//  고증: 흙벽·나무 기둥·창호·마루(대장간 마을은 흙바닥). 유리·벽돌·타일·청사진 같은 근대 재료는 쓰지 않는다.
 
 export type RoomObj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "woodpile" | "tools" | "display";
 export type RoomFire = { id: string; color: string; stage: 1 | 2 | 3; cats: string[] };
@@ -29,14 +29,14 @@ type Props = {
   fallback: ReactNode;
 };
 
-const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2: string; trim: string; rug: string; pattern: "beam" | "brick" | "stone" | "stripe" | "tile" }> = {
-  kkomul: { wall: "#F4ECDA", wall2: "#E9DFC8", floor: "#D9B98C", floor2: "#CDA977", trim: "#B08458", rug: "#8FB79A", pattern: "beam" },
-  ttukttak: { wall: "#C0634A", wall2: "#A9533D", floor: "#8B6A4A", floor2: "#7A5C3F", trim: "#C9A24A", rug: "#C9A24A", pattern: "brick" },
-  jjaekkak: { wall: "#A3ACB8", wall2: "#8E98A5", floor: "#5A4636", floor2: "#4D3B2D", trim: "#34446E", rug: "#34446E", pattern: "stone" },
-  wagle: { wall: "#FFE39A", wall2: "#FF8C7A", floor: "#FFF4DE", floor2: "#FF8C7A", trim: "#6FC3E8", rug: "#6FC3E8", pattern: "stripe" },
-  kkambbak: { wall: "#ECEEF0", wall2: "#D9DDE1", floor: "#7FD3CB", floor2: "#6CC0B8", trim: "#C27C4E", rug: "#B9A3E3", pattern: "tile" }
+const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2: string; trim: string; rug: string; floorKind: "maru" | "earth" }> = {
+  kkomul: { wall: "#E6D9BE", wall2: "#6E5236", floor: "#B8946A", floor2: "#9C7A58", trim: "#6E5236", rug: "#C9B98F", floorKind: "maru" },
+  ttukttak: { wall: "#D2BF9C", wall2: "#5E4430", floor: "#8C7A62", floor2: "#7A6A54", trim: "#5E4430", rug: "#B79E70", floorKind: "earth" },
+  jjaekkak: { wall: "#EBE1CB", wall2: "#4E3A2A", floor: "#A07C58", floor2: "#86664A", trim: "#4E3A2A", rug: "#C9B98F", floorKind: "maru" },
+  wagle: { wall: "#E2D3B4", wall2: "#6E5236", floor: "#B8946A", floor2: "#9C7A58", trim: "#6E5236", rug: "#D6C29A", floorKind: "maru" },
+  kkambbak: { wall: "#DCCFB4", wall2: "#5A4636", floor: "#A88A66", floor2: "#8E7254", trim: "#5A4636", rug: "#C9B993", floorKind: "maru" }
 };
-const LABEL: Record<RoomObj, string> = { hearth: "화로", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "우체통", woodpile: "장작더미", tools: "공구 걸이", display: "진열대" };
+const LABEL: Record<RoomObj, string> = { hearth: "화덕", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "편지함", woodpile: "장작더미", tools: "연장 걸이", display: "소반" };
 
 export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, onPick, fallback }: Props) {
   const mount = useRef<HTMLDivElement>(null);
@@ -98,7 +98,9 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       const patternTex = (kind: string, a: string, b: string, w: number, h: number) => {
         const c = document.createElement("canvas"); c.width = 256; c.height = 256; const x = c.getContext("2d")!;
         x.fillStyle = a; x.fillRect(0, 0, 256, 256); x.strokeStyle = b; x.fillStyle = b;
-        if (kind === "brick") { x.lineWidth = 4; for (let r = 0; r < 8; r++) { x.beginPath(); x.moveTo(0, r * 32); x.lineTo(256, r * 32); x.stroke(); for (let k = 0; k < 4; k++) { const bx = k * 64 + (r % 2) * 32; x.beginPath(); x.moveTo(bx, r * 32); x.lineTo(bx, r * 32 + 32); x.stroke(); } } }
+        if (kind === "earthwall") { for (let k = 0; k < 2; k++) x.fillRect(k * 128 + 58, 0, 14, 256); x.fillRect(0, 150, 256, 10); x.fillStyle = "rgba(0,0,0,.05)"; for (let i = 0; i < 90; i++) x.fillRect((i * 97) % 256, (i * 61) % 256, 3, 2); }
+        else if (kind === "earth") { x.fillStyle = "rgba(0,0,0,.08)"; for (let i = 0; i < 160; i++) x.fillRect((i * 97) % 256, (i * 61) % 256, 4, 3); }
+        else if (kind === "brick") { x.lineWidth = 4; for (let r = 0; r < 8; r++) { x.beginPath(); x.moveTo(0, r * 32); x.lineTo(256, r * 32); x.stroke(); for (let k = 0; k < 4; k++) { const bx = k * 64 + (r % 2) * 32; x.beginPath(); x.moveTo(bx, r * 32); x.lineTo(bx, r * 32 + 32); x.stroke(); } } }
         else if (kind === "stone") { x.lineWidth = 3; for (let r = 0; r < 4; r++) { x.beginPath(); x.moveTo(0, r * 64); x.lineTo(256, r * 64); x.stroke(); for (let k = 0; k < 3; k++) { const bx = k * 96 + (r % 2) * 48; x.beginPath(); x.moveTo(bx, r * 64); x.lineTo(bx, r * 64 + 64); x.stroke(); } } }
         else if (kind === "beam") { for (let k = 0; k < 2; k++) x.fillRect(k * 128 + 54, 0, 20, 256); }
         else if (kind === "stripe") { for (let k = 0; k < 4; k++) x.fillRect(k * 64, 0, 26, 256); }
@@ -107,21 +109,24 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         else if (kind === "checker") { for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) if ((i + j) % 2) x.fillRect(i * 64, j * 64, 64, 64); }
         const t = new three.CanvasTexture(c); t.colorSpace = three.SRGBColorSpace; t.wrapS = t.wrapT = three.RepeatWrapping; t.repeat.set(w / 2.4, h / 2.4); return t;
       };
-      const floorKind = village === "wagle" ? "checker" : village === "kkambbak" ? "tile" : "plank";
+      const floorKind = st.floorKind === "earth" ? "earth" : "plank"; // 마루 / 흙바닥
       const floor = new three.Mesh(new three.BoxGeometry(W, 0.2, D), new three.MeshStandardMaterial({ map: patternTex(floorKind, st.floor, st.floor2, W, D), roughness: 0.9 }));
       floor.position.set(0, -0.1, 0); scene.add(floor);
-      const wallMat = new three.MeshStandardMaterial({ map: patternTex(st.pattern, st.wall, st.wall2, W, H), roughness: 0.95 });
-      const wallMatL = new three.MeshStandardMaterial({ map: patternTex(st.pattern, st.wall, st.wall2, D, H), roughness: 0.95 });
+      const wallMat = new three.MeshStandardMaterial({ map: patternTex("earthwall", st.wall, st.wall2, W, H), roughness: 0.95 });
+      const wallMatL = new three.MeshStandardMaterial({ map: patternTex("earthwall", st.wall, st.wall2, D, H), roughness: 0.95 });
       part(BOX, wallMat, W, H, 0.2, 0, H / 2, -D / 2 - 0.1);
       part(BOX, wallMatL, 0.2, H, D, -W / 2 - 0.1, H / 2, 0);
       part(BOX, mat(st.trim), W, 0.16, 0.24, 0, 0.08, -D / 2 + 0.02); part(BOX, mat(st.trim), 0.24, 0.16, D, -W / 2 + 0.02, 0.08, 0);
       part(BOX, mat(st.trim), W + 0.2, 0.22, 0.3, 0, H, -D / 2); part(BOX, mat(st.trim), 0.3, 0.22, D + 0.2, -W / 2, H, 0);
 
       // 창문 (단계가 오를수록 늘어남)
-      const win = (x: number, y: number, z: number, ry: number, round = village === "kkambbak") => {
+      // 창호: 한지 바른 살창 (바깥 해 질 녘 빛이 은은하게 비친다)
+      const win = (x: number, y: number, z: number, ry: number) => {
         const g = group(null, x, y, z, ry);
-        if (round) { const f = part(CYL, mat(st.trim), 0.62, 0.1, 0.62, 0, 0, 0, g); f.rotation.x = Math.PI / 2; const p = part(CYL, mat("#CDEFF6", { e: "#BDE7F2", ei: 0.4 }), 0.52, 0.12, 0.52, 0, 0, 0.02, g); p.rotation.x = Math.PI / 2; }
-        else { part(BOX, mat(st.trim), 1.2, 1.0, 0.1, 0, 0, 0, g); part(BOX, mat("#CDEFF6", { e: "#BDE7F2", ei: 0.4 }), 1.0, 0.8, 0.12, 0, 0, 0.01, g); part(BOX, mat(st.trim), 0.05, 0.8, 0.14, 0, 0, 0.02, g); part(BOX, mat(st.trim), 1.0, 0.05, 0.14, 0, 0, 0.02, g); }
+        part(BOX, mat(st.trim), 1.2, 1.0, 0.1, 0, 0, 0, g);
+        part(BOX, mat("#F3E7C9", { e: "#F2B07A", ei: 0.35 }), 1.04, 0.84, 0.12, 0, 0, 0.01, g);
+        for (let k = 1; k < 4; k++) part(BOX, mat(st.trim), 0.03, 0.84, 0.14, -0.52 + k * 0.26, 0, 0.02, g);
+        for (let k = 1; k < 3; k++) part(BOX, mat(st.trim), 1.04, 0.03, 0.14, 0, -0.42 + k * 0.28, 0.02, g);
       };
       win(stage >= 3 ? -1.0 : -0.1, 2.15, -D / 2 + 0.02, 0);
       if (stage >= 2) win(-W / 2 + 0.02, 2.15, D / 2 - 0.65, Math.PI / 2);
@@ -129,16 +134,18 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       // ── 화로 + 장작더미 + 모루 ──
       const hx = -W / 2 + 1.4, hz = -D / 2 + 1.0;
       const hearth = group("hearth", hx, 0, hz);
-      part(BOX, mat("#8E8A84"), 1.7, 0.7, 1.3, 0, 0.35, 0, hearth);
-      part(BOX, mat("#3B3633"), 1.2, 0.5, 0.9, 0, 0.62, 0.05, hearth);
-      const hood = part(CONE4, mat("#6E6A66"), 1.25, 1.1, 1.0, 0, 1.75, -0.05, hearth); hood.scale.z = 0.95;
-      part(BOX, mat("#6E6A66"), 0.5, H, 0.5, 0, 1.75 + H / 2, -0.15, hearth);
+      // 흙으로 빚은 화덕 + 벽을 따라 올라간 굴뚝 (김홍도 「대장간」의 화덕)
+      part(BOX, mat("#8C877C"), 1.7, 0.35, 1.3, 0, 0.17, 0, hearth);
+      part(new three.SphereGeometry(1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat("#9C6B4E"), 0.75, 0.75, 0.6, 0, 0.35, -0.05, hearth);
+      part(BOX, mat("#3B3633"), 0.55, 0.4, 0.3, 0, 0.6, 0.5, hearth); // 아궁이
+      part(CYL, mat("#8C7A62"), 0.2, H, 0.2, 0, H / 2 + 0.5, -0.45, hearth);
       const heat = Math.min(1.6, 0.6 + (peak / 100) * 0.6 + fuel * 0.04);
       const flames = [0, 1, 2].map((i) => part(new three.ConeGeometry(0.22, 0.7, 6), mat(i === 1 ? "#FFD27A" : latest, { e: i === 1 ? "#FFB84D" : latest, ei: 1 }), heat, heat, heat, (i - 1) * 0.28, 0.95, 0.1, hearth));
       const glow = new three.PointLight(latest, 2.2, 6, 1.6); glow.position.set(hx, 1.3, hz + 0.6); scene.add(glow);
       anim.push((t) => { flames.forEach((f, i) => { f.scale.y = heat * (1 + Math.sin(t * 9 + i * 2) * 0.18); }); glow.intensity = 2 + Math.sin(t * 11) * 0.4 + Math.sin(t * 7.3) * 0.3; });
       label(LABEL.hearth, hx, 2.6, hz);
-      if (stage >= 3) { const b = part(BOX, mat("#8B6A4A"), 0.7, 0.2, 0.45, 1.2, 0.5, 0.2, hearth); b.rotation.z = 0.3; part(BOX, mat("#C9A24A"), 0.12, 0.12, 0.5, 1.55, 0.6, 0.2, hearth); }
+      // 풀무: 손잡이를 밀고 당기면 불이 커진다 (활활 단계엔 큰 풀무)
+      { const big = stage >= 3 ? 1.3 : 1; const b = part(BOX, mat("#5A4030"), 0.6 * big, 0.35 * big, 0.45 * big, 1.05, 0.35, 0.2, hearth); const handle = part(BOX, mat(st.trim), 0.5, 0.05, 0.05, 1.45, 0.62, 0.2, hearth); anim.push((t) => { handle.position.x = 1.45 + Math.sin(t * 2.2) * 0.12; b.scale.y = 0.35 * big * (1 + Math.sin(t * 2.2) * 0.08); }); }
 
       const wood = group("woodpile", hx + 1.5, 0, hz + 0.1);
       const logs = Math.min(18, fuel);
@@ -166,27 +173,27 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       shown.forEach((f, i) => {
         const b = Math.floor(i / 4), k = i % 4;
         const jar = new three.Group(); jar.position.set(0.02, 0.74 + b * 0.62, -0.78 + k * 0.52); shelf.add(jar);
-        part(CYL, mat("#E8F4F6", { op: 0.35 }), 0.14, 0.34, 0.14, 0, 0.17, 0, jar);
-        part(CYL, mat("#8B6A4A"), 0.1, 0.05, 0.1, 0, 0.36, 0, jar);
-        const orb = part(BALL, mat(f.color, { e: f.color, ei: 1 }), 0.08, 0.1, 0.08, 0, 0.16, 0, jar);
-        anim.push((t) => { orb.scale.setScalar(0.075 + Math.sin(t * 3 + i) * 0.015); });
+        // 한지 초롱: 안에 그 도깨비불이 들어 있다
+        const shade = part(CYL, mat("#F3E7C9", { e: f.color, ei: 0.8 }), 0.13, 0.3, 0.13, 0, 0.18, 0, jar);
+        part(CYL, mat(st.trim), 0.14, 0.03, 0.14, 0, 0.34, 0, jar); part(CYL, mat(st.trim), 0.14, 0.03, 0.14, 0, 0.03, 0, jar);
+        anim.push((t) => { (shade.material as T.MeshStandardMaterial).emissiveIntensity = 0.7 + Math.sin(t * 3 + i) * 0.15; });
       });
       if (fires.length === 0) part(BOX, mat("#FFFFFF"), 0.02, 0.18, 0.3, 0.2, 0.84, 0, shelf);
       if (fires.length > shown.length) label(`+${fires.length - shown.length}`, -W / 2 + 0.45, 0.75 + boards * 0.62, SZ + 0.9);
       label(`${LABEL.shelf} ${fires.length}`, -W / 2 + 0.5, 1.0 + boards * 0.62, SZ);
 
-      // 이웃 액자 (왼쪽 벽 위)
-      for (let i = 0; i < Math.min(4, neighbors); i++) { const f = group(null, -W / 2 + 0.03, 2.95, SZ - 0.9 + i * 0.6, Math.PI / 2); part(BOX, mat(st.trim), 0.4, 0.5, 0.05, 0, 0, 0, f); part(BOX, mat(["#F2A3B3", "#9ED3CB", "#FFD27A", "#B9A3E3"][i]), 0.3, 0.38, 0.06, 0, 0, 0.01, f); }
+      // 이웃 족자 (왼쪽 벽 위): 한지에 먹으로 쓴 이웃 이름
+      for (let i = 0; i < Math.min(4, neighbors); i++) { const f = group(null, -W / 2 + 0.03, 2.85, SZ - 0.9 + i * 0.6, Math.PI / 2); part(BOX, mat("#F3E7C9"), 0.32, 0.62, 0.02, 0, 0, 0, f); part(CYL, mat(st.trim), 0.02, 0.4, 0.02, 0, 0.32, 0.01, f).rotation.z = Math.PI / 2; part(CYL, mat(st.trim), 0.02, 0.4, 0.02, 0, -0.32, 0.01, f).rotation.z = Math.PI / 2; part(BOX, mat("#2A2118"), 0.03, 0.36, 0.025, 0, 0, 0.005, f); }
 
       // ── 설계도 벽 (뒷벽 오른쪽) + 공구 걸이 ──
       const BX = W / 2 - 1.35;
       const LX = W / 2 - W * 0.25;
       const bp = group("blueprint", BX, stage >= 3 ? 0.72 : 1.0, -D / 2 + 0.05);
       const pinned = Math.max(1, Math.min(6, fires.length));
-      for (let i = 0; i < pinned; i++) { const p = part(BOX, mat(i % 2 ? "#FFFFFF" : "#F6EEDC"), 0.36, 0.44, 0.02, -0.75 + (i % 2) * 0.45, 0.4 + Math.floor(i / 2) * 0.52, 0.02, bp); p.rotation.z = (i % 2 ? 1 : -1) * 0.06; part(BALL, mat("#E2574C"), 0.04, 0.04, 0.04, p.position.x, p.position.y + 0.2, 0.05, bp); }
+      for (let i = 0; i < pinned; i++) { const p = part(BOX, mat(i % 2 ? "#F3E7C9" : "#EADCB8"), 0.36, 0.44, 0.02, -0.75 + (i % 2) * 0.45, 0.4 + Math.floor(i / 2) * 0.52, 0.02, bp); p.rotation.z = (i % 2 ? 1 : -1) * 0.06; part(BOX, mat(st.trim), 0.06, 0.04, 0.03, p.position.x, p.position.y + 0.2, 0.04, bp); }
       if (stage >= 2) {
         const c = document.createElement("canvas"); c.width = 256; c.height = 200; const x = c.getContext("2d")!;
-        x.fillStyle = "#3D6FB6"; x.fillRect(0, 0, 256, 200); x.strokeStyle = "rgba(255,255,255,.85)"; x.lineWidth = 4;
+        x.fillStyle = "#F1E4C4"; x.fillRect(0, 0, 256, 200); x.strokeStyle = "rgba(40,30,20,.85)"; x.lineWidth = 4; // 한지에 먹으로 그린 설계도
         x.strokeRect(30, 30, 110, 80); x.beginPath(); x.arc(190, 70, 30, 0, 6.28); x.stroke(); x.beginPath(); x.moveTo(140, 70); x.lineTo(160, 70); x.moveTo(85, 110); x.lineTo(85, 160); x.lineTo(200, 160); x.lineTo(200, 100); x.stroke();
         const tex = new three.CanvasTexture(c); tex.colorSpace = three.SRGBColorSpace;
         const sheet = new three.Mesh(new three.PlaneGeometry(0.95, 0.75), new three.MeshBasicMaterial({ map: tex })); sheet.position.set(0.5, 0.95, 0.03); bp.add(sheet);
@@ -213,13 +220,13 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         for (let i = 0; i < 3; i++) { const p = part(BOX, mat("#FFFFFF"), 0.3, 0.02, 0.22, -0.4 + i * 0.35, 0.9, (i % 2) * 0.15 - 0.05, bench); p.rotation.y = i * 0.5; }
         const pen = part(CYL, mat("#F2C14E"), 0.02, 0.35, 0.02, 0.5, 0.9, 0.2, bench); pen.rotation.z = Math.PI / 2; pen.rotation.y = 0.4;
       } else {
-        const sh = part(BOX, mat("#3D6FB6"), 1.0, 0.02, 0.6, -0.3, 0.9, 0, bench); sh.rotation.y = 0.08;
-        const roll = part(CYL, mat("#3D6FB6"), 0.06, 0.6, 0.06, 0.3, 0.94, 0, bench); roll.rotation.x = Math.PI / 2;
-        part(BOX, mat("#F2C14E"), 0.6, 0.02, 0.06, -0.3, 0.92, 0.25, bench);
+        const sh = part(BOX, mat("#F1E4C4"), 1.0, 0.02, 0.6, -0.3, 0.9, 0, bench); sh.rotation.y = 0.08;
+        const roll = part(CYL, mat("#EADCB8"), 0.06, 0.6, 0.06, 0.3, 0.94, 0, bench); roll.rotation.x = Math.PI / 2;
+        part(BOX, mat("#2A2118"), 0.5, 0.02, 0.02, -0.3, 0.92, 0.1, bench); part(CYL, mat("#3E3530"), 0.02, 0.3, 0.02, 0.0, 0.93, 0.22, bench).rotation.z = Math.PI / 2; // 먹선과 붓
       }
       if (stage >= 3) {
-        part(BOX, mat("#8B6A4A"), 0.5, 0.25, 0.35, 0.55, 1.0, -0.2, bench);
-        ["#E2574C", "#3FBF6E", "#6FC3E8", "#F2C14E"].forEach((c, i) => part(BOX, mat(c), 0.08, 0.08, 0.08, 0.42 + (i % 2) * 0.14, 1.15, -0.27 + Math.floor(i / 2) * 0.14, bench));
+        part(BOX, mat("#6E5236"), 0.5, 0.25, 0.35, 0.55, 1.0, -0.2, bench); // 부품 함
+        ["#B8946A", "#8C877C", "#C9B98F", "#5A3B2A"].forEach((c, i) => part(BOX, mat(c), 0.08, 0.08, 0.08, 0.42 + (i % 2) * 0.14, 1.15, -0.27 + Math.floor(i / 2) * 0.14, bench));
         const proto = new three.Group(); proto.position.set(0.5, 0.88, 0.22); bench.add(proto);
         part(BOX, mat("#F6F5F1"), 0.4, 0.25, 0.3, 0, 0.13, 0, proto);
         const led = part(BALL, mat(latest, { e: latest, ei: 1.2 }), 0.06, 0.06, 0.06, 0.1, 0.28, 0.1, proto);
@@ -231,27 +238,29 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       // ── 진열대 ('나도 갖고 싶어') ──
       if (wants > 0) {
         const d = group("display", W * 0.4, 0, -D / 2 + 1.3);
-        part(CYL, mat(st.trim), 0.3, 0.9, 0.3, 0, 0.45, 0, d);
-        if (wants >= 5) { part(CYL, mat("#E8C25A"), 0.1, 0.25, 0.1, 0, 1.03, 0, d); part(new three.CylinderGeometry(0.22, 0.08, 0.3, 12), mat("#E8C25A"), 1, 1, 1, 0, 1.3, 0, d); }
-        else { part(TORUS, mat("#E2574C"), 0.12, 0.12, 0.12, 0, 1.05, 0, d); }
+        // 소반 위에 메밀묵 한 그릇, 5개가 넘으면 금빛 초롱이 하나 더
+        part(CYL, mat(st.trim), 0.45, 0.06, 0.45, 0, 0.45, 0, d);
+        for (let k = 0; k < 4; k++) part(BOX, mat(st.trim), 0.05, 0.42, 0.05, Math.cos(k * 1.57 + 0.78) * 0.32, 0.21, Math.sin(k * 1.57 + 0.78) * 0.32, d);
+        part(CYL, mat("#E8E2D2"), 0.16, 0.08, 0.16, -0.12, 0.52, 0, d); part(BOX, mat("#6E5A4A"), 0.16, 0.06, 0.12, -0.12, 0.58, 0, d); // 메밀묵
+        if (wants >= 5) { part(CYL, mat("#F3E7C9", { e: "#E8C25A", ei: 1 }), 0.11, 0.24, 0.11, 0.18, 0.62, 0, d); }
         label(`${LABEL.display} ${wants}`, W * 0.4, 1.85, -D / 2 + 1.3);
       }
 
       // ── 우체통 ──
       const mb = group("mailbox", -W / 2 + 0.7, 0, D / 2 - 0.7);
       part(BOX, mat("#5A4636"), 0.1, 0.9, 0.1, 0, 0.45, 0, mb);
-      part(BOX, mat("#E2574C"), 0.55, 0.4, 0.4, 0, 1.05, 0, mb);
+      part(BOX, mat(st.trim), 0.55, 0.4, 0.4, 0, 1.05, 0, mb); // 나무 편지함
       for (let i = 0; i < Math.min(3, notes); i++) { const e = part(BOX, mat("#FFFFFF"), 0.3, 0.2, 0.02, -0.05 + i * 0.06, 1.33, -0.05 + i * 0.05, mb); e.rotation.z = (i - 1) * 0.2; }
       label(LABEL.mailbox, -W / 2 + 0.7, 1.75, D / 2 - 0.7);
 
       // ── 단계 장식: 러그·매단 등 / 다락 ──
       if (stage >= 2) {
-        const rug = part(CYL, mat(st.rug), 1.3, 0.02, 0.9, 0.2, 0.01, 0.5); void rug;
-        const lamp = group(null, W * 0.05, H - 0.3, 0.2);
-        part(CYL, mat("#555"), 0.01, 0.6, 0.01, 0, 0, 0, lamp);
-        const bulb = part(BALL, mat("#FFE6A3", { e: "#FFD27A", ei: 1 }), 0.14, 0.14, 0.14, 0, -0.4, 0, lamp);
-        part(new three.ConeGeometry(0.3, 0.25, 12, 1, true), mat(st.trim), 1, 1, 1, 0, -0.3, 0, lamp);
-        const pl = new three.PointLight("#FFE6A3", 0.8, 6); pl.position.set(W * 0.05, H - 0.8, 0.2); scene.add(pl); void bulb;
+        part(BOX, mat(st.rug), 2.2, 0.02, 1.4, 0.2, 0.01, 0.5); // 돗자리
+        const lamp = group(null, W * 0.3, 0, D / 2 - 0.9); // 등잔
+        part(CYL, mat(st.trim), 0.15, 0.06, 0.15, 0, 0.03, 0, lamp); part(CYL, mat(st.trim), 0.03, 1.1, 0.03, 0, 0.6, 0, lamp); part(CYL, mat("#8C7A62"), 0.1, 0.05, 0.1, 0, 1.17, 0, lamp);
+        const flameL = part(new three.ConeGeometry(0.05, 0.14, 6), mat("#FFD27A", { e: "#FFB84D", ei: 1 }), 1, 1, 1, 0, 1.28, 0, lamp);
+        const pl = new three.PointLight("#FFD9A0", 0.8, 6); pl.position.set(W * 0.3, 1.4, D / 2 - 0.9); scene.add(pl);
+        anim.push((t) => { flameL.scale.y = 1 + Math.sin(t * 12) * 0.15; pl.intensity = 0.75 + Math.sin(t * 9) * 0.1; });
       }
       if (stage >= 3) {
         // 다락: 뒷벽 오른쪽 위 (아래엔 설계도 판)

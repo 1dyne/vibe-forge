@@ -564,22 +564,24 @@ describe("마을의 기척", () => {
 });
 
 describe("대장간 꾸미기", () => {
-  it("모르는 값과 안 열린 꾸미기는 저장 전에 걸러진다", async () => {
-    const { cleanDecor } = await import("../apps/web/lib/find/decor");
+  it("모르는 값과 안 열린 꾸미기는 저장 전에 걸러지고, 예전 이름은 새 이름으로 읽힌다", async () => {
+    const { cleanDecor, readDecor } = await import("../apps/web/lib/find/decor");
     const none = { neighbors: 0, fuel: 0, wants: 0, notes: 0 };
-    expect(cleanDecor({ roof: "#123456", sign: "plank", yard: ["pot", "bench", "lamp"] }, none)).toEqual({ sign: "plank", yard: ["pot"] });
-    expect(cleanDecor({ roof: "#9B7BFF", yard: ["pot", "pot", "bench", "mailbox", "fence"] }, { ...none, neighbors: 3 })).toEqual({ roof: "#9B7BFF", yard: ["pot", "bench", "mailbox"] });
+    expect(cleanDecor({ roof: "#123456" as never, sign: "plank", yard: ["jar", "pyeongsang", "chorong"] }, none)).toEqual({ sign: "plank", yard: ["jar"] });
+    expect(cleanDecor({ roof: "giwa", yard: ["jar", "jar", "pyeongsang", "flower", "fence"] }, { ...none, neighbors: 3 })).toEqual({ roof: "giwa", yard: ["jar", "pyeongsang", "flower"] });
     expect(cleanDecor({ hidePresence: true }, none)).toEqual({ hidePresence: true });
+    // 서양식이던 예전 저장값: 지붕 색은 버리고(마을 기본), 화분·벤치는 장독·평상으로
+    expect(readDecor({ roof: "#9B7BFF", yard: ["pot", "bench", "mailbox"], sign: "lantern" })).toEqual({ sign: "lantern", yard: ["jar", "pyeongsang", "flower"] });
   });
 
   it("기척을 숨긴 집은 마을에 있어도 연기·불빛으로 드러나지 않고, 비공개 집도 주인에겐 보인다", async () => {
     const vs = await import("../apps/web/lib/find/village-store");
     const { forge } = await vs.ensureForge(vs.hashToken(`decor-${Date.now()}`), "숨김", ["s_air"]);
-    await vs.setDecor(forge.id, { hidePresence: true, roof: "#E2574C" });
+    await vs.setDecor(forge.id, { hidePresence: true, roof: "thatch" });
     await vs.touchForge(forge.id);
     expect(await vs.activeForgeIds()).not.toContain(forge.id);
     const house = (await vs.worldHouses()).houses.find((h) => h.id === forge.id)!;
-    expect(house).toMatchObject({ active: false, decor: { hidePresence: true, roof: "#E2574C" } });
+    expect(house).toMatchObject({ active: false, decor: { hidePresence: true, roof: "thatch" } });
     await vs.setVisibility(forge.id, "private");
     expect((await vs.worldHouses()).houses.some((h) => h.id === forge.id)).toBe(false);
     expect((await vs.worldHouses(forge.id)).houses.some((h) => h.id === forge.id)).toBe(true);

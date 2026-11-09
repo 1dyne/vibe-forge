@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import type * as T from "three";
 import { hueSpriteMaterial } from "../three-hue";
 import { track } from "../track";
-import { buildWorld, villageCenter, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
+import { createVillageSound, type Ambience } from "./world-sound";
+import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
 
 // 걷는 도깨비 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
@@ -17,6 +18,24 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
   const [here, setHere] = useState<WorldVillage | null>(null);
   const [failed, setFailed] = useState(false);
   const [hint, setHint] = useState(true);
+  // 소리: 첫 터치 뒤에만 켤 수 있다(브라우저 규칙). 기본은 꺼짐
+  const soundRef = useRef<{ night: boolean; amb: (x: number, z: number) => Ambience; pos?: { x: number; z: number } } | null>(null);
+  const audio = useRef<ReturnType<typeof createVillageSound> | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    if (!soundOn) return;
+    const id = window.setInterval(() => { const sr = soundRef.current; if (sr?.pos && audio.current) audio.current.setAmbience(sr.amb(sr.pos.x, sr.pos.z)); }, 300);
+    return () => clearInterval(id);
+  }, [soundOn]);
+  useEffect(() => () => { audio.current?.close(); audio.current = null; }, []);
+  function toggleSound() {
+    if (!soundRef.current) return;
+    if (!audio.current) { audio.current = createVillageSound(soundRef.current.night); }
+    audio.current.resume();
+    audio.current.setMuted(soundOn);
+    setSoundOn(!soundOn);
+    track("world_sound", { on: String(!soundOn) });
+  }
 
   useEffect(() => { track("world_enter"); }, []);
 
@@ -31,27 +50,27 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       let renderer: T.WebGLRenderer;
       try { renderer = new three.WebGLRenderer({ antialias: true }); } catch { setFailed(true); return; }
       const el = mount.current;
-      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+      renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio));
       renderer.setSize(el.clientWidth, el.clientHeight);
       renderer.outputColorSpace = three.SRGBColorSpace;
       el.appendChild(renderer.domElement);
 
       const scene = new three.Scene();
-      // 하루 시간대: 이 기기의 지금 시각을 따른다 (밤 = 별·반딧불·모든 창문 / 새벽 = 안개 / 저녁 = 노을)
+      // 시간대: 늘 해 질 녘(각색), 실제 밤(19~5시)엔 밤. 하늘·안개·빛을 한 묶음으로 맞춘다
       const hourParam = process.env.NODE_ENV !== "production" ? new URLSearchParams(location.search).get("hour") : null; // 개발 확인용
       const hour = hourParam ? Number(hourParam) : new Date().getHours();
-      const phase = hour >= 19 || hour < 5 ? "night" : hour < 8 ? "dawn" : hour >= 17 ? "dusk" : "day";
-      const SKY = { day: ["#CFE9F1", 35, 110], dawn: ["#E8E4EC", 14, 70], dusk: ["#F6D2B8", 30, 100], night: ["#1D2547", 30, 105] } as const;
-      const [skyCol, fogNear, fogFar] = SKY[phase];
-      scene.background = new three.Color(skyCol);
-      scene.fog = new three.Fog(skyCol, fogNear, fogFar);
-      const camera = new three.PerspectiveCamera(55, el.clientWidth / el.clientHeight, 0.1, 300);
-      scene.add(phase === "night" ? new three.HemisphereLight("#8FA0D8", "#2C3550", 0.75) : new three.HemisphereLight(phase === "dusk" ? "#FFE2C8" : "#ffffff", "#A9CF9A", 1.15));
-      const sun = new three.DirectionalLight(phase === "night" ? "#B9C6FF" : phase === "dusk" ? "#FFB27A" : "#fff3dd", phase === "night" ? 0.45 : 1.5);
-      sun.position.set(30, 40, 12);
+      const phase: Phase = hour >= 19 || hour < 5 ? "night" : "dusk";
+      const pal = PALETTE[phase];
+      scene.background = new three.Color(pal.fog);
+      scene.fog = new three.Fog(pal.fog, pal.near, pal.far);
+      const camera = new three.PerspectiveCamera(50, el.clientWidth / el.clientHeight, 0.1, 400);
+      scene.add(new three.HemisphereLight(pal.hemi[0], pal.hemi[1], pal.hemi[2]));
+      const sun = new three.DirectionalLight(pal.sun[0], pal.sun[1]);
+      sun.position.set(-40, 18, -25); // 서쪽 낮은 해(달)
       scene.add(sun);
 
-      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, night: phase === "night" });
+      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, phase });
+      soundRef.current = { night: phase === "night", amb: world.ambienceAt };
 
       // 마을의 기척: 1분 반마다 '지금 마을에 있는 집'을 받아 연기·창문 불빛을 바꾼다 (내 집도 '마을에 있음'으로 기록됨)
       const beat = async () => {
@@ -72,7 +91,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       scene.add(player);
       const shadow = new three.Mesh(new three.CircleGeometry(0.6, 20), new three.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.18 }));
       shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
-      const pos = { x: 0, z: 11 };
+      const pos = { x: START.x, z: START.z };
 
       const keys = new Set<string>();
       const kd = (e: KeyboardEvent) => { keys.add(e.key.toLowerCase()); setHint(false); };
@@ -94,11 +113,12 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         const dx = c.x - target.x, dz = c.z - target.z, len = Math.hypot(dx, dz) || 1;
         pos.x = target.x + (dx / len) * 4.2; pos.z = target.z + (dz / len) * 4.2;
         heading = Math.atan2(dx / len, -(dz / len));
-      } else if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 21); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
+      } else if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 31); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
       let frame = 0, frameClock = 0, lastNear: Spot | null = null, lastVillage: WorldVillage | null = null;
       const clock = new three.Clock();
       const camPos = new three.Vector3();
       const eye = new three.Vector3(), toCam = new three.Vector3(), camRay = new three.Raycaster();
+      camRay.camera = camera; // 불빛 스프라이트도 부딪힘 검사에 걸리므로 카메라가 필요
       // 개발 확인용 하늘 시점 (배포본에는 없음)
       const topView = process.env.NODE_ENV !== "production" && new URLSearchParams(location.search).has("top");
       if (topView) scene.fog = null;
@@ -131,6 +151,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         player.position.set(pos.x, ground + 1.2 + (moving ? Math.abs(Math.sin(t * 10)) * 0.12 : 0), pos.z);
         shadow.position.set(pos.x, ground + 0.04, pos.z);
         world.player.x = pos.x; world.player.z = pos.z;
+        if (soundRef.current && !soundRef.current.pos) soundRef.current.pos = pos;
 
         const back = { x: Math.sin(heading) * 8.5, z: -Math.cos(heading) * 8.5 };
         camPos.set(pos.x + back.x, ground + 5.6, pos.z + back.z);
@@ -236,8 +257,8 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       </div>
       {near && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
       <div className="world-top">
-        <a href="/find">달그락 대장간</a>
-        <span><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 집 앞으로</a> : <a href="/find">내 집 짓기</a>}</span>
+        <a href="/find" className="world-brand">달그락</a>
+        <span><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 집</a> : <a href="/find">내 집 짓기</a>}</span>
       </div>
     </div>
   );
