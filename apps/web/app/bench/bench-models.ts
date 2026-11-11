@@ -1,0 +1,428 @@
+import type * as T from "three";
+
+// 3D 조립 책상의 절차적 부품 모델 (명세서 2차 v0.1 §2).
+// 외부 3D 파일 없이 코드로 만든다. 단위는 mm.
+// 각 모델의 원점과 핀 위치 규칙은 함수 주석에 적는다. 장면 엔진(bench-scene.ts)이 이 규칙으로 조립한다.
+
+type Three = typeof T;
+export const PITCH = 2.54;
+
+export class Kit3D {
+  private mats = new Map<string, T.Material>();
+  private texCache = new Map<string, T.Texture>();
+  constructor(readonly three: Three, readonly maxAniso: number) {}
+
+  std(color: string, o: { metal?: number; rough?: number; emissive?: string; opacity?: number; map?: T.Texture; key?: string } = {}) {
+    const k = o.key ?? JSON.stringify([color, o.metal, o.rough, o.emissive, o.opacity]);
+    if (!o.map && this.mats.has(k)) return this.mats.get(k)! as T.MeshStandardMaterial;
+    const m = new this.three.MeshStandardMaterial({
+      color, metalness: o.metal ?? 0, roughness: o.rough ?? 0.6, map: o.map ?? null,
+      emissive: o.emissive ?? "#000000", transparent: o.opacity !== undefined, opacity: o.opacity ?? 1
+    });
+    if (!o.map) this.mats.set(k, m);
+    return m;
+  }
+  get tin() { return this.std("#d9dde3", { metal: 1, rough: 0.22 }); }
+  get gold() { return this.std("#e2b75a", { metal: 1, rough: 0.28 }); }
+  get copper() { return this.std("#c87a45", { metal: 1, rough: 0.35 }); }
+  get steel() { return this.std("#b9bec6", { metal: 1, rough: 0.35 }); }
+
+  canvasTex(key: string, w: number, h: number, draw: (x: CanvasRenderingContext2D, w: number, h: number) => void) {
+    const hit = this.texCache.get(key);
+    if (hit) return hit;
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d")!;
+    draw(x, w, h);
+    const t = new this.three.CanvasTexture(c);
+    t.colorSpace = this.three.SRGBColorSpace;
+    t.anisotropy = this.maxAniso;
+    this.texCache.set(key, t);
+    return t;
+  }
+
+  mesh(g: T.BufferGeometry, m: T.Material | T.Material[], parent?: T.Object3D, shadow = true) {
+    const me = new this.three.Mesh(g, m);
+    me.castShadow = shadow; me.receiveShadow = true;
+    parent?.add(me);
+    return me;
+  }
+  box(w: number, h: number, d: number, m: T.Material | T.Material[], x: number, y: number, z: number, parent?: T.Object3D) {
+    const me = this.mesh(new this.three.BoxGeometry(w, h, d), m, parent);
+    me.position.set(x, y, z);
+    return me;
+  }
+  /** 모서리가 둥근 상자 (위에서 본 모양만 둥글다) */
+  rbox(w: number, h: number, d: number, r: number, m: T.Material | T.Material[], parent?: T.Object3D) {
+    const s = roundedRect(this.three, w, d, r);
+    const g = new this.three.ExtrudeGeometry(s, { depth: h, bevelEnabled: true, bevelThickness: Math.min(0.6, h * 0.15), bevelSize: Math.min(0.6, r * 0.4), bevelSegments: 2, curveSegments: 8 });
+    g.rotateX(-Math.PI / 2);
+    const me = this.mesh(g, m, parent);
+    return me;
+  }
+  tube(points: T.Vector3[], r: number, m: T.Material, parent?: T.Object3D, seg = 24, radial = 8, tension = 0.0) {
+    const curve = tension ? new this.three.CatmullRomCurve3(points, false, "catmullrom", tension) : new this.three.CatmullRomCurve3(points, false, "centripetal");
+    return this.mesh(new this.three.TubeGeometry(curve, seg, r, radial, false), m, parent);
+  }
+  label(text: string, o: { px?: number; bg?: string; fg?: string; h?: number } = {}) {
+    const px = o.px ?? 44, h = o.h ?? 4;
+    const key = `label:${text}:${o.bg}:${o.fg}:${px}`;
+    let tex = this.texCache.get(key);
+    if (!tex) {
+      const c = document.createElement("canvas"); const x = c.getContext("2d")!;
+      x.font = `700 ${px}px "IBM Plex Sans KR", system-ui, sans-serif`;
+      c.width = Math.ceil(x.measureText(text).width + px * 0.9); c.height = Math.ceil(px * 1.5);
+      x.font = `700 ${px}px "IBM Plex Sans KR", system-ui, sans-serif`;
+      x.fillStyle = o.bg ?? "rgba(24,26,30,.86)"; x.beginPath(); x.roundRect(0, 0, c.width, c.height, c.height / 2); x.fill();
+      x.fillStyle = o.fg ?? "#fff"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(text, c.width / 2, c.height / 2 + 1);
+      tex = new this.three.CanvasTexture(c); tex.colorSpace = this.three.SRGBColorSpace;
+      this.texCache.set(key, tex);
+    }
+    const canvas = tex.image as HTMLCanvasElement;
+    const s = new this.three.Sprite(new this.three.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    s.scale.set((canvas.width / canvas.height) * h, h, 1);
+    s.renderOrder = 20;
+    return s;
+  }
+}
+
+export function roundedRect(three: Three, w: number, d: number, r: number) {
+  const s = new three.Shape();
+  const x0 = -w / 2, y0 = -d / 2;
+  s.moveTo(x0 + r, y0); s.lineTo(x0 + w - r, y0); s.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
+  s.lineTo(x0 + w, y0 + d - r); s.quadraticCurveTo(x0 + w, y0 + d, x0 + w - r, y0 + d);
+  s.lineTo(x0 + r, y0 + d); s.quadraticCurveTo(x0, y0 + d, x0, y0 + d - r);
+  s.lineTo(x0, y0 + r); s.quadraticCurveTo(x0, y0, x0 + r, y0);
+  return s;
+}
+
+// ───────────────────────── 기판 ─────────────────────────
+
+export type GridBoard = { group: T.Group; topY: number; bottomY: number; hole: (name: string) => T.Vector3 | null; nearest: (local: T.Vector3) => string | null };
+
+const COLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function parseHole(name: string) {
+  const m = /^([A-Z])(\d+)$/i.exec(name);
+  if (!m) return null;
+  return { c: COLS.indexOf(m[1].toUpperCase()), r: Number(m[2]) };
+}
+
+/**
+ * 만능기판. 원점 = 기판 아랫면 가운데. 윗면(부품 면) y = 1.6.
+ * 열 A.. = x(왼→오), 행 1.. = z(뒤→앞). 구멍 이름 "C5".
+ */
+export function perfboard(k: Kit3D, cols = 18, rows = 14): GridBoard {
+  const three = k.three, M = 3, T = 1.6;
+  const W = (cols - 1) * PITCH + M * 2, D = (rows - 1) * PITCH + M * 2;
+  const pxmm = 22;
+  const hx = (c: number) => -W / 2 + M + c * PITCH, hz = (r: number) => -D / 2 + M + (r - 1) * PITCH;
+  const top = k.canvasTex(`pb-top-${cols}x${rows}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#d8b47c"); g.addColorStop(1, "#cba56c");
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.globalAlpha = 0.06; for (let i = 0; i < 900; i++) { x.fillStyle = i % 2 ? "#000" : "#fff"; x.fillRect((i * 997) % w, (i * 613) % h, 3, 2); } x.globalAlpha = 1;
+    for (let c = 0; c < cols; c++) for (let r = 1; r <= rows; r++) {
+      const px = (hx(c) + W / 2) * pxmm, py = (hz(r) + D / 2) * pxmm;
+      x.fillStyle = "rgba(120,80,40,.35)"; x.beginPath(); x.arc(px, py, 0.78 * pxmm, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#1b140c"; x.beginPath(); x.arc(px, py, 0.5 * pxmm, 0, Math.PI * 2); x.fill();
+    }
+    x.fillStyle = "#3a2a18"; x.font = `700 ${1.25 * pxmm}px "IBM Plex Sans KR", sans-serif`; x.textAlign = "center"; x.textBaseline = "middle";
+    for (let c = 0; c < cols; c++) x.fillText(COLS[c], (hx(c) + W / 2) * pxmm, 1.4 * pxmm);
+    x.font = `700 ${1.05 * pxmm}px "IBM Plex Sans KR", sans-serif`;
+    for (let r = 1; r <= rows; r += 1) x.fillText(String(r), 1.35 * pxmm, (hz(r) + D / 2) * pxmm);
+  });
+  const bottom = k.canvasTex(`pb-bot-${cols}x${rows}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
+    x.fillStyle = "#c79f66"; x.fillRect(0, 0, w, h);
+    for (let c = 0; c < cols; c++) for (let r = 1; r <= rows; r++) {
+      // 아래에서 보면 좌우가 뒤집힌다: 텍스처는 위에서 본 좌표로 그리고 UV에서 뒤집는다
+      const px = (hx(c) + W / 2) * pxmm, py = (hz(r) + D / 2) * pxmm;
+      const g = x.createRadialGradient(px - 4, py - 4, 2, px, py, 0.95 * pxmm);
+      g.addColorStop(0, "#f0b27a"); g.addColorStop(1, "#b8693a");
+      x.fillStyle = g; x.beginPath(); x.arc(px, py, 0.95 * pxmm, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#1b140c"; x.beginPath(); x.arc(px, py, 0.48 * pxmm, 0, Math.PI * 2); x.fill();
+    }
+  });
+  bottom.wrapS = three.RepeatWrapping; bottom.repeat.x = 1;
+  const edge = k.std("#b8925c", { rough: 0.8 });
+  const topM = k.std("#ffffff", { map: top, rough: 0.75 });
+  const botM = k.std("#ffffff", { map: bottom, rough: 0.45, metal: 0.25 });
+  const group = new three.Group();
+  // BoxGeometry 면 순서: +x, -x, +y, -y, +z, -z
+  const g = new three.BoxGeometry(W, T, D);
+  // 아랫면 UV: 위에서 본 좌표 그대로 보이도록 v를 뒤집는다
+  const uv = g.attributes.uv as T.BufferAttribute;
+  for (let i = 12; i < 16; i++) uv.setY(i, 1 - uv.getY(i));
+  const me = k.mesh(g, [edge, edge, topM, botM, edge, edge], group);
+  me.position.y = T / 2;
+  me.userData.board = true;
+  const hole = (name: string) => { const p = parseHole(name); if (!p || p.c < 0 || p.c >= cols || p.r < 1 || p.r > rows) return null; return new three.Vector3(hx(p.c), T, hz(p.r)); };
+  const nearest = (l: T.Vector3) => {
+    const c = Math.round((l.x + W / 2 - M) / PITCH), r = Math.round((l.z + D / 2 - M) / PITCH) + 1;
+    if (c < 0 || c >= cols || r < 1 || r > rows) return null;
+    return `${COLS[c]}${r}`;
+  };
+  group.userData.size = [W, T, D];
+  return { group, topY: T, bottomY: 0, hole, nearest };
+}
+
+/**
+ * 브레드보드(400칸형). 원점 = 바닥 가운데. 윗면 y = 8.5.
+ * 행 1..30 = x(왼→오), 열 A..J = z(뒤→앞), 가운데 홈.
+ */
+export function breadboard(k: Kit3D, rowsN = 30): GridBoard {
+  const three = k.three, H = 8.5, W = 82, D = 54.6, pxmm = 14;
+  const rx = (r: number) => -((rowsN - 1) * PITCH) / 2 + (r - 1) * PITCH;
+  const cz = (c: number) => (c < 5 ? -(3.81 + (4 - c) * PITCH) : 3.81 + (c - 5) * PITCH);
+  const railZ = [-(13.97 + 5.3), -(13.97 + 7.84), 13.97 + 5.3, 13.97 + 7.84];
+  const tex = k.canvasTex(`bb-${rowsN}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
+    x.fillStyle = "#f3f1ea"; x.fillRect(0, 0, w, h);
+    const X = (v: number) => (v + W / 2) * pxmm, Z = (v: number) => (v + D / 2) * pxmm;
+    x.fillStyle = "#e4e1d8"; x.fillRect(0, Z(-1.3), w, 2.6 * pxmm);
+    const sq = (px: number, py: number) => { x.fillStyle = "#cfcac0"; x.fillRect(px - 0.75 * pxmm, py - 0.75 * pxmm, 1.5 * pxmm, 1.5 * pxmm); x.fillStyle = "#26231f"; x.fillRect(px - 0.48 * pxmm, py - 0.48 * pxmm, 0.96 * pxmm, 0.96 * pxmm); };
+    for (let r = 1; r <= rowsN; r++) for (let c = 0; c < 10; c++) sq(X(rx(r)), Z(cz(c)));
+    for (const z of railZ) for (let r = 1; r <= rowsN; r++) if ((r - 1) % 6 !== 5) sq(X(rx(r)), Z(z));
+    x.lineWidth = 0.35 * pxmm;
+    for (const [z, col] of [[railZ[1] - 2, "#d43b32"], [railZ[0] + 2, "#2d63c8"], [railZ[2] - 2, "#d43b32"], [railZ[3] + 2, "#2d63c8"]] as Array<[number, string]>) { x.strokeStyle = col; x.beginPath(); x.moveTo(X(-W / 2 + 4), Z(z)); x.lineTo(X(W / 2 - 4), Z(z)); x.stroke(); }
+    x.fillStyle = "#8c877c"; x.font = `600 ${1.5 * pxmm}px "IBM Plex Sans KR", sans-serif`; x.textAlign = "center"; x.textBaseline = "middle";
+    for (let c = 0; c < 10; c++) { x.fillText(COLS[c], X(-W / 2 + 2.2), Z(cz(c))); x.fillText(COLS[c], X(W / 2 - 2.2), Z(cz(c))); }
+    for (let r = 1; r <= rowsN; r++) if (r === 1 || r % 5 === 0) { x.fillText(String(r), X(rx(r)), Z(cz(0) - 2.3)); x.fillText(String(r), X(rx(r)), Z(cz(9) + 2.3)); }
+  });
+  const side = k.std("#e9e6dd", { rough: 0.7 });
+  const topM = k.std("#ffffff", { map: tex, rough: 0.7 });
+  const group = new three.Group();
+  const me = k.mesh(new three.BoxGeometry(W, H, D), [side, side, topM, side, side, side], group);
+  me.position.y = H / 2; me.userData.board = true;
+  const hole = (name: string) => { const p = parseHole(name); if (!p || p.c < 0 || p.c > 9 || p.r < 1 || p.r > rowsN) return null; return new three.Vector3(rx(p.r), H, cz(p.c)); };
+  const nearest = (l: T.Vector3) => {
+    const r = Math.round((l.x - rx(1)) / PITCH) + 1;
+    let best = -1, bd = 99; for (let c = 0; c < 10; c++) { const d = Math.abs(cz(c) - l.z); if (d < bd) { bd = d; best = c; } }
+    if (r < 1 || r > rowsN || bd > 1.6) return null;
+    return `${COLS[best]}${r}`;
+  };
+  group.userData.size = [W, H, D];
+  return { group, topY: H, bottomY: 0, hole, nearest };
+}
+
+// ───────────────────────── 스루홀 부품 ─────────────────────────
+// 다리 꽂는 부품의 원점 = 첫 구멍과 둘째 구멍의 가운데, 기판 윗면 높이. x축 = 첫 구멍 → 둘째 구멍.
+// tails: 기판 아래로 나오는 다리 (다리 자르기에서 줄어든다). 원점 = 기판 아랫면.
+
+export type LeadPart = { group: T.Group; tails: T.Mesh[]; boardT: number };
+
+const BAND: Record<number, string> = { 0: "#1c1c1c", 1: "#7a4a22", 2: "#d22b22", 3: "#f07b1a", 4: "#f2cf1e", 5: "#2f9a3d", 6: "#2a5bd7", 7: "#8a3fc4", 8: "#8d8d8d", 9: "#f4f4f4" };
+function bands(ohms: number) {
+  const s = String(Math.round(ohms)); const a = Number(s[0]), b = Number(s[1] ?? 0), mult = Math.max(0, s.length - 2);
+  return [BAND[a], BAND[b], BAND[mult]];
+}
+
+function addTail(k: Kit3D, parent: T.Object3D, x: number, z: number, len: number, r: number, boardT: number) {
+  const g = new k.three.CylinderGeometry(r, r, len, 10); g.translate(0, -len / 2, 0);
+  const t = k.mesh(g, k.tin, parent);
+  t.position.set(x, -boardT, z);
+  t.userData.len = len;
+  return t;
+}
+
+export function resistor(k: Kit3D, pitch: number, ohms: number, boardT = 1.6): LeadPart {
+  const three = k.three, group = new three.Group();
+  const L = 6.3, R = 1.2;
+  const prof = [[0, -L / 2], [0.85, -L / 2], [R + 0.08, -L / 2 + 0.45], [R + 0.1, -L / 2 + 1.3], [R - 0.12, -L / 2 + 1.9], [R - 0.12, L / 2 - 1.9], [R + 0.1, L / 2 - 1.3], [R + 0.08, L / 2 - 0.45], [0.85, L / 2], [0, L / 2]].map(([r, y]) => new three.Vector2(r, y));
+  const bodyG = new three.LatheGeometry(prof, 28); bodyG.rotateZ(Math.PI / 2);
+  const body = k.mesh(bodyG, k.std("#d9c39a", { rough: 0.55 }), group);
+  const cy = R + 0.12; body.position.y = cy;
+  const cols = bands(ohms);
+  const bandAt = [-2.1, -1.35, -0.6];
+  cols.forEach((c, i) => { const b = k.mesh(new three.CylinderGeometry(bandAt[i] < -1.9 ? R + 0.13 : R - 0.08, bandAt[i] < -1.9 ? R + 0.13 : R - 0.08, 0.5, 24), k.std(c, { rough: 0.5 }), group); b.rotation.z = Math.PI / 2; b.position.set(bandAt[i], cy, 0); });
+  const gb = k.mesh(new three.CylinderGeometry(R + 0.12, R + 0.12, 0.45, 24), k.gold, group); gb.rotation.z = Math.PI / 2; gb.position.set(2.15, cy, 0);
+  const lr = 0.3;
+  for (const s of [-1, 1]) {
+    const x0 = s * (L / 2), xe = s * (pitch / 2);
+    const pts = [new three.Vector3(x0, cy, 0), new three.Vector3(xe - s * 0.9, cy, 0), new three.Vector3(xe - s * 0.15, cy - 0.15, 0), new three.Vector3(xe, cy - 0.9, 0), new three.Vector3(xe, 0, 0), new three.Vector3(xe, -boardT, 0)];
+    k.tube(pts, lr, k.tin, group, 32, 8);
+  }
+  const tails = [addTail(k, group, -pitch / 2, 0, 8, lr, boardT), addTail(k, group, pitch / 2, 0, 8, lr, boardT)];
+  return { group, tails, boardT };
+}
+
+/** LED 5mm. 첫 구멍 = 애노드(긴 다리), 둘째 = 캐소드. */
+export function led5(k: Kit3D, color: string, boardT = 1.6): LeadPart & { lens: T.MeshStandardMaterial; glow: T.Object3D } {
+  const three = k.three, group = new three.Group(), lift = 1.6;
+  const lens = new three.MeshStandardMaterial({ color, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.82, emissive: color, emissiveIntensity: 0 });
+  const prof: T.Vector2[] = [new three.Vector2(0, 0), new three.Vector2(2.45, 0), new three.Vector2(2.45, 5.6)];
+  for (let i = 1; i <= 10; i++) { const a = (i / 10) * (Math.PI / 2); prof.push(new three.Vector2(2.45 * Math.cos(a), 5.6 + 2.45 * Math.sin(a))); }
+  const domeG = new three.LatheGeometry(prof, 32);
+  const dome = k.mesh(domeG, lens, group); dome.position.y = lift + 1;
+  // 테두리: 캐소드 쪽(+x)이 깎인 원
+  const s = new three.Shape(); const rr = 2.9, cut = 2.45, ang = Math.acos(cut / rr);
+  s.absarc(0, 0, rr, ang, Math.PI * 2 - ang, false); s.lineTo(cut, rr * Math.sin(ang)); s.closePath();
+  const fl = new three.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 24 }); fl.rotateX(-Math.PI / 2);
+  const flange = k.mesh(fl, lens, group); flange.position.y = lift;
+  // 안쪽 받침(애노드 포스트·캐소드 앤빌)
+  k.box(0.5, 3.2, 0.5, k.std("#9aa1a8", { metal: 0.8, rough: 0.4 }), -PITCH / 2 + 0.2, lift + 2.4, 0, group);
+  k.box(1.4, 2.4, 0.5, k.std("#9aa1a8", { metal: 0.8, rough: 0.4 }), PITCH / 2 - 0.5, lift + 2.0, 0, group);
+  const lr = 0.25;
+  for (const x of [-PITCH / 2, PITCH / 2]) k.tube([new three.Vector3(x, lift + 1.2, 0), new three.Vector3(x, 0, 0), new three.Vector3(x, -boardT, 0)], lr, k.tin, group, 4, 8);
+  const tails = [addTail(k, group, -PITCH / 2, 0, 11, lr, boardT), addTail(k, group, PITCH / 2, 0, 9, lr, boardT)];
+  const glow = new three.PointLight(color, 0, 60, 1.6); glow.position.y = lift + 5; group.add(glow);
+  const haloTex = k.canvasTex(`halo-${color}`, 128, 128, (x, w, h) => { const g = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.18, color); g.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+  const halo = new three.Sprite(new three.SpriteMaterial({ map: haloTex, blending: three.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }));
+  halo.scale.set(26, 26, 1); halo.position.y = lift + 5.5; group.add(halo);
+  glow.userData.halo = halo;
+  return { group, tails, boardT, lens, glow };
+}
+
+// ───────────────────────── 헤더·모듈 ─────────────────────────
+
+/** 수 헤더. 원점 = 핀 줄 가운데, 플라스틱 아랫면. 긴 쪽(6mm)이 아래, 짧은 쪽(3mm)이 위. */
+export function headerMale(k: Kit3D, n: number) {
+  const three = k.three, group = new three.Group();
+  const W = n * PITCH;
+  k.rbox(W, 2.5, 2.5, 0.25, k.std("#1d1e20", { rough: 0.55 }), group);
+  for (let i = 0; i < n; i++) {
+    const x = -((n - 1) * PITCH) / 2 + i * PITCH;
+    const pin = k.mesh(new three.BoxGeometry(0.64, 11.5, 0.64), k.gold, group);
+    pin.position.set(x, 2.5 + 3 - 11.5 / 2, 0);
+    const tipG = new three.ConeGeometry(0.45, 0.6, 4); tipG.rotateY(Math.PI / 4);
+    const tip = k.mesh(tipG, k.gold, group); tip.position.set(x, 2.5 + 3 + 0.3, 0);
+  }
+  const pinX = (i: number) => -((n - 1) * PITCH) / 2 + i * PITCH;
+  return { group, pinX, plasticTop: 2.5 };
+}
+
+/** 센서 모듈(GY-521 형). 원점 = 핀 구멍 줄 가운데, 기판 아랫면. 기판은 -z 쪽으로 펼쳐진다. */
+export function sensorModule(k: Kit3D, pinNames: string[], silk: string) {
+  const three = k.three, group = new three.Group(), T = 1.6;
+  const n = pinNames.length, W = Math.max(21.2, n * PITCH + 1.4), D = 15.6, edge = 1.6;
+  const pxmm = 30;
+  const hx = (i: number) => -((n - 1) * PITCH) / 2 + i * PITCH;
+  const zc = -D / 2 + edge; // 기판 가운데의 z (핀 줄 기준)
+  const tex = k.canvasTex(`mod-${silk}-${n}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
+    const X = (v: number) => (v + W / 2) * pxmm, Z = (v: number) => (v - zc + D / 2) * pxmm;
+    x.fillStyle = "#1d4fae"; x.fillRect(0, 0, w, h);
+    x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = 6; for (let i = 0; i < 9; i++) { x.beginPath(); x.moveTo(X(-W / 2 + 2 + i * 2), Z(-3)); x.lineTo(X(-W / 2 + 4 + i * 2.2), Z(-12)); x.stroke(); }
+    for (let i = 0; i < n; i++) {
+      x.fillStyle = "#e2b75a"; x.beginPath(); x.arc(X(hx(i)), Z(0), 0.95 * pxmm, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#0e1424"; x.beginPath(); x.arc(X(hx(i)), Z(0), 0.5 * pxmm, 0, Math.PI * 2); x.fill();
+    }
+    x.fillStyle = "#e2b75a"; x.fillRect(X(hx(0)) - 0.95 * pxmm, Z(0) - 0.95 * pxmm, 1.9 * pxmm, 1.9 * pxmm);
+    x.fillStyle = "#0e1424"; x.beginPath(); x.arc(X(hx(0)), Z(0), 0.5 * pxmm, 0, Math.PI * 2); x.fill();
+    for (const sx of [-1, 1]) { const mx = X(sx * (W / 2 - 1.9)), mz = Z(-D + edge + 1.9); x.fillStyle = "#e2b75a"; x.beginPath(); x.arc(mx, mz, 1.6 * pxmm, 0, Math.PI * 2); x.fill(); x.fillStyle = "#0e1424"; x.beginPath(); x.arc(mx, mz, 1.1 * pxmm, 0, Math.PI * 2); x.fill(); }
+    x.fillStyle = "#f4f6fb"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = `700 ${0.95 * pxmm}px "IBM Plex Sans KR", sans-serif`;
+    for (let i = 0; i < n; i++) { x.save(); x.translate(X(hx(i)), Z(-2.7)); x.rotate(-Math.PI / 2); x.fillText(pinNames[i], 0, 0); x.restore(); }
+    x.font = `700 ${1.5 * pxmm}px "IBM Plex Sans KR", sans-serif`; x.fillText(silk, X(W / 2 - 5.5), Z(-D + edge + 4.2));
+    x.strokeStyle = "#f4f6fb"; x.lineWidth = 0.18 * pxmm; x.strokeRect(X(-1.8), Z(-9.3), 3.6 * pxmm, 3.6 * pxmm);
+    x.font = `600 ${0.9 * pxmm}px "IBM Plex Sans KR", sans-serif`; x.fillText("X↑ Y→", X(-W / 2 + 4), Z(-D + edge + 3.8));
+  });
+  const side = k.std("#173f8c", { rough: 0.6 });
+  const pcb = k.mesh(new three.BoxGeometry(W, T, D), [side, side, k.std("#fff", { map: tex, rough: 0.55 }), side, side, side], group);
+  pcb.position.set(0, T / 2, zc);
+  pcb.userData.board = true;
+  // 칩과 작은 부품들
+  const chip = k.box(4, 0.9, 4, k.std("#141414", { rough: 0.5 }), 0, T + 0.45, -7.5, group);
+  const chipTex = k.canvasTex("mpu-mark", 256, 256, (x, w, h) => { x.fillStyle = "#141414"; x.fillRect(0, 0, w, h); x.fillStyle = "#8b9196"; x.font = "700 46px sans-serif"; x.textAlign = "center"; x.fillText("MPU", w / 2, h * 0.45); x.font = "600 34px sans-serif"; x.fillText("6050", w / 2, h * 0.68); x.beginPath(); x.arc(40, 40, 12, 0, Math.PI * 2); x.fill(); });
+  chip.material = [k.std("#141414"), k.std("#141414"), k.std("#fff", { map: chipTex, rough: 0.5 }), k.std("#141414"), k.std("#141414"), k.std("#141414")];
+  const smd = (w: number, d: number, c: string, x: number, z: number, h = 0.5) => k.box(w, h, d, k.std(c, { rough: 0.5 }), x, T + h / 2, z, group);
+  smd(2.9, 1.6, "#1a1a1a", -6.5, -10.2, 1.1);
+  for (const [x, z] of [[4.5, -5.2], [5.6, -9.4], [-4.3, -5.4], [3.3, -11.6], [-2.6, -11.8]]) { smd(1.0, 0.5, "#b8946a", x, z); k.box(0.25, 0.52, 0.52, k.tin, x - 0.5, T + 0.26, z, group); k.box(0.25, 0.52, 0.52, k.tin, x + 0.5, T + 0.26, z, group); }
+  for (const [x, z] of [[7.6, -6.4], [-7.6, -7.2]]) smd(1.0, 0.5, "#1a1a1a", x, z);
+  const led = smd(1.0, 0.5, "#4cd964", 8.2, -11.0); (led.material as T.MeshStandardMaterial) = k.std("#4cd964", { emissive: "#1f6f2f", rough: 0.3 });
+  return { group, hx, topY: T, n };
+}
+
+// ───────────────────────── 전원 ─────────────────────────
+
+/** AA 전지 2개용 홀더. 원점 = 바닥 가운데, 길이 방향 x. 전선은 +x 끝에서 나온다. */
+export function batteryHolder2AA(k: Kit3D) {
+  const three = k.three, group = new three.Group();
+  const L = 58, Wd = 31.5, H = 15, t = 1.4;
+  const black = k.std("#191a1c", { rough: 0.55 });
+  k.box(L, t, Wd, black, 0, t / 2, 0, group);
+  k.box(L, H, t, black, 0, H / 2, -Wd / 2 + t / 2, group);
+  k.box(L, H, t, black, 0, H / 2, Wd / 2 - t / 2, group);
+  k.box(t, H, Wd, black, -L / 2 + t / 2, H / 2, 0, group);
+  k.box(t, H, Wd, black, L / 2 - t / 2, H / 2, 0, group);
+  k.box(L - 2, 3, 1.2, black, 0, 1.5 + t, 0, group);
+  const mark = k.canvasTex("bh-mark", 512, 256, (x, w, h) => { x.fillStyle = "#191a1c"; x.fillRect(0, 0, w, h); x.fillStyle = "#6d6f73"; x.font = "700 70px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("+   −", w * 0.3, h * 0.27); x.fillText("−   +", w * 0.3, h * 0.74); x.font = "600 40px sans-serif"; x.fillText("2×AA 3V", w * 0.76, h * 0.5); });
+  const floor = k.mesh(new three.PlaneGeometry(L - 3, Wd - 3), k.std("#fff", { map: mark, rough: 0.6 }), group, false);
+  floor.rotation.x = -Math.PI / 2; floor.position.y = t + 0.02;
+  // 스프링과 접점
+  for (const [x, z] of [[L / 2 - 3.2, -7.6], [-L / 2 + 3.2, 7.6]]) {
+    const pts: T.Vector3[] = []; for (let i = 0; i <= 60; i++) { const a = i * 0.55; pts.push(new three.Vector3(x + (x < 0 ? 1 : -1) * i * 0.07, 7.5 + Math.sin(a) * 3.2, z + Math.cos(a) * 3.2)); }
+    k.tube(pts, 0.3, k.steel, group, 120, 6);
+  }
+  for (const [x, z] of [[-L / 2 + 2.4, -7.6], [L / 2 - 2.4, 7.6]]) k.box(0.5, 7, 7, k.steel, x, 7.5, z, group);
+  const wireExit = { red: new three.Vector3(L / 2, 3.2, -3.2), black: new three.Vector3(L / 2, 3.2, 3.2) };
+  return { group, wireExit, slots: [new three.Vector3(0, 8.6, -7.6), new three.Vector3(0, 8.6, 7.6)], flip: [false, true] };
+}
+
+/** AA 전지. 원점 = 가운데, 길이 방향 x, + 극이 +x. */
+export function aaBattery(k: Kit3D) {
+  const three = k.three, group = new three.Group();
+  const tex = k.canvasTex("aa", 512, 256, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#2a2b2f"); g.addColorStop(0.5, "#45474d"); g.addColorStop(1, "#202124");
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#e7a83a"; x.fillRect(w * 0.72, 0, w * 0.28, h);
+    x.fillStyle = "#fff"; x.font = "800 64px sans-serif"; x.textBaseline = "middle"; x.fillText("AA 1.5V", 40, h * 0.5);
+    x.fillStyle = "#1b1b1b"; x.font = "800 64px sans-serif"; x.fillText("+", w * 0.82, h * 0.5);
+  });
+  const body = k.mesh(new three.CylinderGeometry(7.1, 7.1, 49, 32, 1, true), k.std("#fff", { map: tex, rough: 0.35, metal: 0.2 }), group);
+  body.rotation.z = -Math.PI / 2;
+  for (const s of [-1, 1]) { const cap = k.mesh(new three.CylinderGeometry(7.0, 7.0, 0.8, 32), k.steel, group); cap.rotation.z = Math.PI / 2; cap.position.x = s * 24.8; }
+  const nub = k.mesh(new three.CylinderGeometry(2.6, 2.6, 1.2, 20), k.steel, group); nub.rotation.z = Math.PI / 2; nub.position.x = 25.6;
+  return group;
+}
+
+// ───────────────────────── 땜납 ─────────────────────────
+
+/** 정상 납땜: 다리를 감싸는 오목한 원뿔. 원점 = 패드 면, +y 방향으로 솟는다. */
+export function filletGeometry(three: Three, padR = 0.95, pinR = 0.33, h = 1.25) {
+  const pts: T.Vector2[] = [new three.Vector2(0.001, 0)];
+  for (let i = 0; i <= 12; i++) { const u = i / 12; const r = padR - (padR - pinR) * (1 - Math.pow(1 - u, 2.2)); pts.push(new three.Vector2(r, u * h)); }
+  pts.push(new three.Vector2(0.001, h));
+  return new three.LatheGeometry(pts, 24);
+}
+/** 냉납: 둥글게 얹힌 울퉁불퉁한 덩어리 */
+export function coldGeometry(three: Three) {
+  const g = new three.IcosahedronGeometry(1.05, 2);
+  const p = g.attributes.position as T.BufferAttribute;
+  for (let i = 0; i < p.count; i++) { const n = 1 + 0.12 * Math.sin(p.getX(i) * 9 + p.getZ(i) * 7) + 0.08 * Math.cos(p.getY(i) * 11); p.setXYZ(i, p.getX(i) * n, Math.max(-0.2, p.getY(i) * n * 0.8) + 0.55, p.getZ(i) * n); }
+  g.computeVertexNormals();
+  return g;
+}
+
+// ───────────────────────── 공구·소품 ─────────────────────────
+
+/** 인두. 원점 = 팁 끝, 손잡이는 +y 방향. */
+export function solderingIron(k: Kit3D) {
+  const three = k.three, group = new three.Group();
+  const tip = k.mesh(new three.ConeGeometry(0.9, 9, 16), k.std("#9da3aa", { metal: 1, rough: 0.3 }), group); tip.position.y = 4.5;
+  const sleeve = k.mesh(new three.CylinderGeometry(2.2, 1.4, 30, 20), k.steel, group); sleeve.position.y = 9 + 15;
+  const nut = k.mesh(new three.CylinderGeometry(4.2, 4.2, 5, 6), k.std("#8b9096", { metal: 1, rough: 0.35 }), group); nut.position.y = 41;
+  const grip = k.mesh(new three.CylinderGeometry(6.4, 5.2, 34, 24), k.std("#2f3e52", { rough: 0.85 }), group); grip.position.y = 60;
+  for (let i = 0; i < 6; i++) { const r = k.mesh(new three.TorusGeometry(5.6 + i * 0.13, 0.55, 8, 24), k.std("#22303f", { rough: 0.9 }), group); r.rotation.x = Math.PI / 2; r.position.y = 46 + i * 4.2; }
+  const back = k.mesh(new three.CylinderGeometry(4.6, 6.4, 28, 24), k.std("#e8e6e1", { rough: 0.55 }), group); back.position.y = 91;
+  const tail = k.mesh(new three.CylinderGeometry(2.2, 3.6, 12, 16), k.std("#1d1e20", { rough: 0.7 }), group); tail.position.y = 110;
+  const glowTip = k.mesh(new three.SphereGeometry(0.9, 12, 8), new three.MeshBasicMaterial({ color: "#ff8a3c", transparent: true, opacity: 0 }), group, false);
+  glowTip.position.y = 0.3;
+  group.userData.glow = glowTip;
+  return group;
+}
+
+/** 니퍼. 원점 = 날 끝. */
+export function flushCutter(k: Kit3D) {
+  const three = k.three, group = new three.Group();
+  const jaw = k.std("#8f959c", { metal: 1, rough: 0.35 });
+  const j1 = k.box(3, 3, 14, jaw, -1.6, 0, 7, group); j1.rotation.y = 0.08;
+  const j2 = k.box(3, 3, 14, jaw, 1.6, 0, 7, group); j2.rotation.y = -0.08;
+  k.mesh(new three.CylinderGeometry(3.2, 3.2, 4, 16), jaw, group).position.set(0, 0, 15);
+  for (const s of [-1, 1]) { const h = k.rbox(7, 6, 52, 3, k.std("#d8452f", { rough: 0.7 }), group); h.position.set(s * 6.5, -3, 42); h.rotation.y = s * -0.12; }
+  return group;
+}
+
+/** 멀티미터 프로브. 원점 = 바늘 끝, 손잡이는 +y. */
+export function probe(k: Kit3D, color: string) {
+  const three = k.three, group = new three.Group();
+  const needle = k.mesh(new three.CylinderGeometry(0.25, 0.6, 14, 10), k.steel, group); needle.position.y = 7;
+  const guard = k.mesh(new three.CylinderGeometry(4.2, 4.2, 2, 20), k.std(color, { rough: 0.6 }), group); guard.position.y = 15;
+  const handle = k.mesh(new three.CylinderGeometry(3.2, 3.6, 70, 20), k.std(color, { rough: 0.55 }), group); handle.position.y = 51;
+  return group;
+}

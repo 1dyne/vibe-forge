@@ -456,3 +456,16 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .giwa small { font-size: 11px; color: #C9C0AE; }
 .giwa.mine { background: #6A5640; }
 .island-map .finger:focus-visible, .island-map .hall:focus-visible { outline: 3px solid #FF8F3F; }
+
+/* 미리 만들어보기 목록 (/find/practice) */
+.find .practice-list{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.find .practice-kit{display:block;border:1.5px solid var(--line);border-radius:var(--radius);padding:14px 16px;text-decoration:none;color:var(--ink);background:var(--surface)}
+.find .practice-kit.soon{opacity:.55}
+.find .practice-kit .pk-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.find .practice-kit .pk-top b{font-family:var(--font-display);font-weight:400;font-size:18px}
+.find .practice-kit .pk-top span{font-size:12px;color:var(--muted);white-space:nowrap}
+.find .practice-kit p{margin:4px 0 0;font-size:13.5px;color:#3A3D45}
+.find .practice-kit .pk-done{display:inline-block;margin-top:6px;font-size:12px;color:var(--teal-ink)}
+.find .practice-cta{display:flex;flex-direction:column;gap:2px;border:1.5px dashed var(--line);border-radius:var(--radius);padding:12px 16px;text-decoration:none;color:var(--ink);background:var(--surface)}
+.find .practice-cta b{font-family:var(--font-display);font-weight:400;font-size:17px}
+.find .practice-cta span{font-size:13px;color:var(--teal-ink)}
