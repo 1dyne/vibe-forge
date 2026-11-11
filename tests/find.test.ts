@@ -633,3 +633,28 @@ describe("소원 등불", () => {
     expect((await ln.forgeLanterns(b.id)).some((l) => l.id === l2.id)).toBe(false);
   });
 });
+
+describe("작업실 메모", () => {
+  it("주인 메모를 쌓고 지우고, 한 번에 내보내면 도깨비불별로 묶인다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const store = await import("../apps/web/lib/find/store");
+    const memo = await import("../apps/web/lib/find/memo");
+    expect(memo.cleanUrl("javascript:alert(1)")).toBe("bad");
+    expect(memo.cleanUrl("")).toBeNull();
+    expect(memo.cleanUrl("https://example.com/a")).toBe("https://example.com/a");
+    const stamp = Date.now();
+    const forge = (await vs.ensureForge(vs.hashToken(`memo-${stamp}`), "메모", ["w_me"])).forge;
+    const fire = { id: `memofire${stamp}`, idea: "물 마시는 거 자꾸 까먹어", sentence: "책상 위에 두는 물컵 알림이", picked: ["f_desk"], labels: ["책상 위에 두는"], peak: 40, color: "#4FB3A6", reactKind: "none", name: "물컵 도깨비불", matches: [], comboKey: "x", card: null, nickname: "메모", forgeId: forge.id, createdAt: new Date().toISOString() };
+    await store.backend().saveFire(fire);
+    const m1 = await memo.addMemo({ forgeId: forge.id, fireId: fire.id, body: "무게 센서를 컵 아래에", url: "https://example.com/load-cell" });
+    const m2 = await memo.addMemo({ forgeId: forge.id, fireId: fire.id, body: "지울 메모", url: null });
+    expect((await memo.forgeMemos(forge.id)).map((m) => m.id)).toEqual(expect.arrayContaining([m1.id, m2.id]));
+    expect(await memo.deleteMemo("someone-else", m2.id)).toBe(false);
+    expect(await memo.deleteMemo(forge.id, m2.id)).toBe(true);
+    const md = memo.exportMarkdown(forge.nickname, [fire], await memo.forgeMemos(forge.id));
+    expect(md).toContain("## 물컵 도깨비불");
+    expect(md).toContain("물 마시는 거 자꾸 까먹어");
+    expect(md).toContain("무게 센서를 컵 아래에 — https://example.com/load-cell");
+    expect(md).not.toContain("지울 메모");
+  });
+});

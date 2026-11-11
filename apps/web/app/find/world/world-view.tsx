@@ -197,7 +197,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         for (const s of world.spots) { const d = Math.hypot(s.x - pos.x, s.z - pos.z); if (d < s.r && d < bestD) { bestD = d; best = s; } }
         if (best && best.kind === "plot" && myForgeId) best = null;
         if (best !== lastNear) { lastNear = best; setNear(best); }
-        const v = world.villageAt(pos.x, pos.z);
+        const v = world.placeAt(pos.x, pos.z);
         if (v !== lastVillage) { lastVillage = v; setHere(v); }
 
         renderer.render(scene, camera);
@@ -210,7 +210,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); window.removeEventListener("resize", onResize);
         renderer.dispose(); el.removeChild(renderer.domElement);
       };
-    })().catch(() => setFailed(true));
+    })().catch((e) => { console.error("3D 장면을 만들지 못함", e); setFailed(true); });
     return () => { disposed = true; cleanup(); };
   }, [houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns]);
 
@@ -261,7 +261,8 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         <div className="world-knob" ref={knob} />
       </div>
       {near && near.kind === "rope" && <button type="button" className="world-enter" onClick={() => { setRope(lanterns.find((g) => g.key === near.group) ?? null); track("rope_open"); }}>소원 줄 보기</button>}
-      {near && near.kind !== "rope" && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
+      {near && near.kind === "npc" && <div className="world-say" role="status"><b>{near.label}</b><span>{near.line}</span></div>}
+      {near && near.kind !== "rope" && near.kind !== "npc" && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
       {rope && <RopeSheet group={rope} hasForge={Boolean(myForgeId)} onClose={() => setRope(null)} />}
       <div className="world-top">
         <a href="/find" className="world-brand">달그락</a>

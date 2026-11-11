@@ -27,6 +27,8 @@ type Props = {
   hue: number;
   /** 전체 화면으로 보일 때 */
   full?: boolean;
+  /** 작업실 메모 수: 설계도 판에 쪽지가 붙는다 */
+  memos?: number;
   /** 이 대장간에 건 소원 등불 (켜진 것 / 이뤄진 것) */
   lanternsLit?: number;
   lanternsDone?: number;
@@ -43,7 +45,7 @@ const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2
 };
 const LABEL: Record<RoomObj, string> = { hearth: "화덕", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "편지함", woodpile: "장작더미", tools: "연장 걸이", display: "소반" };
 
-export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, full = false, lanternsLit = 0, lanternsDone = 0, onPick, fallback }: Props) {
+export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, full = false, memos = 0, lanternsLit = 0, lanternsDone = 0, onPick, fallback }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -194,7 +196,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       const BX = W / 2 - 1.35;
       const LX = W / 2 - W * 0.25;
       const bp = group("blueprint", BX, stage >= 3 ? 0.72 : 1.0, -D / 2 + 0.05);
-      const pinned = Math.max(1, Math.min(6, fires.length));
+      const pinned = Math.max(1, Math.min(6, memos || fires.length));
       for (let i = 0; i < pinned; i++) { const p = part(BOX, mat(i % 2 ? "#F3E7C9" : "#EADCB8"), 0.36, 0.44, 0.02, -0.75 + (i % 2) * 0.45, 0.4 + Math.floor(i / 2) * 0.52, 0.02, bp); p.rotation.z = (i % 2 ? 1 : -1) * 0.06; part(BOX, mat(st.trim), 0.06, 0.04, 0.03, p.position.x, p.position.y + 0.2, 0.04, bp); }
       if (stage >= 2) {
         const c = document.createElement("canvas"); c.width = 256; c.height = 200; const x = c.getContext("2d")!;
@@ -341,9 +343,9 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         cv.removeEventListener("pointerdown", down); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("resize", onResize);
         renderer.dispose(); el.removeChild(cv);
       };
-    })().catch(() => setFailed(true));
+    })().catch((e) => { console.error("3D 장면을 만들지 못함", e); setFailed(true); });
     return () => { disposed = true; cleanup(); };
-  }, [village, fires, peak, fuel, wants, notes, neighbors, hue, full, lanternsLit, lanternsDone]);
+  }, [village, fires, peak, fuel, wants, notes, neighbors, hue, full, memos, lanternsLit, lanternsDone]);
 
   if (failed) return <>{fallback}</>;
   return <div className={full ? "room3d room3d-full" : "room3d"} ref={mount} role="img" aria-label="대장간 안. 화로, 도깨비불 선반, 설계도, 작업대, 우체통이 있어." />;

@@ -5,6 +5,7 @@ import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
 import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
 import { MyLanterns, RopeSheet } from "./lantern-panel";
+import { MemoSheet } from "./memo-panel";
 import type { LanternRecord, PublicLantern } from "../../lib/find/lantern";
 import { ROOFS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../lib/find/decor";
 import FireCardView, { Roast } from "./fire-card";
@@ -24,9 +25,11 @@ type Props = {
   dexAdded: number;
   lanterns: { mine: LanternRecord[] | null; allowance: number; shown: PublicLantern[] };
   news?: ReactNode;
+  /** 작업실 메모 수 (주인만) */
+  memoCount?: number;
 };
 const PHRASES = ["나도 갖고 싶어", "이거 천재다", "만들면 알려줘!", "장작 넣고 감", "응원해"];
-type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern";
+type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern" | "memo";
 
 // 골목 테마별 방 색 (다인의 방 그림이 오기 전 임시)
 const ROOM_TINT: Record<string, [string, string, string]> = {
@@ -36,7 +39,8 @@ const ROOM_TINT: Record<string, [string, string, string]> = {
 };
 const VIS_LABEL = { public: "전체 공개", link: "링크로만", private: "비공개" } as const;
 
-export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news }: Props) {
+export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news, memoCount: initialMemos = 0 }: Props) {
+  const [memoCount, setMemoCount] = useState(initialMemos);
   const [more, setMore] = useState(false);
   useEffect(() => { if (isOwner && window.location.hash === "#lantern") setOpen("lantern"); }, [isOwner]);
   const [social, setSocial] = useState(initialSocial);
@@ -93,7 +97,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   return (
     <section className="forge-full" style={{ ["--fire" as string]: latest?.color ?? "#4FB3A6" }}>
       <div className="forge-stage">
-      <ForgeRoom full lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
+      <ForgeRoom full memos={memoCount} lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
       <div className="room" style={{ ["--wall" as string]: wall, ["--wall2" as string]: wall2, ["--floor" as string]: floor }}>
         <svg className="room-bg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           <polygon points="4,64 4,24 50,4 50,44" fill="var(--wall)" stroke="#232323" strokeWidth=".6" />
@@ -133,10 +137,11 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       </header>
       {toast && <div className="forge-toast" role="status"><span>{toast}</span><button className="link" type="button" onClick={() => setToast("")}>좋아</button></div>}
       <p className="forge-hint">물건을 눌러봐 · 옆으로 끌면 둘러볼 수 있어</p>
-      <nav className="forge-dock" aria-label="대장간에서 할 일">
+      <nav className={`forge-dock ${isOwner ? "owner" : ""}`} aria-label="대장간에서 할 일">
         {isOwner ? (
           <>
-            <a href="/find" className="dock-main">새 불 피우기</a>
+            <a href="/find" className="dock-main">새 불</a>
+            <button type="button" onClick={() => show("memo")}>메모{memoCount ? ` ${memoCount}` : ""}</button>
             <button type="button" onClick={() => show("lantern")}>등불{lanterns.mine?.length ? ` ${lanterns.mine.length}` : ""}</button>
             <button type="button" onClick={() => show("decor")}>꾸미기</button>
             <button type="button" onClick={() => { setMore(true); track("forge_sheet"); }}>더보기</button>
@@ -223,13 +228,14 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       </nav>
       <button className="link" type="button" onClick={() => setMore(false)}>닫기</button>
       </div></div>}
+      {open === "memo" && isOwner && <MemoSheet fires={fires.map((f) => ({ id: f.id, name: f.name, sentence: f.sentence }))} onCount={setMemoCount} onClose={() => setOpen(null)} />}
       {open === "lantern" && (isOwner && lanterns.mine
         ? <MyLanterns initial={lanterns.mine} allowance={lanterns.allowance} fires={fires.map((f) => ({ id: f.id, name: f.name }))} onClose={() => setOpen(null)} />
         : <RopeSheet group={{ key: `forge:${forge.id}`, label: `${forge.nickname}의 등불`, count: lanterns.shown.length, done: lanterns.shown.filter((l) => l.status === "done").length, lanterns: lanterns.shown }} hasForge={viewerHasForge} onClose={() => setOpen(null)} />)}
 
       {open === "mailbox" && <MailSheet screen={`forge:${forge.id}`} onClose={() => setOpen(null)} />}
       {open === "decor" && <DecorSheet initial={forge.decor} village={forge.village} stats={{ neighbors: social.neighbors, fuel: social.fuelTotal, wants: social.wants, notes: social.notes.length }} houseId={forge.id} onClose={() => setOpen(null)} />}
-      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && (
+      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && open !== "memo" && (
         <div className="overlay" role="dialog" aria-label="대장간 물건" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
           <div className="sheet tall">
             {open === "hearth" && (latest?.card ? (
@@ -241,6 +247,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
             {open === "blueprint" && (
               <>
                 {latest && <div className="note"><div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div><div className="sentence">{latest.sentence}</div></div>}
+                {isOwner && <button className="btn btn-ghost" type="button" onClick={() => show("memo")}>작업실 메모 열기{memoCount ? ` (${memoCount})` : ""}</button>}
                 {isOwner ? <ForgeSignup fire={latest ? { id: latest.id, name: latest.name } : null} forgeId={forge.id} refCode={null} couponText={couponText} /> : (
                   <p className="body">설계도의 나머지 칸(부품·회로·하우징·조립)은 대장간이 문을 열면 켜져.</p>
                 )}

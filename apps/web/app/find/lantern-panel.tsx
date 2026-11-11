@@ -43,16 +43,16 @@ export function RopeSheet({ group: initial, hasForge, onClose }: { group: Lanter
           {lit.map((l) => (
             <div key={l.id} className="lantern-row">
               <i className={l.makers ? "taken" : ""} aria-hidden />
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="lantern-text">
                 <b>{forWhom(l.target)}</b>
                 <span>{l.wish}</span>
                 <small>{l.forgeId ? <a href={`/f/${l.forgeId}`}>{l.nickname}의 대장간</a> : l.nickname}{l.fireName ? ` · ${l.fireName}` : ""}{l.makers ? ` · 솜씨 도깨비 ${l.makers}명이 만들어보는 중` : ""}</small>
               </div>
-              {!l.mine && <button type="button" className={`chip ${l.iMake ? "on" : ""}`} onClick={() => make(l)}>{l.iMake ? "만드는 중" : "만들어볼게"}</button>}
+              {!l.mine && <span className="lantern-actions"><button type="button" className={`chip ${l.iMake ? "on" : ""}`} onClick={() => make(l)}>{l.iMake ? "만드는 중" : "만들어볼게"}</button></span>}
             </div>
           ))}
           {done.length > 0 && <div className="tiny muted" style={{ marginTop: 8 }}>이뤄져서 호수에 띄운 소원</div>}
-          {done.map((l) => <div key={l.id} className="lantern-row done"><i aria-hidden /><div style={{ flex: 1 }}><b>{forWhom(l.target)}</b><span>{l.wish}</span></div></div>)}
+          {done.map((l) => <div key={l.id} className="lantern-row done"><i aria-hidden /><div className="lantern-text"><b>{forWhom(l.target)}</b><span>{l.wish}</span></div></div>)}
         </div>
         {open.length > 0 && (
           <div className="note">
@@ -102,9 +102,11 @@ export function MyLanterns({ initial, allowance, fires, onClose }: { initial: La
             {list.map((l) => (
               <div key={l.id} className={`lantern-row ${l.status === "done" ? "done" : ""}`}>
                 <i aria-hidden />
-                <div style={{ flex: 1, minWidth: 0 }}><b>{forWhom(l.target)}</b><span>{l.wish}</span><small>{l.private ? "나만 보기" : l.hideTarget ? "대상 이름 가림" : "전체 공개"}{l.shareCard ? " · 구상안 함께 공개" : ""}{l.status === "done" ? " · 이뤄져서 호수에 띄움" : ""}</small></div>
-                {l.status === "lit" && <button type="button" className="chip" onClick={() => act(l, "done")}>이뤄졌어</button>}
-                <button type="button" className="link" style={{ fontSize: 12 }} onClick={() => act(l, "remove")}>내리기</button>
+                <div className="lantern-text"><b>{forWhom(l.target)}</b><span>{l.wish}</span><small>{l.private ? "나만 보기" : l.hideTarget ? "대상 이름 가림" : "전체 공개"}{l.shareCard ? " · 구상안 함께 공개" : ""}{l.status === "done" ? " · 이뤄져서 호수에 띄움" : ""}</small></div>
+                <span className="lantern-actions">
+                  {l.status === "lit" && <button type="button" className="chip" onClick={() => act(l, "done")}>이뤄졌어</button>}
+                  <button type="button" className="link" style={{ fontSize: 13 }} onClick={() => act(l, "remove")}>내리기</button>
+                </span>
               </div>
             ))}
           </div>

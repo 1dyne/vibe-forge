@@ -1,6 +1,7 @@
 import type * as T from "three";
 import type { Decor, RoofId } from "../../../lib/find/decor";
 import type { LanternGroup } from "../../../lib/find/lantern";
+import { buildEras, eraCenter, eraTint, ERA_R, ERA_RADIUS, ERAS } from "./world-eras";
 
 // 도깨비 마을 3D 세계. 하회마을처럼 물이 감싸 도는 땅에 다섯 마을이 앉고, 한가운데 호수 섬에 본관 대장간이 있다.
 // 고증 원칙(docs/FIND-WORLD.md): 조선 민가 문법(초가·기와·흙벽·창호·장승·솟대), 단청·오니·청사초롱 가로등 없음.
@@ -8,7 +9,7 @@ import type { LanternGroup } from "../../../lib/find/lantern";
 
 export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean; decor: Decor };
 export type WorldVillage = { id: string; name: string; topics: string; mood: string; themes: string[] };
-export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot" | "rope"; house?: WorldHouse; village?: string; group?: string; label: string };
+export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot" | "rope" | "npc"; house?: WorldHouse; village?: string; group?: string; label: string; line?: string };
 export type NameTag = { s: T.Sprite; x: number; z: number; always: boolean };
 export type Phase = "dusk" | "night";
 
@@ -31,7 +32,7 @@ const INK = "#1E1A26";      // 먹선
 const AMBER = "#F2A65A";    // 사람의 불빛
 const WISP = ["#7FE0D2", "#B9A3E3"]; // 도깨비불
 
-export const ISLAND_R = 92;
+export const ISLAND_R = 114;
 const VILLAGE_D = 46;
 const PLAZA_R = 10.5;       // 호수 섬(본관 광장)
 const LAKE_IN = 11.5, LAKE_OUT = 20.5;
@@ -212,10 +213,15 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   const onBridge = (x: number, z: number) => { const r = Math.hypot(x, z); return r > LAKE_IN - 1.2 && r < LAKE_OUT + 1.2 && spokes.some((s) => segDist(x, z, 0, 0, s.bx, s.bz) < 0.95); };
   const inLake = (x: number, z: number) => Math.abs(Math.hypot(x, z) - lakeMid) < lakeHalf;
 
+  // 시대 마을로 가는 길(호숫가 → 시대 마을 입구)
+  const eraSpokes = ERAS.map((e) => ({ ax: Math.sin(e.angle) * (LAKE_OUT + 0.5), az: -Math.cos(e.angle) * (LAKE_OUT + 0.5), bx: Math.sin(e.angle) * (ERA_R - ERA_RADIUS + 1), bz: -Math.cos(e.angle) * (ERA_R - ERA_RADIUS + 1) }));
+  const eraCenters = ERAS.map((e) => eraCenter(e));
   function builtDist(x: number, z: number) {
     let d = Math.hypot(x, z) - LAKE_OUT - 2;
     for (const s of spokes) d = Math.min(d, segDist(x, z, s.ax, s.az, s.bx, s.bz) - 2.5);
     for (const c of centers) d = Math.min(d, Math.hypot(x - c.x, z - c.z) - 22);
+    for (const s of eraSpokes) d = Math.min(d, segDist(x, z, s.ax, s.az, s.bx, s.bz) - 2.2);
+    for (const c of eraCenters) d = Math.min(d, Math.hypot(x - c.x, z - c.z) - ERA_RADIUS - 2);
     return d;
   }
   /** 땅 높이 (지형 메시용) */
@@ -252,12 +258,13 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       take(st.path, (1.4 - Math.abs(dc - LOOP_R)) / 0.7);
       if (outerLoop[i]) take(st.path, (1.2 - Math.abs(dc - (RINGS[0] + RINGS[1]) / 2)) / 0.7);
     }
+    eraSpokes.forEach((s, i) => take(ERAS[i].alley ?? "#8A7556", (1.4 - segDist(x, z, s.ax, s.az, s.bx, s.bz)) / 0.7));
     return best;
   }
   function pathAt(x: number, z: number) { const p = pathMix(x, z); return p && p.w > 0.3 ? p.color : null; }
 
   {
-    const SIZE = ISLAND_R * 2 + 6, SEG = 240;
+    const SIZE = ISLAND_R * 2 + 6, SEG = 270;
     const g = new three.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     g.rotateX(-Math.PI / 2);
     const pos = g.attributes.position as T.BufferAttribute;
@@ -280,6 +287,8 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       const lr = Math.abs(r - lakeMid);
       if (lr < lakeHalf + 1.8) acc.lerp(bank, clamp01((lakeHalf + 1.8 - lr) / 1.4));
       if (h < -0.4) acc.lerp(mud, 0.85);
+      const et = eraTint(x, z);
+      if (et) acc.lerp(tmp.set(et.color), 0.92 * et.w);
       if (r > ISLAND_R - 11) acc.lerp(sand, clamp01((r - (ISLAND_R - 11)) / 3));
       const n = (Math.sin(x * 1.7 + z * 0.9) + Math.sin(z * 2.3 - x * 0.4)) * 0.014;
       colors[i * 3] = acc.r + n; colors[i * 3 + 1] = acc.g + n; colors[i * 3 + 2] = acc.b + n;
@@ -758,10 +767,10 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   // 호숫가 버드나무와 갈대, 언덕 소나무, 고갯길 서낭당
   {
     const r = rng(9);
-    for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2 + 0.3; const x = Math.sin(a) * (LAKE_OUT + 2.3), z = -Math.cos(a) * (LAKE_OUT + 2.3); if (spokes.some((s) => segDist(x, z, 0, 0, s.bx, s.bz) < 3)) continue; tree(x, z, "willow", 0.9 + r() * 0.3); }
+    for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2 + 0.3; const x = Math.sin(a) * (LAKE_OUT + 2.3), z = -Math.cos(a) * (LAKE_OUT + 2.3); if (spokes.some((s) => segDist(x, z, 0, 0, s.bx, s.bz) < 3) || eraSpokes.some((s) => segDist(x, z, s.ax, s.az, s.bx, s.bz) < 3)) continue; tree(x, z, "willow", 0.9 + r() * 0.3); }
     for (let k = 0; k < 40; k++) { const a = r() * Math.PI * 2; const rad = r() < 0.5 ? LAKE_OUT + 0.9 : LAKE_IN - 0.7; const x = Math.sin(a) * rad, z = -Math.cos(a) * rad; if (spokes.some((s) => segDist(x, z, 0, 0, s.bx, s.bz) < 1.8)) continue; grassTuft(x, z, "#A89A6E", 0.9); }
-    for (let k = 0; k < 75; k++) {
-      const a = r() * Math.PI * 2, d = 28 + r() * 50;
+    for (let k = 0; k < 120; k++) {
+      const a = r() * Math.PI * 2, d = 28 + r() * 74;
       const x = Math.sin(a) * d, z = -Math.cos(a) * d;
       if (builtDist(x, z) < 2 || Math.hypot(x, z) > ISLAND_R - 11) continue;
       if (solids.some((o) => Math.hypot(x - o.x, z - o.z) < o.r + 1.5)) continue;
@@ -769,7 +778,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     }
     // 서낭당: 고갯마루 돌무더기 + 오색천을 맨 신목
     ANGLES.slice(0, 3).forEach((a, k) => {
-      const b = a + 0.63; const x = Math.sin(b) * 52 + 2.5, z = -Math.cos(b) * 52;
+      const b = a + 0.63 + 0.13; const x = Math.sin(b) * 52, z = -Math.cos(b) * 52; // 시대 마을 길에서 비켜선 고갯마루
       const y = groundAt(x, z);
       const pile = part(CONE, mat("#8C877C"), 0.9, 0.9, 0.9, x, y + 0.45, z); ink(pile, 1.05);
       tree(x + 1.4, z + 0.4, "zelkova", 1.2);
@@ -1016,6 +1025,12 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     if (inLake(x, z) && !onBridge(x, z)) return false;
     return solids.every((o) => Math.hypot(x - o.x, z - o.z) > o.r + 0.25);
   }
+  /** 지금 서 있는 곳: 다섯 마을 또는 시대 마을 (마을 이름 띠용) */
+  function placeAt(x: number, z: number): WorldVillage | null {
+    const v = villageAt(x, z); if (v) return v;
+    for (const e of ERAS) { const c = eraCenter(e); if (Math.hypot(x - c.x, z - c.z) < ERA_RADIUS + 2) return { id: e.id, name: `${e.name} · ${e.period}`, topics: e.topics, mood: "", themes: [] }; }
+    return null;
+  }
   function villageAt(x: number, z: number) {
     let best = -1, bd = 24;
     centers.forEach((c, i) => { const d = Math.hypot(x - c.x, z - c.z); if (d < bd) { bd = d; best = i; } });
@@ -1029,5 +1044,6 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     return { water, fire, wisp };
   }
   function setActive(ids: Set<string>) { for (const [id, st] of houseState) st.active = ids.has(id); }
-  return { spots, anim, nameTags, fades, occluders, heightAt, walkable, villageAt, setActive, player, ambienceAt };
+  buildEras({ three, scene, night, part, mat, ink, glow, textSprite, smokeMat, G: { BOX, CYL, CYL6, BALL, CONE, DOME, DISC, TORUS }, solids, anim, spots, nameTags, occluders, firePoints, wispSpots, player });
+  return { spots, anim, nameTags, fades, occluders, heightAt, walkable, villageAt, placeAt, setActive, player, ambienceAt };
 }
