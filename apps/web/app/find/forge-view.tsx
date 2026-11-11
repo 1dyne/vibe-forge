@@ -6,6 +6,7 @@ import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
 import { MyLanterns, RopeSheet } from "./lantern-panel";
 import { MemoSheet } from "./memo-panel";
+import { QuestionSheet, useQuestion } from "./question-panel";
 import type { LanternRecord, PublicLantern } from "../../lib/find/lantern";
 import { ROOFS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../lib/find/decor";
 import FireCardView, { Roast } from "./fire-card";
@@ -41,6 +42,8 @@ const VIS_LABEL = { public: "전체 공개", link: "링크로만", private: "비
 
 export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news, memoCount: initialMemos = 0 }: Props) {
   const [memoCount, setMemoCount] = useState(initialMemos);
+  const [question, setQuestion] = useQuestion(isOwner);
+  const [asking, setAsking] = useState(false);
   const [more, setMore] = useState(false);
   useEffect(() => { if (isOwner && window.location.hash === "#lantern") setOpen("lantern"); }, [isOwner]);
   const [social, setSocial] = useState(initialSocial);
@@ -136,6 +139,12 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </span>
       </header>
       {toast && <div className="forge-toast" role="status"><span>{toast}</span><button className="link" type="button" onClick={() => setToast("")}>좋아</button></div>}
+      {isOwner && question && !asking && (
+        <button type="button" className="forge-ask" onClick={() => { setAsking(true); track("forge_sheet", { sheet: "question" }); }}>
+          <b>화덕 도깨비</b><span>{question.ask}</span>
+        </button>
+      )}
+      {asking && question && <QuestionSheet q={question} onClose={() => setAsking(false)} onDone={(msg) => { setAsking(false); setQuestion(null); setToast(msg); setTimeout(() => window.location.reload(), 1400); }} />}
       <p className="forge-hint">물건을 눌러봐 · 옆으로 끌면 둘러볼 수 있어</p>
       <nav className={`forge-dock ${isOwner ? "owner" : ""}`} aria-label="대장간에서 할 일">
         {isOwner ? (

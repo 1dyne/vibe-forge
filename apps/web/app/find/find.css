@@ -441,3 +441,18 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 /* 마지막 줄에 낱말 하나만 남지 않게: 짧은 안내는 줄 길이를 고르게, 긴 글은 끝줄을 보기 좋게 */
 .find .note, .find .note *, .lantern-row span, .lantern-row b, .memo-row span, .world-say span, .forge-toast span, .forge-hint, .world-hint, .find .error, .find [role="status"] { text-wrap: balance; }
 .find .body, .find p, .lantern-sheet .small, .memo-sheet .small { text-wrap: pretty; }
+
+/* 화덕 도깨비의 질문: 대장간 화면 아래쪽 말풍선 */
+.forge-ask { position: absolute; left: 14px; right: 14px; bottom: calc(112px + env(safe-area-inset-bottom, 0px)); margin: 0 auto; max-width: 420px; display: flex; flex-direction: column; gap: 2px; text-align: left; background: #F6F0E4; color: #232323; border: 2px solid #232323; border-radius: 16px; padding: 10px 14px; font: inherit; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,.25); animation: ask-bob 2.4s ease-in-out infinite; word-break: keep-all; }
+.forge-ask b { font-size: 12px; color: #8A5A2B; }
+.forge-ask span { font-size: 15px; text-wrap: balance; }
+@keyframes ask-bob { 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .forge-ask { animation: none; } }
+.question-sheet .chip { font-size: 15px; padding: 9px 14px; }
+
+/* 본관 기와 */
+.giwa-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.giwa { display: inline-flex; flex-direction: column; min-width: 92px; max-width: 46%; padding: 7px 10px 6px; background: #4A4850; color: #EDE6D6; border-radius: 10px 10px 4px 4px; border: 2px solid #232323; font-size: 13px; line-height: 1.35; }
+.giwa small { font-size: 11px; color: #C9C0AE; }
+.giwa.mine { background: #6A5640; }
+.island-map .finger:focus-visible, .island-map .hall:focus-visible { outline: 3px solid #FF8F3F; }

@@ -4,6 +4,7 @@ import type * as T from "three";
 import { hueSpriteMaterial } from "../three-hue";
 import { track } from "../track";
 import { createVillageSound, type Ambience } from "./world-sound";
+import { ERAS, ERA_R, ERA_RADIUS } from "./world-eras";
 import { RopeSheet } from "../lantern-panel";
 import type { LanternGroup } from "../../../lib/find/lantern";
 import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
@@ -11,9 +12,9 @@ import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type 
 // 걷는 도깨비 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
 
-type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number; lanterns: LanternGroup[] };
+type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number; lanterns: LanternGroup[]; giwa?: number };
 
-export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns }: Props) {
+export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns, giwa = 0 }: Props) {
   const [rope, setRope] = useState<LanternGroup | null>(null);
   const mount = useRef<HTMLDivElement>(null);
   const stick = useRef({ x: 0, y: 0, active: false });
@@ -25,6 +26,14 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
   const soundRef = useRef<{ night: boolean; amb: (x: number, z: number) => Ambience; pos?: { x: number; z: number } } | null>(null);
   const audio = useRef<ReturnType<typeof createVillageSound> | null>(null);
   const [soundOn, setSoundOn] = useState(false);
+  // 가벼운 모드: null = 자동, true/false = 직접 고름(이 기기에 기억)
+  const lightRef = useRef<boolean | null>(null);
+  const lightApply = useRef<((on: boolean) => void) | null>(null);
+  const [lightOn, setLightState] = useState(false);
+  const look = useRef({ dx: 0, id: -1, x: 0 });
+  if (typeof window !== "undefined" && lightRef.current === null) {
+    try { const v = localStorage.getItem("find_world_light"); if (v === "1" || v === "0") lightRef.current = v === "1"; } catch {}
+  }
   useEffect(() => {
     if (!soundOn) return;
     const id = window.setInterval(() => { const sr = soundRef.current; if (sr?.pos && audio.current) audio.current.setAmbience(sr.amb(sr.pos.x, sr.pos.z)); }, 300);
@@ -53,7 +62,20 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       let renderer: T.WebGLRenderer;
       try { renderer = new three.WebGLRenderer({ antialias: true }); } catch { setFailed(true); return; }
       const el = mount.current;
-      renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio));
+      // 가벼운 모드: 저사양 기기는 처음부터, 그 밖에는 프레임이 계속 떨어지면 자동으로 켠다
+      const nav = navigator as Navigator & { deviceMemory?: number };
+      const lowEnd = (nav.deviceMemory ?? 8) <= 3 || (navigator.hardwareConcurrency ?? 8) <= 4;
+      let light = lightRef.current ?? lowEnd;
+      const applyQuality = () => {
+        renderer.setPixelRatio(light ? 1 : Math.min(1.75, window.devicePixelRatio));
+        renderer.setSize(el.clientWidth, el.clientHeight);
+        // 빛 번짐(가산 스프라이트)·물안개를 끈다. 이름표·간판은 그대로
+        scene.traverse((o) => {
+          const m = (o as T.Mesh).material as T.Material | undefined;
+          if (m && !Array.isArray(m) && m.blending === three.AdditiveBlending) o.visible = !light;
+        });
+      };
+      setLightState(light);
       renderer.setSize(el.clientWidth, el.clientHeight);
       renderer.outputColorSpace = three.SRGBColorSpace;
       el.appendChild(renderer.domElement);
@@ -72,7 +94,9 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       sun.position.set(-40, 18, -25); // 서쪽 낮은 해(달)
       scene.add(sun);
 
-      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, phase, lanterns });
+      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, phase, lanterns, giwa });
+      applyQuality();
+      lightApply.current = (on: boolean) => { light = on; lightRef.current = on; applyQuality(); setLightState(on); };
       soundRef.current = { night: phase === "night", amb: world.ambienceAt };
 
       // 마을의 기척: 1분 반마다 '지금 마을에 있는 집'을 받아 연기·창문 불빛을 바꾼다 (내 집도 '마을에 있음'으로 기록됨)
@@ -107,6 +131,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       // 개발 확인용: ?at=마을id 로 그 마을 문 앞에서 시작
       const at = new URLSearchParams(location.search).get("at"); // ?at=마을id: 그 마을 문 앞에서 시작 (2D 지도에서 넘어올 때)
       const atIdx = villages.findIndex((v) => v.id === at);
+      const atEra = ERAS.find((e) => e.id === at);
       // ?house=집id (또는 me): 그 집 문 앞에 서서 집을 바라보며 시작
       const houseParam = new URLSearchParams(location.search).get("house");
       const target = houseParam ? world.spots.find((s) => s.kind === "house" && s.house!.id === (houseParam === "me" ? myForgeId : houseParam)) : null;
@@ -118,6 +143,8 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         heading = Math.atan2(dx / len, -(dz / len));
       } else if (process.env.NODE_ENV !== "production" && new URLSearchParams(location.search).get("pos")) { // 개발 확인용 ?pos=x,z,heading
         const [px, pz, ph] = new URLSearchParams(location.search).get("pos")!.split(",").map(Number); pos.x = px; pos.z = pz; heading = ph || 0;
+      } else if (atEra) { // 시대 마을 입구 앞에서 그 마을을 바라보며
+        const d = ERA_R - ERA_RADIUS - 4; pos.x = Math.sin(atEra.angle) * d; pos.z = -Math.cos(atEra.angle) * d; heading = Math.PI + atEra.angle;
       } else if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 31); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
       let frame = 0, frameClock = 0, lastNear: Spot | null = null, lastVillage: WorldVillage | null = null;
       const clock = new three.Clock();
@@ -127,7 +154,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       // 개발 확인용 하늘 시점 (배포본에는 없음)
       const topView = process.env.NODE_ENV !== "production" && new URLSearchParams(location.search).has("top");
       if (topView) scene.fog = null;
-      let first = true;
+      let first = true, slowAcc = 0;
 
       const tick = () => {
         const dt = Math.min(0.05, clock.getDelta());
@@ -200,6 +227,12 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         const v = world.placeAt(pos.x, pos.z);
         if (v !== lastVillage) { lastVillage = v; setHere(v); }
 
+        if (!light && lightRef.current === null) { // 사용자가 직접 고르지 않았을 때만 자동
+          slowAcc = slowAcc * 0.98 + (dt > 1 / 28 ? 1 : 0) * 0.02;
+          if (t > 4 && slowAcc > 0.6) { lightApply.current?.(true); lightRef.current = null; track("world_quality", { auto: "light" }); }
+        }
+        // 화면 끌어서 둘러보기
+        if (look.current.dx) { heading += look.current.dx * 0.006; look.current.dx = 0; }
         renderer.render(scene, camera);
         raf = requestAnimationFrame(tick);
       };
@@ -212,7 +245,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       };
     })().catch((e) => { console.error("3D 장면을 만들지 못함", e); setFailed(true); });
     return () => { disposed = true; cleanup(); };
-  }, [houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns]);
+  }, [houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns, giwa]);
 
   // 마을에 들어서면 이름표를 잠깐 띄운다
   const [banner, setBanner] = useState<WorldVillage | null>(null);
@@ -237,6 +270,13 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
     if (knob.current) knob.current.style.transform = "translate(0,0)";
   }
 
+  function toggleLight() {
+    const on = !lightOn;
+    try { localStorage.setItem("find_world_light", on ? "1" : "0"); } catch {}
+    lightApply.current?.(on);
+    track("world_quality", { manual: on ? "light" : "full" });
+  }
+
   if (failed) return (
     <div className="world-fallback">
       <p>이 기기에서는 3D 마을을 열 수 없어. 지도로 볼래?</p>
@@ -249,14 +289,18 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
 
   return (
     <div className="world">
-      <div className="world-canvas" ref={mount} />
+      <div className="world-canvas" ref={mount}
+        onPointerDown={(e) => { if (look.current.id !== -1) return; look.current.id = e.pointerId; look.current.x = e.clientX; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); setHint(false); }}
+        onPointerMove={(e) => { if (e.pointerId !== look.current.id) return; look.current.dx += e.clientX - look.current.x; look.current.x = e.clientX; }}
+        onPointerUp={(e) => { if (e.pointerId === look.current.id) look.current.id = -1; }}
+        onPointerCancel={(e) => { if (e.pointerId === look.current.id) look.current.id = -1; }} />
       {banner && (
         <div className="world-banner" key={banner.id}>
           <b>{banner.name}</b>
           <span>{banner.topics}</span>
         </div>
       )}
-      {hint && !banner && <div className="world-hint">왼쪽 아래 동그라미를 밀어서 걸어봐 · 키보드는 W A S D</div>}
+      {hint && !banner && <div className="world-hint">왼쪽 아래 동그라미로 걷고, 화면을 끌어서 둘러봐 · 키보드는 W A S D</div>}
       <div className="world-pad" ref={pad} onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); setHint(false); move(e); }} onPointerMove={(e) => { if (stick.current.active) move(e); }} onPointerUp={end} onPointerCancel={end}>
         <div className="world-knob" ref={knob} />
       </div>
@@ -266,7 +310,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       {rope && <RopeSheet group={rope} hasForge={Boolean(myForgeId)} onClose={() => setRope(null)} />}
       <div className="world-top">
         <a href="/find" className="world-brand">달그락</a>
-        <span><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 대장간</a> : <a href="/find">내 대장간 짓기</a>}</span>
+        <span><button type="button" className="world-sound" onClick={toggleLight} aria-pressed={lightOn} title="느린 폰이면 켜줘">{lightOn ? "가볍게 ✓" : "가볍게"}</button><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 대장간</a> : <a href="/find">내 대장간 짓기</a>}</span>
       </div>
     </div>
   );

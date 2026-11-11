@@ -658,3 +658,50 @@ describe("작업실 메모", () => {
     expect(md).not.toContain("지울 메모");
   });
 });
+
+describe("도깨비의 질문", () => {
+  it("빈 갈래를 먼저 묻고, 하루에 한 번만 답을 받아 설계 한 줄을 키운다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const store = await import("../apps/web/lib/find/store");
+    const qn = await import("../apps/web/lib/find/question");
+    const q = qn.questionFor({ id: "x", name: "물컵 도깨비불", picked: ["f_cup", "s_time"] }, 0)!;
+    expect(["알아채면 어떻게 알려줄까?", "누구를 위해 만드는 거야?"]).toContain(q.ask);
+    expect(q.options.length).toBeGreaterThan(0);
+    const full = qn.questionFor({ id: "x", name: "n", picked: ["f_cup", "s_time", "r_light", "w_me"] }, 0)!;
+    expect(full.ask).toBe("조금 더 자세히 정해볼까?");
+    expect(full.options.every((o) => !["f_cup", "s_time", "r_light", "w_me"].includes(o.id))).toBe(true);
+    expect(qn.todayKst(Date.parse("2026-11-10T15:30:00Z"))).toBe("2026-11-11");
+
+    const stamp = Date.now();
+    const forge = (await vs.ensureForge(vs.hashToken(`q-${stamp}`), "질문", ["f_cup"])).forge;
+    const fire = { id: `qfire${stamp}`, idea: "(테스트)", sentence: "컵 받침처럼 생긴 물건이야.", picked: ["f_cup"], labels: ["컵 받침 모양"], peak: 30, color: "#4FB3A6", reactKind: "none", name: "물컵 도깨비불", matches: [], comboKey: "x", card: null, nickname: "질문", forgeId: forge.id, createdAt: new Date().toISOString() };
+    await store.backend().saveFire(fire);
+    const today = qn.questionOfDay([fire])!;
+    const chip = today.options[0].id;
+    expect(await qn.answeredOn(forge.id)).toBe(false);
+    const grown = await qn.saveAnswer(forge.id, fire, chip);
+    expect(grown?.picked).toEqual(["f_cup", chip]);
+    expect(grown!.peak).toBeGreaterThan(30);
+    expect((await store.backend().getFire(fire.id))?.picked).toContain(chip);
+    expect(await qn.answeredOn(forge.id)).toBe(true);
+    expect(await qn.saveAnswer(forge.id, grown!, today.options[1]?.id ?? "w_me")).toBeNull();
+  });
+});
+
+describe("본관 기와", () => {
+  it("대장간마다 한 장만 새기고, 가린 기와는 목록에서 빠진다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const gw = await import("../apps/web/lib/find/giwa");
+    expect(gw.giwaProblem("")).toMatch(/적어줘/);
+    expect(gw.giwaProblem("010 1234 5678")).toMatch(/숫자/);
+    expect(gw.giwaProblem("첫 발명품 꼭 완성")).toBeNull();
+    const stamp = Date.now();
+    const forge = (await vs.ensureForge(vs.hashToken(`gw-${stamp}`), "기와장이", ["w_me"])).forge;
+    expect(await gw.carveGiwa(forge.id, "첫 발명품 꼭 완성")).toBe(true);
+    expect(await gw.carveGiwa(forge.id, "두 번째")).toBe(false);
+    expect(await gw.myGiwa(forge.id)).toEqual({ wish: "첫 발명품 꼭 완성" });
+    expect((await gw.listGiwa()).list.find((g) => g.forgeId === forge.id)).toMatchObject({ nickname: "기와장이", wish: "첫 발명품 꼭 완성" });
+    await gw.hideGiwa(forge.id);
+    expect((await gw.listGiwa()).list.some((g) => g.forgeId === forge.id)).toBe(false);
+  });
+});

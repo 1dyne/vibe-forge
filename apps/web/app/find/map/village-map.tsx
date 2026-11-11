@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import GiwaBoard from "../giwa-panel";
 import { track } from "../track";
 import ForgeSignup from "../waitlist";
+import { ERAS, ERA_DOKKAEBI } from "../world/world-eras";
 
 type Street = { id: string; name: string; topics: string; mood: string; residents: number };
 type Plan = { id: number; title: string; description: string; status: "voting" | "building" | "done"; fuel: number; mine: number };
@@ -18,35 +20,21 @@ type Props = {
   couponText: string | null;
 };
 
-// 마을 5개 자리 (3D 마을이 안 열리는 기기용 간단 지도)
-const FINGERS: Record<string, { x: number; y: number; w: number; h: number; rot: number }> = {
-  kkomul: { x: 66, y: 296, w: 50, h: 112, rot: -40 },
-  ttukttak: { x: 70, y: 70, w: 52, h: 200, rot: -6 },
-  jjaekkak: { x: 132, y: 30, w: 54, h: 230, rot: 0 },
-  wagle: { x: 196, y: 52, w: 52, h: 210, rot: 5 },
-  kkambbak: { x: 254, y: 118, w: 48, h: 160, rot: 13 }
-};
+// 3D 마을과 같은 배치를 위에서 본 지도: 호수 섬 가운데 본관, 둘레 다섯 마을, 바깥 시대 마을 셋 (3D를 못 여는 폰용)
+const S = 150 / 114; // 월드 반지름 114 → 지도 반지름 150
+const VANG = [-0.63, 0.63, 1.88, Math.PI, -1.88];
+const VCOL: Record<string, string> = { kkomul: "#A9BE92", ttukttak: "#B9B38E", jjaekkak: "#A5B79E", wagle: "#B6C38E", kkambbak: "#9FB8A6" };
+const ECOL: Record<string, string> = { prehistory: "#9AA578", modern: "#A9A69C", y2k: "#8E8C94" };
+const pt = (a: number, d: number) => ({ x: 180 + Math.sin(a) * d * S, y: 180 - Math.cos(a) * d * S });
 const DOT_COLORS = ["#9B7BFF", "#FF8F3F", "#3FBF6E", "#4FB3A6"];
-
-function Hall({ stage }: { stage: number }) {
-  // 본관 공사 단계: 터 → 뼈대 → 지붕 → 굴뚝 → 완공 (다인 그림 오기 전 임시)
-  return (
-    <g>
-      <rect x="140" y="378" width="80" height="44" rx="3" fill={stage >= 4 ? "#F6F5F1" : "none"} stroke="#232323" strokeWidth="2" strokeDasharray={stage === 0 ? "5 4" : undefined} />
-      {stage >= 1 && <g stroke="#8B6A4A" strokeWidth="3"><line x1="150" y1="422" x2="150" y2="378" /><line x1="180" y1="422" x2="180" y2="378" /><line x1="210" y1="422" x2="210" y2="378" /></g>}
-      {stage >= 2 && <polygon points="132,380 180,346 228,380" fill="#E2574C" stroke="#232323" strokeWidth="2" />}
-      {stage >= 3 && <g><rect x="200" y="346" width="12" height="22" fill="#9E9E9E" stroke="#232323" strokeWidth="2" /><circle cx="206" cy="338" r="6" fill="#FF8F3F" className="hall-smoke" /></g>}
-      {stage >= 4 && <g><rect x="172" y="398" width="16" height="24" fill="#FFD27A" stroke="#232323" strokeWidth="2" /><line x1="180" y1="346" x2="180" y2="326" stroke="#232323" strokeWidth="2" /><polygon points="180,326 196,331 180,336" fill="#9B7BFF" /></g>}
-    </g>
-  );
-}
 
 export default function VillageMap(props: Props) {
   const { streets, hall, floating, totalForges, topWant, notices, me, couponText } = props;
-  const [sheet, setSheet] = useState<null | { kind: "street"; street: Street } | { kind: "hall" }>(null);
+  const [sheet, setSheet] = useState<null | { kind: "street"; street: Street } | { kind: "hall" } | { kind: "era"; era: (typeof ERAS)[number] }>(null);
   const [plans, setPlans] = useState(props.plans);
   const [budget, setBudget] = useState(props.budget);
   const [planMsg, setPlanMsg] = useState("");
+  useEffect(() => { if (window.location.hash === "#hall") setSheet({ kind: "hall" }); }, []);
 
   async function vote(p: Plan, delta: number) {
     if (!me) { setPlanMsg("내 대장간이 있어야 장작으로 투표할 수 있어."); return; }
@@ -65,30 +53,37 @@ export default function VillageMap(props: Props) {
       </div>
 
       <div className="palm-wrap">
-        <svg viewBox="0 0 360 500" className="palm" role="img" aria-label="도깨비 마을 지도">
-          <rect x="62" y="250" width="240" height="230" rx="96" fill="#EAF5F2" stroke="#232323" strokeWidth="2.5" />
-          {streets.map((s) => {
-            const f = FINGERS[s.id];
-            const residents = s.residents;
-            return (
-              <g key={s.id} className="finger" transform={`rotate(${f.rot} ${f.x + f.w / 2} ${f.y + f.h})`} onClick={() => { setSheet({ kind: "street", street: s }); track("street_open", { street: s.id }); }} role="button" tabIndex={0} aria-label={`${s.name} 열기`}>
-                <rect x={f.x} y={f.y} width={f.w} height={f.h + 40} rx={f.w / 2} fill={residents ? "#F6F5F1" : "#F1F0EB"} stroke="#232323" strokeWidth="2.5" />
-                <text x={f.x + f.w / 2} y={f.y + 26} textAnchor="middle" className="finger-name">{s.name}</text>
-                <text x={f.x + f.w / 2} y={f.y + 44} textAnchor="middle" className="finger-count">{residents ? `${residents}채` : "빈 터"}</text>
-                {Array.from({ length: Math.min(4, Math.ceil(residents / 2) + 1) }).map((_, i) => (
-                  <circle key={i} cx={f.x + f.w / 2 + (i % 2 ? 9 : -9)} cy={f.y + 70 + i * 28} r="5" fill={DOT_COLORS[(i + s.id.length) % 4]} className="float-dot" style={{ animationDelay: `${i * 0.7}s` }} />
-                ))}
-              </g>
-            );
-          })}
+        <svg viewBox="0 0 360 360" className="palm island-map" role="img" aria-label="도깨비 마을 지도">
+          <circle cx="180" cy="180" r="156" fill="#CFE3EA" />
+          <circle cx="180" cy="180" r="150" fill="#B9C79E" stroke="#232323" strokeWidth="2.5" />
+          {/* 시대 마을로 가는 길 */}
+          {ERAS.map((e) => { const a = pt(e.angle, 21), b = pt(e.angle, 68); return <line key={`p-${e.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#C9B48E" strokeWidth="4" strokeLinecap="round" />; })}
+          {VANG.map((a, i) => { const p1 = pt(a, 11), p2 = pt(a, 38); return <line key={`v-${i}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#C9B48E" strokeWidth="5" strokeLinecap="round" />; })}
+          {/* 호수와 섬 */}
+          <circle cx="180" cy="180" r={16 * S} fill="none" stroke="#5E7FA8" strokeWidth={9 * S} />
+          {VANG.map((a, i) => { const p1 = pt(a, 11), p2 = pt(a, 21); return <line key={`b-${i}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#8A7350" strokeWidth="5" />; })}
+          {/* 시대 마을 */}
+          {ERAS.map((e) => { const c = pt(e.angle, 84); return (
+            <g key={e.id} className="finger" onClick={() => { setSheet({ kind: "era", era: e }); track("era_open", { era: e.id }); }} role="button" tabIndex={0} aria-label={`${e.name} 열기`}>
+              <rect x={c.x - 36} y={c.y - 22} width="72" height="44" rx="10" fill={ECOL[e.id]} stroke="#232323" strokeWidth="2" />
+              <text x={c.x} y={c.y - 3} textAnchor="middle" className="finger-name" style={{ fontSize: 12 }}>{e.name}</text>
+              <text x={c.x} y={c.y + 12} textAnchor="middle" className="finger-count" style={{ fontSize: 9 }}>{e.period}</text>
+            </g>
+          ); })}
+          {/* 다섯 마을 */}
+          {streets.map((s, i) => { const c = pt(VANG[i], 46); return (
+            <g key={s.id} className="finger" onClick={() => { setSheet({ kind: "street", street: s }); track("street_open", { street: s.id }); }} role="button" tabIndex={0} aria-label={`${s.name} 열기`}>
+              <circle cx={c.x} cy={c.y} r="26" fill={VCOL[s.id] ?? "#B9C79E"} stroke="#232323" strokeWidth="2" />
+              <text x={c.x} y={c.y - 2} textAnchor="middle" className="finger-name" style={{ fontSize: 12 }}>{s.name}</text>
+              <text x={c.x} y={c.y + 13} textAnchor="middle" className="finger-count">{s.residents ? `${s.residents}채` : "빈 터"}</text>
+              {Array.from({ length: Math.min(3, Math.ceil(s.residents / 3)) }).map((_, k) => <circle key={k} cx={c.x - 8 + k * 8} cy={c.y - 17} r="2.6" fill={DOT_COLORS[(k + i) % 4]} className="float-dot" style={{ animationDelay: `${k * 0.7}s` }} />)}
+            </g>
+          ); })}
           <g className="hall" onClick={() => { setSheet({ kind: "hall" }); track("hall_open"); }} role="button" tabIndex={0} aria-label="달그락 대장간 본관">
-            <rect x="112" y="316" width="136" height="140" rx="20" fill="transparent" />
-            <Hall stage={hall.stage} />
-            <text x="180" y="446" textAnchor="middle" className="hall-name">달그락 대장간 본관</text>
-          </g>
-          <g>
-            <rect x="110" y="456" width="140" height="10" rx="5" fill="#EEECE5" stroke="#232323" strokeWidth="1" />
-            <rect x="110" y="456" width={Math.max(4, 1.4 * hall.pct)} height="10" rx="5" fill="#FF8F3F" />
+            <circle cx="180" cy="180" r={11 * S} fill="#CDB894" stroke="#232323" strokeWidth="2" />
+            <rect x="170" y="172" width="20" height="14" fill={hall.stage >= 4 ? "#F6F5F1" : "none"} stroke="#232323" strokeWidth="1.5" strokeDasharray={hall.stage === 0 ? "3 2" : undefined} />
+            {hall.stage >= 2 && <polygon points="166,173 180,163 194,173" fill="#3E3C42" stroke="#232323" strokeWidth="1.5" />}
+            {hall.stage >= 3 && <circle cx="186" cy="160" r="3" fill="#FF8F3F" className="hall-smoke" />}
           </g>
         </svg>
       </div>
@@ -108,6 +103,8 @@ export default function VillageMap(props: Props) {
           {notices.map((n) => <div key={n.id} className="notice-row"><b>{n.title}</b><span>{n.body}</span></div>)}
         </div>
       )}
+
+      <GiwaBoard hasForge={Boolean(me)} />
 
       <div className="notes">
         <div className="tiny muted">공사 계획판 — 다음에 지을 것에 장작으로 투표{budget ? ` (내 장작 ${budget.total - budget.used}/${budget.total}개 남음)` : ""}</div>
@@ -130,9 +127,17 @@ export default function VillageMap(props: Props) {
       <nav className="town-tabs" aria-label="마을 메뉴"><a href="/find/home">내 대장간</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 대장간이나</a></nav>
 
       {sheet && (
-        <div className="overlay" role="dialog" aria-label={sheet.kind === "hall" ? "본관" : sheet.street.name} onClick={(e) => { if (e.target === e.currentTarget) setSheet(null); }}>
+        <div className="overlay" role="dialog" aria-label={sheet.kind === "hall" ? "본관" : sheet.kind === "era" ? sheet.era.name : sheet.street.name} onClick={(e) => { if (e.target === e.currentTarget) setSheet(null); }}>
           <div className="sheet tall">
-            {sheet.kind === "street" ? (
+            {sheet.kind === "era" ? (
+              <>
+                <div className="display" style={{ fontSize: 22 }}>{sheet.era.name} <span className="muted small">{sheet.era.period}</span></div>
+                <p className="body" style={{ margin: 0 }}>{sheet.era.topics}</p>
+                <div className="tiny muted">여기 사는 물건 도깨비</div>
+                <div className="phrases">{(ERA_DOKKAEBI[sheet.era.id] ?? []).map((n) => <span key={n} className="chip">{n}</span>)}</div>
+                <a className="btn btn-fire" href={`/find/village?at=${sheet.era.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>이 시대 마을 걸어보기</a>
+              </>
+            ) : sheet.kind === "street" ? (
               <>
                 <div className="display" style={{ fontSize: 22 }}>{sheet.street.name} <span className="muted small">{sheet.street.topics}</span></div>
                 <p className="body" style={{ margin: 0 }}>{sheet.street.mood}. 지금 대장간 {sheet.street.residents}채.</p>
