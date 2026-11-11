@@ -47,7 +47,7 @@ export default function AlleyMap({ houses, strings, capacity, myForgeId }: { hou
         const body = (
           <>
             <HouseIcon h={h} />
-            <span className="house-name">{h.mine ? "내 집" : h.nickname}</span>
+            <span className="house-name">{h.mine ? "내 대장간" : h.nickname}</span>
             <span className="house-plot">{h.plotNo}번 터</span>
           </>
         );

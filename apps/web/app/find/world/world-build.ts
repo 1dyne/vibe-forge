@@ -1,5 +1,6 @@
 import type * as T from "three";
 import type { Decor, RoofId } from "../../../lib/find/decor";
+import type { LanternGroup } from "../../../lib/find/lantern";
 
 // 도깨비 마을 3D 세계. 하회마을처럼 물이 감싸 도는 땅에 다섯 마을이 앉고, 한가운데 호수 섬에 본관 대장간이 있다.
 // 고증 원칙(docs/FIND-WORLD.md): 조선 민가 문법(초가·기와·흙벽·창호·장승·솟대), 단청·오니·청사초롱 가로등 없음.
@@ -7,7 +8,7 @@ import type { Decor, RoofId } from "../../../lib/find/decor";
 
 export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean; decor: Decor };
 export type WorldVillage = { id: string; name: string; topics: string; mood: string; themes: string[] };
-export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot"; house?: WorldHouse; village?: string; label: string };
+export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot" | "rope"; house?: WorldHouse; village?: string; group?: string; label: string };
 export type NameTag = { s: T.Sprite; x: number; z: number; always: boolean };
 export type Phase = "dusk" | "night";
 
@@ -59,7 +60,7 @@ function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz:
   return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
 }
 
-export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; hasForge: boolean; phase?: Phase }) {
+export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; hasForge: boolean; phase?: Phase; lanterns?: LanternGroup[] }) {
   const phase: Phase = opts.phase ?? "dusk";
   const night = phase === "night";
   const pal = PALETTE[phase];
@@ -366,6 +367,54 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
         for (let k = 0; k <= 4; k++) { const z = -len / 2 + 0.4 + k * ((len - 0.8) / 4); for (const sx of [-0.85, 0.85]) { part(CYL6, mat("#4E3A2A"), 0.08, 1.1, 0.08, sx, -0.45, z, g); const y = part(CYL6, mat("#4E3A2A"), 0.05, 0.4, 0.05, sx + Math.sign(sx) * 0.12, 0.0, z, g); y.rotation.z = Math.sign(sx) * 0.5; } }
       }
     });
+  }
+
+  // ── 소원 줄(하회 줄불처럼 호수를 가로지른 줄에 한지 초롱) + 이뤄진 소원은 호수에 띄운 유등 ──
+  {
+    const groups = (opts.lanterns ?? []).filter((g) => g.count > g.done).slice(0, 10);
+    const gaps = ANGLES.map((a) => a).sort((a, b) => a - b);
+    const ropeAngles: number[] = [];
+    for (let k = 0; k < gaps.length; k++) { const a = gaps[k], b = k + 1 < gaps.length ? gaps[k + 1] : gaps[0] + Math.PI * 2; const mid = (a + b) / 2; ropeAngles.push(mid - 0.22, mid + 0.22); }
+    const rnd = rng(41);
+    groups.forEach((g, gi) => {
+      const ang = ropeAngles[gi % ropeAngles.length];
+      const ax = Math.sin(ang) * (LAKE_IN - 0.8), az = -Math.cos(ang) * (LAKE_IN - 0.8);
+      const bx = Math.sin(ang) * (LAKE_OUT + 0.9), bz = -Math.cos(ang) * (LAKE_OUT + 0.9);
+      const H = 3.4;
+      for (const [px, pz] of [[ax, az], [bx, bz]]) { const pole = part(CYL6, mat("#5E4430"), 0.07, H, 0.07, px, groundAt(px, pz) + H / 2, pz); ink(pole, 1.25); solids.push({ x: px, z: pz, r: 0.25 }); }
+      const pts: T.Vector3[] = []; const N = 16;
+      const ya = groundAt(ax, az) + H, yb = groundAt(bx, bz) + H;
+      for (let k = 0; k <= N; k++) { const t = k / N; pts.push(new three.Vector3(ax + (bx - ax) * t, ya + (yb - ya) * t - Math.sin(Math.PI * t) * 0.9, az + (bz - az) * t)); }
+      scene.add(new three.Line(new three.BufferGeometry().setFromPoints(pts), new three.LineBasicMaterial({ color: "#C9B98F" })));
+      const lit = g.lanterns.filter((l) => l.status === "lit");
+      const n = Math.min(9, lit.length);
+      for (let k = 0; k < n; k++) {
+        const t = (k + 1) / (n + 1); const p = pts[Math.round(t * N)];
+        const taken = lit[k].makers > 0;
+        part(CYL6, mat("#8A7350"), 0.01, 0.35, 0.01, p.x, p.y - 0.17, p.z);
+        const lan = part(CYL, mat("#F3E7C9", { emissive: taken ? "#FFD27A" : AMBER, ei: 0.95 }), 0.17, 0.36, 0.17, p.x, p.y - 0.55, p.z);
+        if (taken) part(BOX, mat("#3E3530"), 0.12, 0.03, 0.03, p.x, p.y - 0.33, p.z + 0.17); // 망치 표시: 누가 만들어보는 중
+        const gl = glow(AMBER, 1.8, p.x, p.y - 0.55, p.z, 0.75);
+        const ph = rnd() * 6; anim.push((tt) => { lan.rotation.z = Math.sin(tt * 1.3 + ph) * 0.08; gl.material.opacity = 0.65 + Math.sin(tt * 4 + ph) * 0.1; });
+      }
+      // 줄 이름 (가까이 가면 보인다)
+      const tag = textSprite(`소원 줄 · 등불 ${g.count - g.done}`, { bg: "#2A2118", fg: "#F3E7C9", size: 36, scale: 0.5 });
+      tag.position.set(bx, yb + 0.6, bz); scene.add(tag);
+      nameTags.push({ s: tag, x: bx, z: bz, always: false });
+      spots.push({ x: bx, z: bz, r: 3, kind: "rope", group: g.key, label: g.label });
+      spots.push({ x: ax, z: az, r: 3, kind: "rope", group: g.key, label: g.label });
+      firePoints.push({ x: (ax + bx) / 2, z: (az + bz) / 2, loud: 0.15 });
+    });
+    // 이뤄진 소원: 호수를 천천히 도는 유등
+    const done = (opts.lanterns ?? []).reduce((n, g) => n + g.done, 0);
+    const floats = Array.from({ length: Math.min(40, done) }, (_, i) => {
+      const m = new three.Group(); scene.add(m);
+      part(CYL, mat("#F3E7C9", { emissive: "#FFD27A", ei: 1 }), 0.2, 0.28, 0.2, 0, 0.14, 0, m);
+      part(BOX, mat("#6E5236"), 0.5, 0.06, 0.5, 0, 0, 0, m); // 나무 받침
+      const gl = glow("#FFD27A", 1.6, 0, 0, 0, 0.7);
+      return { m, gl, a: (i / Math.max(1, done)) * Math.PI * 2 + rnd() * 0.3, r: lakeMid + (rnd() - 0.5) * (lakeHalf * 1.2), sp: 0.01 + rnd() * 0.012 };
+    });
+    anim.push((tt, dt) => floats.forEach((f, i) => { f.a += f.sp * dt; const x = Math.sin(f.a) * f.r, z = -Math.cos(f.a) * f.r; const y = -0.2 + Math.sin(tt * 1.2 + i) * 0.04; f.m.position.set(x, y, z); f.gl.position.set(x, y + 0.1, z); }));
   }
 
   // ── 자연물 ──

@@ -40,7 +40,7 @@ export default async function Dex() {
               </div>
             );
           })}
-        <nav className="town-tabs" aria-label="마을 길"><a href="/find/home">내 집</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 집이나</a></nav>
+        <nav className="town-tabs" aria-label="마을 길"><a href="/find/home">내 대장간</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 대장간이나</a></nav>
       </section>
     </main>
   );

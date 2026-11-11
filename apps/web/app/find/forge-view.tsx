@@ -1,9 +1,11 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { FireCard } from "../../lib/find/card";
 import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
 import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
+import { MyLanterns, RopeSheet } from "./lantern-panel";
+import type { LanternRecord, PublicLantern } from "../../lib/find/lantern";
 import { ROOFS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../lib/find/decor";
 import FireCardView, { Roast } from "./fire-card";
 import { MailSheet } from "./mailbox";
@@ -20,9 +22,11 @@ type Props = {
   social: Social;
   viewerHasForge: boolean;
   dexAdded: number;
+  lanterns: { mine: LanternRecord[] | null; allowance: number; shown: PublicLantern[] };
+  news?: ReactNode;
 };
 const PHRASES = ["나도 갖고 싶어", "이거 천재다", "만들면 알려줘!", "장작 넣고 감", "응원해"];
-type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor";
+type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern";
 
 // 골목 테마별 방 색 (다인의 방 그림이 오기 전 임시)
 const ROOM_TINT: Record<string, [string, string, string]> = {
@@ -32,7 +36,9 @@ const ROOM_TINT: Record<string, [string, string, string]> = {
 };
 const VIS_LABEL = { public: "전체 공개", link: "링크로만", private: "비공개" } as const;
 
-export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded }: Props) {
+export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news }: Props) {
+  const [more, setMore] = useState(false);
+  useEffect(() => { if (isOwner && window.location.hash === "#lantern") setOpen("lantern"); }, [isOwner]);
   const [social, setSocial] = useState(initialSocial);
   const [needForge, setNeedForge] = useState(false);
   const [toast, setToast] = useState(dexAdded > 0 ? `도감에 ${forge.nickname}의 도깨비불 ${dexAdded}칸 추가!` : "");
@@ -85,14 +91,9 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   }
 
   return (
-    <section className="screen forge-screen" style={{ ["--fire" as string]: latest?.color ?? "#4FB3A6" }}>
-      <div className="forge-head">
-        <div className="tiny muted">{forge.alley}</div>
-        <h1 style={{ fontSize: 27 }}>{forge.nickname}의 대장간</h1>
-        <div className="muted small">도깨비불 {fires.length}개가 머무는 중 · 대장간 {STAGE_NAME[topStage - 1]} 단계</div>
-      </div>
-
-      <ForgeRoom village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
+    <section className="forge-full" style={{ ["--fire" as string]: latest?.color ?? "#4FB3A6" }}>
+      <div className="forge-stage">
+      <ForgeRoom full lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
       <div className="room" style={{ ["--wall" as string]: wall, ["--wall2" as string]: wall2, ["--floor" as string]: floor }}>
         <svg className="room-bg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           <polygon points="4,64 4,24 50,4 50,44" fill="var(--wall)" stroke="#232323" strokeWidth=".6" />
@@ -120,9 +121,40 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
           <em>우체통</em>
         </button>
       </div>} />
-      <p className="tiny muted" style={{ textAlign: "center", margin: 0 }}>물건을 눌러봐 · 옆으로 끌면 방을 둘러볼 수 있어</p>
-      {toast && <div className="news" role="status"><span>{toast}</span><button className="link" type="button" onClick={() => setToast("")}>좋아</button></div>}
+      <header className="forge-top">
+        <a className="forge-back" href={`/find/village?house=${forge.id}`} aria-label="마을로 나가기">← 마을</a>
+        <div className="forge-title">
+          <b>{forge.nickname}의 대장간</b>
+          <span>{forge.alley} · {STAGE_NAME[topStage - 1]} · 도깨비불 {fires.length}</span>
+        </div>
+        <span className="forge-chips" aria-label="받은 것">
+          <i title="오늘 받은 장작">장작 {social.fuelToday}</i><i title="나도 갖고 싶어">갖고 싶어 {social.wants}</i>
+        </span>
+      </header>
+      {toast && <div className="forge-toast" role="status"><span>{toast}</span><button className="link" type="button" onClick={() => setToast("")}>좋아</button></div>}
+      <p className="forge-hint">물건을 눌러봐 · 옆으로 끌면 둘러볼 수 있어</p>
+      <nav className="forge-dock" aria-label="대장간에서 할 일">
+        {isOwner ? (
+          <>
+            <a href="/find" className="dock-main">새 불 피우기</a>
+            <button type="button" onClick={() => show("lantern")}>등불{lanterns.mine?.length ? ` ${lanterns.mine.length}` : ""}</button>
+            <button type="button" onClick={() => show("decor")}>꾸미기</button>
+            <button type="button" onClick={() => { setMore(true); track("forge_sheet"); }}>더보기</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="dock-main" disabled={social.mine.fuelGivenToday} onClick={() => act("fuel")}>{social.mine.fuelGivenToday ? "장작 넣었어" : "장작 넣기"}</button>
+            <button type="button" disabled={social.mine.wanted} onClick={() => act("want")}>{social.mine.wanted ? "갖고 싶어 ✓" : "갖고 싶어"}</button>
+            <button type="button" onClick={() => show("lantern")}>등불{lanterns.shown.length ? ` ${lanterns.shown.length}` : ""}</button>
+            <button type="button" onClick={() => { setMore(true); track("forge_sheet"); }}>더보기</button>
+          </>
+        )}
+      </nav>
+      </div>
 
+      {more && <div className="overlay" role="dialog" aria-label="대장간 살림" onClick={(e) => { if (e.target === e.currentTarget) setMore(false); }}>
+      <div className="sheet tall forge-more">
+      {news}
       <div className="social-stats">
         <div><b>{social.fuelToday}</b><small>오늘 받은 장작</small></div>
         <div><b>{social.wants}</b><small>나도 갖고 싶어</small></div>
@@ -184,15 +216,20 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </div>
       )}
 
-      <a className="btn btn-ghost" href="/find/village" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>도깨비 마을 지도 보기</a>
+      <a className="btn btn-ghost" href={`/find/village?house=${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을로 나가기</a>
       {!isOwner && <ReportLink forgeId={forge.id} />}
       <nav className="town-tabs" aria-label="마을 길">
-        <a href="/find/home">내 집</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 집이나</a>
+        <a href="/find/home">내 대장간</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 대장간이나</a>
       </nav>
+      <button className="link" type="button" onClick={() => setMore(false)}>닫기</button>
+      </div></div>}
+      {open === "lantern" && (isOwner && lanterns.mine
+        ? <MyLanterns initial={lanterns.mine} allowance={lanterns.allowance} fires={fires.map((f) => ({ id: f.id, name: f.name }))} onClose={() => setOpen(null)} />
+        : <RopeSheet group={{ key: `forge:${forge.id}`, label: `${forge.nickname}의 등불`, count: lanterns.shown.length, done: lanterns.shown.filter((l) => l.status === "done").length, lanterns: lanterns.shown }} hasForge={viewerHasForge} onClose={() => setOpen(null)} />)}
 
       {open === "mailbox" && <MailSheet screen={`forge:${forge.id}`} onClose={() => setOpen(null)} />}
       {open === "decor" && <DecorSheet initial={forge.decor} village={forge.village} stats={{ neighbors: social.neighbors, fuel: social.fuelTotal, wants: social.wants, notes: social.notes.length }} houseId={forge.id} onClose={() => setOpen(null)} />}
-      {open && open !== "mailbox" && open !== "decor" && (
+      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && (
         <div className="overlay" role="dialog" aria-label="대장간 물건" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
           <div className="sheet tall">
             {open === "hearth" && (latest?.card ? (
@@ -256,7 +293,7 @@ function DecorSheet({ initial, stats, houseId, onClose }: { initial: Decor; vill
     <div className="overlay" role="dialog" aria-label="대장간 꾸미기" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="sheet tall">
         <div className="display" style={{ fontSize: 22 }}>대장간 꾸미기</div>
-        <div className="tiny muted">마을에서 보이는 내 집 겉모습이야.</div>
+        <div className="tiny muted">마을에서 보이는 내 대장간 겉모습이야.</div>
         <div className="decor-group">
           <b className="small">지붕</b>
           <div className="phrases">

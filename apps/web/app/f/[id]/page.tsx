@@ -12,6 +12,7 @@ import FireCardView, { Roast } from "../../find/fire-card";
 import ForgeView from "../../find/forge-view";
 import Mailbox from "../../find/mailbox";
 import VillageNews from "../../find/village-news";
+import { forgeLanterns, lanternAllowance, publicLanternGroups } from "../../../lib/find/lantern";
 import "../../find/fonts";
 
 export const dynamic = "force-dynamic";
@@ -67,12 +68,14 @@ export default async function SharedPage({ params, searchParams }: Props) {
     // 놀러 온 사람: 방문 기록 + 이 집 도깨비불을 내 도감에 한 칸씩
     const dexAdded = owner ? 0 : await recordVisit(viewer?.id ?? null, forge.id, fires.slice(0, 5).map((f) => f.id)).catch(() => 0);
     const social = await socialState(forge.id, viewer?.id ?? null);
+    // 소원 등불: 주인은 내 등불 전부, 손님은 이 대장간의 공개 등불만(대상 이름 가리기·카드 공개 여부 반영)
+    const own = await forgeLanterns(forge.id);
+    const ids = new Set(own.map((l) => l.id));
+    const shown = (await publicLanternGroups(viewer?.id ?? null)).flatMap((g) => g.lanterns).filter((l) => ids.has(l.id));
+    const lanterns = { mine: owner ? own : null, allowance: lanternAllowance(fires.length), shown };
     return (
-      <main className="find" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
-        <header className="top"><a className="brand" href="/find">달그락 대장간</a><div className="step">{owner ? "내 대장간" : "놀러 온 대장간"}</div></header>
-        {owner && <div style={{ padding: "0 20px" }}><VillageNews /></div>}
-        <ForgeView forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
-        <Mailbox screen={`forge:${forge.id}`} />
+      <main className="find forge-page" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
+        <ForgeView news={owner ? <VillageNews /> : null} lanterns={lanterns} forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
       </main>
     );
   }

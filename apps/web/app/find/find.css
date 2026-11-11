@@ -381,3 +381,41 @@ body:has(.find){background:#fff}
 .world-top { gap: 8px; }
 .world-top a, .world-top .world-sound { white-space: nowrap; font-size: 15px; padding: 6px 11px; }
 .world-top span { gap: 5px; flex-shrink: 0; }
+
+/* ── 대장간: 전체 화면 공간 ── */
+.find.forge-page { max-width: none; padding: 0; min-height: 100dvh; }
+.forge-full { position: fixed; inset: 0; }
+.forge-stage { position: absolute; inset: 0; overflow: hidden; background: linear-gradient(180deg, #2B2D55 0%, #6B5B8E 55%, #E7A77A 100%); }
+.room3d.room3d-full { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 0; background: transparent; }
+.forge-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: calc(12px + env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 12px max(14px, env(safe-area-inset-left, 0px)); background: linear-gradient(180deg, rgba(20,18,30,.55), rgba(20,18,30,0)); color: #F6F0E4; pointer-events: none; }
+.forge-top > * { pointer-events: auto; }
+.forge-back { flex-shrink: 0; color: #1E1F24; background: rgba(246,240,228,.92); text-decoration: none; padding: 6px 12px; border-radius: 999px; font-family: var(--font-display, Jua), sans-serif; font-size: 15px; }
+.forge-title { flex: 1; min-width: 0; display: grid; line-height: 1.25; }
+.forge-title b { font-family: var(--font-display, Jua), sans-serif; font-weight: 400; font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+.forge-title span { font-size: 12px; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.forge-chips { display: grid; gap: 4px; flex-shrink: 0; }
+.forge-chips i { font-style: normal; font-size: 11px; background: rgba(30,31,36,.6); padding: 2px 8px; border-radius: 999px; text-align: right; }
+.forge-hint { position: absolute; left: 0; right: 0; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); margin: 0; text-align: center; font-size: 12px; color: rgba(246,240,228,.85); text-shadow: 0 1px 4px rgba(0,0,0,.5); pointer-events: none; }
+.forge-toast { position: absolute; left: 14px; right: 14px; top: calc(70px + env(safe-area-inset-top, 0px)); display: flex; gap: 10px; align-items: center; background: rgba(30,31,36,.88); color: #fff; border-radius: 14px; padding: 10px 14px; font-size: 14px; }
+.forge-toast .link { color: #FFD27A; }
+.forge-dock { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 8px; padding: 12px max(12px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: linear-gradient(0deg, rgba(20,18,30,.7), rgba(20,18,30,0)); }
+.forge-dock > a, .forge-dock > button { display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 14px; border: 2px solid #232323; background: #F6F0E4; color: #1E1F24; font: 16px var(--font-display, Jua), sans-serif; text-decoration: none; cursor: pointer; padding: 0 6px; white-space: nowrap; }
+.forge-dock .dock-main { background: #FF8F3F; box-shadow: 0 3px 0 #232323; }
+.forge-dock button:disabled { opacity: .6; }
+.forge-more { max-height: 86dvh; overflow-y: auto; }
+button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-serif; cursor: pointer; }
+
+/* ── 소원 등불 ── */
+.lantern-sheet { display: grid; gap: 12px; max-height: 88dvh; overflow-y: auto; }
+.lantern-list { display: grid; gap: 8px; }
+.lantern-row { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: #F6F0E4; }
+.lantern-row > i { width: 16px; height: 22px; border-radius: 5px; background: #F3E7C9; box-shadow: 0 0 10px 2px rgba(242,166,90,.75); border: 1px solid #8A7350; flex-shrink: 0; }
+.lantern-row > i.taken { box-shadow: 0 0 10px 2px rgba(255,210,122,.95); }
+.lantern-row.done { opacity: .75; }
+.lantern-row.done > i { box-shadow: 0 0 12px 3px rgba(255,210,122,.9); }
+.lantern-row b { display: block; font-size: 14px; }
+.lantern-row span { display: block; font-size: 14px; }
+.lantern-row small { display: block; font-size: 12px; color: #6B6E78; }
+.lantern-form { display: grid; gap: 8px; }
+.lantern-form input, .lantern-form select { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #D8D2C4; background: #fff; }
+.lantern-form label { font-size: 14px; font-weight: 600; }

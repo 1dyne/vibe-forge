@@ -127,7 +127,7 @@ export default function VillageMap(props: Props) {
         {planMsg && <div className="error">{planMsg}</div>}
       </div>
 
-      <nav className="town-tabs" aria-label="마을 메뉴"><a href="/find/home">내 집</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 집이나</a></nav>
+      <nav className="town-tabs" aria-label="마을 메뉴"><a href="/find/home">내 대장간</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 대장간이나</a></nav>
 
       {sheet && (
         <div className="overlay" role="dialog" aria-label={sheet.kind === "hall" ? "본관" : sheet.street.name} onClick={(e) => { if (e.target === e.currentTarget) setSheet(null); }}>

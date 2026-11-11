@@ -4,6 +4,7 @@ import { VILLAGES, hallProgress } from "../../../lib/find/village";
 import { REACT_HUE, type ReactKind } from "../../../lib/find/chips";
 import { villageGate } from "../../../lib/find/village-gate";
 import { forgeFires, touchForge, worldHouses } from "../../../lib/find/village-store";
+import { publicLanternGroups } from "../../../lib/find/lantern";
 import "../fonts";
 import WorldView from "../world/world-view";
 import VillageGate from "./gate";
@@ -36,7 +37,7 @@ export default async function Village() {
   const hall = hallProgress(world.totalFuel);
   return (
     <main className="find world-page">
-      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.topics, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} />
+      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.topics, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} lanterns={await publicLanternGroups(me.id)} />
     </main>
   );
 }
