@@ -9,7 +9,7 @@ import { RopeSheet } from "../lantern-panel";
 import type { LanternGroup } from "../../../lib/find/lantern";
 import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
 
-// 걷는 도깨비 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
+// 걷는 달그락 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
 
 type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number; lanterns: LanternGroup[]; giwa?: number };
@@ -373,7 +373,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
             <button key={t.id} type="button" className={`map-tag ${t.kind}`} style={{ left: `${(t.x / mapShot.hx + 1) * 50}%`, top: `${(t.z / mapShot.hz + 1) * 50}%` }} onClick={() => goMap(t.id)} aria-label={t.name}>{t.kind === "mine" ? "" : t.name}</button>
           ))}
           <i className="map-me" style={{ left: `${(mapShot.me.x / mapShot.hx + 1) * 50}%`, top: `${(mapShot.me.z / mapShot.hz + 1) * 50}%` }} />
-          <div className="map-head"><span>도깨비 마을 지형도</span><button type="button" onClick={() => setMapShot(null)}>닫기</button></div>
+          <div className="map-head"><span>달그락 마을 지형도</span><button type="button" onClick={() => setMapShot(null)}>닫기</button></div>
           <div className="map-foot">이름을 누르면 그 앞으로 바로 가{mapShot.tags.some((t) => t.kind === "mine") ? " · 주황 깃발이 내 대장간" : ""} · <a href="/find/map" style={{ color: "#FFD27A" }}>본관 게시판</a></div>
         </div>
       )}

@@ -3,7 +3,7 @@ import type { Decor, RoofId } from "../../../lib/find/decor";
 import type { LanternGroup } from "../../../lib/find/lantern";
 import { buildEras, eraCenter, eraTint, ERA_R, ERA_RADIUS, ERAS } from "./world-eras";
 
-// 도깨비 마을 3D 세계. 하회마을처럼 물이 감싸 도는 땅에 다섯 마을이 앉고, 한가운데 호수 섬에 본관 대장간이 있다.
+// 달그락 마을 3D 세계. 하회마을처럼 물이 감싸 도는 땅에 다섯 마을이 앉고, 한가운데 호수 섬에 본관 대장간이 있다.
 // 고증 원칙(docs/FIND-WORLD.md): 조선 민가 문법(초가·기와·흙벽·창호·장승·솟대), 단청·오니·청사초롱 가로등 없음.
 // 빛은 두 가지: 사람의 불빛(창호지 창·초롱·화톳불, 따뜻한 주황)과 도깨비불(청록·연보라, 서늘함).
 

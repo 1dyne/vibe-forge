@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (forge) {
     if (forge.visibility === "private") return { title: "달그락 대장간", robots: { index: false } };
     const title = `${forge.nickname}의 대장간 · ${alleyName(forge.theme)}`;
-    const description = "도깨비 마을에 놀러 와. 너만의 도깨비불도 찾아볼래?";
+    const description = "달그락 마을에 놀러 와. 너만의 도깨비불도 찾아볼래?";
     const image = `${origin}/f/${forge.id}/og.png`;
     return {
       title: `${title} · 달그락 대장간`, description, metadataBase: new URL(origin),
