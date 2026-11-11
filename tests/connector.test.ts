@@ -17,6 +17,7 @@ import { getProject, listProjects } from "../apps/web/lib/local-project-store";
 import { signSession, userSessionValue } from "../apps/web/lib/session";
 import { vaultFor, withVault } from "../apps/web/lib/vault";
 import { workflowFor } from "../apps/web/lib/workflow";
+import { guideToKit } from "../apps/web/lib/bench/from-guide";
 
 const SECRET = "test-secret-for-connector-routes-0123456789";
 let folder: string;
@@ -264,6 +265,20 @@ describe("Claude connector", () => {
     const saved = await tool(token, "set_assembly_guide", { projectId: id, guide });
     expect(saved.isError).toBeFalsy();
     expect(saved.structuredContent!.assembly.steps[0].cards[0].id).toBe("s1-c1");
+    // 3D 작업대용 동작: 회로에 없는 핀 납땜은 거절, 맞는 핀은 저장되고 3D 입력으로 바뀐다
+    const badSolder = await tool(token, "set_assembly_guide", { projectId: id, guide: { ...guide, steps: [guide.steps[0], { ...guide.steps[1], ops: [{ op: "solder", joints: ["U1.D9"], side: "top" }] }] } });
+    expect(badSolder.isError).toBe(true);
+    expect(badSolder.content[0].text).toContain("U1.D9");
+    const withOps = await tool(token, "set_assembly_guide", { projectId: id, guide: { ...guide, steps: [guide.steps[0], { ...guide.steps[1], ops: [{ op: "solder", joints: ["U1.D2", "SW1.A"], side: "top" }, { op: "check", how: "continuity", targets: ["U1.D2", "SW1.A"], expected: "삐 소리" }] }] } });
+    expect(withOps.isError).toBeFalsy();
+    const kit = guideToKit((await withVault(vaultFor(token, user.id), () => getProject(id)))!)!;
+    expect(kit.parts.map((p) => p.ref)).toEqual(["BASE", "U1", "SW1"]);
+    expect(kit.steps[0].ops[0]).toMatchObject({ op: "place", ref: "BASE" });
+    expect(kit.steps[1].ops.some((o) => o.op === "jumper" && o.from === "U1.D2" && o.to === "SW1.A")).toBe(true);
+    expect(kit.steps[1].ops.some((o) => o.op === "solder")).toBe(true);
+    const u1 = kit.parts.find((p) => p.ref === "U1")!;
+    expect(u1.spec?.pinXY?.find((p) => p.name === "D2")).toMatchObject({ x: 30, y: 21 });
+    await tool(token, "set_assembly_guide", { projectId: id, guide });
 
     await act({ action: "approve_mockup" });
     await tool(token, "set_team", { projectId: id, agents: ["hw"] });

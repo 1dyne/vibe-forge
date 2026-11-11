@@ -122,7 +122,7 @@ export default function ProjectWorkspace() {
     </section>
     {showArtifacts&&project&&<>
       <ResizeHandle className="workbench-resizer" controls="workbench-panel" label="작업대 크기 조절" axis={layout.stacked?"y":"x"} reverse value={layout.stacked?layout.sizes.workbenchHeight:layout.sizes.workbench} min={layout.stacked?180:280} max={layout.stacked?800:1000} onResize={v=>resize(layout.stacked?"workbenchHeight":"workbench",v)} onReset={()=>resize(layout.stacked?"workbenchHeight":"workbench",layout.stacked?360:460)}/>
-      <WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action}/>
+      <WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action} connectorOnly={connectorOnly}/>
     </>}
     {makerHelp&&<div className="modal-backdrop" onClick={()=>setMakerHelp(false)}><section className="profile-modal maker-help" role="dialog" aria-modal="true" aria-label="메이커스페이스 안내" onClick={e=>e.stopPropagation()}><header><h2>3D 프린터가 없어도 괜찮아요</h2><button aria-label="닫기" onClick={()=>setMakerHelp(false)}>×</button></header>
       {connectorOnly?<p>내 Claude에게 <b>“내 근처 메이커스페이스 찾아줘”</b>라고 말하면, 사는 곳과 이동할 수 있는 범위를 먼저 묻고 근처에서 쓸 수 있는 공간을 찾아 정리해줘요.</p>:<p className="notice">미안해요. 웹 대화에서 근처 메이커스페이스를 찾아주는 기능은 아직 설계 중이에요. 아래 방법으로 직접 찾아보실 수 있어요. Claude 커넥터로 쓰시면 Claude가 위치를 묻고 대신 찾아드려요.</p>}

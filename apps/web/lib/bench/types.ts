@@ -6,7 +6,9 @@ export type BenchView = "34" | "top" | "bottom" | "front";
 
 export type BenchPartKind =
   | "perfboard" | "breadboard" | "resistor" | "led" | "battery_holder_2aa" | "aa_battery"
-  | "header_male" | "sensor_module";
+  | "header_male" | "sensor_module"
+  // 프로젝트 조립 가이드에서 오는 부품: 부품 카드(catalogId)나 가이드의 크기·핀으로 만든다
+  | "module" | "plate";
 
 export type BenchPart = {
   ref: string;
@@ -15,7 +17,15 @@ export type BenchPart = {
   /** 부품 한 줄 설명 (칩을 누르면 보인다) */
   about: string;
   /** 종류별 추가 값: 저항값, LED 색, 핀 수, 기판 크기 등 */
-  spec?: { ohms?: number; color?: string; pins?: number; cols?: number; rows?: number; pinNames?: string[]; silk?: string };
+  spec?: {
+    ohms?: number; color?: string; pins?: number; cols?: number; rows?: number; pinNames?: string[]; silk?: string;
+    /** module: 기판 위 자리(기판 왼쪽 위 기준 mm)와 핀 위치(같은 좌표계, 회전 적용 후) */
+    catalogId?: string; partType?: string; model?: string;
+    foot?: { x: number; y: number; w: number; h: number; rotation: number };
+    pinXY?: Array<{ name: string; x: number; y: number }>;
+    /** plate·perfboard·breadboard 크기 (mm) */
+    widthMm?: number; heightMm?: number;
+  };
 };
 
 /** "PB.H5" = 기판 PB의 H열 5행 구멍, "U1.VCC" = 부품 U1의 VCC 핀, "BT.RED" = 배터리 홀더 빨간 선 끝 */
@@ -31,7 +41,11 @@ export type BenchOp =
   | { op: "bridge"; pairs: Array<[Anchor, Anchor]> }
   | { op: "trim"; refs: string[] }
   | { op: "batteries"; ref: string }
-  | { op: "check"; how: "look" | "continuity" | "power_on"; targets: Anchor[]; expected: string };
+  | { op: "check"; how: "look" | "continuity" | "power_on"; targets: Anchor[]; expected: string }
+  /** 기판(onto) 위 foot 자리에 부품을 놓는다 */
+  | { op: "seat"; ref: string; onto: string }
+  /** 두 핀을 전선으로 잇는다 (브레드보드 점퍼선 또는 납땜용 전선) */
+  | { op: "jumper"; from: Anchor; to: Anchor; color: string; label?: string };
 
 export type BenchMistake = { kind: "cold" | "bridge" | "starved"; title: string; looks: string; fix: string };
 

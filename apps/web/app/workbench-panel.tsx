@@ -7,8 +7,8 @@ import { AGENTS, workflowFor } from "../lib/workflow";
 import { CircuitView, MockupView, TaskView } from "./artifact-views";
 import { AssemblyView } from "./assembly-view";
 
-export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction }: {
-  project: LocalProject; items: WorkbenchItem[]; selected: string; busy: boolean;
+export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction, connectorOnly = false }: {
+  project: LocalProject; items: WorkbenchItem[]; selected: string; busy: boolean; connectorOnly?: boolean;
   onSelect: (id: string) => void; onClose: () => void; onAction: (input: Record<string, unknown>) => void;
 }) {
   const item = items.find(i => i.id === selected) ?? items[0];
@@ -39,7 +39,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
       {source || !hasPreview ? <pre className="file-source">{item.content}</pre> : <>
         {item.kind === "circuit" && project.build && <><div className="artifact-title"><span className="pill">회로 초안</span><h3>{project.build.blueprint.title}</h3></div><CircuitView blueprint={project.build.blueprint} /><div className="check-list">{project.build.checks.map(c => <div key={c.id} className={c.verdict}><span>{c.verdict === "pass" ? "✓" : c.verdict === "unknown" ? "?" : "!"}</span><p><b>{c.id}</b>{c.message}</p></div>)}</div><details><summary>HW / SW 검토 결과</summary><p>{project.build.evaluator.summary}</p>{[project.build.evaluator.hw, project.build.evaluator.sw].map((v, i) => <p key={i}><span className={`pill ${v.verdict}`}>{i ? "SW" : "HW"} · {v.verdict}</span> {v.findings.join(" ")}</p>)}</details></>}
         {item.kind === "product" && project.productForm && <><div className="artifact-title"><span className="pill">완성품 미리보기</span><h3>{project.name}</h3></div><MockupView blueprint={project.build?.blueprint ?? { title: project.name, board: "", supplyVoltage: 5, components: [], nets: [], enclosure: { widthMm: 40, depthMm: 40, heightMm: 40, wallMm: 2 }, firmware: { platform: "arduino", behavior: "", pinAssignments: [], loopSteps: [] }, assumptions: [], humanChecks: [] }} form={project.productForm} /></>}
-        {item.kind === "assembly" && project.assembly && <AssemblyView project={project} busy={busy} onAction={onAction} />}
+        {item.kind === "assembly" && project.assembly && <AssemblyView project={project} busy={busy} onAction={onAction} connectorOnly={connectorOnly} />}
         {item.kind === "cad" && project.build && <><div className="artifact-title"><span className="pill">치수 기반 3D</span><h3>{item.filename}</h3></div><MockupView blueprint={project.build.blueprint} /></>}
         {item.kind === "bom" && project.build && <><h3>{project.name} · 부품목록</h3><p className="notice">구매 전 정확한 모델·수량·가격·판매처 재고를 확인해주세요. 출처의 가격은 확인한 날짜 기준이에요.</p><table className="bom-table"><thead><tr><th>부품 / 용도</th><th>진행 상태</th></tr></thead><tbody>{project.build.blueprint.components.map(c => <tr key={c.ref}><td><small>{c.ref} · 수량 확인 필요</small><strong>{c.valueOrModel}</strong><p>{c.reason}</p>{(workflow.partSources?.[c.ref] ?? []).map(s => <p className="part-source" key={s.url}><a href={s.url} target="_blank" rel="noreferrer noopener">↗ {s.title}</a>{s.price && <> · {s.price}</>} <small>{s.checkedAt.slice(0, 10)} 확인</small></p>)}</td><td><select aria-label={`${c.ref} 구매 상태`} value={workflow.purchases[c.ref] ?? "needed"} disabled={busy} onChange={e => onAction({ action: "purchase", ref: c.ref, status: e.target.value })}><option value="needed">구매 예정</option><option value="ordered">주문 완료</option><option value="received">수령 완료</option><option value="problem">문제 발생</option></select></td></tr>)}</tbody></table></>}
         {item.kind === "tasks" && <TaskView project={project} onAction={onAction} busy={busy} />}

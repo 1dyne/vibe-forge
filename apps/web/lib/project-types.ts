@@ -144,7 +144,13 @@ export type ProductForm = {
 export type AssemblyPart = { ref: string; label: string; x: number; y: number; width: number; height: number; color?: string; pins?: Array<{ name: string; x: number; y: number }>; catalogId?: string; rotation?: 0 | 90 | 180 | 270 };
 export type AssemblyWire = { from: string; to: string; color: string; label?: string };
 export type TroubleCard = { id: string; symptom: string; check: string; expected: string; ifNot: string };
-export type AssemblyStep = { title: string; action: string; place: string[]; wires: AssemblyWire[]; check: string; cards: TroubleCard[] };
+// 3D 조립 책상에서 연출할 추가 동작 (명세서 2차 v0.1 §3). 없으면 place·wires만으로 연출한다.
+// 핀 표기는 REF.PIN. 납땜 위치는 회로 net에 들어 있는 핀이어야 한다.
+export type AssemblyOp =
+  | { op: "solder"; joints: string[]; side: "top" | "bottom" }
+  | { op: "trim"; refs: string[] }
+  | { op: "check"; how: "look" | "continuity" | "power_on"; targets: string[]; expected: string };
+export type AssemblyStep = { title: string; action: string; place: string[]; wires: AssemblyWire[]; check: string; cards: TroubleCard[]; ops?: AssemblyOp[] };
 export type AssemblyGuide = {
   stage: string;
   base: { name: string; kind: "breadboard" | "board" | "stack" | "perfboard"; width: number; height: number };

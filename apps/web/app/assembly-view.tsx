@@ -4,6 +4,10 @@ import type { LocalProject } from "../lib/project-types";
 import { judgeReading, libraryCardsForStep, type ExpectedRange } from "../lib/parts/trouble-cards";
 import { stepBasis, wireLengths } from "../lib/assembly-utils";
 import { PartsBoard, placeParts } from "./parts-board";
+import { createPortal } from "react-dom";
+import BenchViewScreen, { type BenchPhoto } from "./bench/bench-view";
+import { guideToKit } from "../lib/bench/from-guide";
+import { workflowFor } from "../lib/workflow";
 
 const RED = "#d64545", BLACK = "#222222";
 
@@ -15,9 +19,26 @@ function rangeText(range: ExpectedRange | null): string {
   return range.min != null && range.max != null ? `${fmt(range.min)}~${fmt(range.max)}${range.unit}` : range.min != null ? `${fmt(range.min)}${range.unit} 이상` : `${fmt(range.max!)}${range.unit} 이하`;
 }
 
-export function AssemblyView({ project, busy, onAction }: { project: LocalProject; busy: boolean; onAction: (input: Record<string, unknown>) => void }) {
+export function AssemblyView({ project, busy, onAction, connectorOnly = false }: { project: LocalProject; busy: boolean; onAction: (input: Record<string, unknown>) => void; connectorOnly?: boolean }) {
   const guide = project.assembly!;
+  const [bench, setBench] = useState(false);
+  const kit = useMemo(() => (bench ? guideToKit(project) : null), [bench, project.assembly, project.build, project.buildPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+  // HW 작업실에 실제로 묻는다 (대장간 단계가 아니면 대장 방으로 간다)
+  const askHw = async (text: string, photos: BenchPhoto[]) => {
+    const w = workflowFor(project);
+    const channel = w.phase === "workshop" && w.activeAgents.includes("hw") ? "hw" : "main";
+    const r = await fetch(`/api/projects/${project.id}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, attachments: photos, channel, mode: "work" }) });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok || !b.project) throw new Error(b.error ?? "지금은 답하지 못했어요. 잠시 뒤 다시 보내 주세요.");
+    const msgs = (b.project as LocalProject).messages;
+    const lastUser = msgs.map((m) => m.role).lastIndexOf("user");
+    const replies = msgs.slice(lastUser + 1).filter((m) => m.role === "assistant");
+    const hw = replies.find((m) => m.agent === "hw") ?? replies[replies.length - 1];
+    return hw?.text ?? "기록했어요. 작업실에서 답을 확인해 주세요.";
+  };
+
   const reports = project.assemblyReports ?? [];
+  const reportedSteps = [...new Set(reports.filter((r) => !r.cardId).map((r) => r.step))];
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [replay, setReplay] = useState(0);
@@ -73,7 +94,10 @@ export function AssemblyView({ project, busy, onAction }: { project: LocalProjec
     <PartsBoard base={guide.base} placed={placed} label={`${guide.base.name} · ${W}×${H}mm 실제 비율`} replayKey={`${step}-${replay}`}
       wires={wires.map((w) => ({ from: w.from, to: w.to, stroke: w.stroke, fresh: w.fresh }))} freshRefs={new Set(visible.filter((p) => placedAt.get(p.ref) === step).map((p) => p.ref))}
       pastRefs={new Set(visible.filter((p) => (placedAt.get(p.ref) ?? 0) < step).map((p) => p.ref))} activePins={activePins} />
-    <div className="board-actions"><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button></div>
+    <div className="board-actions"><button className="primary bench-open" onClick={() => setBench(true)}>🔥 3D 작업대에서 따라 하기</button><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button></div>
+    {bench && kit && typeof document !== "undefined" && createPortal(
+      <div className="bench-overlay"><BenchViewScreen kit={kit} mode="project" onClose={() => setBench(false)} onAsk={connectorOnly ? undefined : askHw} connectorOnly={connectorOnly} reported={reportedSteps}
+        onReport={(n, text) => onAction({ action: "assembly_report", step: n, text })} /></div>, document.body)}
     {fallbacks.length > 0 && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 준비되지 않아 사각형으로 보여요. 핀 위치는 {fallbacks.some((p) => p.card?.pins.length) ? "부품 카드" : "가이드"} 기준이니, 판매 페이지 사진과 핀 이름으로 방향을 확인하세요.</p>}
     <div className="assembly-controls">
       <button disabled={step === 0} onClick={() => { setPlaying(false); setStep(step - 1); setShowDetail(false); }}>◀ 이전</button>

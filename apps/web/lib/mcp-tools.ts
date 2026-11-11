@@ -159,6 +159,9 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - steps는 하나씩 할 동작이다: 어떤 부품을 어느 방향으로 어디에 놓는지, 어떤 선을 어느 핀에서 어느 핀으로 잇는지(빨강=전원, 검정=GND), 마치면 무엇을 확인하는지. 대시보드에서 단계별 애니메이션으로 재생된다.
 - 단계마다 예상 문제 카드를 미리 넣는다: 증상 → 확인 방법(멀티미터 모드·측정 위치까지, 예: "DC 20V 모드로 빨간 리드를 5V 핀, 검은 리드를 GND에") → 정상값 → 아니면 할 일.
 - 사용자가 카드 결과를 보내면 assemblyReports로 돌아온다. 기대값과 비교해 원인을 좁히고, 필요하면 가이드를 고쳐 다시 저장한다. 채팅으로 말해준 결과는 record_assembly_result로 남긴다.
+- 같은 가이드가 대시보드의 '3D 작업대'에서 HW 달그락의 안내로 재생된다: 부품이 트레이에서 기판 위 x·y 자리로 날아와 앉고, 전선이 핀에서 핀으로 이어진다. 그래서 x·y·크기·rotation은 실제 배치 그대로 넣는다.
+- 납땜으로 잇는 단계면 steps[].ops에 어느 핀을 어느 면에서 납땜하는지(solder: joints REF.PIN, side), 다리 자르기(trim), 확인(check: look·continuity 두 핀·power_on)을 넣는다. 회로 net에 없는 핀은 납땜으로 저장되지 않는다. ops를 비우면 연결 방식이 solder·perfboard·pcb일 때 전선 양 끝이 납땜으로 표시된다.
+- 사용자가 3D 작업대에서 'HW 달그락'을 두 번 눌러 물으면 [조립 · 단계 n/N · 제목] 머리말과 사진이 HW 작업실 대화로 온다. 그 단계의 핀과 문제 카드를 기준으로 답한다.
 
 ## 진행 상황 보여주기 (report_progress)
 - 설계도·회로·조립 가이드처럼 여러 단계가 걸리는 작업을 시작할 때 report_progress로 제목, 계획 체크리스트(done/doing/todo), 생각 요약(지금 무엇을 왜 고민하는지 2~3문장)을 보낸다. 단계가 바뀔 때마다 갱신하고, 끝나면 모두 done으로 보낸다. 사용자는 대시보드에서 이 진행을 실시간으로 본다.
@@ -396,7 +399,12 @@ const AssemblySchema = z.object({
     title: z.string().min(1).max(80), action: z.string().min(1).max(600), place: z.array(z.string()).max(8),
     wires: z.array(z.object({ from: z.string().regex(PIN_REF), to: z.string().regex(PIN_REF), color: z.string().regex(/^#[0-9a-fA-F]{6}$/), label: z.string().max(40).optional() }).strict()).max(12),
     check: z.string().min(1).max(400),
-    cards: z.array(z.object({ symptom: z.string().min(1).max(200), check: z.string().min(1).max(400), expected: z.string().min(1).max(200), ifNot: z.string().min(1).max(400) }).strict()).max(6)
+    cards: z.array(z.object({ symptom: z.string().min(1).max(200), check: z.string().min(1).max(400), expected: z.string().min(1).max(200), ifNot: z.string().min(1).max(400) }).strict()).max(6),
+    ops: z.array(z.discriminatedUnion("op", [
+      z.object({ op: z.literal("solder"), joints: z.array(z.string().regex(PIN_REF)).min(1).max(24), side: z.enum(["top", "bottom"]) }).strict(),
+      z.object({ op: z.literal("trim"), refs: z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,15}$/)).min(1).max(8) }).strict(),
+      z.object({ op: z.literal("check"), how: z.enum(["look", "continuity", "power_on"]), targets: z.array(z.string().min(1).max(40)).min(1).max(4), expected: z.string().min(1).max(120) }).strict()
+    ])).max(8).optional()
   }).strict()).min(1).max(20)
 }).strict();
 
@@ -746,7 +754,7 @@ TOOLS.push(
   },
   {
     name: "set_assembly_guide", title: "조립 가이드 (실제 기판 배치·단계·문제 카드)",
-    description: "설계도의 한 단계를 실제로 따라 만들 수 있게 한다. base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기·위치와 핀 위치, steps는 하나씩 할 동작(어떤 부품을 어디에 놓고 어떤 선을 어디서 어디로 잇는지), 단계마다 확인할 것과 문제 카드(증상 → 확인 방법 → 기대값 → 아니면 할 일, 예: 멀티미터 DC 20V로 5V-GND 측정 4.75~5.25V)를 넣는다. 대시보드에서 단계별 애니메이션으로 재생되고, 사용자가 카드의 확인 결과를 보내면 assemblyReports로 돌아온다.",
+    description: "설계도의 한 단계를 실제로 따라 만들 수 있게 한다. base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기·위치와 핀 위치, steps는 하나씩 할 동작(어떤 부품을 어디에 놓고 어떤 선을 어디서 어디로 잇는지), 단계마다 확인할 것과 문제 카드(증상 → 확인 방법 → 기대값 → 아니면 할 일, 예: 멀티미터 DC 20V로 5V-GND 측정 4.75~5.25V)를 넣는다. 대시보드에서 단계별 애니메이션으로 재생되고, '3D 작업대'에서는 부품이 트레이에서 기판 위 자리로 날아와 앉고 전선·납땜이 단계별로 연출된다(HW 달그락이 화면 안에서 안내). 그래서 x·y·크기·핀 위치를 실제 값으로 넣는다. 사용자가 카드의 확인 결과나 '실제로 했어요'를 보내면 assemblyReports로 돌아온다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "guide"], properties: { projectId, guide: { type: "object", additionalProperties: false, required: ["stage", "base", "parts", "steps"], properties: {
       stage: { type: "string", description: "설계도의 어느 단계인지" },
       base: { type: "object", additionalProperties: false, required: ["name", "kind", "width", "height"], properties: { name: { type: "string", description: "예: 하프 브레드보드 400홀" }, kind: { type: "string", enum: ["breadboard", "board", "stack", "perfboard"] }, width: { type: "number", description: "실제 가로 mm (하프 브레드보드 약 82)" }, height: { type: "number", description: "실제 세로 mm (하프 브레드보드 약 55)" } } },
@@ -755,7 +763,16 @@ TOOLS.push(
         title: { type: "string" }, action: { type: "string", description: "초보자가 따라 할 동작 (방향·핀 이름까지)" }, place: { type: "array", items: { type: "string" }, description: "이 단계에서 놓는 부품 ref" },
         wires: { type: "array", items: { type: "object", additionalProperties: false, required: ["from", "to", "color"], properties: { from: { type: "string", description: "REF.PIN (parts의 pins에 있어야 함)" }, to: { type: "string" }, color: { type: "string", description: "빨강=전원 #d64545, 검정=GND #333333 등" }, label: { type: "string" } } } },
         check: { type: "string", description: "이 단계를 마치면 확인할 것" },
-        cards: { type: "array", items: { type: "object", additionalProperties: false, required: ["symptom", "check", "expected", "ifNot"], properties: { symptom: { type: "string" }, check: { type: "string", description: "멀티미터 모드·측정 위치까지 구체적으로" }, expected: { type: "string" }, ifNot: { type: "string" } } } }
+        cards: { type: "array", items: { type: "object", additionalProperties: false, required: ["symptom", "check", "expected", "ifNot"], properties: { symptom: { type: "string" }, check: { type: "string", description: "멀티미터 모드·측정 위치까지 구체적으로" }, expected: { type: "string" }, ifNot: { type: "string" } } } },
+        ops: { type: "array", description: "선택. 3D 작업대에서 연출할 추가 동작. 납땜 연결이면 어느 핀을 납땜하는지(solder), 리드 자르기(trim), 확인(check: look·continuity·power_on). 없으면 place·wires로만 연출하고, 연결 방식이 solder/perfboard/pcb면 전선 양 끝을 납땜으로 보여준다.", items: { type: "object", required: ["op"], properties: {
+          op: { type: "string", enum: ["solder", "trim", "check"] },
+          joints: { type: "array", items: { type: "string" }, description: "solder: 납땜할 핀 REF.PIN (회로 net에 있는 핀만)" },
+          side: { type: "string", enum: ["top", "bottom"], description: "solder: 납땜하는 면" },
+          refs: { type: "array", items: { type: "string" }, description: "trim: 다리를 자를 부품 ref" },
+          how: { type: "string", enum: ["look", "continuity", "power_on"] },
+          targets: { type: "array", items: { type: "string" }, description: "check: 대상 REF 또는 REF.PIN (continuity는 두 핀)" },
+          expected: { type: "string", description: "check: 정상일 때 (예: 소리 없음, LED 켜짐)" }
+        } } }
       } } }
     } } } },
     run: async (input, context) => {
@@ -784,6 +801,17 @@ TOOLS.push(
             if (!hasPin(ref, pin)) problems.push(`${index + 1}단계 전선 끝 ${end}의 핀이 부품 카드나 parts.pins에 없어요`);
           }
           if (circuitNets.length && !sameNet(wire.from, wire.to)) problems.push(`${index + 1}단계 전선 ${wire.from}→${wire.to}는 회로에 없는 연결이에요`);
+        }
+        const inNet = (end: string) => !circuitNets.length || circuitNets.some((net) => net.members.includes(end));
+        for (const op of step.ops ?? []) {
+          if (op.op === "solder") for (const j of op.joints) {
+            const [ref, ...rest] = j.split(".");
+            if (!hasPin(ref, rest.join("."))) problems.push(`${index + 1}단계 납땜 ${j}의 핀이 부품 카드나 parts.pins에 없어요`);
+            else if (!inNet(j)) problems.push(`${index + 1}단계 납땜 ${j}는 회로 연결에 없는 핀이에요`);
+          }
+          if (op.op === "trim") for (const ref of op.refs) if (!guide.parts.some((p) => p.ref === ref)) problems.push(`${index + 1}단계 trim의 ${ref}가 parts에 없어요`);
+          if (op.op === "check") for (const t of op.targets) { const [ref, ...rest] = t.split("."); if (!guide.parts.some((p) => p.ref === ref) || (rest.length && !hasPin(ref, rest.join(".")))) problems.push(`${index + 1}단계 check 대상 ${t}가 parts나 핀에 없어요`); }
+          if (op.op === "check" && op.how === "continuity" && op.targets.length !== 2) problems.push(`${index + 1}단계 continuity check는 핀 두 개가 필요해요`);
         }
       });
       if (problems.length) throw new ToolError(`조립 가이드를 저장하지 못했어요: ${problems.slice(0, 6).join(" / ")}`);

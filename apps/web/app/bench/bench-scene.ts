@@ -2,7 +2,7 @@ import type * as T from "three";
 import type { BenchKit, BenchOp, BenchPart, BenchView } from "../../lib/bench/types";
 import {
   Kit3D, PITCH, aaBattery, batteryHolder2AA, breadboard, coldGeometry, filletGeometry, flushCutter, headerMale,
-  led5, perfboard, probe, resistor, roundedRect, sensorModule, solderingIron, type GridBoard
+  led5, moduleModel, perfboard, plate, probe, resistor, roundedRect, sensorModule, solderingIron, type GridBoard
 } from "./bench-models";
 
 // 3D 조립 책상 엔진 (명세서 2차 v0.1 §1). 단위 mm, 매트 윗면 y = 0.
@@ -42,7 +42,13 @@ type PartRec = {
   header?: ReturnType<typeof headerMale>;
   module?: ReturnType<typeof sensorModule>;
   atHome: boolean;
+  /** 프로젝트 부품: 핀 윗점(부품 원점 기준) */
+  pinLocal?: Map<string, T.Vector3>;
+  /** 기판(받침): 가이드 좌표 → 기판 원점 기준 위치 */
+  baseMap?: (x: number, y: number) => T.Vector3;
+  baseKind?: string;
 };
+type JumperRec = { op: Extract<BenchOp, { op: "jumper" }>; curve: T.CatmullRomCurve3 | null; mesh: T.Mesh | null; ends: T.Object3D[]; t: number; built: number; mat: T.Material };
 type WireRec = { id: string; color: string; holderRef: string; exitLocal: T.Vector3; looseLocal: T.Vector3; strip: number; tin: number; insert: number; hole: T.Vector3 | null; mesh: T.Mesh | null; bare: T.Mesh | null; bareMat: T.MeshStandardMaterial; key: string };
 type Joint = { anchor: string; pos: T.Vector3; side: "top" | "bottom"; mesh: T.Mesh };
 type Target = { pos: T.Vector3; label?: string; radius: number; part?: string };
@@ -50,7 +56,7 @@ type Target = { pos: T.Vector3; label?: string; radius: number; part?: string };
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const smooth = (t: number) => { t = clamp(t); return t * t * (3 - 2 * t); };
 const seg = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
-const OP_SECONDS: Record<BenchOp["op"], number> = { place: 0.9, insert: 1.2, mount_on: 1.2, prep_wire: 1.6, insert_wire: 0.9, solder: 1.0, bridge: 0.7, trim: 0.6, batteries: 1.1, check: 0.7 };
+const OP_SECONDS: Record<BenchOp["op"], number> = { place: 0.9, insert: 1.2, mount_on: 1.2, prep_wire: 1.6, insert_wire: 0.9, solder: 1.0, bridge: 0.7, trim: 0.6, batteries: 1.1, check: 0.7, seat: 1.0, jumper: 0.9 };
 function opSeconds(op: BenchOp) {
   if (op.op === "solder") return 0.25 + op.joints.length * 0.95;
   if (op.op === "bridge") return 0.3 + op.pairs.length * 0.75;
@@ -129,14 +135,16 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
   mat.castShadow = false; ground.push(mat);
 
   const TRAY = { x: 0, z: 116, w: 206, d: 112 };
-  const trayG = new three.Group(); trayG.position.set(TRAY.x, 0, TRAY.z); scene.add(trayG); ground.push(trayG);
+  const trayG = new three.Group(); scene.add(trayG); ground.push(trayG);
   const trayM = k.std("#efe6d6", { rough: 0.62 });
-  const floorS = roundedRect(three, TRAY.w, TRAY.d, 9);
-  const floorG = new three.ExtrudeGeometry(floorS, { depth: 2.5, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.6, bevelSegments: 2 }); floorG.rotateX(-Math.PI / 2);
-  k.mesh(floorG, trayM, trayG);
-  const rimS = roundedRect(three, TRAY.w, TRAY.d, 9); rimS.holes.push(roundedRect(three, TRAY.w - 6, TRAY.d - 6, 7) as unknown as T.Path);
-  const rimG = new three.ExtrudeGeometry(rimS, { depth: 7, bevelEnabled: true, bevelThickness: 0.8, bevelSize: 0.8, bevelSegments: 3 }); rimG.rotateX(-Math.PI / 2);
-  k.mesh(rimG, trayM, trayG);
+  const buildTray = () => {
+    trayG.clear(); trayG.position.set(TRAY.x, 0, TRAY.z);
+    const floorG = new three.ExtrudeGeometry(roundedRect(three, TRAY.w, TRAY.d, 9), { depth: 2.5, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.6, bevelSegments: 2 }); floorG.rotateX(-Math.PI / 2);
+    k.mesh(floorG, trayM, trayG);
+    const rimS = roundedRect(three, TRAY.w, TRAY.d, 9); rimS.holes.push(roundedRect(three, TRAY.w - 6, TRAY.d - 6, 7) as unknown as T.Path);
+    const rimG = new three.ExtrudeGeometry(rimS, { depth: 7, bevelEnabled: true, bevelThickness: 0.8, bevelSize: 0.8, bevelSegments: 3 }); rimG.rotateX(-Math.PI / 2);
+    k.mesh(rimG, trayM, trayG);
+  };
   const TRAY_FLOOR = 3.1;
 
   const qY = (a: number) => new three.Quaternion().setFromAxisAngle(new three.Vector3(0, 1, 0), a);
@@ -175,9 +183,13 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
   // 기판 먼저 (다른 부품의 최종 위치가 기판 구멍에서 나온다)
   for (const def of kit.parts) {
     let obj: T.Group, rec: Partial<PartRec> = {};
+    const gw = def.spec?.widthMm, gh = def.spec?.heightMm;
     if (def.kind === "perfboard") { const b = perfboard(k, def.spec?.cols, def.spec?.rows); obj = b.group; rec.board = b; }
-    else if (def.kind === "breadboard") { const b = breadboard(k, def.spec?.rows); obj = b.group; rec.board = b; }
+    else if (def.kind === "breadboard") { const b = breadboard(k, gw ? Math.max(10, Math.round((gw - 82) / PITCH) + 30) : def.spec?.rows); obj = b.group; rec.board = b; }
+    else if (def.kind === "plate") { const b = plate(k, gw ?? 120, gh ?? 80); obj = b.group; rec.baseMap = (x, y) => new three.Vector3(x - (gw ?? 120) / 2, b.topY, y - (gh ?? 80) / 2); }
     else continue;
+    rec.baseKind = def.kind;
+    if (!rec.baseMap && rec.board && gw && gh) { const top = rec.board.topY; rec.baseMap = (x, y) => new three.Vector3(x - gw / 2, top, y - gh / 2); }
     const place = allOps.find((o) => o.op === "place" && o.ref === def.ref) as Extract<BenchOp, { op: "place" }> | undefined;
     const y = def.kind === "perfboard" ? BOARD_LIFT : 0;
     const final = place ? { p: new three.Vector3(place.at[0], y, place.at[1]), q: qY(((place.rotation ?? 0) * Math.PI) / 180) } : null;
@@ -229,6 +241,12 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
       const bat = allOps.find((o) => o.op === "batteries") as Extract<BenchOp, { op: "batteries" }> | undefined;
       const holder = bat ? parts.get(bat.ref) : null;
       if (holder?.final) final = { p: holder.final.p.clone().add(new three.Vector3(0, 8.6, 0).applyQuaternion(holder.final.q)), q: holder.final.q.clone() };
+    } else if (def.kind === "module" && def.spec?.foot) {
+      const seat = allOps.find((o) => o.op === "seat" && o.ref === def.ref) as Extract<BenchOp, { op: "seat" }> | undefined;
+      const base = seat ? parts.get(seat.onto) : undefined;
+      const m = moduleModel(k, { catalogId: def.spec.catalogId, partType: def.spec.partType, model: def.spec.model ?? def.label, color: def.spec.color, foot: def.spec.foot, pinXY: def.spec.pinXY ?? [] }, base?.baseKind === "breadboard");
+      obj = m.group; rec.pinLocal = m.pinLocal; if (m.led) rec.led = m.led;
+      if (base?.final && base.baseMap) { const f = def.spec.foot; const local = base.baseMap(f.x + f.w / 2, f.y + f.h / 2); final = { p: local.applyMatrix4(poseMatrix(base.final)), q: base.final.q.clone() }; }
     } else { obj = new three.Group(); }
     scene.add(obj);
     parts.set(def.ref, { def, obj, home: { p: new three.Vector3(), q: new three.Quaternion() }, final, atHome: true, ...rec });
@@ -247,10 +265,17 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     });
     const rows: Array<typeof items> = [[]];
     let used = 0;
+    const widest = Math.max(...items.map((i) => i.w));
+    TRAY.w = Math.max(206, Math.min(320, widest + 30));
     const maxW = TRAY.w - 22;
     for (const it of items) { if (used + it.w > maxW && rows[rows.length - 1].length) { rows.push([]); used = 0; } rows[rows.length - 1].push(it); used += it.w + 9; }
     const rowD = rows.map((r) => Math.max(...r.map((i) => i.d)));
     const totalD = rowD.reduce((a, b) => a + b, 0) + (rows.length - 1) * 8;
+    let front = 0;
+    for (const p of parts.values()) if (p.final && (p.board || p.baseMap)) { const sz = p.obj.userData.size as number[] | undefined; if (sz) front = Math.max(front, p.final.p.z + sz[2] / 2); }
+    TRAY.d = Math.max(112, totalD + 22);
+    TRAY.z = Math.max(116, front + 22 + TRAY.d / 2);
+    buildTray();
     let z = TRAY.z - totalD / 2;
     rows.forEach((r, ri) => {
       const rw = r.reduce((a, i) => a + i.w, 0) + (r.length - 1) * 9;
@@ -317,6 +342,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     if (p?.board) return holeWorld(anchor, side);
     if (p?.module && p.final) { const i = (p.def.spec?.pinNames ?? []).indexOf(name); if (i < 0) return null; return new three.Vector3(p.module.hx(i), p.module.topY, 0).applyMatrix4(poseMatrix(p.final)); }
     if (p?.holder) return wireEnd(anchor);
+    if (p?.pinLocal && p.final) { const l = p.pinLocal.get(anchor.slice(ref.length + 1)) ?? p.pinLocal.get(name); if (l) return l.clone().applyMatrix4(poseMatrix(p.final)); const c = p.final.p.clone(); c.y += 4; return c; }
     return null;
   };
 
@@ -346,6 +372,41 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     bridgeMeshes.set(o, o.pairs.map(([a, b]) => { const pa = anchorWorld(a, "bottom")!, pb = anchorWorld(b, "bottom")!; const me = capsule(pa.clone().add(new three.Vector3(0, -0.55, 0)), pb.clone().add(new three.Vector3(0, -0.55, 0)), 0.75, tinM); me.visible = false; return me; }));
   }
   const mistakeBlob = capsule(new three.Vector3(), new three.Vector3(PITCH, 0, 0), 0.7, tinM); mistakeBlob.visible = false;
+
+  // ── 점퍼선 (프로젝트 조립: 핀 ↔ 핀) ──
+  const jumpers = new Map<BenchOp, JumperRec>();
+  const jumperMats = new Map<string, T.Material>();
+  const onBreadboard = [...parts.values()].some((p) => p.baseKind === "breadboard");
+  for (const o of allOps) if (o.op === "jumper") {
+    const a = anchorWorld(o.from), b = anchorWorld(o.to);
+    let mat = jumperMats.get(o.color); if (!mat) { mat = k.std(o.color, { rough: 0.45 }); jumperMats.set(o.color, mat); }
+    const rec: JumperRec = { op: o, curve: null, mesh: null, ends: [], t: 0, built: -1, mat };
+    if (a && b) {
+      const lift = onBreadboard ? 13 : 1.5;
+      const a2 = a.clone().add(new three.Vector3(0, lift, 0)), b2 = b.clone().add(new three.Vector3(0, lift, 0));
+      const h = 8 + a.distanceTo(b) * 0.16;
+      const mid = a2.clone().lerp(b2, 0.5).add(new three.Vector3(0, h, 0));
+      rec.curve = new three.CatmullRomCurve3([a2, a2.clone().add(new three.Vector3(0, h * 0.45, 0)), mid, b2.clone().add(new three.Vector3(0, h * 0.45, 0)), b2], false, "centripetal");
+      if (onBreadboard) for (const e of [a, b]) { const box = k.box(2.5, 13, 2.5, k.std("#18191b", { rough: 0.5 }), e.x, e.y + 6.5, e.z, scene); box.visible = false; rec.ends.push(box); }
+    }
+    jumpers.set(o, rec);
+  }
+  const syncJumpers = () => {
+    for (const j of jumpers.values()) {
+      if (!j.curve) continue;
+      const t = j.t;
+      if (j.ends[0]) j.ends[0].visible = t > 0.02 && !below;
+      if (j.ends[1]) j.ends[1].visible = t > 0.97 && !below;
+      if (t <= 0.01) { if (j.mesh) j.mesh.visible = false; continue; }
+      if (Math.abs(t - j.built) > 0.004) {
+        const pts = Array.from({ length: 28 }, (_, i) => j.curve!.getPoint((i / 27) * t));
+        const g = new three.TubeGeometry(new three.CatmullRomCurve3(pts), 48, 0.75, 8, false);
+        if (!j.mesh) j.mesh = k.mesh(g, j.mat, scene); else { j.mesh.geometry.dispose(); j.mesh.geometry = g; }
+        j.built = t;
+      }
+      j.mesh!.visible = true;
+    }
+  };
 
   // ── 마커·고스트·라벨 ──
   const markerG = new three.Group(); scene.add(markerG);
@@ -388,6 +449,8 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
 
   const applyOp = (op: BenchOp, t: number, active: boolean) => {
     switch (op.op) {
+      case "seat": { const p = parts.get(op.ref); if (p) fly(p, t, 12); break; }
+      case "jumper": { const j = jumpers.get(op); if (j) j.t = t; break; }
       case "place": case "insert": case "mount_on": case "batteries": {
         const ref = op.ref;
         const p = op.op === "batteries" ? [...parts.values()].find((x) => x.def.kind === "aa_battery") : parts.get(ref);
@@ -489,6 +552,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
       }
     });
     for (const w of wires) rebuildWire(w);
+    syncJumpers();
     applyMistake();
     syncGroundVisibility();
   };
@@ -507,7 +571,8 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
         a = j.pos;
         const [ref, name] = j.anchor.split(".");
         const p = parts.get(ref);
-        if (p?.module) { const names = p.def.spec?.pinNames ?? []; const i = names.indexOf(name); b = anchorWorld(`${ref}.${names[i + 1] ?? names[i - 1]}`, "top"); }
+        if (p?.pinLocal && p.final) { const me = p.pinLocal.get(name); let best: T.Vector3 | null = null, bd = Infinity; for (const [n, v] of p.pinLocal) if (n !== name && me) { const d = v.distanceTo(me); if (d < bd) { bd = d; best = v; } } if (best) b = best.clone().applyMatrix4(poseMatrix(p.final)); }
+        else if (p?.module) { const names = p.def.spec?.pinNames ?? []; const i = names.indexOf(name); b = anchorWorld(`${ref}.${names[i + 1] ?? names[i - 1]}`, "top"); }
         else { const m = /^([A-Z])(\d+)$/.exec(name); if (m) b = anchorWorld(`${ref}.${String.fromCharCode(m[1].charCodeAt(0) + 1)}${m[2]}`, j.side); }
       } else {
         const br = step.ops.find((o) => o.op === "bridge") as Extract<BenchOp, { op: "bridge" }> | undefined;
@@ -543,6 +608,10 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
         const fin = op.op === "batteries" ? p?.final : p?.final;
         if (op.op === "mount_on") { for (const h of op.holes) { const a = anchorWorld(h); if (a) out.push({ pos: a, label: h.split(".")[1], radius: 2.2 }); } }
         else if (fin) out.push({ pos: fin.p.clone().add(new three.Vector3(0, op.op === "batteries" ? 8 : 1, 0)), radius: 18, part: op.ref });
+      } else if (op.op === "seat") {
+        const p = parts.get(op.ref); if (p?.final) { const b = new three.Box3().setFromObject(p.obj); const h = Math.max(2, b.max.y - b.min.y); const r = Math.min(14, Math.max(5, Math.max(b.max.x - b.min.x, b.max.z - b.min.z) * 0.45)); out.push({ pos: p.final.p.clone().add(new three.Vector3(0, h * 0.5, 0)), radius: r, part: op.ref }); }
+      } else if (op.op === "jumper") {
+        for (const end of [op.from, op.to]) { const a = anchorWorld(end); if (a) out.push({ pos: a, label: end, radius: 2.6 }); }
       } else if (op.op === "insert") {
         op.holes.forEach((h, i) => { const a = anchorWorld(h); if (a) out.push({ pos: a, label: i === 0 || i === op.holes.length - 1 ? h.split(".")[1] : undefined, radius: 2.0 }); });
       } else if (op.op === "prep_wire") {
@@ -570,7 +639,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     if (!s || progress[current] > 0) return;
     targets = stepTargets(current);
     const view = s.view;
-    const ghostOp = s.ops.find((o) => o.op === "place" || o.op === "insert" || o.op === "mount_on" || o.op === "batteries") as Extract<BenchOp, { ref: string }> | undefined;
+    const ghostOp = s.ops.find((o) => o.op === "place" || o.op === "insert" || o.op === "mount_on" || o.op === "batteries" || o.op === "seat") as Extract<BenchOp, { ref: string }> | undefined;
     if (ghostOp) {
       const p = ghostOp.op === "batteries" ? [...parts.values()].find((x) => x.def.kind === "aa_battery") : parts.get(ghostOp.ref);
       if (p?.final) {
@@ -608,7 +677,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     for (const op of s?.ops ?? []) {
       const ref = "ref" in op ? op.ref : null;
       const p = op.op === "batteries" ? [...parts.values()].find((x) => x.def.kind === "aa_battery") : ref ? parts.get(ref) : null;
-      if (p?.atHome && (op.op === "place" || op.op === "insert" || op.op === "mount_on" || op.op === "batteries")) pts.push(p.home.p.clone());
+      if (p?.atHome && (op.op === "place" || op.op === "insert" || op.op === "mount_on" || op.op === "batteries" || op.op === "seat")) pts.push(p.home.p.clone());
     }
     return pts;
   };

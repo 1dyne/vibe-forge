@@ -426,3 +426,149 @@ export function probe(k: Kit3D, color: string) {
   const handle = k.mesh(new three.CylinderGeometry(3.2, 3.6, 70, 20), k.std(color, { rough: 0.55 }), group); handle.position.y = 51;
   return group;
 }
+
+// ───────────────────────── 프로젝트 부품 (부품 카드 기반) ─────────────────────────
+
+export type ModuleSpec = {
+  catalogId?: string; partType?: string; model: string; color?: string;
+  foot: { x: number; y: number; w: number; h: number; rotation: number };
+  pinXY: Array<{ name: string; x: number; y: number }>;
+};
+export type ModuleModel = { group: T.Group; pinLocal: Map<string, T.Vector3>; lift: number; led?: { lens: T.MeshStandardMaterial; glow: T.PointLight }; tails: T.Mesh[] };
+
+const PCB_COLOR: Record<string, string> = {
+  "arduino-uno-r3": "#14808a", "arduino-nano": "#1f5fae", "esp32-devkit-v1": "#1c1d20", "xiao-esp32s3-sense": "#24262a",
+  "raspberry-pi-pico": "#2d7a3c", "nucode-nu40-dk": "#1e4f8f", "seeed-round-display-xiao": "#1c1d20", "ssd1306-oled-128x64": "#1d4fae"
+};
+const TYPE_COLOR: Record<string, string> = { board: "#2a6f5f", display: "#1d4fae", sensor: "#1d4fae", actuator: "#2a6fd0", input: "#2f3238", indicator: "#2f3238", passive: "#2f3238", audio: "#1f2023" };
+
+/**
+ * 부품 카드로 만드는 3D 부품. 원점 = 자리(foot) 가운데, 기판 윗면. x = 가이드 x, z = 가이드 y.
+ * onBreadboard면 모듈 기판을 핀 길이만큼 띄우고 핀이 아래로 꽂힌다.
+ * pinLocal: 전선·납땜이 닿는 핀 윗점 (원점 기준).
+ */
+export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): ModuleModel {
+  const three = k.three, group = new three.Group();
+  const { foot } = spec;
+  const cx = foot.x + foot.w / 2, cy = foot.y + foot.h / 2;
+  // 몸체는 회전 전 좌표로 만들고 돌린다. 핀은 이미 회전된 좌표라 그대로 둔다.
+  const body = new three.Group(); body.rotation.y = (-foot.rotation * Math.PI) / 180; group.add(body);
+  const pins = spec.pinXY.map((p) => ({ name: p.name, x: p.x - cx, z: p.y - cy }));
+  const pinLocal = new Map<string, T.Vector3>();
+  const id = spec.catalogId ?? "";
+  const tails: T.Mesh[] = [];
+  const W = foot.w, D = foot.h;
+  const along = () => { // 두 핀 사이 축 (저항·LED)
+    if (pins.length < 2) return { mid: new three.Vector3(), len: Math.max(W, D) * 0.6, ang: 0 };
+    const a = pins[0], b = pins[1];
+    return { mid: new three.Vector3((a.x + b.x) / 2, 0, (a.z + b.z) / 2), len: Math.hypot(b.x - a.x, b.z - a.z), ang: Math.atan2(-(b.z - a.z), b.x - a.x) };
+  };
+
+  if (id === "led-5mm" || id === "resistor") {
+    const ax = along();
+    const sub = new three.Group(); sub.position.copy(ax.mid); sub.rotation.y = ax.ang; group.add(sub);
+    let led: ModuleModel["led"];
+    if (id === "resistor") { const r = resistor(k, Math.max(7.62, ax.len), 220, onBreadboard ? 6 : 1.6); sub.add(r.group); r.tails.forEach((t) => (t.visible = false)); }
+    else { const l = led5(k, spec.color ?? "#ff3b2f", onBreadboard ? 6 : 1.6); sub.add(l.group); l.tails.forEach((t) => (t.visible = false)); led = { lens: l.lens, glow: l.glow as T.PointLight }; }
+    for (const p of pins) pinLocal.set(p.name, new three.Vector3(p.x, 0.6, p.z));
+    return { group, pinLocal, lift: 0, led, tails };
+  }
+
+  const lift = onBreadboard && !["sg90-servo"].includes(id) ? 10.5 : 0;
+  const T2 = 1.6;
+  const pcbCol = PCB_COLOR[id] ?? spec.color ?? TYPE_COLOR[spec.partType ?? ""] ?? "#2a6f5f";
+  const pcbLike = !["sg90-servo", "active-buzzer", "tact-switch-12mm", "potentiometer-10k", "fsr-402"].includes(id);
+
+  if (pcbLike) {
+    const pxmm = 14;
+    const tex = k.canvasTex(`mod-${id || spec.model}-${W.toFixed(1)}x${D.toFixed(1)}-${pins.length}`, Math.max(64, Math.round(W * pxmm)), Math.max(64, Math.round(D * pxmm)), (x, w, h) => {
+      x.fillStyle = pcbCol; x.fillRect(0, 0, w, h);
+      x.strokeStyle = "rgba(255,255,255,.07)"; x.lineWidth = 5; for (let i = 0; i < 12; i++) { x.beginPath(); x.moveTo((i * 0.13 * w) % w, h * 0.2); x.lineTo(((i * 0.13 + 0.08) * w) % w, h * 0.8); x.stroke(); }
+      x.fillStyle = "rgba(255,255,255,.88)"; x.textAlign = "center"; x.textBaseline = "middle";
+      const fs = Math.max(10, Math.min(2.6 * pxmm, (w / Math.max(6, spec.model.length)) * 1.3));
+      x.font = `700 ${fs}px "IBM Plex Sans KR", sans-serif`; x.fillText(spec.model.replace(/\(.*?\)/g, "").trim().slice(0, 28), w / 2, h * 0.5);
+    });
+    const side = k.std(pcbCol, { rough: 0.6 });
+    const pcb = k.mesh(new three.BoxGeometry(W, T2, D), [side, side, k.std("#fff", { map: tex, rough: 0.55 }), side, side, side], body);
+    pcb.position.y = lift + T2 / 2;
+    // 보드: 마이크로컨트롤러 칩 + USB
+    if (spec.partType === "board" || id.startsWith("arduino") || id.startsWith("esp32") || id.startsWith("xiao") || id.startsWith("raspberry")) {
+      const chipW = Math.min(W, D) * 0.32;
+      k.box(chipW, 1.1, chipW, k.std("#141414", { rough: 0.45 }), W * 0.08, lift + T2 + 0.55, 0, body);
+      const usbW = Math.min(9, Math.min(W, D) * 0.45);
+      const usb = k.box(usbW, 3.2, 6.5, k.steel, -W / 2 + 3.2, lift + T2 + 1.6, 0, body); usb.rotation.y = Math.PI / 2;
+      if (id === "arduino-uno-r3") { k.box(12, 11, 16, k.steel, -W / 2 + 6, lift + T2 + 5.5, -D / 2 + 13, body); k.box(14, 11, 9, k.std("#151515"), -W / 2 + 7, lift + T2 + 5.5, D / 2 - 9, body); }
+      if (id === "esp32-devkit-v1") { k.box(W * 0.62, 0.9, D * 0.3, k.steel, 0, lift + T2 + 0.45, -D / 2 + D * 0.2, body); }
+    }
+    if (id === "ssd1306-oled-128x64") {
+      const scr = k.box(W * 0.84, 0.9, D * 0.56, new three.MeshStandardMaterial({ color: "#07090c", roughness: 0.15, metalness: 0.2, emissive: "#1b6fd8", emissiveIntensity: 0 }), 0, lift + T2 + 0.45, D * 0.1, body);
+      scr.userData.screen = true;
+    }
+    if (spec.partType === "sensor" && id !== "fsr-402") k.box(Math.min(W, D) * 0.25, 1, Math.min(W, D) * 0.25, k.std("#151515"), 0, lift + T2 + 0.5, -D * 0.15, body);
+  } else if (id === "sg90-servo") {
+    // 실제 몸체(22.2×11.8×22.7mm)는 자리 오른쪽에, 3핀 커넥터는 카드 핀 위치에. 둘을 케이블로 잇는다.
+    const blue = k.std("#2563c9", { rough: 0.5 });
+    const bw = 22.2, bd = 11.8, bx = W / 2 - bw / 2 - 2;
+    k.box(bw, 22.7, bd, blue, bx, 11.35, 0, body);
+    k.box(bw + 10, 2.5, bd, blue, bx, 16, 0, body);
+    const top = k.mesh(new three.CylinderGeometry(5.6, 5.6, 4, 24), blue, body); top.position.set(bx - 5, 24.6, 0);
+    const horn = k.rbox(6, 1.6, 26, 2.5, k.std("#f4f4f2", { rough: 0.5 }), body); horn.position.set(bx - 5, 26.8, 0); horn.rotation.y = Math.PI / 2;
+    if (pins.length) {
+      const pc = pins.reduce((a, p) => ({ x: a.x + p.x / pins.length, z: a.z + p.z / pins.length }), { x: 0, z: 0 });
+      const conn = k.box(3, 4, 8, k.std("#18191b", { rough: 0.5 }), pc.x, 2, pc.z, group);
+      conn.rotation.y = Math.abs(pins[0].x - pins[pins.length - 1].x) > Math.abs(pins[0].z - pins[pins.length - 1].z) ? Math.PI / 2 : 0;
+      const start = new three.Vector3(bx - bw / 2, 6, 0).applyAxisAngle(new three.Vector3(0, 1, 0), body.rotation.y);
+      ["#6b4a2b", "#d8322a", "#e8892e"].forEach((c, i) => k.tube([start.clone().add(new three.Vector3(0, 0, (i - 1) * 1.1)), new three.Vector3((start.x + pc.x) / 2, 1.2, (start.z + pc.z) / 2 + (i - 1) * 1.1), new three.Vector3(pc.x + 2, 2.5, pc.z + (i - 1) * 1.1)], 0.5, k.std(c, { rough: 0.5 }), group, 20, 6));
+    }
+  } else if (id === "active-buzzer") {
+    const b = k.mesh(new three.CylinderGeometry(6, 6, 9, 32), k.std("#1b1b1d", { rough: 0.45 }), body); b.position.y = (onBreadboard ? 3 : 0) + 4.5;
+    const hole = k.mesh(new three.CylinderGeometry(1, 1, 0.2, 16), k.std("#000"), body); hole.position.y = (onBreadboard ? 3 : 0) + 9.05;
+  } else if (id === "tact-switch-12mm") {
+    k.box(12, 3.6, 12, k.std("#202125", { rough: 0.5 }), 0, 1.8, 0, body);
+    k.box(12.3, 0.4, 12.3, k.steel, 0, 3.8, 0, body);
+    const cap = k.mesh(new three.CylinderGeometry(3.4, 3.4, 3.2, 24), k.std("#d9442f", { rough: 0.5 }), body); cap.position.y = 5.6;
+  } else if (id === "potentiometer-10k") {
+    k.box(Math.min(W, 10), 6, Math.min(D, 10), k.std("#2b5fd0", { rough: 0.5 }), 0, 3, 0, body);
+    const knob = k.mesh(new three.CylinderGeometry(2.2, 2.2, 7, 18), k.std("#e9e9e4", { rough: 0.5 }), body); knob.position.y = 9.5;
+  } else {
+    k.rbox(Math.max(4, W), 2.4, Math.max(4, D), 1.2, k.std(spec.color ?? "#3b3e44", { rough: 0.5 }), body);
+  }
+
+  // 핀: 브레드보드면 아래로 꽂히는 금색 핀, 아니면 패드 위로 짧게 나온 핀
+  for (const p of pins) {
+    const topY = pcbLike ? lift + T2 : 2.5;
+    if (pcbLike) {
+      const pad = k.mesh(new three.CylinderGeometry(0.95, 0.95, 0.12, 16), k.gold, group); pad.position.set(p.x, topY + 0.06, p.z);
+      if (lift > 0) { const leg = k.mesh(new three.BoxGeometry(0.64, lift + T2 + 2, 0.64), k.gold, group); leg.position.set(p.x, (lift + T2 + 2) / 2 - 0.2, p.z); }
+      const stub = k.mesh(new three.BoxGeometry(0.64, 2.2, 0.64), k.gold, group); stub.position.set(p.x, topY + 1.1, p.z);
+      pinLocal.set(p.name, new three.Vector3(p.x, topY, p.z));
+    } else {
+      const leg = k.mesh(new three.BoxGeometry(0.6, 6, 0.6), k.tin, group); leg.position.set(p.x, onBreadboard ? -1 : 1, p.z);
+      pinLocal.set(p.name, new three.Vector3(p.x, 1.0, p.z));
+    }
+  }
+  if (lift > 0 && pins.length) {
+    // 헤더 플라스틱 (핀 줄마다)
+    const rows = new Map<string, typeof pins>();
+    for (const p of pins) { const key = Math.abs(Math.round(p.z / 2.54)) < 1e9 ? `${Math.round(p.z * 2)}` : "x"; rows.set(key, [...(rows.get(key) ?? []), p]); }
+    for (const r of rows.values()) if (r.length >= 2) {
+      const xs = r.map((p) => p.x), minX = Math.min(...xs), maxX = Math.max(...xs);
+      k.box(maxX - minX + 2.54, 2.5, 2.5, k.std("#1d1e20", { rough: 0.55 }), (minX + maxX) / 2, 1.25, r[0].z, group);
+    }
+  }
+  return { group, pinLocal, lift, tails };
+}
+
+/** 받침판(나무 작업판). 원점 = 바닥 가운데, 윗면 y = 3. */
+export function plate(k: Kit3D, w: number, d: number) {
+  const three = k.three, group = new three.Group();
+  const tex = k.canvasTex(`plate-${w}x${d}`, 512, Math.round((512 * d) / w), (x, cw, ch) => {
+    x.fillStyle = "#e3cfa6"; x.fillRect(0, 0, cw, ch);
+    for (let i = 0; i < 60; i++) { x.strokeStyle = `rgba(150,110,60,${0.04 + (i % 3) * 0.02})`; x.lineWidth = 2; x.beginPath(); const y0 = (i * 37) % ch; x.moveTo(0, y0); x.bezierCurveTo(cw * 0.3, y0 + 6, cw * 0.6, y0 - 6, cw, y0 + 3); x.stroke(); }
+  });
+  const edge = k.std("#cbb17f", { rough: 0.8 });
+  const me = k.mesh(new three.BoxGeometry(w, 3, d), [edge, edge, k.std("#fff", { map: tex, rough: 0.8 }), edge, edge, edge], group);
+  me.position.y = 1.5; me.userData.board = true;
+  group.userData.size = [w, 3, d];
+  return { group, topY: 3 };
+}
