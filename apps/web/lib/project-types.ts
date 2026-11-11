@@ -91,6 +91,7 @@ export type LocalProject = {
   buildPlan?: BuildPlan;
   productForm?: ProductForm;
   assembly?: AssemblyGuide;
+  housing?: HousingPlan;
   assemblyReports?: AssemblyReport[];
   assemblyDetails?: AssemblyDetail[];
   assemblyRequests?: AssemblyRequest[];
@@ -231,4 +232,36 @@ export type AgentPlan = {
     title: string;
     plain: string;
   }>;
+};
+
+// 하우징을 부위별로 무엇으로 어떻게 만드는지 (명세서 2차 v0.1 §6).
+// shapeRefs는 ProductForm.shape의 인덱스. feasible·outputs 상태·합계는 서버가 다시 계산한다.
+export type FabMethod = "print_fdm" | "print_resin" | "resin_cast" | "pp_sheet" | "laser_cut" | "foam_board" | "fabric_sew" | "off_the_shelf" | "none";
+export type JoinMethod = "screw" | "heat_insert" | "snap" | "magnet" | "tape" | "glue" | "slot" | "sew" | "velcro";
+export type HousingOutputKind = "stl" | "scad" | "dxf_unfold" | "svg_cut" | "pattern_pdf" | "mold_plan" | "buy_link";
+export type HousingRegion = {
+  id: string;
+  name: string;
+  role: string;
+  shapeRefs: number[];
+  method: FabMethod;
+  why: string;
+  material: { name: string; thicknessMm: number | null; color?: string; finish?: string };
+  join: Array<{ to: string; method: JoinMethod; detail: string }>;
+  toleranceMm: number | null;
+  access?: { purpose: "battery" | "charging" | "button" | "debug" | "none"; how: string };
+  outputs: Array<{ kind: HousingOutputKind; status: "ready" | "todo" | "unknown"; note: string; url?: string }>;
+  process: string[];
+  costKRW: number | null;
+  timeHours: number | null;
+  feasible: "yes" | "needs_service" | "no" | "unknown";
+};
+export type HousingPlan = {
+  summary: string;
+  regions: HousingRegion[];
+  environment: { indoorOutdoor: "indoor" | "outdoor" | "both"; water: "none" | "splash" | "rain" | "submerge"; heatSources: string[]; skinContact: boolean; childUse: boolean };
+  assemblyOrder: string[];
+  totals: { costKRW: number | null; timeHours: number | null; partial: boolean };
+  risks: string[];
+  updatedAt: string;
 };

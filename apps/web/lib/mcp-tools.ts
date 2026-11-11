@@ -18,6 +18,8 @@ import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDev
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
+import { checkHousing, finalizeHousing, FAB_LABEL } from "./housing";
+import type { HousingPlan } from "./project-types";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
 // the thinking on the person's subscription; the server stores the result and
@@ -150,6 +152,14 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - shape는 외형, features는 겉에 보이는 화면·카메라 구멍·버튼 등(어느 면을 향하는지), internals는 안에 들어갈 실제 부품을 데이터시트 기준 실제 치수로 넣는다(예: XIAO ESP32S3 21×17.8×3.5mm, 보조배터리 실제 크기). 서버가 부품이 외형 밖으로 나가는지 확인한다.
 - 사용자가 대시보드에서 돌려보고 "속 보기"로 부품 자리를 확인한 뒤 바꾸고 싶은 곳을 말하면 다시 저장한다. 회로 승인 후 OpenSCAD 외형도 이 모양을 따른다.
 - 더 정밀한 외형(털, 곡면 조형)이 필요하면 Blender를 쓸 수 있다. Blender MCP는 사용자 컴퓨터에 Blender를 설치하고 Claude 데스크톱 앱이나 Claude Code에 연결해야 하며, 웹 claude.ai에서는 쓸 수 없다. 원할 때만 안내한다.
+
+## 하우징 제작 계획 (set_housing_plan)
+완성품 형태가 정해지면(회로 승인 뒤) ME·ID 달그락이 하우징을 부위로 나누고 부위마다 만드는 방식을 정한다. 하우징이 늘 3D 프린트인 건 아니다.
+- 방식: 3D 프린트(FDM·레진), 레진 주형(원형→실리콘 몰드→주입), PP 시트+양면테이프(가볍고 싸고 칼로 만듦), 레이저 커팅(아크릴·MDF), 폼보드, 원단·봉제, 기성 케이스+가공.
+- 체크리스트의 3D 프린터 접근성·보유 도구·예산을 보고 고른다. 프린터가 없으면 PP·폼보드·기성 케이스를 먼저 제안하고, 프린트는 대행 비용을 원으로 넣는다.
+- 부위마다 재료·두께, 결합(나사·인서트·끼움·자석·테이프·접착), 공차, 여는 곳(배터리·충전 단자), 만드는 순서(프린트면 출력 방향·서포트), 비용(원)·시간을 넣는다. 모르는 값은 null.
+- 물·피부·아이·열 환경을 environment에 넣으면 서버가 실링·경화·삼킴·통풍 위험을 붙인다. 배터리가 있으면 여는 곳 없이는 저장되지 않는다.
+- 서버가 STL(프린트), PP 1:1 전개도, 판 재단 SVG, 레진 몰드 계획을 만들어 작업대에 둔다.
 
 ## 조립 가이드 (set_assembly_guide)
 회로 다음에는 사용자가 실제로 따라 만들 수 있는 조립 가이드를 만든다. 3D 승인 뒤(handoff) 설계도 1단계부터 만든다.
@@ -299,6 +309,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     productForm: project.productForm ?? null,
+    housing: project.housing ?? null,
     assembly: project.assembly ? { stage: project.assembly.stage, base: project.assembly.base, steps: project.assembly.steps.map((step, index) => ({ step: index + 1, title: step.title, cards: step.cards.map((card) => ({ id: card.id, symptom: card.symptom })), wireLengths: wireLengths(project, index) })) } : null,
     liveStatus: project.liveStatus ?? null,
     assemblyReports: (project.assemblyReports ?? []).slice(-10),
@@ -388,6 +399,26 @@ const ProductFormSchema = z.object({
   features: z.array(z.object({ name: z.string().min(1).max(60), kind: z.enum(["screen", "camera", "button", "speaker", "mic", "port", "light", "other"]), facing: z.enum(["front", "back", "top", "bottom", "left", "right"]), position: Vec3, size: z.tuple([z.number().min(0.5).max(300), z.number().min(0.5).max(300)]), linkedRef: z.string().max(16).optional() }).strict()).max(16),
   internals: z.array(z.object({ ref: z.string().min(1).max(16), label: z.string().min(1).max(80), size: Size3, position: Vec3 }).strict()).max(16),
   material: z.string().min(1).max(200)
+}).strict();
+
+const FAB = z.enum(["print_fdm", "print_resin", "resin_cast", "pp_sheet", "laser_cut", "foam_board", "fabric_sew", "off_the_shelf", "none"]);
+const HousingSchema = z.object({
+  summary: z.string().min(1).max(800),
+  regions: z.array(z.object({
+    id: z.string().regex(/^[a-z][a-z0-9_-]{0,23}$/), name: z.string().min(1).max(40), role: z.string().min(1).max(200),
+    shapeRefs: z.array(z.number().int().min(0).max(15)).max(16), method: FAB, why: z.string().min(1).max(400),
+    material: z.object({ name: z.string().max(80), thicknessMm: z.number().min(0.1).max(30).nullable(), color: z.string().max(40).optional(), finish: z.string().max(80).optional() }).strict(),
+    join: z.array(z.object({ to: z.string().min(1).max(24), method: z.enum(["screw", "heat_insert", "snap", "magnet", "tape", "glue", "slot", "sew", "velcro"]), detail: z.string().min(1).max(200) }).strict()).max(8),
+    toleranceMm: z.number().min(0).max(3).nullable(),
+    access: z.object({ purpose: z.enum(["battery", "charging", "button", "debug", "none"]), how: z.string().min(1).max(200) }).strict().optional(),
+    outputs: z.array(z.object({ kind: z.enum(["stl", "scad", "dxf_unfold", "svg_cut", "pattern_pdf", "mold_plan", "buy_link"]), status: z.enum(["ready", "todo", "unknown"]), note: z.string().max(200), url: z.string().url().max(500).optional() }).strict()).max(8),
+    process: z.array(z.string().min(1).max(300)).min(1).max(12),
+    costKRW: z.number().int().min(0).max(10_000_000).nullable(), timeHours: z.number().min(0).max(500).nullable(),
+    feasible: z.enum(["yes", "needs_service", "no", "unknown"]).optional()
+  }).strict()).min(1).max(10),
+  environment: z.object({ indoorOutdoor: z.enum(["indoor", "outdoor", "both"]), water: z.enum(["none", "splash", "rain", "submerge"]), heatSources: z.array(z.string().max(60)).max(6), skinContact: z.boolean(), childUse: z.boolean() }).strict(),
+  assemblyOrder: z.array(z.string().max(24)).max(10),
+  risks: z.array(z.string().max(300)).max(10).optional()
 }).strict();
 
 const PIN_REF = /^[A-Za-z][A-Za-z0-9_]{0,15}\.[A-Za-z0-9_+\-/.()]{1,20}$/;
@@ -753,6 +784,46 @@ TOOLS.push(
     }
   },
   {
+    name: "set_housing_plan", title: "하우징 제작 계획 (부위별 제작 방식)",
+    description: "완성품 형태(set_product_form)의 도형들을 부위로 나누고, 부위마다 무엇으로 어떻게 만들지 정한다: 3D 프린트(FDM/레진), 레진 주형, PP 시트+양면테이프, 레이저 커팅, 폼보드, 원단, 기성 케이스. 부위마다 재료·두께, 결합(나사·인서트·끼움·자석·테이프·접착), 공차, 여는 곳(배터리·충전), 만드는 순서, 비용(원)·시간을 넣는다. ME 달그락과 ID 달그락이 맡는다. 서버가 사용자 도구로 직접 할 수 있는지(feasible)와 합계를 다시 계산하고, 프린트 부위는 STL, PP는 1:1 전개도 SVG, 레이저·폼보드는 판 재단 SVG, 레진 주형은 몰드 계획을 작업대에서 내려받게 만든다. 배터리가 있으면 여는 곳이 꼭 있어야 저장된다. 사용자 체크리스트의 3D 프린터 접근성을 보고 방식을 고른다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "plan"], properties: { projectId, plan: { type: "object", required: ["summary", "regions", "environment", "assemblyOrder"], properties: {
+      summary: { type: "string", description: "하우징을 어떻게 나눠 무엇으로 만드는지 한 문단" },
+      regions: { type: "array", minItems: 1, items: { type: "object", required: ["id", "name", "role", "shapeRefs", "method", "why", "material", "join", "toleranceMm", "outputs", "process", "costKRW", "timeHours"], properties: {
+        id: { type: "string", description: "영문 소문자 id (예: body, lid, grip)" }, name: { type: "string", description: "보이는 이름 (예: 본체, 덮개)" }, role: { type: "string" },
+        shapeRefs: { type: "array", items: { type: "integer" }, description: "productForm.shape 인덱스 (0부터). 한 도형은 한 부위에만" },
+        method: { type: "string", enum: ["print_fdm", "print_resin", "resin_cast", "pp_sheet", "laser_cut", "foam_board", "fabric_sew", "off_the_shelf", "none"] },
+        why: { type: "string", description: "왜 이 방식인지 (도구·예산·내구·외관)" },
+        material: { type: "object", required: ["name", "thicknessMm"], properties: { name: { type: "string", description: "PLA, PETG, PP, 아크릴, MDF, 에폭시 레진 등" }, thicknessMm: { type: ["number", "null"], description: "벽·판 두께 mm. 프린트 1.2 이상, PP 0.3~1.5" }, color: { type: "string" }, finish: { type: "string" } } },
+        join: { type: "array", items: { type: "object", required: ["to", "method", "detail"], properties: { to: { type: "string", description: "다른 부위 id 또는 internal(내부 부품)/base" }, method: { type: "string", enum: ["screw", "heat_insert", "snap", "magnet", "tape", "glue", "slot", "sew", "velcro"] }, detail: { type: "string", description: "예: M2×6 나사 4개, 모서리 보스 / 실리콘 가스켓" } } } },
+        toleranceMm: { type: ["number", "null"], description: "끼워 맞춤 공차 (FDM 0.2~0.3)" },
+        access: { type: "object", required: ["purpose", "how"], properties: { purpose: { type: "string", enum: ["battery", "charging", "button", "debug", "none"] }, how: { type: "string" } } },
+        outputs: { type: "array", items: { type: "object", required: ["kind", "status", "note"], properties: { kind: { type: "string", enum: ["stl", "scad", "dxf_unfold", "svg_cut", "pattern_pdf", "mold_plan", "buy_link"] }, status: { type: "string", enum: ["ready", "todo", "unknown"] }, note: { type: "string" }, url: { type: "string" } } }, description: "서버가 만드는 파일(stl·전개도·재단·몰드)은 자동으로 채워져요. 기성 케이스는 buy_link url 필수" },
+        process: { type: "array", items: { type: "string" }, description: "이 부위를 만드는 순서. 프린트면 출력 방향·서포트 포함" },
+        costKRW: { type: ["integer", "null"], description: "재료+대행비 원. 모르면 null" }, timeHours: { type: ["number", "null"], description: "출력·경화 대기 포함 시간" }
+      } } },
+      environment: { type: "object", required: ["indoorOutdoor", "water", "heatSources", "skinContact", "childUse"], properties: { indoorOutdoor: { type: "string", enum: ["indoor", "outdoor", "both"] }, water: { type: "string", enum: ["none", "splash", "rain", "submerge"] }, heatSources: { type: "array", items: { type: "string" } }, skinContact: { type: "boolean" }, childUse: { type: "boolean" } } },
+      assemblyOrder: { type: "array", items: { type: "string" }, description: "부위 id 조립 순서" },
+      risks: { type: "array", items: { type: "string" } }
+    } } } },
+    run: async (input, context) => {
+      const { projectId: id, plan } = z.object({ projectId: z.string().uuid(), plan: HousingSchema }).strict().parse(input) as { projectId: string; plan: Omit<HousingPlan, "totals" | "updatedAt" | "risks"> & { risks?: string[] } };
+      const project = await ownedProject(id, context);
+      const { problems, warnings } = checkHousing(plan, project);
+      if (problems.length) throw new ToolError(`하우징 계획을 저장하지 못했어요: ${problems.slice(0, 6).join(" / ")}`);
+      const saved = finalizeHousing(plan, project, warnings);
+      const updated = await mutateProject(id, (p) => {
+        const w = workflowFor(p);
+        p.housing = saved;
+        if (p.buildPlan) p.buildPlan.fabrication = { needs3DPrint: saved.regions.some((r) => r.method === "print_fdm" || r.method === "print_resin" || r.method === "resin_cast"), plan: saved.regions.map((r) => `${r.name}: ${FAB_LABEL[r.method]}`).join(" / ") };
+        const text = `하우징 제작 계획을 정했어요. ${saved.summary}\n${saved.regions.map((r) => `· ${r.name}: ${FAB_LABEL[r.method]} (${r.material.name}${r.material.thicknessMm != null ? ` ${r.material.thicknessMm}mm` : ""})`).join("\n")}\n작업대의 '하우징'에서 부위별 파일(STL·전개도·재단)을 내려받을 수 있어요.${saved.risks.length ? `\n확인할 것: ${saved.risks.slice(0, 3).join(" / ")}` : ""}`;
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "me", channel: w.phase === "workshop" && w.activeAgents.includes("me") ? "me" : "main", text, createdAt: saved.updatedAt, shared: true });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "me", text: `하우징: ${saved.regions.map((r) => `${r.name}=${FAB_LABEL[r.method]}`).join(" · ")}`, createdAt: saved.updatedAt });
+        p.workflow = w;
+      });
+      return stored(updated, context, `하우징 계획을 저장했어요.${warnings.length ? ` 확인 필요: ${warnings.slice(0, 5).join(" / ")}` : ""}`);
+    }
+  },
+  {
     name: "set_assembly_guide", title: "조립 가이드 (실제 기판 배치·단계·문제 카드)",
     description: "설계도의 한 단계를 실제로 따라 만들 수 있게 한다. base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기·위치와 핀 위치, steps는 하나씩 할 동작(어떤 부품을 어디에 놓고 어떤 선을 어디서 어디로 잇는지), 단계마다 확인할 것과 문제 카드(증상 → 확인 방법 → 기대값 → 아니면 할 일, 예: 멀티미터 DC 20V로 5V-GND 측정 4.75~5.25V)를 넣는다. 대시보드에서 단계별 애니메이션으로 재생되고, '3D 작업대'에서는 부품이 트레이에서 기판 위 자리로 날아와 앉고 전선·납땜이 단계별로 연출된다(HW 달그락이 화면 안에서 안내). 그래서 x·y·크기·핀 위치를 실제 값으로 넣는다. 사용자가 카드의 확인 결과나 '실제로 했어요'를 보내면 assemblyReports로 돌아온다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "guide"], properties: { projectId, guide: { type: "object", additionalProperties: false, required: ["stage", "base", "parts", "steps"], properties: {
@@ -1016,7 +1087,7 @@ TOOLS.push(
 export function resetStage(p: LocalProject, stage: "product_form" | "plan") {
   const w = workflowFor(p);
   const now = new Date().toISOString();
-  delete p.productForm; delete p.assembly; delete p.assemblyReports; delete p.assemblyDetails; delete p.assemblyRequests; delete p.liveStatus;
+  delete p.productForm; delete p.housing; delete p.assembly; delete p.assemblyReports; delete p.assemblyDetails; delete p.assemblyRequests; delete p.liveStatus;
   if (stage === "plan") delete p.buildPlan;
   p.build = null;
   p.stage = "idea";

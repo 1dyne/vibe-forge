@@ -1,10 +1,11 @@
 import type { BuildPlan, LocalProject } from "./project-types";
+import { housingFiles, housingMarkdown } from "./housing";
 import { workflowFor } from "./workflow";
 
 export type WorkbenchItem = {
   id: string;
   filename: string;
-  kind: "product" | "assembly" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
+  kind: "product" | "assembly" | "housing" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
 };
@@ -39,7 +40,8 @@ ${plan.risks.length ? `<h2>위험과 확인할 것</h2><ul>${plan.risks.map(r =>
 }
 
 // Both the viewer and download route use these same documents, including old projects.
-export function workbenchItems(project: LocalProject | null): WorkbenchItem[] {
+// files: 탭에는 안 보이고 내려받기로만 쓰는 파일(하우징 STL·전개도 등)까지 포함할지
+export function workbenchItems(project: LocalProject | null, opts: { files?: boolean } = {}): WorkbenchItem[] {
   if (!project) return [];
   const workflow = workflowFor(project);
   const stem = project.name.replace(/[\\/:*?"<>|\r\n]/g, "-").slice(0, 80) || "project";
@@ -48,6 +50,10 @@ export function workbenchItems(project: LocalProject | null): WorkbenchItem[] {
   if (project.assembly) {
     const g = project.assembly;
     items.push({ id: "document:assembly", filename: `${stem}-조립가이드.md`, kind: "assembly", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 조립 가이드\n\n${g.stage} · ${g.base.name} (${g.base.width}×${g.base.height}mm)\n\n${g.steps.map((s, i) => `## ${i + 1}. ${s.title}\n\n${s.action}\n\n${s.wires.map(w => `- ${w.from} → ${w.to}${w.label ? ` (${w.label})` : ""}`).join("\n")}\n\n확인: ${s.check}\n\n${s.cards.map(c => `> ⚠ ${c.symptom}\n> 확인: ${c.check}\n> 정상: ${c.expected}\n> 아니면: ${c.ifNot}`).join("\n\n")}`).join("\n\n")}\n` });
+  }
+  if (project.housing && project.productForm) {
+    items.push({ id: "document:housing", filename: `${stem}-하우징.md`, kind: "housing", mimeType: "text/markdown; charset=utf-8", content: housingMarkdown(project) });
+    if (opts.files) for (const f of housingFiles(project)) items.push({ id: f.id, filename: f.filename, kind: "file", mimeType: f.mimeType, content: f.content });
   }
   if (project.buildPlan) items.push(...[{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan) }] as WorkbenchItem[]);
   items.push(...(project.build?.artifacts ?? [])

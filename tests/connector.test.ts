@@ -159,6 +159,12 @@ describe("Claude connector", () => {
     await tool(token, "set_product_form", { projectId: id, form: productForm });
     await tool(token, "set_build_plan", { projectId: id, plan: buildPlan });
     await tool(token, "submit_circuit", { projectId: id, blueprint, review });
+    const housingPlan = { summary: "몸통은 PP 원통 대신 프린트", regions: [{ id: "body", name: "몸통", role: "램프 몸통", shapeRefs: [0], method: "print_fdm", why: "원통은 프린트가 쉬워요", material: { name: "PLA", thicknessMm: 2 }, join: [], toleranceMm: 0.3, outputs: [], process: ["바닥을 아래로 출력, 서포트 없음"], costKRW: 4000, timeHours: 5 }], environment: { indoorOutdoor: "indoor", water: "none", heatSources: [], skinContact: false, childUse: false }, assemblyOrder: ["body"] };
+    expect((await tool(token, "set_housing_plan", { projectId: id, plan: { ...housingPlan, regions: [{ ...housingPlan.regions[0], shapeRefs: [3] }] } })).isError).toBe(true);
+    const housing = await tool(token, "set_housing_plan", { projectId: id, plan: housingPlan });
+    expect(housing.isError).toBeFalsy();
+    expect(housing.structuredContent!.housing.regions[0].outputs[0]).toMatchObject({ kind: "stl", status: "ready" });
+    expect(housing.structuredContent!.buildPlan.fabrication.needs3DPrint).toBe(true);
     const source = await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "https://example.com/tact-switch", title: "택트 스위치 6x6", price: "100원" });
     expect(source.structuredContent!.partSources.S1[0]).toMatchObject({ url: "https://example.com/tact-switch", price: "100원" });
     expect((await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "javascript:alert(1)", title: "x" })).isError).toBe(true);
