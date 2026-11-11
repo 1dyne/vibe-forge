@@ -61,7 +61,7 @@ function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz:
   return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
 }
 
-export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; hasForge: boolean; phase?: Phase; lanterns?: LanternGroup[] }) {
+export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; hasForge: boolean; phase?: Phase; lanterns?: LanternGroup[]; giwa?: number }) {
   const phase: Phase = opts.phase ?? "dusk";
   const night = phase === "night";
   const pal = PALETTE[phase];
@@ -887,10 +887,10 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       // 공사 중: 통나무 비계(새끼로 묶음)·기와 더미·목재
       for (const [px, pz] of [[-3.8, -3.0], [3.8, -3.0], [-3.8, 3.0], [3.8, 3.0]]) part(CYL6, mat("#8A6A4A"), 0.08, 6, 0.08, px, 3, pz, hall);
       for (const hy of [2, 4]) { part(CYL6, mat("#8A6A4A"), 0.06, 7.6, 0.06, 0, hy, -3.0, hall).rotation.z = Math.PI / 2; part(CYL6, mat("#8A6A4A"), 0.06, 7.6, 0.06, 0, hy, 3.0, hall).rotation.z = Math.PI / 2; }
-      for (let k = 0; k < 4; k++) part(BOX, mat("#3E3C42"), 0.9, 0.12, 0.5, 3.6, 0.5 + k * 0.13, 4.2, hall); // 기와 더미
+      { const n = 4 + Math.min(14, Math.floor((opts.giwa ?? 0) / 3)); for (let k = 0; k < n; k++) part(BOX, mat("#3E3C42"), 0.9, 0.12, 0.5, 3.6 + (k >= 9 ? 1.0 : 0), 0.5 + (k % 9) * 0.13, 4.2, hall); } // 기와 더미: 주민이 새긴 기와만큼 쌓인다
       for (let k = 0; k < 5; k++) { const l = part(CYL6, mat("#9C7A58"), 0.12, 3, 0.12, -3.4, 0.55 + (k % 2) * 0.22, 4.0 + k * 0.1, hall); l.rotation.z = Math.PI / 2; }
     }
-    const lbl = textSprite(`달그락 대장간 본관 · 공사 ${hallPct}%`, { bg: "#2A2118", fg: "#F3E7C9", size: 46, scale: 1 });
+    const lbl = textSprite(`달그락 대장간 본관 · 공사 ${hallPct}%${opts.giwa ? ` · 기와 ${opts.giwa}장` : ""}`, { bg: "#2A2118", fg: "#F3E7C9", size: 46, scale: 1 });
     lbl.position.set(0, 9.2, 0); scene.add(lbl);
     nameTags.push({ s: lbl, x: 0, z: 0, always: true });
     solids.push({ x: 0, z: 0, r: 4.6 });

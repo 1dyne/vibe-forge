@@ -11,6 +11,12 @@ export const ERAS: Era[] = [
   { id: "modern", name: "연탄 골목", period: "1970–80년대", topics: "연탄 때던 시절 · 브라운관과 다이얼 전화기가 도깨비가 된 골목", angle: 2.51, ground: "#8C8A82", alley: "#A3A098" },
   { id: "y2k", name: "PC방 골목", period: "2000년대 초", topics: "삐삐와 폴더폰의 시절 · 걸어다니는 C언어를 만날 수 있어", angle: -2.51, ground: "#6E6C72", alley: "#56545C" }
 ];
+/** 2D 지도·안내용: 시대마다 사는 물건 도깨비 */
+export const ERA_DOKKAEBI: Record<string, string[]> = {
+  prehistory: ["빗살무늬토기", "간석기 도끼"],
+  modern: ["브라운관", "다이얼 전화기", "카세트테이프"],
+  y2k: ["폴더폰", "삐삐", "플로피디스크", "걸어다니는 C언어", "디도스 도깨비 떼", "전화 모뎀"]
+};
 export const ERA_R = 84;      // 섬 가운데서 시대 마을 가운데까지
 export const ERA_RADIUS = 16; // 시대 마을 반지름
 
