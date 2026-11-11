@@ -456,3 +456,20 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .giwa small { font-size: 11px; color: #C9C0AE; }
 .giwa.mine { background: #6A5640; }
 .island-map .finger:focus-visible, .island-map .hall:focus-visible { outline: 3px solid #FF8F3F; }
+.find .hall-gauge { height: 10px; border-radius: 999px; background: var(--surface-2, #EEE9DF); border: 1.5px solid #232323; overflow: hidden; }
+.find .hall-gauge i { display: block; height: 100%; background: #FF8F3F; }
+
+/* 3D 마을 안 지형도: 실제 마을을 위에서 찍은 그림 + 이름표 (누르면 그 앞으로 이동) */
+.world-map { position: absolute; inset: 0; z-index: 30; background: #1E1F24; }
+.world-map img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.world-map .map-tag { position: absolute; transform: translate(-50%, -50%); font: inherit; font-family: var(--font-display, Jua), sans-serif; font-size: 14px; white-space: nowrap; background: rgba(246,240,228,.94); color: #232323; border: 2px solid #232323; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.world-map .map-tag.era { background: rgba(214,220,232,.94); }
+.world-map .map-tag.hall { background: #F3E7C9; }
+.world-map .map-tag.mine { background: #FF8F3F; }
+.world-map .map-me { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; border: 3px solid #FF5F3F; box-shadow: 0 0 0 4px rgba(255,95,63,.35); animation: map-me 1.4s ease-in-out infinite; pointer-events: none; }
+@keyframes map-me { 50% { box-shadow: 0 0 0 9px rgba(255,95,63,.1); } }
+.world-map .map-head { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; color: #F6F0E4; font-family: var(--font-display, Jua), sans-serif; font-size: 17px; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.world-map .map-head button { font: inherit; background: rgba(255,255,255,.9); color: #1E1F24; border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+.world-map .map-foot { position: absolute; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); text-align: center; color: #F6F0E4; font-size: 13px; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+.world-map img { filter: brightness(1.18) saturate(1.1); }
+.world-map .map-tag.mine { width: 22px; height: 22px; padding: 0; border-radius: 50% 50% 50% 0; transform: translate(-50%, -100%) rotate(-45deg); z-index: 2; }
