@@ -4,14 +4,17 @@ import type * as T from "three";
 import { hueSpriteMaterial } from "../three-hue";
 import { track } from "../track";
 import { createVillageSound, type Ambience } from "./world-sound";
+import { RopeSheet } from "../lantern-panel";
+import type { LanternGroup } from "../../../lib/find/lantern";
 import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
 
 // 걷는 도깨비 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
 
-type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number };
+type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number; lanterns: LanternGroup[] };
 
-export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myHue }: Props) {
+export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns }: Props) {
+  const [rope, setRope] = useState<LanternGroup | null>(null);
   const mount = useRef<HTMLDivElement>(null);
   const stick = useRef({ x: 0, y: 0, active: false });
   const [near, setNear] = useState<Spot | null>(null);
@@ -69,7 +72,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       sun.position.set(-40, 18, -25); // 서쪽 낮은 해(달)
       scene.add(sun);
 
-      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, phase });
+      const world = buildWorld(three, scene, { houses, villages, hallStage, hallPct, myForgeId, hasForge: !!myForgeId, phase, lanterns });
       soundRef.current = { night: phase === "night", amb: world.ambienceAt };
 
       // 마을의 기척: 1분 반마다 '지금 마을에 있는 집'을 받아 연기·창문 불빛을 바꾼다 (내 집도 '마을에 있음'으로 기록됨)
@@ -113,6 +116,8 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         const dx = c.x - target.x, dz = c.z - target.z, len = Math.hypot(dx, dz) || 1;
         pos.x = target.x + (dx / len) * 4.2; pos.z = target.z + (dz / len) * 4.2;
         heading = Math.atan2(dx / len, -(dz / len));
+      } else if (process.env.NODE_ENV !== "production" && new URLSearchParams(location.search).get("pos")) { // 개발 확인용 ?pos=x,z,heading
+        const [px, pz, ph] = new URLSearchParams(location.search).get("pos")!.split(",").map(Number); pos.x = px; pos.z = pz; heading = ph || 0;
       } else if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 31); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
       let frame = 0, frameClock = 0, lastNear: Spot | null = null, lastVillage: WorldVillage | null = null;
       const clock = new three.Clock();
@@ -207,7 +212,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       };
     })().catch(() => setFailed(true));
     return () => { disposed = true; cleanup(); };
-  }, [houses, villages, hallStage, hallPct, myForgeId, myHue]);
+  }, [houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns]);
 
   // 마을에 들어서면 이름표를 잠깐 띄운다
   const [banner, setBanner] = useState<WorldVillage | null>(null);
@@ -239,7 +244,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
     </div>
   );
 
-  const enterHref = near ? (near.kind === "hall" ? "/find/map#hall" : near.kind === "plot" ? "/find" : `/f/${near.house!.id}`) : "";
+  const enterHref = near ? (near.kind === "hall" ? "/find/map#hall" : near.kind === "plot" ? "/find" : near.house ? `/f/${near.house.id}` : "") : "";
   const enterText = near ? (near.kind === "hall" ? "본관 게시판 보기" : near.kind === "plot" ? "내 도깨비불 찾고 여기 입주하기" : `${near.label} 들어가기`) : "";
 
   return (
@@ -255,10 +260,12 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       <div className="world-pad" ref={pad} onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); setHint(false); move(e); }} onPointerMove={(e) => { if (stick.current.active) move(e); }} onPointerUp={end} onPointerCancel={end}>
         <div className="world-knob" ref={knob} />
       </div>
-      {near && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
+      {near && near.kind === "rope" && <button type="button" className="world-enter" onClick={() => { setRope(lanterns.find((g) => g.key === near.group) ?? null); track("rope_open"); }}>소원 줄 보기</button>}
+      {near && near.kind !== "rope" && <a className="world-enter" href={enterHref} onClick={() => track("world_house_enter", { kind: near.kind })}>{enterText}</a>}
+      {rope && <RopeSheet group={rope} hasForge={Boolean(myForgeId)} onClose={() => setRope(null)} />}
       <div className="world-top">
         <a href="/find" className="world-brand">달그락</a>
-        <span><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 집</a> : <a href="/find">내 집 짓기</a>}</span>
+        <span><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><a href="/find/map">지도</a>{myForgeId ? <a href="/find/village?house=me">내 대장간</a> : <a href="/find">내 대장간 짓기</a>}</span>
       </div>
     </div>
   );

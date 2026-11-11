@@ -25,6 +25,11 @@ type Props = {
   neighbors: number;
   /** 집 주인 달그락 색 (온보딩 때 받은 색) */
   hue: number;
+  /** 전체 화면으로 보일 때 */
+  full?: boolean;
+  /** 이 대장간에 건 소원 등불 (켜진 것 / 이뤄진 것) */
+  lanternsLit?: number;
+  lanternsDone?: number;
   onPick: (o: RoomObj) => void;
   fallback: ReactNode;
 };
@@ -38,7 +43,7 @@ const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2
 };
 const LABEL: Record<RoomObj, string> = { hearth: "화덕", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "편지함", woodpile: "장작더미", tools: "연장 걸이", display: "소반" };
 
-export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, onPick, fallback }: Props) {
+export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, full = false, lanternsLit = 0, lanternsDone = 0, onPick, fallback }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -274,6 +279,21 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         for (let i = 0; i < 6; i++) part(BOX, mat(st.trim), 0.44, 0.05, 0.05, 0, 0.35 + i * 0.4, 0, ladder);
       }
 
+      // ── 소원 등불: 앞 처마 도리에 매단 한지 초롱 (이뤄진 것은 금빛) ──
+      {
+        const n = Math.min(8, lanternsLit + lanternsDone);
+        const LZ = -D / 2 + 0.35; // 뒷벽 도리
+        if (n) part(BOX, mat(st.trim), W * 0.8, 0.12, 0.12, 0.3, H - 0.25, LZ);
+        for (let k = 0; k < n; k++) {
+          const done = k < lanternsDone;
+          const x = 0.3 - W * 0.36 + (k + 0.5) * (W * 0.72 / n);
+          part(CYL, mat("#8A7350"), 0.01, 0.4, 0.01, x, H - 0.5, LZ);
+          const lan = part(CYL, mat("#F3E7C9", { e: done ? "#FFD27A" : "#F2A65A", ei: 1 }), 0.13, 0.28, 0.13, x, H - 0.85, LZ);
+          const ph = k; anim.push((t) => { lan.rotation.z = Math.sin(t * 1.2 + ph) * 0.08; });
+        }
+        if (n) { const pl = new three.PointLight("#FFC27A", 0.6, 5); pl.position.set(0.3, H - 1, LZ + 0.4); scene.add(pl); }
+      }
+
       // ── 집 도깨비: 이 집 주인의 달그락(온보딩 때 받은 색)이 화로 옆을 지킨다 ──
       const tex = await new three.TextureLoader().loadAsync("/find/sprites/idle.webp").catch(() => null);
       if (tex && !disposed) {
@@ -289,7 +309,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       const camera = new three.PerspectiveCamera(FOV, el.clientWidth / el.clientHeight, 0.1, 100);
       const target = new three.Vector3(0, 1.1, 0);
       const fit = Math.hypot(W, D) / 2 / Math.tan(((FOV / 2) * Math.PI) / 180) / Math.min(1, el.clientWidth / el.clientHeight);
-      const dist = fit * 0.92;
+      const dist = fit * (full ? 0.74 : 0.92);
       let yaw = 0.62, drag: { x: number; yaw: number; moved: boolean } | null = null;
       const place = () => { camera.position.set(target.x + Math.sin(yaw) * dist * 0.85, target.y + dist * 0.5, target.z + Math.cos(yaw) * dist * 0.85); camera.lookAt(target); };
       place();
@@ -308,7 +328,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         if (o) pick.current(o.userData.obj as RoomObj);
       };
       const cv = renderer.domElement;
-      cv.style.touchAction = "pan-y";
+      cv.style.touchAction = full ? "none" : "pan-y";
       cv.addEventListener("pointerdown", down); window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
       const onResize = () => { renderer.setSize(el.clientWidth, el.clientHeight); camera.aspect = el.clientWidth / el.clientHeight; camera.updateProjectionMatrix(); };
       window.addEventListener("resize", onResize);
@@ -323,8 +343,8 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       };
     })().catch(() => setFailed(true));
     return () => { disposed = true; cleanup(); };
-  }, [village, fires, peak, fuel, wants, notes, neighbors, hue]);
+  }, [village, fires, peak, fuel, wants, notes, neighbors, hue, full, lanternsLit, lanternsDone]);
 
   if (failed) return <>{fallback}</>;
-  return <div className="room3d" ref={mount} role="img" aria-label="대장간 안. 화로, 도깨비불 선반, 설계도, 작업대, 우체통이 있어." />;
+  return <div className={full ? "room3d room3d-full" : "room3d"} ref={mount} role="img" aria-label="대장간 안. 화로, 도깨비불 선반, 설계도, 작업대, 우체통이 있어." />;
 }

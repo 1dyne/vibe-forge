@@ -600,3 +600,36 @@ describe("마을 문", () => {
     expect(await vs.villageOpenFor(forge.id)).toBe(true);
   });
 });
+
+describe("소원 등불", () => {
+  it("같은 소원끼리 한 줄에 꿰이고, 가리기·나만 보기·만들어볼게·이뤄졌어가 반영된다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const store = await import("../apps/web/lib/find/store");
+    const ln = await import("../apps/web/lib/find/lantern");
+    expect(ln.groupKeyOf(["f_desk", "w_family", "s_time", "r_light"])).toBe("w_family|s_time|r_light");
+    expect(ln.lanternTextProblem("010-1234-5678", 12, "누구를 위해")).toMatch(/숫자/);
+    expect(ln.lanternTextProblem("엄마", 12, "누구를 위해")).toBeNull();
+    expect(ln.lanternAllowance(0)).toBe(1);
+    const stamp = Date.now();
+    const a = (await vs.ensureForge(vs.hashToken(`ln-a-${stamp}`), "등불A", ["w_family"])).forge;
+    const b = (await vs.ensureForge(vs.hashToken(`ln-b-${stamp}`), "등불B", ["w_family"])).forge;
+    const key = `w_family|s_time|r_light`;
+    const fire = { id: `lnfire${stamp}`, idea: "(테스트)", sentence: "x", picked: ["w_family", "s_time", "r_light"], labels: [], peak: 30, color: "#4FB3A6", reactKind: "light", name: "할머니 알림이", matches: [], comboKey: "x", card: null, nickname: "등불A", forgeId: a.id, createdAt: new Date().toISOString() };
+    await store.backend().saveFire(fire);
+    const l1 = await ln.createLantern({ forgeId: a.id, fireId: fire.id, target: "할머니", wish: "물 드시게", hideTarget: false, private: false, shareCard: true, groupKey: key });
+    const l2 = await ln.createLantern({ forgeId: b.id, fireId: null, target: "아빠", wish: "허리 펴시게", hideTarget: true, private: false, shareCard: false, groupKey: key });
+    await ln.createLantern({ forgeId: b.id, fireId: null, target: "비밀", wish: "나만", hideTarget: false, private: true, shareCard: false, groupKey: key });
+    await ln.setMaker(l1.id, b.id, true);
+    let g = (await ln.publicLanternGroups(b.id)).find((x) => x.key === key)!;
+    const mine1 = g.lanterns.filter((l) => l.id === l1.id || l.id === l2.id);
+    expect(mine1).toHaveLength(2);
+    expect(mine1.find((l) => l.id === l1.id)).toMatchObject({ target: "할머니", fireName: "할머니 알림이", forgeId: a.id, makers: 1, iMake: true });
+    expect(mine1.find((l) => l.id === l2.id)).toMatchObject({ target: null, forgeId: b.id, mine: true });
+    expect(g.lanterns.some((l) => l.wish === "나만")).toBe(false);
+    await ln.markDone(l1.id);
+    g = (await ln.publicLanternGroups(null)).find((x) => x.key === key)!;
+    expect(g.lanterns.find((l) => l.id === l1.id)?.status).toBe("done");
+    await ln.removeLantern(l2.id);
+    expect((await ln.forgeLanterns(b.id)).some((l) => l.id === l2.id)).toBe(false);
+  });
+});
