@@ -10,7 +10,9 @@ export type BenchPartKind =
   // 프로젝트 조립 가이드에서 오는 부품: 부품 카드(catalogId)나 가이드의 크기·핀으로 만든다
   | "module" | "plate"
   // 하우징 부위 도형 (완성품 형태 + 하우징 계획에서)
-  | "housing_shape";
+  | "housing_shape"
+  // 낱개 전선 한 가닥 (끝 = REF.END). spec.color, spec.widthMm = 길이
+  | "wire";
 
 export type BenchPart = {
   ref: string;
@@ -45,7 +47,7 @@ export type BenchOp =
   | { op: "bridge"; pairs: Array<[Anchor, Anchor]> }
   | { op: "trim"; refs: string[] }
   | { op: "batteries"; ref: string }
-  | { op: "check"; how: "look" | "continuity" | "power_on"; targets: Anchor[]; expected: string }
+  | { op: "check"; how: "look" | "continuity" | "voltage" | "power_on"; targets: Anchor[]; expected: string }
   /** 기판(onto) 위 foot 자리에 부품을 놓는다 */
   | { op: "seat"; ref: string; onto: string }
   /** 두 핀을 전선으로 잇는다 (브레드보드 점퍼선 또는 납땜용 전선) */

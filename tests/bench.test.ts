@@ -18,6 +18,8 @@ describe("bench practice kits", () => {
         if (part.kind === "perfboard" || part.kind === "breadboard") return hole.test(name);
         if (part.kind === "sensor_module") return (part.spec?.pinNames ?? []).includes(name);
         if (part.kind === "battery_holder_2aa") return name === "RED" || name === "BLK";
+        if (part.kind === "wire") return name === "END";
+        if (part.kind === "module") return (part.spec?.pinXY ?? []).some((p) => p.name === name);
         return false;
       };
       const anchors = (o: BenchOp): string[] => {
@@ -28,6 +30,7 @@ describe("bench practice kits", () => {
           case "solder": return o.joints;
           case "bridge": return o.pairs.flat();
           case "check": return o.targets;
+          case "jumper": return [o.from, o.to];
           default: return [];
         }
       };
@@ -41,7 +44,7 @@ describe("bench practice kits", () => {
         for (const o of ops) if ("ref" in o) expect(refs.has(o.ref), o.ref).toBe(true);
       });
       it("places every part exactly once, boards before what goes into them", () => {
-        const moved = ops.filter((o) => o.op === "place" || o.op === "insert" || o.op === "mount_on").map((o) => (o as { ref: string }).ref);
+        const moved = ops.filter((o) => o.op === "place" || o.op === "insert" || o.op === "mount_on" || o.op === "seat").map((o) => (o as { ref: string }).ref);
         expect(new Set(moved).size).toBe(moved.length);
         ops.forEach((o, i) => {
           if (o.op !== "insert" && o.op !== "mount_on") return;
@@ -51,9 +54,11 @@ describe("bench practice kits", () => {
           expect(at).toBeLessThan(i);
         });
       });
-      it("solders only where something was inserted", () => {
+      it("solders only where something was inserted, a wire ends, or on a module pad", () => {
         const filled = new Set<string>();
+        for (const p of kit.parts) if (p.kind === "sensor_module") (p.spec?.pinNames ?? []).forEach((n) => filled.add(`${p.ref}.${n}`));
         for (const o of ops) {
+          if (o.op === "jumper") { filled.add(o.from); filled.add(o.to); }
           if (o.op === "insert") o.holes.forEach((h) => filled.add(h));
           if (o.op === "mount_on") o.holes.forEach((h) => filled.add(h));
           if (o.op === "insert_wire") filled.add(o.hole);

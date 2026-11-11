@@ -49,7 +49,7 @@ type PartRec = {
   baseKind?: string;
 };
 type JumperRec = { op: Extract<BenchOp, { op: "jumper" }>; curve: T.CatmullRomCurve3 | null; mesh: T.Mesh | null; ends: T.Object3D[]; t: number; built: number; mat: T.Material };
-type WireRec = { id: string; color: string; holderRef: string; exitLocal: T.Vector3; looseLocal: T.Vector3; strip: number; tin: number; insert: number; hole: T.Vector3 | null; mesh: T.Mesh | null; bare: T.Mesh | null; bareMat: T.MeshStandardMaterial; key: string };
+type WireRec = { id: string; color: string; holderRef: string; exitLocal: T.Vector3; looseLocal: T.Vector3; strip: number; tin: number; insert: number; hole: T.Vector3 | null; surface?: boolean; mesh: T.Mesh | null; bare: T.Mesh | null; bareMat: T.MeshStandardMaterial; key: string };
 type Joint = { anchor: string; pos: T.Vector3; side: "top" | "bottom"; mesh: T.Mesh };
 type Target = { pos: T.Vector3; label?: string; radius: number; part?: string };
 
@@ -231,6 +231,13 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     } else if (def.kind === "sensor_module") {
       const m = sensorModule(k, def.spec?.pinNames ?? ["VCC", "GND", "SCL", "SDA"], def.spec?.silk ?? "MODULE"); obj = m.group; rec.module = m;
       if (ins?.op === "mount_on") { const h = parts.get(ins.onto); if (h?.final && h.header) final = { p: new three.Vector3(0, h.header.plasticTop, 0).applyMatrix4(poseMatrix(h.final)), q: h.final.q.clone() }; }
+      else { const place = allOps.find((o) => o.op === "place" && o.ref === def.ref) as Extract<BenchOp, { op: "place" }> | undefined; if (place) final = { p: new three.Vector3(place.at[0], 0, place.at[1]), q: qY(((place.rotation ?? 0) * Math.PI) / 180) }; }
+    } else if (def.kind === "wire") {
+      obj = new three.Group();
+      const place = allOps.find((o) => o.op === "place" && o.ref === def.ref) as Extract<BenchOp, { op: "place" }> | undefined;
+      if (place) final = { p: new three.Vector3(place.at[0], 0, place.at[1]), q: qY(((place.rotation ?? 0) * Math.PI) / 180) };
+      const len = def.spec?.widthMm ?? 60;
+      const sizer = new three.Mesh(new three.BoxGeometry(len, 1.6, 2), new three.MeshBasicMaterial({ visible: false })); sizer.position.set(len / 2, 0.8, 0); obj.add(sizer); // 트레이 배치용 크기
     } else if (def.kind === "battery_holder_2aa") {
       const h = batteryHolder2AA(k); obj = h.group; rec.holder = h;
       const place = allOps.find((o) => o.op === "place" && o.ref === def.ref) as Extract<BenchOp, { op: "place" }> | undefined;
@@ -309,6 +316,10 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
       wires.push({ id: `${p.def.ref}.${id}`, color, holderRef: p.def.ref, exitLocal: exit.clone(), looseLocal: new three.Vector3(58, 1.0, side * 12), strip: 0, tin: 0, insert: 0, hole: null, mesh: null, bare: null, bareMat, key: "" });
     }
   }
+  for (const p of parts.values()) if (p.def.kind === "wire") {
+    const len = p.def.spec?.widthMm ?? 60;
+    wires.push({ id: `${p.def.ref}.END`, color: p.def.spec?.color ?? "#d8322a", holderRef: p.def.ref, exitLocal: new three.Vector3(0, 0.8, 0), looseLocal: new three.Vector3(len, 0.8, 0), strip: 0, tin: 0, insert: 0, hole: null, mesh: null, bare: null, bareMat: new three.MeshStandardMaterial({ color: "#c87a45", metalness: 1, roughness: 0.35 }), key: "" });
+  }
   for (const o of allOps) if (o.op === "insert_wire") { const w = wires.find((x) => x.id === o.wire); if (w) w.hole = holeWorld(o.hole); }
   const insulMats = new Map<string, T.Material>();
   const wirePoints = (w: WireRec) => {
@@ -322,7 +333,11 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     const lp = [exit, out, looseMid1, looseMid2, loose.clone().setY(Math.max(1.0, loose.y)), loose.clone().add(new three.Vector3(4, 0, 0)).setY(Math.max(1.0, loose.y))];
     if (!w.hole || w.insert <= 0) return lp;
     const hb = w.hole.clone(), b = w.insert;
-    const ip = [exit, out, out.clone().lerp(hb, 0.45).setY(hb.y + 18), hb.clone().add(new three.Vector3(-3, 7, 0)), hb.clone().setY(hb.y + 1.2), hb.clone().setY(hb.y - 1.6 - 1.5)];
+    // surface: 패드 위에 눕혀 붙이기 (모듈 패드에 직접 납땜), 아니면 구멍에 꽂아 아래로
+    const toward = exit.clone().sub(hb).setY(0).normalize();
+    const ip = w.surface
+      ? [exit, out, out.clone().lerp(hb, 0.5).setY(Math.max(hb.y, out.y) + 10), hb.clone().add(toward.clone().multiplyScalar(9)).setY(hb.y + 2.2), hb.clone().add(toward.clone().multiplyScalar(3)).setY(hb.y + 0.9), hb.clone().add(toward.clone().multiplyScalar(-1.5)).setY(hb.y + 0.7)]
+      : [exit, out, out.clone().lerp(hb, 0.45).setY(hb.y + 18), hb.clone().add(new three.Vector3(-3, 7, 0)), hb.clone().setY(hb.y + 1.2), hb.clone().setY(hb.y - 1.6 - 1.5)];
     const arc = Math.sin(Math.PI * b) * 14;
     return lp.map((pt, i) => pt.clone().lerp(ip[i], smooth(b)).add(new three.Vector3(0, i >= 2 ? arc : 0, 0)));
   };
@@ -357,6 +372,9 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     if (p?.pinLocal && p.final) { const l = p.pinLocal.get(anchor.slice(ref.length + 1)) ?? p.pinLocal.get(name); if (l) return l.clone().applyMatrix4(poseMatrix(p.final)); const c = p.final.p.clone(); c.y += 4; return c; }
     return null;
   };
+
+  // 구멍이 아닌 핀(모듈 패드)에 붙이는 전선
+  for (const o of allOps) if (o.op === "insert_wire") { const w = wires.find((x) => x.id === o.wire); if (w && !w.hole) { w.hole = anchorWorld(o.hole); w.surface = true; } }
 
   // ── 땜납 ──
   const filletG = filletGeometry(three), coldG = coldGeometry(three);
@@ -539,15 +557,17 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
         if (op.how === "power_on") {
           for (const tg of op.targets) { const p = parts.get(tg); if (p?.led) { p.led.lens.emissiveIntensity = 2.6 * smooth(t); p.led.glow.intensity = 900 * smooth(t); ((p.led.glow.userData.halo as T.Sprite).material as T.SpriteMaterial).opacity = 0.9 * smooth(t); } }
         }
-        if (op.how === "continuity" && active) {
-          const a = anchorWorld(op.targets[0], "bottom"), b = anchorWorld(op.targets[1] ?? op.targets[0], "bottom");
+        if ((op.how === "continuity" || op.how === "voltage") && active) {
+          const up = kit.steps[current]?.view !== "bottom";
+          const a = anchorWorld(op.targets[0], up ? "top" : "bottom"), b = anchorWorld(op.targets[1] ?? op.targets[0], up ? "top" : "bottom");
           if (a && b) {
-            const u = t;
-            const w1: Pose = { p: a.clone().add(new three.Vector3(0, -0.6, 0)), q: new three.Quaternion().setFromUnitVectors(new three.Vector3(0, 1, 0), new three.Vector3(-0.35, -0.85, 0.4).normalize()) };
-            const w2: Pose = { p: b.clone().add(new three.Vector3(0, -0.6, 0)), q: new three.Quaternion().setFromUnitVectors(new three.Vector3(0, 1, 0), new three.Vector3(0.35, -0.85, 0.4).normalize()) };
+            const u = t, sy = up ? 1 : -1;
+            const w1: Pose = { p: a.clone().add(new three.Vector3(0, 0.6 * sy, 0)), q: new three.Quaternion().setFromUnitVectors(new three.Vector3(0, 1, 0), new three.Vector3(-0.35, 0.85 * sy, 0.4).normalize()) };
+            const w2: Pose = { p: b.clone().add(new three.Vector3(0, 0.6 * sy, 0)), q: new three.Quaternion().setFromUnitVectors(new three.Vector3(0, 1, 0), new three.Vector3(0.35, 0.85 * sy, 0.4).normalize()) };
             const e = u < 0.35 ? u / 0.35 : u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1;
             toolTo(probeR, PROBE_REST[0], w1, e); toolTo(probeB, PROBE_REST[1], w2, e);
-            if (u > 0.4 && u < 0.9) showReading(op.expected.includes("없음") || op.expected.includes("OL") ? "OL · 소리 없음" : "삐 ─ 연결됨", a.clone().lerp(b, 0.5).add(new three.Vector3(0, -9, 0)));
+            const side = kit.steps[current]?.view === "bottom" ? -9 : 9;
+            if (u > 0.4 && u < 0.9) showReading(op.how === "voltage" ? op.expected : op.expected.includes("없음") || op.expected.includes("OL") ? "OL · 소리 없음" : "삐 ─ 연결됨", a.clone().lerp(b, 0.5).add(new three.Vector3(0, side, 0)));
           }
         }
         break;
@@ -650,7 +670,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
       } else if (op.op === "trim") {
         for (const r of op.refs) for (const t of parts.get(r)?.tails ?? []) { t.updateMatrixWorld(); const wp = new three.Vector3(); t.getWorldPosition(wp); out.push({ pos: wp.add(new three.Vector3(0, -(t.userData.len as number) * 0.6, 0)), radius: 4 }); }
       } else if (op.op === "check") {
-        if (op.how === "continuity" && op.targets.length >= 2) { const a = anchorWorld(op.targets[0], "bottom"), b = anchorWorld(op.targets[1], "bottom"); if (a && b) out.push({ pos: a.clone().lerp(b, 0.5), label: `${op.targets[0].split(".")[1]}–${op.targets[1].split(".")[1]}`, radius: 2.4 }); }
+        if ((op.how === "continuity" || op.how === "voltage") && op.targets.length >= 2) { const sd = kit.steps[si].view === "bottom" ? "bottom" : "top"; const a = anchorWorld(op.targets[0], sd), b = anchorWorld(op.targets[1], sd); if (a && b) out.push({ pos: a.clone().lerp(b, 0.5), label: `${op.targets[0].split(".")[1]}–${op.targets[1].split(".")[1]}`, radius: 2.4 }); }
         else if (op.how === "look" && op.targets.every((t) => !t.includes("."))) { for (const t of op.targets) { const a = anchorWorld(t); if (a) out.push({ pos: a, radius: 14, part: t }); } }
         else for (const t of op.targets) { const side = kit.steps[si].view === "bottom" ? "bottom" : "top"; const a = anchorWorld(t, side); if (a) out.push({ pos: a, label: t.includes(".") ? t.split(".")[1] : undefined, radius: t.includes(".") ? 2.2 : 12, part: t.includes(".") ? undefined : t }); }
       }
