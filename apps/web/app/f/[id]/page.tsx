@@ -13,6 +13,7 @@ import ForgeView from "../../find/forge-view";
 import Mailbox from "../../find/mailbox";
 import VillageNews from "../../find/village-news";
 import { forgeLanterns, lanternAllowance, publicLanternGroups } from "../../../lib/find/lantern";
+import { forgeMemos } from "../../../lib/find/memo";
 import "../../find/fonts";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +76,7 @@ export default async function SharedPage({ params, searchParams }: Props) {
     const lanterns = { mine: owner ? own : null, allowance: lanternAllowance(fires.length), shown };
     return (
       <main className="find forge-page" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
-        <ForgeView news={owner ? <VillageNews /> : null} lanterns={lanterns} forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
+        <ForgeView news={owner ? <VillageNews /> : null} lanterns={lanterns} memoCount={owner ? (await forgeMemos(forge.id)).length : 0} forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
       </main>
     );
   }

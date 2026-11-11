@@ -199,6 +199,8 @@ CREATE TABLE IF NOT EXISTS find_visit (id bigserial PRIMARY KEY, visitor_forge t
 CREATE INDEX IF NOT EXISTS find_visit_host ON find_visit(host_forge, at);
 CREATE TABLE IF NOT EXISTS find_plan (id bigserial PRIMARY KEY, title text NOT NULL, description text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'voting', created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS find_plan_vote (plan_id bigint NOT NULL, forge_id text NOT NULL, fuel integer NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (plan_id, forge_id));
+CREATE TABLE IF NOT EXISTS find_memo (id text PRIMARY KEY, forge_id text NOT NULL, fire_id text NOT NULL, body text NOT NULL, url text, created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS find_memo_forge ON find_memo(forge_id, fire_id);
 CREATE TABLE IF NOT EXISTS find_lantern (id text PRIMARY KEY, forge_id text NOT NULL, fire_id text, target text NOT NULL, wish text NOT NULL, hide_target boolean NOT NULL DEFAULT false, private boolean NOT NULL DEFAULT false, share_card boolean NOT NULL DEFAULT false, group_key text NOT NULL, status text NOT NULL DEFAULT 'lit', created_at timestamptz NOT NULL DEFAULT now(), done_at timestamptz);
 CREATE INDEX IF NOT EXISTS find_lantern_group ON find_lantern(group_key);
 CREATE INDEX IF NOT EXISTS find_lantern_forge ON find_lantern(forge_id);

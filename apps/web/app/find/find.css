@@ -419,3 +419,25 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .lantern-form { display: grid; gap: 8px; }
 .lantern-form input, .lantern-form select { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #D8D2C4; background: #fff; }
 .lantern-form label { font-size: 14px; font-weight: 600; }
+.world-say { position: absolute; left: 150px; right: 14px; bottom: calc(34px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 4px; background: rgba(246,240,228,.96); border: 2px solid #232323; border-radius: 16px; padding: 12px 14px; font-size: 14px; line-height: 1.5; word-break: keep-all; box-shadow: 0 3px 0 #232323; }
+.world-say b { font-family: var(--font-display, Jua), sans-serif; font-weight: 400; font-size: 15px; }
+
+/* 한국어 줄바꿈: 낱말 중간에서 끊지 않는다 */
+.find, .find .sheet, .find .overlay, .world, .forge-full { word-break: keep-all; overflow-wrap: break-word; }
+.lantern-row { flex-wrap: wrap; align-items: flex-start; }
+.lantern-row > i { margin-top: 3px; }
+.lantern-text { flex: 1 1 12em; min-width: 0; }
+.lantern-actions { display: flex; gap: 10px; align-items: center; margin-left: auto; flex-shrink: 0; }
+.lantern-text span, .lantern-text small, .lantern-text b { word-break: keep-all; overflow-wrap: break-word; }
+.forge-dock.owner { grid-template-columns: 1.1fr 1fr 1fr 1fr 1fr; }
+.forge-dock > a, .forge-dock > button { font-size: 15px; }
+.memo-sheet { display: grid; gap: 12px; max-height: 88dvh; overflow-y: auto; }
+.memo-sheet textarea { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1.5px solid #D8D2C4; resize: vertical; }
+.memo-list { display: grid; gap: 8px; }
+.memo-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #F6F0E4; }
+.memo-row a { display: block; font-size: 13px; color: #2F7A70; word-break: break-all; }
+.memo-row small { display: block; font-size: 12px; color: #6B6E78; }
+.memo-export { width: 100%; font: 12px/1.5 ui-monospace, monospace; padding: 10px; border-radius: 10px; border: 1.5px solid #D8D2C4; }
+/* 마지막 줄에 낱말 하나만 남지 않게: 짧은 안내는 줄 길이를 고르게, 긴 글은 끝줄을 보기 좋게 */
+.find .note, .find .note *, .lantern-row span, .lantern-row b, .memo-row span, .world-say span, .forge-toast span, .forge-hint, .world-hint, .find .error, .find [role="status"] { text-wrap: balance; }
+.find .body, .find p, .lantern-sheet .small, .memo-sheet .small { text-wrap: pretty; }
