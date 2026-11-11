@@ -92,6 +92,10 @@ export type LocalProject = {
   productForm?: ProductForm;
   assembly?: AssemblyGuide;
   housing?: HousingPlan;
+  power?: PowerBudget;
+  testPlan?: TestPlan;
+  safety?: SafetyReview;
+  history?: DesignSnapshot[];
   assemblyReports?: AssemblyReport[];
   assemblyDetails?: AssemblyDetail[];
   assemblyRequests?: AssemblyRequest[];
@@ -265,3 +269,29 @@ export type HousingPlan = {
   risks: string[];
   updatedAt: string;
 };
+
+// 전원·배터리 수명 (명세서 2차 v0.1 §7). result는 서버가 다시 계산한다.
+export type PowerLoad = { ref: string; currentMa: number; basis: "card_typical" | "card_max" | "datasheet" | "measured" | "assumed" };
+export type PowerBudget = {
+  source: { kind: "usb" | "battery" | "adapter"; part?: string; capacityMah?: number | null; voltage: number };
+  modes: Array<{ name: string; dutyPct: number; loads: PowerLoad[] }>;
+  regulatorEfficiency: number;
+  derating: number;
+  result: { avgCurrentMa: number; peakCurrentMa: number; hours: number | null; estimated: boolean; railWarnings: string[] };
+  updatedAt: string;
+};
+
+// 펌웨어 업로드·동작 테스트 계획 (§8). 결과를 보내도 자동으로 pass가 되지 않는다.
+export type TestCase = {
+  id: string; stage: number; title: string; setup: string; do: string;
+  expect: { serial?: string[]; observe?: string; measure?: { what: string; min: number; max: number; unit: string } };
+  result?: { status: "pass" | "fail" | "unknown"; evidence: string; at: string; by: "person" | "claude" };
+};
+export type TestPlan = { board: string; cases: TestCase[]; updatedAt: string };
+
+// 안전 검토 (§11). 조건에 맞는 필수 항목은 서버가 넣는다. risk는 사람이 '확인했어요'를 눌러야 대장간에 들어간다.
+export type SafetyItem = { id: string; topic: string; text: string; status: "ok" | "risk" | "unknown"; required: boolean; ackAt?: string };
+export type SafetyReview = { items: SafetyItem[]; updatedAt: string };
+
+// 설계 기록 (§10). set_* 도구가 덮어쓰기 전 값을 남긴다.
+export type DesignSnapshot = { id: string; at: string; tool: string; summary: string; field: "productForm" | "buildPlan" | "build" | "assembly" | "housing" | "power" | "testPlan" | "safety"; snapshot: string };

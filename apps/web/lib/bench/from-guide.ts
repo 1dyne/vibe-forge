@@ -1,4 +1,6 @@
 import type { AssemblyGuide, LocalProject } from "../project-types";
+import { FAB_LABEL } from "../housing";
+import { provisionalReasons } from "../provisional";
 import { findCard, type PartCard } from "../parts/catalog";
 import { resolvePin } from "../parts/rules";
 import wokwiSizes from "../parts/wokwi-pins.json";
@@ -102,7 +104,23 @@ export function guideToKit(project: LocalProject): BenchKit | null {
     };
   });
 
+  // 하우징 계획이 있으면 마지막에 부위별로 씌우는 단계를 더한다 (명세서 §6.5)
+  const housing = project.housing, form = project.productForm;
+  if (housing && form) {
+    const order = [...housing.assemblyOrder, ...housing.regions.map((r) => r.id)].filter((id, i, a) => a.indexOf(id) === i);
+    const colors = ["#e9a48c", "#9ed3cb", "#cdbdff", "#ffc48a", "#f7c1d4", "#b9d98a"];
+    for (const id of order) {
+      const r = housing.regions.find((x) => x.id === id); if (!r || r.method === "none") continue;
+      const ri = housing.regions.indexOf(r);
+      const refs = r.shapeRefs.filter((i) => form.shape[i]).map((i) => { const s = form.shape[i]; const ref = `H_${r.id}_${i}`; parts.push({ ref, kind: "housing_shape", label: `${r.name} (${FAB_LABEL[r.method]})`, about: `${r.role}. ${r.material.name}${r.material.thicknessMm != null ? ` ${r.material.thicknessMm}mm` : ""}`, spec: { primitive: s.primitive, sizeMm: s.size, posMm: s.position, color: colors[ri % colors.length], around: baseRef } }); return ref; });
+      if (!refs.length) continue;
+      const joins = r.join.map((j) => `${housing.regions.find((x) => x.id === j.to)?.name ?? (j.to === "internal" ? "내부 부품" : j.to)}와 ${({ screw: "나사", heat_insert: "열 인서트+나사", snap: "끼움", magnet: "자석", tape: "양면테이프", glue: "접착", slot: "홈 끼움", sew: "바느질", velcro: "벨크로" } as const)[j.method]}(${j.detail})`).join(", ");
+      steps.push({ phase: "검사", title: `${r.name} 씌우기`, action: `**${r.name}**(${FAB_LABEL[r.method]})을 올려 ${joins || "고정"}해요.${r.access && r.access.purpose !== "none" ? ` 여는 곳: ${r.access.how}.` : ""}`, why: r.why, ops: [{ op: "enclose", refs }], view: "34", tapHint: `${r.name}이 들어갈 자리를 눌러`, caution: r.toleranceMm != null ? `공차 ${r.toleranceMm}mm: 빡빡하면 억지로 누르지 말고 다듬어요` : undefined, doneWhen: "흔들리지 않고 선이 끼지 않는다" });
+    }
+  }
+
   return {
+    provisional: provisionalReasons(project).map((r) => r.label),
     id: `project-${project.id}`,
     title: project.name,
     subtitle: guide.stage,

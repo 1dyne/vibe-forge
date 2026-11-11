@@ -228,6 +228,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
           <div className="eyebrow"><span>{mode === "practice" ? "미리 만들어보기" : "조립 가이드"}</span><span>{String(Math.min(step + 1, total)).padStart(2, "0")} / {String(total).padStart(2, "0")}</span></div>
           <h1>{kit.title}</h1>
           <p className="sub">{kit.subtitle}</p>
+          {kit.provisional && kit.provisional.length > 0 && <span className="bench-sticker" title={`빌드하면서 바뀔 수 있어요: ${kit.provisional.join(", ")}`}>🔧 바뀔 수 있어요 · {kit.provisional.join(" · ")}</span>}
           <div className="meta"><span className="lvl"><i /><i /><i className={kit.level === "처음" ? "off" : ""} />{kit.level}</span><span>약 {kit.minutes}분</span><button type="button" className="chip-btn" onClick={toggleLight} aria-pressed={light}>{light ? "가볍게 ✓" : "가볍게"}</button></div>
         </div>
       </header>

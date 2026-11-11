@@ -56,7 +56,7 @@ type Target = { pos: T.Vector3; label?: string; radius: number; part?: string };
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const smooth = (t: number) => { t = clamp(t); return t * t * (3 - 2 * t); };
 const seg = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
-const OP_SECONDS: Record<BenchOp["op"], number> = { place: 0.9, insert: 1.2, mount_on: 1.2, prep_wire: 1.6, insert_wire: 0.9, solder: 1.0, bridge: 0.7, trim: 0.6, batteries: 1.1, check: 0.7, seat: 1.0, jumper: 0.9 };
+const OP_SECONDS: Record<BenchOp["op"], number> = { place: 0.9, insert: 1.2, mount_on: 1.2, prep_wire: 1.6, insert_wire: 0.9, solder: 1.0, bridge: 0.7, trim: 0.6, batteries: 1.1, check: 0.7, seat: 1.0, jumper: 0.9, enclose: 1.4 };
 function opSeconds(op: BenchOp) {
   if (op.op === "solder") return 0.25 + op.joints.length * 0.95;
   if (op.op === "bridge") return 0.3 + op.pairs.length * 0.75;
@@ -241,6 +241,17 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
       const bat = allOps.find((o) => o.op === "batteries") as Extract<BenchOp, { op: "batteries" }> | undefined;
       const holder = bat ? parts.get(bat.ref) : null;
       if (holder?.final) final = { p: holder.final.p.clone().add(new three.Vector3(0, 8.6, 0).applyQuaternion(holder.final.q)), q: holder.final.q.clone() };
+    } else if (def.kind === "housing_shape" && def.spec?.sizeMm && def.spec.posMm) {
+      const [sx, sy, sz] = def.spec.sizeMm, [px, py, pz] = def.spec.posMm;
+      const m = new three.MeshStandardMaterial({ color: def.spec.color ?? "#9ed3cb", transparent: true, opacity: 0, depthWrite: false, side: three.DoubleSide, roughness: 0.55 });
+      const g = def.spec.primitive === "cylinder" ? new three.CylinderGeometry(Math.min(sx, sy) / 2, Math.min(sx, sy) / 2, sz, 40) : def.spec.primitive === "cone" ? new three.ConeGeometry(Math.min(sx, sy) / 2, sz, 40) : def.spec.primitive === "sphere" ? new three.SphereGeometry(0.5, 32, 20) : new three.BoxGeometry(sx, sz, sy);
+      obj = new three.Group();
+      const me = new three.Mesh(g, m); if (def.spec.primitive === "sphere") me.scale.set(sx, sz, sy); obj.add(me);
+      const edges = new three.LineSegments(new three.EdgesGeometry(g, 30), new three.LineBasicMaterial({ color: "#2f5d55", transparent: true, opacity: 0 })); if (def.spec.primitive === "sphere") edges.scale.set(sx, sz, sy); obj.add(edges);
+      obj.userData.fade = [m, edges.material];
+      const base = parts.get(def.spec.around ?? "");
+      const c = base?.final?.p ?? new three.Vector3(0, 0, -6);
+      final = { p: new three.Vector3(c.x + px, pz + sz / 2, c.z + py), q: new three.Quaternion() };
     } else if (def.kind === "module" && def.spec?.foot) {
       const seat = allOps.find((o) => o.op === "seat" && o.ref === def.ref) as Extract<BenchOp, { op: "seat" }> | undefined;
       const base = seat ? parts.get(seat.onto) : undefined;
@@ -256,7 +267,8 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
 
   // 트레이 배치: 부품 순서대로 왼쪽부터, 눕혀서. 폭이 넘치면 다음 줄.
   {
-    const items = [...parts.values()].map((p) => {
+    for (const p of parts.values()) if (p.def.kind === "housing_shape" && p.final) p.home = { p: p.final.p.clone().add(new three.Vector3(0, 110, 0)), q: p.final.q.clone() };
+    const items = [...parts.values()].filter((p) => p.def.kind !== "housing_shape").map((p) => {
       const k2 = p.def.kind;
       const q = k2 === "resistor" || k2 === "led" || k2 === "header_male" ? new three.Quaternion().setFromEuler(new three.Euler(-Math.PI / 2, 0, 0)) : new three.Quaternion();
       p.obj.position.set(0, 0, 0); p.obj.quaternion.copy(q); p.obj.updateMatrixWorld(true);
@@ -450,6 +462,17 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
   const applyOp = (op: BenchOp, t: number, active: boolean) => {
     switch (op.op) {
       case "seat": { const p = parts.get(op.ref); if (p) fly(p, t, 12); break; }
+      case "enclose": {
+        op.refs.forEach((ref, i) => {
+          const p = parts.get(ref); if (!p?.final) return;
+          const u = smooth(clamp(t * op.refs.length - i));
+          p.obj.position.copy(p.home.p).lerp(p.final.p, u); p.obj.quaternion.copy(p.final.q);
+          p.atHome = u <= 0; p.obj.visible = u > 0;
+          const [m, e] = p.obj.userData.fade as [T.MeshStandardMaterial, T.LineBasicMaterial];
+          m.opacity = 0.38 * u; e.opacity = 0.8 * u;
+        });
+        break;
+      }
       case "jumper": { const j = jumpers.get(op); if (j) j.t = t; break; }
       case "place": case "insert": case "mount_on": case "batteries": {
         const ref = op.ref;
@@ -592,7 +615,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
   const syncGroundVisibility = () => {
     for (const g of ground) g.visible = !below;
     for (const g of props) g.visible = !below && !light;
-    for (const p of parts.values()) p.obj.visible = !(below && p.atHome);
+    for (const p of parts.values()) p.obj.visible = p.def.kind === "housing_shape" ? !p.atHome : !(below && p.atHome);
     for (const w of wires) { const h = parts.get(w.holderRef); const hide = below && !!h?.atHome; if (w.mesh) w.mesh.visible = !hide; if (w.bare) w.bare.visible = !hide && w.strip > 0.01; }
     scene.traverse((o) => { if (o.userData.prop) o.visible = !below && !light; });
     under.intensity = below ? 1.6 : 0;
@@ -610,6 +633,8 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
         else if (fin) out.push({ pos: fin.p.clone().add(new three.Vector3(0, op.op === "batteries" ? 8 : 1, 0)), radius: 18, part: op.ref });
       } else if (op.op === "seat") {
         const p = parts.get(op.ref); if (p?.final) { const b = new three.Box3().setFromObject(p.obj); const h = Math.max(2, b.max.y - b.min.y); const r = Math.min(14, Math.max(5, Math.max(b.max.x - b.min.x, b.max.z - b.min.z) * 0.45)); out.push({ pos: p.final.p.clone().add(new three.Vector3(0, h * 0.5, 0)), radius: r, part: op.ref }); }
+      } else if (op.op === "enclose") {
+        for (const ref of op.refs.slice(0, 1)) { const p = parts.get(ref); if (p?.final) out.push({ pos: p.final.p.clone(), radius: 18, part: ref }); }
       } else if (op.op === "jumper") {
         for (const end of [op.from, op.to]) { const a = anchorWorld(end); if (a) out.push({ pos: a, label: end, radius: 2.6 }); }
       } else if (op.op === "insert") {

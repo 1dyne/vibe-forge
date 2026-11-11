@@ -139,3 +139,4 @@ body:has(.bench){background:#e9e5dd;overflow:hidden}
 .bench-sheet .typing{color:var(--muted);font-style:italic}
 .bench-sheet .quick button:disabled{opacity:.5}
 .bench-overlay .bench{z-index:1000}
+.bench-sticker{display:inline-block;margin-top:6px;transform:rotate(-2deg);background:#ffd84d;color:#3b2a00;border:2px dashed #b88a00;border-radius:10px;padding:3px 9px;font-size:12px;font-weight:700;box-shadow:0 2px 0 #e0b400;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -8,6 +8,8 @@ import { transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
+import { unackedRisks } from "../../../../../lib/safety";
+import { snapshot, RESTORABLE, FIELD_LABEL } from "../../../../../lib/history";
 
 const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
   solderingSkill: z.enum(["unanswered", "none", "tried", "comfortable"]).optional(), printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
@@ -25,6 +27,9 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("assembly_report"), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^(s\d+-c\d+|lib:[a-z0-9-]+)$/).optional(), text: z.string().trim().min(1).max(1000), value: z.number().finite().nullable().optional(), yes: z.boolean().nullable().optional() }),
   z.object({ action: z.literal("detail_request"), step: z.number().int().min(1).max(20), level: z.enum(["beginner", "micro"]) }),
   z.object({ action: z.literal("reset_stage"), stage: z.enum(["product_form", "plan"]) }),
+  z.object({ action: z.literal("safety_ack"), itemId: z.string().max(32) }),
+  z.object({ action: z.literal("test_result"), caseId: z.string().max(32), status: z.enum(["pass", "fail", "unknown"]), evidence: z.string().trim().min(1).max(2000) }),
+  z.object({ action: z.literal("restore_version"), snapshotId: z.string().uuid() }),
   z.object({ action: z.literal("purchase"), ref: z.string().max(80), status: z.enum(["needed", "ordered", "received", "problem"]), note: z.string().max(1000).default("") })
 ]);
 async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -43,6 +48,9 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
     const blocked = blockingChecks(project.build);
     if (blocked.length && ["approve_circuit", "approve_mockup", "enter_workshop", "assembly_report"].includes(input.action)) {
       return NextResponse.json({ error: `회로에 꼭 고쳐야 할 문제가 ${blocked.length}건 있어 진행할 수 없어요: ${blocked.map((check) => check.message).join(" / ")} Claude에게 회로를 고쳐 다시 제출해 달라고 해주세요.` }, { status: 409 });
+    }
+    if (input.action === "enter_workshop" && unackedRisks(project).length) {
+      return NextResponse.json({ error: `안전 검토에서 확인할 위험이 ${unackedRisks(project).length}개 있어요. 작업대의 '안전'에서 하나씩 '확인했어요'를 눌러 주세요.` }, { status: 409 });
     }
     let newBuild = null;
     if (input.action === "plan") {
@@ -69,6 +77,22 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         pushActivity(p, { source: "person", title: `${input.step}단계 더 잘게 보기 요청` });
       } else if (input.action === "reset_stage") {
         resetStage(p, input.stage);
+      } else if (input.action === "safety_ack") {
+        const item = p.safety?.items.find((i) => i.id === input.itemId);
+        if (!item) throw new Error("안전 항목을 찾을 수 없어요.");
+        item.ackAt = now;
+        pushActivity(p, { source: "person", title: `안전 확인: ${item.text.slice(0, 40)}` });
+      } else if (input.action === "test_result") {
+        const c = p.testPlan?.cases.find((x) => x.id === input.caseId);
+        if (!c) throw new Error("테스트를 찾을 수 없어요.");
+        c.result = { status: input.status, evidence: input.evidence, at: now, by: "person" };
+        p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `테스트 '${c.title}' 결과: ${{ pass: "기대대로 돼요", fail: "기대와 달라요", unknown: "잘 모르겠어요" }[input.status]}\n${input.evidence}`, createdAt: now, shared: true });
+      } else if (input.action === "restore_version") {
+        const snap = p.history?.find((h) => h.id === input.snapshotId);
+        if (!snap || !RESTORABLE.includes(snap.field)) throw new Error("이 기록은 되돌릴 수 없어요. 완성품 형태·회로는 '단계 다시'로 바꿔 주세요.");
+        snapshot(p, snap.field, "restore_version", `${FIELD_LABEL[snap.field]} 되돌리기 전`);
+        (p as unknown as Record<string, unknown>)[snap.field] = JSON.parse(snap.snapshot);
+        announce(`${FIELD_LABEL[snap.field]}를 ${new Date(snap.at).toLocaleString("ko-KR")} 버전으로 되돌렸어요. 되돌리기 전 버전도 기록에 남아 있어요.`);
       } else if (input.action === "dev_profile") {
         w.devProfile = input.devProfile as DevProfile;
       } else if (input.action === "agents") {

@@ -19,6 +19,12 @@ import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
 import { checkHousing, finalizeHousing, FAB_LABEL } from "./housing";
+import { checkPower, computePower, suggestedLoads, type PowerInput } from "./power";
+import { mergeSafety, requiredSafety, unackedRisks } from "./safety";
+import { snapshot, FIELD_LABEL } from "./history";
+import { provisionalReasons } from "./provisional";
+import { uploadGuideFor } from "./firmware-guide";
+import type { SafetyItem, TestCase } from "./project-types";
 import type { HousingPlan } from "./project-types";
 
 // Tools a person's own Claude uses to keep a 달그락 대장간 project. Claude does
@@ -160,6 +166,15 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 부위마다 재료·두께, 결합(나사·인서트·끼움·자석·테이프·접착), 공차, 여는 곳(배터리·충전 단자), 만드는 순서(프린트면 출력 방향·서포트), 비용(원)·시간을 넣는다. 모르는 값은 null.
 - 물·피부·아이·열 환경을 environment에 넣으면 서버가 실링·경화·삼킴·통풍 위험을 붙인다. 배터리가 있으면 여는 곳 없이는 저장되지 않는다.
 - 서버가 STL(프린트), PP 1:1 전개도, 판 재단 SVG, 레진 몰드 계획을 만들어 작업대에 둔다.
+
+## 정해지지 않은 게 있어도 설계는 멈추지 않는다
+- 하우징·전원·부품 값이 아직 정해지지 않아도 설계도·회로·조립 가이드를 만든다. 대시보드 결과물에 노란 '🔧 바뀔 수 있어요' 스티커가 자동으로 붙는다(get_project의 provisional). 사용자에게 "빌드하면서 바뀔 수 있는 곳"이라고 알려 준다.
+
+## 전원·테스트·안전·기록
+- set_power_budget: 배터리를 쓰면 모드별 부하 전류(powerSuggestedLoads의 카드 값 우선)로 몇 시간 가는지 서버가 계산한다. 가정은 basis: assumed.
+- set_test_plan: 업로드 후 단계별로 확인할 것(시리얼 줄·눈으로 볼 것·멀티미터 값). 보드별 업로드 방법은 get_project의 uploadGuide를 그대로 안내한다. 결과는 자동 통과가 아니다(record_test_result는 근거가 있을 때만 pass/fail).
+- set_safety_review: get_project의 safetyRequired를 같은 id로 판단한다. risk는 사람이 대시보드에서 확인해야 대장간에 들어간다.
+- set_* 도구는 덮어쓰기 전 값을 기록(history)에 남기고, 사람은 대시보드에서 되돌릴 수 있다.
 
 ## 조립 가이드 (set_assembly_guide)
 회로 다음에는 사용자가 실제로 따라 만들 수 있는 조립 가이드를 만든다. 3D 승인 뒤(handoff) 설계도 1단계부터 만든다.
@@ -310,6 +325,14 @@ function summarize(project: LocalProject, context: ToolContext) {
     buildPlan: project.buildPlan ?? null,
     productForm: project.productForm ?? null,
     housing: project.housing ?? null,
+    provisional: provisionalReasons(project),
+    power: project.power ?? null,
+    powerSuggestedLoads: suggestedLoads(project),
+    testPlan: project.testPlan ?? null,
+    uploadGuide: uploadGuideFor((project.build?.blueprint.components ?? []).find((c) => findCard(c.catalogId)?.type === "board")?.catalogId),
+    safety: project.safety ?? null,
+    safetyRequired: requiredSafety(project).map((i) => ({ id: i.id, topic: i.topic, text: i.text })),
+    history: (project.history ?? []).slice(-10).map((h) => ({ id: h.id, at: h.at, field: FIELD_LABEL[h.field], summary: h.summary })),
     assembly: project.assembly ? { stage: project.assembly.stage, base: project.assembly.base, steps: project.assembly.steps.map((step, index) => ({ step: index + 1, title: step.title, cards: step.cards.map((card) => ({ id: card.id, symptom: card.symptom })), wireLengths: wireLengths(project, index) })) } : null,
     liveStatus: project.liveStatus ?? null,
     assemblyReports: (project.assemblyReports ?? []).slice(-10),
@@ -572,6 +595,7 @@ export const TOOLS: ToolDefinition[] = [
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = saved.updatedAt;
+        snapshot(p, "buildPlan", "set_build_plan", "설계도 바꾸기 전");
         p.buildPlan = saved;
         const text = `전체 설계도를 정리했어요. ${saved.summary}\n보드: ${saved.board.model} · 연결: ${saved.connection.method} · 단계 ${saved.stages.length}개${saved.prerequisites.length ? ` · 먼저 익힐 것 ${saved.prerequisites.length}개` : ""}\n예상 부품비 ${totalKRW.toLocaleString("ko-KR")}원${unpriced ? ` (+가격 미정 ${unpriced}개)` : ""}${budgetKRW != null ? ` / 예산 ${budgetKRW.toLocaleString("ko-KR")}원` : ""}. 작업대의 설계도에서 자세히 볼 수 있어요.`;
         p.messages.push({ id: randomUUID(), role: "assistant", agent: "chief", channel: "main", text, createdAt: now, shared: true });
@@ -607,6 +631,7 @@ export const TOOLS: ToolDefinition[] = [
         }
         w.circuitApprovedAt = null;
         w.mockupApprovedAt = null;
+        snapshot(p, "build", "submit_circuit", "회로 바꾸기 전");
         p.build = build;
         p.stage = "spec";
         p.lastAgentMode = "live";
@@ -760,6 +785,7 @@ TOOLS.push(
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = saved.updatedAt;
+        snapshot(p, "productForm", "set_product_form", "완성품 형태 바꾸기 전");
         p.productForm = saved;
         // An approved circuit already has CAD; refresh it to the new outer form.
         if (p.build && w.circuitApprovedAt) p.build = approvedCad(p.build, saved);
@@ -813,6 +839,7 @@ TOOLS.push(
       const saved = finalizeHousing(plan, project, warnings);
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
+        snapshot(p, "housing", "set_housing_plan", "하우징 바꾸기 전");
         p.housing = saved;
         if (p.buildPlan) p.buildPlan.fabrication = { needs3DPrint: saved.regions.some((r) => r.method === "print_fdm" || r.method === "print_resin" || r.method === "resin_cast"), plan: saved.regions.map((r) => `${r.name}: ${FAB_LABEL[r.method]}`).join(" / ") };
         const text = `하우징 제작 계획을 정했어요. ${saved.summary}\n${saved.regions.map((r) => `· ${r.name}: ${FAB_LABEL[r.method]} (${r.material.name}${r.material.thicknessMm != null ? ` ${r.material.thicknessMm}mm` : ""})`).join("\n")}\n작업대의 '하우징'에서 부위별 파일(STL·전개도·재단)을 내려받을 수 있어요.${saved.risks.length ? `\n확인할 것: ${saved.risks.slice(0, 3).join(" / ")}` : ""}`;
@@ -821,6 +848,83 @@ TOOLS.push(
         p.workflow = w;
       });
       return stored(updated, context, `하우징 계획을 저장했어요.${warnings.length ? ` 확인 필요: ${warnings.slice(0, 5).join(" / ")}` : ""}`);
+    }
+  },
+  {
+    name: "set_power_budget", title: "전원·배터리 수명 계산",
+    description: "부품별 소비 전류를 모드(동작·대기 등)별로 넣으면 서버가 평균·최대 전류와 배터리로 버티는 시간을 계산한다. 전류는 get_project의 powerSuggestedLoads(부품 카드 값)를 먼저 쓰고, 없으면 데이터시트 값(basis: datasheet)이나 가정(assumed)으로 넣는다. 가정이 하나라도 있으면 결과에 '추정'이 붙는다. 보드 전원 핀 한계와 모터는 경고가 붙는다. result는 보내지 않아도 된다(서버가 다시 계산).",
+    inputSchema: { type: "object", required: ["projectId", "budget"], properties: { projectId, budget: { type: "object", required: ["source", "modes", "regulatorEfficiency", "derating"], properties: {
+      source: { type: "object", required: ["kind", "voltage"], properties: { kind: { type: "string", enum: ["usb", "battery", "adapter"] }, part: { type: "string" }, capacityMah: { type: ["number", "null"] }, voltage: { type: "number" } } },
+      modes: { type: "array", items: { type: "object", required: ["name", "dutyPct", "loads"], properties: { name: { type: "string", description: "예: 동작, 대기, 잠자기" }, dutyPct: { type: "number", description: "전체 시간 중 비율 %. 모드 합 100" }, loads: { type: "array", items: { type: "object", required: ["ref", "currentMa", "basis"], properties: { ref: { type: "string" }, currentMa: { type: "number" }, basis: { type: "string", enum: ["card_typical", "card_max", "datasheet", "measured", "assumed"] } } } } } } },
+      regulatorEfficiency: { type: "number", description: "레귤레이터 효율 (스위칭 0.85, LDO는 Vout/Vin)" }, derating: { type: "number", description: "전지 실사용 비율 (기본 0.8)" }
+    } } } },
+    run: async (input, context) => {
+      const Load = z.object({ ref: z.string().min(1).max(16), currentMa: z.number().min(0).max(20000), basis: z.enum(["card_typical", "card_max", "datasheet", "measured", "assumed"]) }).strict();
+      const { projectId: id, budget } = z.object({ projectId: z.string().uuid(), budget: z.object({ source: z.object({ kind: z.enum(["usb", "battery", "adapter"]), part: z.string().max(60).optional(), capacityMah: z.number().min(1).max(100000).nullable().optional(), voltage: z.number().min(1).max(24) }).strict(), modes: z.array(z.object({ name: z.string().min(1).max(30), dutyPct: z.number().min(0).max(100), loads: z.array(Load).max(20) }).strict()).min(1).max(6), regulatorEfficiency: z.number().min(0.3).max(1), derating: z.number().min(0.3).max(1), result: z.unknown().optional() }).strict() }).strict().parse(input) as { projectId: string; budget: PowerInput & { result?: unknown } };
+      const project = await ownedProject(id, context);
+      const { result: _ignored, ...clean } = budget; void _ignored;
+      const problems = checkPower(clean, project);
+      if (problems.length) throw new ToolError(`전원 계산을 저장하지 못했어요: ${problems.slice(0, 5).join(" / ")}`);
+      const saved = computePower(clean, project);
+      const updated = await mutateProject(id, (p) => {
+        snapshot(p, "power", "set_power_budget", "전원 계산 바꾸기 전");
+        p.power = saved;
+        const r = saved.result;
+        const text = `전원을 계산했어요. 평균 ${r.avgCurrentMa}mA, 가장 많이 쓸 때 ${r.peakCurrentMa}mA${r.hours != null ? `, ${saved.source.capacityMah}mAh 전지로 약 ${r.hours}시간` : ""}${r.estimated ? " (가정한 값이 있어 추정)" : ""}.${r.railWarnings.length ? `\n주의: ${r.railWarnings.join(" / ")}` : ""}`;
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "hw", channel: "main", text, createdAt: saved.updatedAt, shared: true });
+      });
+      return stored(updated, context, `전원 계산을 저장했어요: 평균 ${saved.result.avgCurrentMa}mA${saved.result.hours != null ? `, 약 ${saved.result.hours}시간` : ""}.`);
+    }
+  },
+  {
+    name: "set_test_plan", title: "펌웨어 업로드·동작 테스트 계획",
+    description: "설계도 단계마다 업로드 후 확인할 테스트를 만든다: 준비(setup), 할 일(do), 기대(시리얼에 찍힐 줄 serial, 눈으로 볼 것 observe, 멀티미터로 잴 값 measure min~max). 사용자는 대시보드 '테스트' 탭에서 보드별 업로드 안내(get_project uploadGuide)를 보고 결과를 보낸다. 결과가 와도 자동으로 통과가 되지 않는다. 기존 결과는 같은 id면 유지된다.",
+    inputSchema: { type: "object", required: ["projectId", "cases"], properties: { projectId, cases: { type: "array", items: { type: "object", required: ["id", "stage", "title", "setup", "do", "expect"], properties: { id: { type: "string", description: "영문 id (예: t1-led)" }, stage: { type: "integer" }, title: { type: "string" }, setup: { type: "string" }, do: { type: "string" }, expect: { type: "object", properties: { serial: { type: "array", items: { type: "string" } }, observe: { type: "string" }, measure: { type: "object", required: ["what", "min", "max", "unit"], properties: { what: { type: "string" }, min: { type: "number" }, max: { type: "number" }, unit: { type: "string" } } } } } } } } } },
+    run: async (input, context) => {
+      const Case = z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/), stage: z.number().int().min(1).max(20), title: z.string().min(1).max(80), setup: z.string().min(1).max(300), do: z.string().min(1).max(300), expect: z.object({ serial: z.array(z.string().min(1).max(80)).max(6).optional(), observe: z.string().max(200).optional(), measure: z.object({ what: z.string().min(1).max(80), min: z.number(), max: z.number(), unit: z.string().min(1).max(8) }).strict().optional() }).strict().refine((e) => e.serial?.length || e.observe || e.measure, "기대 결과(serial·observe·measure) 중 하나는 있어야 해요") }).strict();
+      const { projectId: id, cases } = z.object({ projectId: z.string().uuid(), cases: z.array(Case).min(1).max(30) }).strict().parse(input) as { projectId: string; cases: TestCase[] };
+      const project = await ownedProject(id, context);
+      if (new Set(cases.map((c) => c.id)).size !== cases.length) throw new ToolError("테스트 id가 중복돼요");
+      const bad = cases.filter((c) => c.expect.measure && c.expect.measure.min > c.expect.measure.max).map((c) => c.id);
+      if (bad.length) throw new ToolError(`측정 범위의 min이 max보다 커요: ${bad.join(", ")}`);
+      const board = (project.build?.blueprint.components ?? []).map((c) => findCard(c.catalogId)).find((c) => c?.type === "board");
+      const updated = await mutateProject(id, (p) => {
+        snapshot(p, "testPlan", "set_test_plan", "테스트 계획 바꾸기 전");
+        const prev = new Map((p.testPlan?.cases ?? []).map((c) => [c.id, c]));
+        p.testPlan = { board: board?.model ?? project.build?.blueprint.board ?? "보드 미정", cases: cases.map((c) => ({ ...c, ...(prev.get(c.id)?.result ? { result: prev.get(c.id)!.result } : {}) })), updatedAt: new Date().toISOString() };
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "hw", channel: "main", text: `업로드 후 확인할 테스트 ${cases.length}개를 만들었어요. 작업대의 '테스트'에서 업로드 방법을 보고 하나씩 해 본 결과를 보내 주세요.`, createdAt: p.testPlan.updatedAt, shared: true });
+      });
+      return stored(updated, context, `테스트 계획 ${cases.length}개를 저장했어요.`);
+    }
+  },
+  {
+    name: "record_test_result", title: "테스트 결과 기록",
+    description: "사용자가 채팅으로 알려준 테스트 결과를 남긴다. status는 근거가 있을 때만 pass/fail, 아니면 unknown. 시리얼 로그나 측정값을 evidence에 그대로 적는다.",
+    inputSchema: { type: "object", required: ["projectId", "caseId", "status", "evidence"], properties: { projectId, caseId: { type: "string" }, status: { type: "string", enum: ["pass", "fail", "unknown"] }, evidence: { type: "string" } } },
+    run: async (input, context) => {
+      const { projectId: id, caseId, status, evidence } = z.object({ projectId: z.string().uuid(), caseId: z.string().max(32), status: z.enum(["pass", "fail", "unknown"]), evidence: z.string().min(1).max(1000) }).strict().parse(input);
+      const project = await ownedProject(id, context);
+      if (!project.testPlan?.cases.some((c) => c.id === caseId)) throw new ToolError(`테스트 ${caseId}가 없어요`);
+      const updated = await mutateProject(id, (p) => { const c = p.testPlan!.cases.find((x) => x.id === caseId)!; c.result = { status, evidence, at: new Date().toISOString(), by: "claude" }; });
+      return stored(updated, context, `테스트 ${caseId} 결과를 ${status}로 기록했어요.`);
+    }
+  },
+  {
+    name: "set_safety_review", title: "안전 검토",
+    description: "ID 달그락이 만든 물건의 안전을 검토한다. get_project의 safetyRequired(리튬 전지, 피부 접촉, 아이 사용, 발열, 모터, 판매 목적이면 서버가 넣는 필수 항목)를 같은 id로 판단해 status(ok·risk·unknown)와 text를 채우고, 그 밖의 항목을 더한다. 필수 항목은 빠뜨려도 지워지지 않는다. risk 항목은 사람이 대시보드에서 '확인했어요'를 눌러야 대장간에 들어갈 수 있다. 가정용 220V는 다루지 않는다.",
+    inputSchema: { type: "object", required: ["projectId", "items"], properties: { projectId, items: { type: "array", items: { type: "object", required: ["id", "topic", "text", "status"], properties: { id: { type: "string" }, topic: { type: "string" }, text: { type: "string" }, status: { type: "string", enum: ["ok", "risk", "unknown"] } } } } } },
+    run: async (input, context) => {
+      const { projectId: id, items } = z.object({ projectId: z.string().uuid(), items: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/), topic: z.string().min(1).max(30), text: z.string().min(1).max(300), status: z.enum(["ok", "risk", "unknown"]) }).strict()).max(20) }).strict().parse(input) as { projectId: string; items: Array<Omit<SafetyItem, "required" | "ackAt">> };
+      const project = await ownedProject(id, context);
+      const saved = mergeSafety(items, project);
+      const updated = await mutateProject(id, (p) => {
+        snapshot(p, "safety", "set_safety_review", "안전 검토 바꾸기 전");
+        p.safety = saved;
+        const risks = saved.items.filter((i) => i.status === "risk");
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "id", channel: "main", text: `안전 검토를 했어요. 확인할 위험 ${risks.length}개${risks.length ? `: ${risks.map((r) => r.text).join(" / ")}` : ""}. 작업대의 '안전'에서 하나씩 '확인했어요'를 눌러 주세요.`, createdAt: saved.updatedAt, shared: true });
+      });
+      const left = unackedRisks(updated).length;
+      return stored(updated, context, `안전 검토를 저장했어요. 사람이 확인해야 할 위험 ${left}개.`);
     }
   },
   {
@@ -890,6 +994,7 @@ TOOLS.push(
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = saved.updatedAt;
+        snapshot(p, "assembly", "set_assembly_guide", "조립 가이드 바꾸기 전");
         p.assembly = saved;
         const cards = saved.steps.reduce((sum, step) => sum + step.cards.length, 0);
         const text = `조립 가이드를 준비했어요: ${saved.stage}. ${saved.base.name} 위에 ${saved.parts.length}개 부품을 ${saved.steps.length}단계로 배치해요. 작업대의 '조립 가이드'에서 단계별로 재생하며 따라 하고, 문제가 생기면 카드의 확인 방법대로 재서 결과를 보내주세요. (문제 카드 ${cards}개)`;
@@ -1087,6 +1192,7 @@ TOOLS.push(
 export function resetStage(p: LocalProject, stage: "product_form" | "plan") {
   const w = workflowFor(p);
   const now = new Date().toISOString();
+  for (const f of (["productForm", "housing", "assembly", "build", ...(stage === "plan" ? ["buildPlan"] : [])] as Array<"productForm" | "housing" | "assembly" | "build" | "buildPlan">)) snapshot(p, f, "reset_project_stage", `${stage === "plan" ? "설계도" : "완성품 형태"}부터 다시 하기 전`);
   delete p.productForm; delete p.housing; delete p.assembly; delete p.assemblyReports; delete p.assemblyDetails; delete p.assemblyRequests; delete p.liveStatus;
   if (stage === "plan") delete p.buildPlan;
   p.build = null;

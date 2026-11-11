@@ -8,7 +8,9 @@ export type BenchPartKind =
   | "perfboard" | "breadboard" | "resistor" | "led" | "battery_holder_2aa" | "aa_battery"
   | "header_male" | "sensor_module"
   // 프로젝트 조립 가이드에서 오는 부품: 부품 카드(catalogId)나 가이드의 크기·핀으로 만든다
-  | "module" | "plate";
+  | "module" | "plate"
+  // 하우징 부위 도형 (완성품 형태 + 하우징 계획에서)
+  | "housing_shape";
 
 export type BenchPart = {
   ref: string;
@@ -25,6 +27,8 @@ export type BenchPart = {
     pinXY?: Array<{ name: string; x: number; y: number }>;
     /** plate·perfboard·breadboard 크기 (mm) */
     widthMm?: number; heightMm?: number;
+    /** housing_shape: 완성품 형태 도형 (x 가로, y 앞뒤(+가 앞), z 높이 바닥 기준) */
+    primitive?: "box" | "sphere" | "cylinder" | "cone"; sizeMm?: [number, number, number]; posMm?: [number, number, number]; around?: string;
   };
 };
 
@@ -45,7 +49,9 @@ export type BenchOp =
   /** 기판(onto) 위 foot 자리에 부품을 놓는다 */
   | { op: "seat"; ref: string; onto: string }
   /** 두 핀을 전선으로 잇는다 (브레드보드 점퍼선 또는 납땜용 전선) */
-  | { op: "jumper"; from: Anchor; to: Anchor; color: string; label?: string };
+  | { op: "jumper"; from: Anchor; to: Anchor; color: string; label?: string }
+  /** 하우징 부위를 위에서 내려 씌운다 */
+  | { op: "enclose"; refs: string[] };
 
 export type BenchMistake = { kind: "cold" | "bridge" | "starved"; title: string; looks: string; fix: string };
 
@@ -82,4 +88,6 @@ export type BenchKit = {
   faq: BenchFaq[];
   /** 데이터만 있고 아직 3D 연출이 완성되지 않은 키트 */
   draft?: boolean;
+  /** '바뀔 수 있어요' 스티커에 붙일 이유 (프로젝트) */
+  provisional?: string[];
 };
