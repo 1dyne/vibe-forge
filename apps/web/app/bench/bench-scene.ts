@@ -696,7 +696,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     const pts = v === "34" || v === "front" ? stepPoints() : stepTargets(current).filter((t) => t.radius <= 7).map((t) => t.pos);
     const c = focusFor(v);
     const spread = pts.length ? Math.max(...pts.map((p) => p.distanceTo(c))) : 0;
-    const R = v === "34" ? Math.max(70, spread + 44) : v === "front" ? Math.max(55, spread + 25) : Math.max(19, spread + 13);
+    const R = v === "34" ? Math.max(70, spread + 44) : v === "front" ? Math.max(55, spread + 25) : Math.max([...parts.values()].some((p) => p.def.kind === "perfboard" || p.def.kind === "sensor_module") ? 19 : 38, spread + 13);
     const vh = Math.tan((camera.fov * Math.PI) / 360) * (band / H);
     const hh = Math.tan((camera.fov * Math.PI) / 360) * (Math.max(120, W - insetLeft - insetRight) / H);
     return R / Math.min(vh, hh);

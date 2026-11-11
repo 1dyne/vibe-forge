@@ -438,9 +438,11 @@ export type ModuleModel = { group: T.Group; pinLocal: Map<string, T.Vector3>; li
 
 const PCB_COLOR: Record<string, string> = {
   "arduino-uno-r3": "#14808a", "arduino-nano": "#1f5fae", "esp32-devkit-v1": "#1c1d20", "xiao-esp32s3-sense": "#24262a",
-  "raspberry-pi-pico": "#2d7a3c", "nucode-nu40-dk": "#1e4f8f", "seeed-round-display-xiao": "#1c1d20", "ssd1306-oled-128x64": "#1d4fae"
+  "raspberry-pi-pico": "#2d7a3c", "nucode-nu40-dk": "#1e4f8f", "seeed-round-display-xiao": "#1c1d20", "ssd1306-oled-128x64": "#1d4fae",
+  "tp4056-protected": "#2a4fb0", "mt3608-boost": "#2a4fb0", "ams1117-3v3": "#2a4fb0", "hc-sr04": "#1f5fae", "aht20-module": "#1c1d20",
+  "mpu6050-gy521": "#1d4fae", "inmp441-i2s-mic": "#2a4fb0", "drv8833-driver": "#b8232b"
 };
-const TYPE_COLOR: Record<string, string> = { board: "#2a6f5f", display: "#1d4fae", sensor: "#1d4fae", actuator: "#2a6fd0", input: "#2f3238", indicator: "#2f3238", passive: "#2f3238", audio: "#1f2023" };
+const TYPE_COLOR: Record<string, string> = { power: "#2a4fb0", board: "#2a6f5f", display: "#1d4fae", sensor: "#1d4fae", actuator: "#2a6fd0", input: "#2f3238", indicator: "#2f3238", passive: "#2f3238", audio: "#1f2023" };
 
 /**
  * 부품 카드로 만드는 3D 부품. 원점 = 자리(foot) 가운데, 기판 윗면. x = 가이드 x, z = 가이드 y.
@@ -477,7 +479,7 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
   const lift = onBreadboard && !["sg90-servo"].includes(id) ? 10.5 : 0;
   const T2 = 1.6;
   const pcbCol = PCB_COLOR[id] ?? spec.color ?? TYPE_COLOR[spec.partType ?? ""] ?? "#2a6f5f";
-  const pcbLike = !["sg90-servo", "active-buzzer", "tact-switch-12mm", "potentiometer-10k", "fsr-402"].includes(id);
+  const pcbLike = !["sg90-servo", "active-buzzer", "tact-switch-12mm", "potentiometer-10k", "fsr-402", "ws2812b-ring-12", "holder-18650", "lipo-1s-jstph", "slide-switch-spdt"].includes(id);
 
   if (pcbLike) {
     const pxmm = 14;
@@ -504,7 +506,11 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
       const scr = k.box(W * 0.84, 0.9, D * 0.56, new three.MeshStandardMaterial({ color: "#07090c", roughness: 0.15, metalness: 0.2, emissive: "#1b6fd8", emissiveIntensity: 0 }), 0, lift + T2 + 0.45, D * 0.1, body);
       scr.userData.screen = true;
     }
-    if (spec.partType === "sensor" && id !== "fsr-402") k.box(Math.min(W, D) * 0.25, 1, Math.min(W, D) * 0.25, k.std("#151515"), 0, lift + T2 + 0.5, -D * 0.15, body);
+    if (id === "hc-sr04") for (const sx of [-1, 1]) { const can = k.mesh(new three.CylinderGeometry(8, 8, 12, 32), k.steel, body); can.position.set(sx * W * 0.26, lift + T2 + 6, 0); const mesh = k.mesh(new three.CylinderGeometry(6.5, 6.5, 0.4, 24), k.std("#2a2b2e", { rough: 0.9 }), body); mesh.position.set(sx * W * 0.26, lift + T2 + 12.2, 0); }
+    if (id === "tp4056-protected") { k.box(7.5, 2.6, 5.6, k.steel, -W / 2 + 3, lift + T2 + 1.3, 0, body); k.box(3.2, 1, 4, k.std("#151515"), W * 0.08, lift + T2 + 0.5, -D * 0.15, body); }
+    if (id === "mt3608-boost") { k.box(6.5, 4.5, 3.5, k.std("#2563c9"), W * 0.2, lift + T2 + 2.25, -D * 0.2, body); const coil = k.mesh(new three.CylinderGeometry(2.8, 2.8, 3, 20), k.std("#3a3a3a"), body); coil.position.set(-W * 0.12, lift + T2 + 1.5, 0); }
+    if (id === "drv8833-driver" || id === "ams1117-3v3" || id === "inmp441-i2s-mic") k.box(Math.min(W, D) * 0.3, 1, Math.min(W, D) * 0.3, k.std("#151515"), 0, lift + T2 + 0.5, 0, body);
+    if (spec.partType === "sensor" && id !== "fsr-402" && id !== "hc-sr04") k.box(Math.min(W, D) * 0.25, 1, Math.min(W, D) * 0.25, k.std("#151515"), 0, lift + T2 + 0.5, -D * 0.15, body);
   } else if (id === "sg90-servo") {
     // 실제 몸체(22.2×11.8×22.7mm)는 자리 오른쪽에, 3핀 커넥터는 카드 핀 위치에. 둘을 케이블로 잇는다.
     const blue = k.std("#2563c9", { rough: 0.5 });
@@ -520,6 +526,18 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
       const start = new three.Vector3(bx - bw / 2, 6, 0).applyAxisAngle(new three.Vector3(0, 1, 0), body.rotation.y);
       ["#6b4a2b", "#d8322a", "#e8892e"].forEach((c, i) => k.tube([start.clone().add(new three.Vector3(0, 0, (i - 1) * 1.1)), new three.Vector3((start.x + pc.x) / 2, 1.2, (start.z + pc.z) / 2 + (i - 1) * 1.1), new three.Vector3(pc.x + 2, 2.5, pc.z + (i - 1) * 1.1)], 0.5, k.std(c, { rough: 0.5 }), group, 20, 6));
     }
+  } else if (id === "ws2812b-ring-12") {
+    const R = Math.max(W, D) / 2 || 18.5;
+    const ring = k.mesh(new three.RingGeometry(R * 0.63, R, 48), k.std("#18191b", { rough: 0.55 }), body); ring.rotation.x = -Math.PI / 2; ring.position.y = 1.7;
+    const rim = k.mesh(new three.CylinderGeometry(R, R, 1.6, 48, 1, true), k.std("#18191b"), body); rim.position.y = 0.8;
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; k.box(5, 1.6, 5, k.std("#f2f2ef", { rough: 0.3 }), Math.cos(a) * R * 0.82, 2.5, Math.sin(a) * R * 0.82, body); }
+  } else if (id === "holder-18650") {
+    k.rbox(Math.max(W, 77), 5, Math.max(Math.min(D, 22), 21), 2, k.std("#18191b"), body);
+    const cell = k.mesh(new three.CylinderGeometry(9, 9, 65, 32), k.std("#3a7bd5", { rough: 0.35, metal: 0.2 }), body); cell.rotation.z = Math.PI / 2; cell.position.y = 11;
+  } else if (id === "lipo-1s-jstph") {
+    k.rbox(Math.max(W, 36), 4.8, Math.max(D, 29), 2, k.std("#c9ccd1", { metal: 0.6, rough: 0.35 }), body);
+  } else if (id === "slide-switch-spdt") {
+    k.box(8.5, 3.5, 3.7, k.std("#1b1b1d"), 0, 1.75, 0, body); k.box(1.6, 4, 1.6, k.std("#2d2d30"), 1.5, 5.5, 0, body);
   } else if (id === "active-buzzer") {
     const b = k.mesh(new three.CylinderGeometry(6, 6, 9, 32), k.std("#1b1b1d", { rough: 0.45 }), body); b.position.y = (onBreadboard ? 3 : 0) + 4.5;
     const hole = k.mesh(new three.CylinderGeometry(1, 1, 0.2, 16), k.std("#000"), body); hole.position.y = (onBreadboard ? 3 : 0) + 9.05;
