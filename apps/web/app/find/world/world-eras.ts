@@ -1,17 +1,18 @@
 import type * as T from "three";
 
 // 시대 마을: 도깨비는 '오래 쓴 물건'이 변한 존재라서, 물건이 쌓인 시간만큼 마을이 이어진다.
-//   선사시대 불씨 언덕(처음 불을 피운 곳) → 한옥 다섯 마을(조선) → 1970–80년대 연탄 골목 → 2000년대 초 PC방 골목.
+//   화면에는 시대·연도를 쓰지 않는다. 이름은 세계관 이름만 쓰고, 모습으로만 그 시대를 보여준다.
+//   (안쪽 메모) 은빛 언덕 = 선사시대 모습, 꼼지락 골목 = 1970–80년대 모습, 와글 뒷산 = 2000년대 초 모습.
 // 지금은 한국 사회의 시간만 둔다(나중에 인류사로 넓힐 수 있게 시대를 목록으로 둔다).
 // 시대 마을에는 주민 대장간이 없다. 그 시대 물건이 변한 도깨비들이 산다.
 
-export type Era = { id: string; name: string; period: string; topics: string; angle: number; ground: string; alley: string | null };
+export type Era = { id: string; name: string; topics: string; angle: number; ground: string; alley: string | null };
 export const ERAS: Era[] = [
-  { id: "prehistory", name: "불씨 언덕", period: "선사시대", topics: "사람이 처음 불을 피운 곳 · 모든 도깨비불은 여기서 처음 피어났대", angle: 0, ground: "#7E8A5E", alley: "#8A7556" },
-  { id: "modern", name: "연탄 골목", period: "1970–80년대", topics: "연탄 때던 시절 · 브라운관과 다이얼 전화기가 도깨비가 된 골목", angle: 2.51, ground: "#8C8A82", alley: "#A3A098" },
-  { id: "y2k", name: "PC방 골목", period: "2000년대 초", topics: "삐삐와 폴더폰의 시절 · 걸어다니는 C언어를 만날 수 있어", angle: -2.51, ground: "#6E6C72", alley: "#56545C" }
+  { id: "prehistory", name: "은빛 언덕", topics: "모든 도깨비불이 처음 피어났다는 언덕 · 아주 오래된 물건 도깨비들이 살아", angle: 0, ground: "#7E8A5E", alley: "#8A7556" },
+  { id: "modern", name: "꼼지락 골목", topics: "낡은 물건들이 꼼지락대며 사는 골목 · 브라운관과 다이얼 전화기 도깨비가 있어", angle: 2.51, ground: "#8C8A82", alley: "#A3A098" },
+  { id: "y2k", name: "와글 뒷산", topics: "와글마을 뒤 비탈 골목 · 걸어다니는 C언어를 만날 수 있어", angle: -2.51, ground: "#6E6C72", alley: "#56545C" }
 ];
-/** 2D 지도·안내용: 시대마다 사는 물건 도깨비 */
+/** 지도 안내용: 시대 마을마다 사는 물건 도깨비 */
 export const ERA_DOKKAEBI: Record<string, string[]> = {
   prehistory: ["빗살무늬토기", "간석기 도끼"],
   modern: ["브라운관", "다이얼 전화기", "카세트테이프"],
@@ -95,7 +96,7 @@ export function buildEras(c: EraCtx) {
   };
   const E = (id: string) => ERAS.find((e) => e.id === id)!;
 
-  // ── 선사시대: 불씨 언덕 ──
+  // ── 은빛 언덕 (선사시대 모습) ──
   function prehistory(g: T.Group, at: (lx: number, lz: number, ry?: number) => T.Group, solid: (lx: number, lz: number, r: number) => void, w: (lx: number, lz: number) => T.Vector3) {
     // 가운데 큰 모닥불: 돌을 둘러 쌓은 화덕, 연기 기둥은 멀리서도 보인다
     const fire = at(0, 0);
@@ -139,7 +140,7 @@ export function buildEras(c: EraCtx) {
     npc("간석기 도끼 도깨비", "돌을 갈아서 날을 세웠어. 처음 장작을 팬 것도 나야.", axe, circle(E("prehistory"), 11.5, -0.18, 1.5, 0.15));
   }
 
-  // ── 1970–80년대: 연탄 골목 ──
+  // ── 꼼지락 골목 (1970–80년대 모습) ──
   function modern(g: T.Group, at: (lx: number, lz: number, ry?: number) => T.Group, solid: (lx: number, lz: number, r: number) => void, w: (lx: number, lz: number) => T.Vector3) {
     const wallC = ["#D9D3C4", "#CFC7B4", "#E2DCCB", "#C9C2B0"];
     const gateC = ["#3E7A5E", "#3E5E8A", "#5E7A3E", "#4A6E8A"];
@@ -222,7 +223,7 @@ export function buildEras(c: EraCtx) {
     npc("카세트테이프 도깨비", "연필로 감아주면 다시 노래해. 늘어진 것도 정이야.", tape, (t) => { const k = (Math.sin(t * 0.12 + 2) + 1) / 2; const v = w(-0.8, -10 + k * 22); return { x: v.x, z: v.z, y: Math.abs(Math.sin(t * 6)) * 0.2, ry: -E("modern").angle }; });
   }
 
-  // ── 2000년대 초: PC방 골목 ──
+  // ── 와글 뒷산 (2000년대 초 모습) ──
   function y2k(g: T.Group, at: (lx: number, lz: number, ry?: number) => T.Group, solid: (lx: number, lz: number, r: number) => void, w: (lx: number, lz: number) => T.Vector3) {
     // 붉은 벽돌 빌라(다세대) 셋: 층마다 창 불빛, 옥상 물탱크, 실외기
     function villa(lx: number, lz: number, side: 1 | -1, floors: number, signs: Array<{ text: string; bg: string; fg: string; floor: number }>) {
@@ -286,7 +287,7 @@ export function buildEras(c: EraCtx) {
 
     // 입구 이름표
     const gate = at(0, ERA_RADIUS + 1);
-    const label = c.textSprite(`${e.name} · ${e.period}`, { bg: "#2A2118", fg: "#F3E7C9", size: 40, scale: 0.55 });
+    const label = c.textSprite(e.name, { bg: "#2A2118", fg: "#F3E7C9", size: 40, scale: 0.55 });
     label.position.set(0, 4.2, 0); gate.add(label);
     c.nameTags.push({ s: label, x: w(0, ERA_RADIUS + 1).x, z: w(0, ERA_RADIUS + 1).z, always: false });
 

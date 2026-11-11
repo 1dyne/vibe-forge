@@ -310,7 +310,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
           c += vec3(0.35, 0.18, 0.05) * pow(west, 6.0) * (1.0 - smoothstep(0.0, 0.3, abs(h)));
           gl_FragColor = vec4(c, 1.0); }`
     }));
-    sky.renderOrder = -1; scene.add(sky);
+    sky.renderOrder = -1; sky.name = "sky"; scene.add(sky);
     // 초승달 (신윤복 「월하정인」의 밤처럼)
     const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d")!;
     x.fillStyle = "#FFF4D6"; x.beginPath(); x.arc(64, 64, 46, 0, 6.283); x.fill();
@@ -1028,7 +1028,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   /** 지금 서 있는 곳: 다섯 마을 또는 시대 마을 (마을 이름 띠용) */
   function placeAt(x: number, z: number): WorldVillage | null {
     const v = villageAt(x, z); if (v) return v;
-    for (const e of ERAS) { const c = eraCenter(e); if (Math.hypot(x - c.x, z - c.z) < ERA_RADIUS + 2) return { id: e.id, name: `${e.name} · ${e.period}`, topics: e.topics, mood: "", themes: [] }; }
+    for (const e of ERAS) { const c = eraCenter(e); if (Math.hypot(x - c.x, z - c.z) < ERA_RADIUS + 2) return { id: e.id, name: e.name, topics: e.topics, mood: "", themes: [] }; }
     return null;
   }
   function villageAt(x: number, z: number) {
