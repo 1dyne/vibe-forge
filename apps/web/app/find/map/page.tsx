@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = await siteOrigin();
-  return { title: "본관 게시판 · 달그락 대장간", description: "도깨비불들이 대장간을 짓고 사는 다섯 마을.", metadataBase: new URL(origin), openGraph: { title: "도깨비 마을", description: "너만의 도깨비불을 찾으면 마을에 네 대장간이 생겨.", images: [{ url: `${origin}/find/og.png?v=1`, width: 1200, height: 600 }] } };
+  return { title: "본관 게시판 · 달그락 대장간", description: "도깨비불들이 대장간을 짓고 사는 다섯 마을.", metadataBase: new URL(origin), openGraph: { title: "달그락 마을", description: "너만의 도깨비불을 찾으면 마을에 네 대장간이 생겨.", images: [{ url: `${origin}/find/og.png?v=1`, width: 1200, height: 600 }] } };
 }
 
 // 본관 게시판: 공사 게이지·소식판·기와·공사 계획판. 마을 지도는 3D 마을 안의 지형도(위에서 내려다본 실제 마을)로 본다

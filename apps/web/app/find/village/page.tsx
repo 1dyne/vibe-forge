@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = await siteOrigin();
-  return { title: "도깨비 마을 · 달그락 대장간", description: "도깨비불들이 대장간을 짓고 사는 다섯 마을. 너만의 도깨비불을 찾으면 마을에 네 대장간이 생겨.", metadataBase: new URL(origin), openGraph: { title: "도깨비 마을", images: [{ url: `${origin}/find/og.png?v=1`, width: 1200, height: 600 }] } };
+  return { title: "달그락 마을 · 달그락 대장간", description: "도깨비불들이 대장간을 짓고 사는 다섯 마을. 너만의 도깨비불을 찾으면 마을에 네 대장간이 생겨.", metadataBase: new URL(origin), openGraph: { title: "달그락 마을", images: [{ url: `${origin}/find/og.png?v=1`, width: 1200, height: 600 }] } };
 }
 
-// 걷는 도깨비 마을. 내 도깨비불을 찾고 대장간 오픈 알림(이메일)을 남긴 사람에게 문이 열린다.
+// 걷는 달그락 마을. 내 도깨비불을 찾고 대장간 오픈 알림(이메일)을 남긴 사람에게 문이 열린다.
 // 2D 지도(/find/map)는 3D가 안 되는 기기용.
 export default async function Village() {
   const gate = await villageGate();
