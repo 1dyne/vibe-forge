@@ -37,6 +37,8 @@
 - 전원(§7) `set_power_budget`, 테스트(§8) `set_test_plan`·`record_test_result`·보드별 업로드 안내, 안전(§11) `set_safety_review`(필수 항목 자동, risk 미확인이면 대장간 입장 막음), 설계 기록(§10, 덮어쓰기 전 30개, 보기·되돌리기). 작업대 '전원'·'테스트'·'안전' 탭, 팀기록 아래 설계 기록.
 - 3D 작업대 마지막에 하우징 부위를 씌우는 단계.
 - 연습 키트 4종 완성: `wire-to-pad`(모듈 패드에 전선 직접), `battery-safe`(TP4056 보호형 + LiPo + 스위치, 출력 전압 재기).
+- **데이터 약속(펌웨어 ↔ 앱)**: `set_data_contract`(한 줄 메시지: kv·csv·json, 방향·시작 글자·값 타입·범위·예시, 자기 검사), 펌웨어 코드·SW 명세·테스트 기대값과 자동 대조(`dataContractFindings`), 펌웨어용 `contract.h`·앱용 `contract.ts`(parseLine·make_*) 생성, SW 명세서에 약속 포함·통신 방식이 다르면 명세 저장 거절. 작업대 '데이터 약속' 탭: 시리얼 모니터 줄 붙여 넣기 검사기 + 데스크톱 Chrome에서 보드 직접 5초 읽기(Web Serial), 결과 기록. `check_data_contract`.
+- **아두이노 IDE 온보딩** `/find/setup`: 아는지 묻기 → 무엇인지(그림) → OS별 설치(맥·윈도·리눅스·크롬북=Cloud Editor) → 보드 고르기 → 보드 패키지·포트·Blink 업로드 → 확인, 다른 도구 소개. 연습 목록·테스트 탭에서 연결, MCP `ideSetupPath`.
 - 남은 것: 완성 후 사용 테스트(§12), 양산(§13), Postgres(§14), Web Serial 로그 자동 대조(§8 선택), 대장간 방 연장 걸이에 인두(§5.1).
 
 

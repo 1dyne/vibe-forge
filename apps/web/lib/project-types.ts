@@ -96,6 +96,9 @@ export type LocalProject = {
   testPlan?: TestPlan;
   safety?: SafetyReview;
   history?: DesignSnapshot[];
+  dataContract?: DataContract;
+  /** SW 명세서(write_dev_spec)가 적은 통신 방식·형식 — 데이터 약속과 대조한다 */
+  swInterface?: { transport: "serial" | "ble" | "wifi_http" | "wifi_mqtt" | "none"; format: string; at: string };
   assemblyReports?: AssemblyReport[];
   assemblyDetails?: AssemblyDetail[];
   assemblyRequests?: AssemblyRequest[];
@@ -294,4 +297,18 @@ export type SafetyItem = { id: string; topic: string; text: string; status: "ok"
 export type SafetyReview = { items: SafetyItem[]; updatedAt: string };
 
 // 설계 기록 (§10). set_* 도구가 덮어쓰기 전 값을 남긴다.
-export type DesignSnapshot = { id: string; at: string; tool: string; summary: string; field: "productForm" | "buildPlan" | "build" | "assembly" | "housing" | "power" | "testPlan" | "safety"; snapshot: string };
+export type DesignSnapshot = { id: string; at: string; tool: string; summary: string; field: "productForm" | "buildPlan" | "build" | "assembly" | "housing" | "power" | "testPlan" | "safety" | "dataContract"; snapshot: string };
+
+// 펌웨어와 SW가 주고받는 데이터 약속 (2차 v0.2 추가). 한 줄 = 메시지 하나.
+// kv: "state=1;temp=23.5"  csv: "S,1,23.5" (prefix 다음 값 순서대로)  json: {"t":"state","on":1}
+export type ContractField = { name: string; type: "int" | "float" | "bool" | "string" | "enum"; unit?: string; min?: number; max?: number; values?: string[] };
+export type ContractMessage = { id: string; direction: "device_to_app" | "app_to_device"; prefix: string; description: string; every?: string; fields: ContractField[]; example: string };
+export type ContractRun = { id: string; at: string; source: "device_log" | "app_sample" | "claude"; total: number; ok: number; problems: string[]; by: "person" | "claude" };
+export type DataContract = {
+  transport: "serial" | "ble" | "wifi_http" | "wifi_mqtt";
+  format: "kv" | "csv" | "json";
+  baud: number | null;
+  messages: ContractMessage[];
+  runs: ContractRun[];
+  updatedAt: string;
+};

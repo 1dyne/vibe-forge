@@ -1,12 +1,13 @@
 import type { BuildPlan, LocalProject } from "./project-types";
 import { housingFiles, housingMarkdown } from "./housing";
 import { provisionalReasons, stickerHtml } from "./provisional";
+import { contractHeader, contractMarkdown, contractTs } from "./contract";
 import { workflowFor } from "./workflow";
 
 export type WorkbenchItem = {
   id: string;
   filename: string;
-  kind: "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
+  kind: "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
 };
@@ -57,6 +58,10 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
     if (opts.files) for (const f of housingFiles(project)) items.push({ id: f.id, filename: f.filename, kind: "file", mimeType: f.mimeType, content: f.content });
   }
   if (project.power) { const r = project.power.result; items.push({ id: "document:power", filename: `${stem}-전원.md`, kind: "power", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 전원\n\n평균 ${r.avgCurrentMa}mA · 최대 ${r.peakCurrentMa}mA${r.hours != null ? ` · 약 ${r.hours}시간` : ""}${r.estimated ? " (추정)" : ""}\n\n${project.power.modes.map((m) => `- ${m.name} ${m.dutyPct}%: ${m.loads.map((l) => `${l.ref} ${l.currentMa}mA`).join(", ")}`).join("\n")}\n${r.railWarnings.map((w) => `\n> ⚠ ${w}`).join("")}\n` }); }
+  if (project.dataContract) {
+    items.push({ id: "document:contract", filename: `${stem}-데이터약속.md`, kind: "contract", mimeType: "text/markdown; charset=utf-8", content: contractMarkdown(project.dataContract, project) });
+    if (opts.files) items.push({ id: "contract:h", filename: "contract.h", kind: "file", mimeType: "text/plain; charset=utf-8", content: contractHeader(project.dataContract, project) }, { id: "contract:ts", filename: "contract.ts", kind: "file", mimeType: "text/plain; charset=utf-8", content: contractTs(project.dataContract) });
+  }
   if (project.testPlan) items.push({ id: "document:tests", filename: `${stem}-테스트.md`, kind: "tests", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 테스트 계획\n\n${project.testPlan.cases.map((c) => `## ${c.stage}단계 · ${c.title}\n\n- 준비: ${c.setup}\n- 할 일: ${c.do}\n- 기대: ${[c.expect.serial?.join(" / "), c.expect.observe, c.expect.measure ? `${c.expect.measure.what} ${c.expect.measure.min}~${c.expect.measure.max}${c.expect.measure.unit}` : ""].filter(Boolean).join(" · ")}${c.result ? `\n- 결과: ${c.result.status} — ${c.result.evidence}` : ""}`).join("\n\n")}\n` });
   if (project.safety) items.push({ id: "document:safety", filename: `${stem}-안전.md`, kind: "safety", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 안전 검토\n\n${project.safety.items.map((i) => `- [${i.status === "ok" || i.ackAt ? "x" : " "}] (${i.status}) ${i.topic}: ${i.text}${i.required ? " · 필수" : ""}`).join("\n")}\n` });
   if (project.buildPlan) items.push(...[{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan, stickerHtml(provisionalReasons(project))) }] as WorkbenchItem[]);

@@ -102,6 +102,17 @@ describe("Claude connector", () => {
     const approve = await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify({ action: "approve_circuit" }) }), { params: Promise.resolve({ id }) });
     expect(approve.status).toBe(200);
     await tool(token, "set_test_plan", { projectId: id, cases: [{ id: "t1", stage: 1, title: "버튼", setup: "USB 연결", do: "버튼 누르기", expect: { serial: ["pressed"], observe: "LED 켜짐" } }] });
+    // 데이터 약속: 예시가 규칙에 안 맞으면 거절, 저장되면 실제 줄 검사
+    const msg = { id: "state", direction: "device_to_app", prefix: "state=", description: "램프 상태", fields: [{ name: "state", type: "bool" }], example: "state=1" };
+    expect((await tool(token, "set_data_contract", { projectId: id, contract: { transport: "serial", format: "kv", baud: 115200, messages: [{ ...msg, example: "state=7" }] } })).isError).toBe(true);
+    const contract = await tool(token, "set_data_contract", { projectId: id, contract: { transport: "serial", format: "kv", baud: 115200, messages: [msg] } });
+    expect(contract.isError).toBeFalsy();
+    expect(contract.structuredContent!.dataContractFindings.some((f: { side: string }) => f.side === "firmware")).toBe(true);
+    const checked = await tool(token, "check_data_contract", { projectId: id, source: "device_log", lines: "boot ok\nstate=1\nstate=2" });
+    expect(checked.content[0].text).toContain("2줄 중 1줄");
+    const bleSpec = await tool(token, "write_dev_spec", { projectId: id, title: "앱", goal: "상태 보기", whyCode: "원격", pieces: [{ name: "웹", kind: "web", purpose: "표시" }], features: [{ name: "보기", detail: "상태" }], acceptance: ["보인다"], outOfScope: [], dataInterface: { transport: "ble", format: "state=1" }, stack: [{ name: "HTML", reason: "쉬움" }], learningSteps: [{ step: "폴더", explain: "만들기" }], recommendedTool: "claude_code" });
+    expect(bleSpec.isError).toBe(true);
+    expect(bleSpec.content[0].text).toContain("데이터 약속은 serial");
     const after = await tool(token, "get_project", { projectId: id });
     expect(after.structuredContent!.phase).toBe("mockup");
     expect(after.structuredContent!.files.some((f: { kind: string }) => f.kind === "cad")).toBe(true);

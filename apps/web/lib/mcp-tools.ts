@@ -24,6 +24,8 @@ import { mergeSafety, requiredSafety, unackedRisks } from "./safety";
 import { snapshot, FIELD_LABEL } from "./history";
 import { provisionalReasons } from "./provisional";
 import { uploadGuideFor } from "./firmware-guide";
+import { contractMarkdown, contractTs, crossCheck, selfCheck, validateLog } from "./contract";
+import type { ContractMessage, DataContract } from "./project-types";
 import type { SafetyItem, TestCase } from "./project-types";
 import type { HousingPlan } from "./project-types";
 
@@ -172,6 +174,8 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 
 ## 전원·테스트·안전·기록
 - set_power_budget: 배터리를 쓰면 모드별 부하 전류(powerSuggestedLoads의 카드 값 우선)로 몇 시간 가는지 서버가 계산한다. 가정은 basis: assumed.
+- 보드에 코드를 올려 본 적이 없으면(firmwareExperience none) 펌웨어를 주기 전에 대시보드 주소 + ideSetupPath(아두이노 IDE가 무엇인지 → 설치 → LED 깜빡이기)를 먼저 안내한다.
+- set_data_contract: 앱(웹·폰)과 보드가 데이터를 주고받으면 HW·SW 달그락이 같이 한 줄 메시지 약속을 정한다. 펌웨어는 contract.h, 앱은 contract.ts를 쓰게 하고, dataContractFindings의 ❌부터 고친다. 사용자가 시리얼 모니터 줄을 보내면 check_data_contract로 검사한다.
 - set_test_plan: 업로드 후 단계별로 확인할 것(시리얼 줄·눈으로 볼 것·멀티미터 값). 보드별 업로드 방법은 get_project의 uploadGuide를 그대로 안내한다. 결과는 자동 통과가 아니다(record_test_result는 근거가 있을 때만 pass/fail).
 - set_safety_review: get_project의 safetyRequired를 같은 id로 판단한다. risk는 사람이 대시보드에서 확인해야 대장간에 들어간다.
 - set_* 도구는 덮어쓰기 전 값을 기록(history)에 남기고, 사람은 대시보드에서 되돌릴 수 있다.
@@ -329,9 +333,12 @@ function summarize(project: LocalProject, context: ToolContext) {
     power: project.power ?? null,
     powerSuggestedLoads: suggestedLoads(project),
     testPlan: project.testPlan ?? null,
+    ideSetupPath: "/find/setup",
     uploadGuide: uploadGuideFor((project.build?.blueprint.components ?? []).find((c) => findCard(c.catalogId)?.type === "board")?.catalogId),
     safety: project.safety ?? null,
     safetyRequired: requiredSafety(project).map((i) => ({ id: i.id, topic: i.topic, text: i.text })),
+    dataContract: project.dataContract ? { ...project.dataContract, runs: project.dataContract.runs.slice(-3) } : null,
+    dataContractFindings: crossCheck(project),
     history: (project.history ?? []).slice(-10).map((h) => ({ id: h.id, at: h.at, field: FIELD_LABEL[h.field], summary: h.summary })),
     assembly: project.assembly ? { stage: project.assembly.stage, base: project.assembly.base, steps: project.assembly.steps.map((step, index) => ({ step: index + 1, title: step.title, cards: step.cards.map((card) => ({ id: card.id, symptom: card.symptom })), wireLengths: wireLengths(project, index) })) } : null,
     liveStatus: project.liveStatus ?? null,
@@ -928,6 +935,51 @@ TOOLS.push(
     }
   },
   {
+    name: "set_data_contract", title: "데이터 약속 (펌웨어 ↔ 앱)",
+    description: "보드(펌웨어)와 앱(SW)이 주고받는 한 줄 메시지를 하나의 약속으로 정한다. HW 달그락과 SW 달그락이 같이 쓴다. 통신 방식·속도(baud), 형식(kv: 'state=1;temp=23.5', csv: 'S,1,23.5', json), 메시지마다 방향(device_to_app/app_to_device)·시작 글자(prefix)·값(이름·타입·단위·범위)·예시를 넣는다. 서버가 예시가 규칙에 맞는지 검사하고, 펌웨어 코드(통신 속도·보내는 코드), SW 명세(write_dev_spec의 dataInterface), 테스트 계획의 시리얼 기대값과 대조해 dataContractFindings로 돌려준다. 펌웨어용 contract.h와 앱용 contract.ts가 작업대에 생기고, SW 명세서에도 들어간다. 사용자는 보드를 연결해 시리얼 모니터 줄을 붙여 넣어 실제로 맞는지 검사한다.",
+    inputSchema: { type: "object", required: ["projectId", "contract"], properties: { projectId, contract: { type: "object", required: ["transport", "format", "baud", "messages"], properties: {
+      transport: { type: "string", enum: ["serial", "ble", "wifi_http", "wifi_mqtt"] }, format: { type: "string", enum: ["kv", "csv", "json"], description: "초보자는 kv를 권장" }, baud: { type: ["integer", "null"], description: "시리얼이면 115200 등" },
+      messages: { type: "array", items: { type: "object", required: ["id", "direction", "prefix", "description", "fields", "example"], properties: {
+        id: { type: "string", description: "영문 소문자 (예: state, cmd)" }, direction: { type: "string", enum: ["device_to_app", "app_to_device"] }, prefix: { type: "string", description: "이 메시지가 시작하는 글자. kv면 첫 이름= (예: 'state='), csv면 'S', json이면 '{\"t\":\"state\"'" }, description: { type: "string" }, every: { type: "string", description: "보내는 주기 (예: 1초마다, 버튼 누를 때)" },
+        fields: { type: "array", items: { type: "object", required: ["name", "type"], properties: { name: { type: "string" }, type: { type: "string", enum: ["int", "float", "bool", "string", "enum"] }, unit: { type: "string" }, min: { type: "number" }, max: { type: "number" }, values: { type: "array", items: { type: "string" } } } } },
+        example: { type: "string", description: "실제로 오가는 한 줄 그대로" }
+      } } }
+    } } } },
+    run: async (input, context) => {
+      const Field = z.object({ name: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]{0,23}$/), type: z.enum(["int", "float", "bool", "string", "enum"]), unit: z.string().max(12).optional(), min: z.number().optional(), max: z.number().optional(), values: z.array(z.string().max(24)).max(12).optional() }).strict();
+      const Msg = z.object({ id: z.string().regex(/^[a-z][a-z0-9_]{0,23}$/), direction: z.enum(["device_to_app", "app_to_device"]), prefix: z.string().min(1).max(40), description: z.string().min(1).max(200), every: z.string().max(60).optional(), fields: z.array(Field).min(1).max(12), example: z.string().min(1).max(200) }).strict();
+      const { projectId: id, contract } = z.object({ projectId: z.string().uuid(), contract: z.object({ transport: z.enum(["serial", "ble", "wifi_http", "wifi_mqtt"]), format: z.enum(["kv", "csv", "json"]), baud: z.number().int().min(300).max(2_000_000).nullable(), messages: z.array(Msg).min(1).max(12) }).strict() }).strict().parse(input) as { projectId: string; contract: Omit<DataContract, "runs" | "updatedAt"> & { messages: ContractMessage[] } };
+      const project = await ownedProject(id, context);
+      const problems = selfCheck(contract);
+      if (problems.length) throw new ToolError(`데이터 약속을 저장하지 못했어요: ${problems.slice(0, 6).join(" / ")}`);
+      const updated = await mutateProject(id, (p) => {
+        snapshot(p, "dataContract", "set_data_contract", "데이터 약속 바꾸기 전");
+        p.dataContract = { ...contract, runs: p.dataContract?.runs ?? [], updatedAt: new Date().toISOString() };
+        const f = crossCheck(p).filter((x) => x.level === "fail");
+        const w = workflowFor(p);
+        p.messages.push({ id: randomUUID(), role: "assistant", agent: "sw", channel: w.phase === "workshop" && w.activeAgents.includes("sw") ? "sw" : "main", text: `보드와 앱이 주고받을 데이터 약속을 정했어요: ${contract.messages.map((m) => `${m.direction === "device_to_app" ? "보드→앱" : "앱→보드"} ${m.example}`).join(" / ")}.${f.length ? `\n아직 안 맞는 곳 ${f.length}개: ${f.slice(0, 3).map((x) => x.text).join(" / ")}` : ""}\n보드를 연결하면 작업대 '데이터 약속'에 시리얼 모니터 줄을 붙여 넣어 실제로 맞는지 검사할 수 있어요.`, createdAt: p.dataContract.updatedAt, shared: true });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "sw", text: `데이터 약속: ${contract.transport} ${contract.format} · ${contract.messages.map((m) => m.id).join(", ")}`, createdAt: p.dataContract.updatedAt });
+        p.workflow = w;
+      });
+      const findings = crossCheck(updated);
+      return stored(updated, context, `데이터 약속을 저장했어요. 대조 결과: 안 맞음 ${findings.filter((x) => x.level === "fail").length}, 주의 ${findings.filter((x) => x.level === "warn").length}, 확인 전 ${findings.filter((x) => x.level === "unknown").length}.${findings.filter((x) => x.level === "fail").length ? ` 고칠 곳: ${findings.filter((x) => x.level === "fail").slice(0, 4).map((x) => x.text).join(" / ")}` : ""}`);
+    }
+  },
+  {
+    name: "check_data_contract", title: "데이터 약속 검사 (실제 줄)",
+    description: "사용자가 보낸 시리얼 모니터 줄이나 앱이 만든 줄을 데이터 약속으로 한 줄씩 검사한다. 부팅 메시지 같은 잡음은 건너뛴다. 결과는 기록되고, 맞지 않는 줄은 이유(값 범위, 빠진 이름, 형식)가 나온다. 판단은 결과를 보고 사람과 함께 한다.",
+    inputSchema: { type: "object", required: ["projectId", "lines", "source"], properties: { projectId, lines: { type: "string", description: "검사할 줄들 (줄바꿈으로 구분)" }, source: { type: "string", enum: ["device_log", "app_sample"] } } },
+    run: async (input, context) => {
+      const { projectId: id, lines, source } = z.object({ projectId: z.string().uuid(), lines: z.string().min(1).max(20000), source: z.enum(["device_log", "app_sample"]) }).strict().parse(input);
+      const project = await ownedProject(id, context);
+      if (!project.dataContract) throw new ToolError("먼저 set_data_contract로 데이터 약속을 정하세요.");
+      const r = validateLog(project.dataContract, lines, { dir: source === "device_log" ? "device_to_app" : "app_to_device", ignoreNoise: true });
+      const problems = [...r.results.filter((x) => !x.ok).map((x) => `"${x.line}": ${x.errors.join(", ")}`), ...r.missing.map((m) => `${m} 메시지가 한 번도 안 나왔어요`)];
+      const updated = await mutateProject(id, (p) => { p.dataContract!.runs = [...p.dataContract!.runs, { id: randomUUID(), at: new Date().toISOString(), source: "claude" as const, total: r.total, ok: r.ok, problems: problems.slice(0, 10), by: "claude" as const }].slice(-20); });
+      return stored(updated, context, `${r.total}줄 중 ${r.ok}줄이 약속과 맞아요.${problems.length ? ` 안 맞는 곳: ${problems.slice(0, 5).join(" / ")}` : " 모두 맞아요."}`);
+    }
+  },
+  {
     name: "set_assembly_guide", title: "조립 가이드 (실제 기판 배치·단계·문제 카드)",
     description: "설계도의 한 단계를 실제로 따라 만들 수 있게 한다. base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기·위치와 핀 위치, steps는 하나씩 할 동작(어떤 부품을 어디에 놓고 어떤 선을 어디서 어디로 잇는지), 단계마다 확인할 것과 문제 카드(증상 → 확인 방법 → 기대값 → 아니면 할 일, 예: 멀티미터 DC 20V로 5V-GND 측정 4.75~5.25V)를 넣는다. 대시보드에서 단계별 애니메이션으로 재생되고, '3D 작업대'에서는 부품이 트레이에서 기판 위 자리로 날아와 앉고 전선·납땜이 단계별로 연출된다(HW 달그락이 화면 안에서 안내). 그래서 x·y·크기·핀 위치를 실제 값으로 넣는다. 사용자가 카드의 확인 결과나 '실제로 했어요'를 보내면 assemblyReports로 돌아온다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "guide"], properties: { projectId, guide: { type: "object", additionalProperties: false, required: ["stage", "base", "parts", "steps"], properties: {
@@ -1152,10 +1204,13 @@ TOOLS.push(
     run: async (input, context) => {
       const { projectId: id, ...spec } = DevSpecSchema.parse(input) as DevSpecInput & { projectId: string };
       const project = await ownedProject(id, context);
-      const files = buildDevHandoff(project, spec);
+      const dc = project.dataContract;
+      if (dc && spec.dataInterface.transport !== "none" && spec.dataInterface.transport !== dc.transport) throw new ToolError(`데이터 약속은 ${dc.transport}인데 SW 명세는 ${spec.dataInterface.transport}예요. 약속(set_data_contract)을 바꾸거나 명세를 약속에 맞춰 주세요.`);
+      const files = [...buildDevHandoff(project, spec), ...(dc ? [{ filename: "contract.ts", content: contractTs(dc) }, { filename: "CONTRACT.md", content: contractMarkdown(dc, project) }] : [])];
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = new Date().toISOString();
+        p.swInterface = { ...spec.dataInterface, at: now };
         const names = new Set(files.map((file) => file.filename));
         p.workspaceFiles = [...(p.workspaceFiles ?? []).filter((file) => !(file.agent === "sw" && names.has(file.filename))), ...files.map((file) => ({ ...file, agent: "sw" as const, id: randomUUID(), createdAt: now }))];
         if (!w.activeAgents.includes("sw")) w.activeAgents = [...w.activeAgents, "sw"];

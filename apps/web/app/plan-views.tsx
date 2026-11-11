@@ -34,6 +34,7 @@ export function TestView({ project, onAction, busy }: { project: LocalProject; o
   return <div className="plan-view">
     <div className="artifact-title"><span className="pill">테스트</span><h3>업로드하고 확인하기</h3></div>
     {guide ? <details className="upload-guide" open={!plan.cases.some((c) => c.result)}><summary>📤 {guide.boardName}에 펌웨어 올리는 법</summary>
+      <p className="muted">아두이노 IDE가 처음이면 <a href={`/find/setup?board=${boardId ?? ""}&back=/`} target="_blank" rel="noreferrer">설치부터 LED 깜빡이기까지 따라 하기 ↗</a></p>
       <ol><li>Arduino IDE를 설치하고 열어요.</li>{guide.managerUrl && <li>환경설정 → 추가 보드 관리자 URL에 <code>{guide.managerUrl}</code> 를 넣어요.</li>}<li>보드 매니저에서 <b>{guide.package}</b>를 설치해요.</li><li>{guide.select}</li><li>포트: {guide.port}</li><li>업로드(→) 버튼을 누르고, 끝나면 시리얼 모니터를 열어요.</li></ol>
       <h5>잘 안 되면</h5><ul>{guide.errors.map((e) => <li key={e.symptom}><b>{e.symptom}</b> — {e.fix}</li>)}</ul></details>
       : <p className="notice">이 보드의 업로드 안내는 아직 없어요. 판매처 문서를 따라 주세요.</p>}

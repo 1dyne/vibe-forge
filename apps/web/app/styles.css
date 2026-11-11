@@ -142,3 +142,10 @@
 .safety-list{list-style:none;padding:0;margin:8px 0}.safety-list li{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #eee;font-size:13px}
 .safety-list li > span:nth-child(2){flex:1}.safety-list .acked{color:#2C7A70;white-space:nowrap}
 .history-list ul{list-style:none;padding:0}.history-list li{border-bottom:1px solid #eee;padding:8px 0;font-size:13px}
+
+/* 데이터 약속 */
+.contract-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}.contract-table td,.contract-table th{border:1px solid #dfe5e3;padding:6px 8px;text-align:left;vertical-align:top}.contract-table th{background:#f1faf8}
+.contract-side ul{list-style:none;padding:0;margin:4px 0 10px;font-size:12.5px}.contract-side li{padding:2px 0}.contract-side li.fail{color:#b3402f}
+.contract-input{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px;border:1px solid #dfe5e3;border-radius:10px;padding:8px;margin:6px 0}
+.contract-result ol{font-size:12px;padding-left:20px;max-height:240px;overflow:auto}.contract-result li.fail{color:#b3402f}.contract-result li.noise{color:#8a8f98}
+.contract-runs{font-size:12px;padding-left:18px}

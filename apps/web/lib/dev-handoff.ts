@@ -87,7 +87,8 @@ ${spec.features.map((f) => `### ${f.name}\n${f.detail}`).join("\n\n")}
 
 ## 하드웨어와 주고받는 데이터
 - 방식: ${TRANSPORT[spec.dataInterface.transport]}
-- 형식: ${spec.dataInterface.format}
+- 형식: ${spec.dataInterface.format}${project.dataContract ? `
+- **데이터 약속이 정해져 있어요.** 함께 받은 \`contract.ts\`의 \`parseLine\`·\`make_*\`만 써서 읽고 보내요. 형식을 코드에서 따로 만들지 말아요. 약속을 바꿔야 하면 달그락 대장간에 변경 제안으로 남겨요 (펌웨어의 contract.h와 같이 바뀌어야 해요).` : ""}
 
 ${hardwareSection(project)}
 
