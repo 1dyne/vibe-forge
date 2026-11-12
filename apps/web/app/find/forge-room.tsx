@@ -33,6 +33,8 @@ type Props = {
   lanternsLit?: number;
   lanternsDone?: number;
   onPick: (o: RoomObj) => void;
+  /** 열린 쪽 화살표를 누르면: 달그락이 걸어 나간 뒤 불린다 (주인 화면에서 마을로) */
+  onExit?: () => void;
   fallback: ReactNode;
 };
 
@@ -45,10 +47,12 @@ const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2
 };
 const LABEL: Record<RoomObj, string> = { hearth: "화덕", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "편지함", woodpile: "장작더미", tools: "연장 걸이", display: "소반" };
 
-export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, full = false, memos = 0, lanternsLit = 0, lanternsDone = 0, onPick, fallback }: Props) {
+export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, full = false, memos = 0, lanternsLit = 0, lanternsDone = 0, onPick, onExit, fallback }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -297,14 +301,54 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       }
 
       // ── 집 도깨비: 이 집 주인의 달그락(온보딩 때 받은 색)이 화로 옆을 지킨다 ──
-      const tex = await new three.TextureLoader().loadAsync("/find/sprites/idle.webp").catch(() => null);
+      // 바닥을 누르면 그리로 걸어가고, 물건을 누르면 그 앞까지 걸어간 뒤 연다. 처음엔 열린 쪽에서 걸어 들어온다
+      const loader = new three.TextureLoader();
+      const [tex, walkTex] = await Promise.all([loader.loadAsync("/find/sprites/idle.webp").catch(() => null), loader.loadAsync("/find/sprites/stoke.webp").catch(() => null)]);
+      const home = new three.Vector3(hx + 0.9, 0, hz + 2.2);
+      const me = { pos: new three.Vector3(W / 2 + 1.4, 0, D / 2 + 1.4), target: home.clone() as T.Vector3 | null, then: null as null | (() => void), leaving: false };
+      const clampIn = (v: T.Vector3) => { v.x = Math.max(-W / 2 + 0.6, Math.min(W / 2 - 0.4, v.x)); v.z = Math.max(-D / 2 + 0.9, Math.min(D / 2 - 0.2, v.z)); return v; };
+      let sp: T.Sprite | null = null;
       if (tex && !disposed) {
-        tex.colorSpace = three.SRGBColorSpace; tex.repeat.set(1 / 25, 1);
-        const sp = new three.Sprite(hueSpriteMaterial(three, tex, hue));
-        sp.scale.set(1.4, 1.4, 1); sp.position.set(hx + 0.9, 0.7, hz + 2.2); scene.add(sp);
-        let f = 0, clockF = 0;
-        anim.push((t) => { if (t - clockF > 0.09) { clockF = t; f = (f + 1) % 25; tex.offset.x = f / 25; } });
+        for (const t0 of [tex, walkTex]) if (t0) { t0.colorSpace = three.SRGBColorSpace; t0.repeat.set(1 / 25, 1); }
+        const spMat = hueSpriteMaterial(three, tex, hue);
+        sp = new three.Sprite(spMat); sp.scale.set(1.4, 1.4, 1); scene.add(sp);
+        const shadow = new three.Mesh(new three.CircleGeometry(0.32, 16), new three.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.18 }));
+        shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
+        let f = 0, clockF = 0, last = 0;
+        anim.push((t) => {
+          const dt = Math.min(0.05, t - last); last = t;
+          let moving = false;
+          if (me.target) {
+            const d = me.target.clone().sub(me.pos); d.y = 0; const len = d.length();
+            if (len < 0.05) { me.target = null; const fn = me.then; me.then = null; fn?.(); }
+            else { me.pos.addScaledVector(d.normalize(), Math.min(len, (me.leaving ? 2.2 : 1.8) * dt)); moving = true; }
+          }
+          const cur = moving && walkTex ? walkTex : tex;
+          const m = sp!.material as T.SpriteMaterial & { uniforms?: { map: { value: T.Texture } } };
+          if (m.uniforms?.map) { if (m.uniforms.map.value !== cur) m.uniforms.map.value = cur; } else if (m.map !== cur) { m.map = cur; m.needsUpdate = true; }
+          if (t - clockF > (moving ? 0.05 : 0.09)) { clockF = t; f = (f + 1) % 25; cur.offset.x = f / 25; }
+          sp!.position.set(me.pos.x, 0.7 + (moving ? Math.abs(Math.sin(t * 10)) * 0.06 : 0), me.pos.z);
+          shadow.position.set(me.pos.x, 0.02, me.pos.z);
+          if (me.leaving) { const o = Math.max(0, Math.min(1, (W / 2 + 1.5 - me.pos.x) / 1.4)); (sp!.material as T.Material).opacity = o; (sp!.material as T.Material).transparent = true; }
+        });
       }
+      const walkTo = (p: T.Vector3, then?: () => void) => { if (me.leaving) return; if (!sp) { then?.(); return; } me.target = clampIn(p.clone()); me.then = then ?? null; };
+
+      // ── 나가는 화살표: 방의 열린 쪽(앞) 바닥에서 통통 튄다 ──
+      if (exitRef.current) {
+        const ex = group(null, W / 2 - 0.75, 0, D / 2 - 0.75); // 앞 오른쪽 모서리(열린 쪽)
+        ex.userData.exit = true; pickables.push(ex);
+        const shape = new three.Shape(); shape.moveTo(0, 0.55); shape.lineTo(0.45, 0.05); shape.lineTo(0.18, 0.05); shape.lineTo(0.18, -0.45); shape.lineTo(-0.18, -0.45); shape.lineTo(-0.18, 0.05); shape.lineTo(-0.45, 0.05); shape.closePath();
+        const arrow = new three.Mesh(new three.ShapeGeometry(shape), new three.MeshBasicMaterial({ color: "#FF8F3F", side: three.DoubleSide }));
+        arrow.rotation.x = -Math.PI / 2; arrow.position.y = 0.05; const holder = new three.Group(); holder.rotation.y = -Math.PI * 0.75; holder.add(arrow); ex.add(holder); // 열린 모서리 바깥을 가리킨다
+        const hit = new three.Mesh(new three.CircleGeometry(0.8, 12), new three.MeshBasicMaterial({ visible: false })); hit.rotation.x = -Math.PI / 2; hit.position.y = 0.06; ex.add(hit);
+        anim.push((t) => { arrow.position.z = -0.1 - Math.abs(Math.sin(t * 3)) * 0.2; });
+        label("마을로", W / 2 - 0.75, 0.85, D / 2 - 0.75);
+      }
+      const leave = () => {
+        if (me.leaving) return;
+        walkTo(new three.Vector3(W / 2 - 0.8, 0, D / 2 - 0.8), () => { me.leaving = true; me.target = new three.Vector3(W / 2 + 1.6, 0, D / 2 + 1.6); me.then = () => exitRef.current?.(); });
+      };
 
       // ── 카메라: 오른쪽 앞에서 방 모서리를 본다. 옆으로 끌면 조금 돌려볼 수 있다 ──
       const FOV = 38;
@@ -326,8 +370,20 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         ray.setFromCamera(ndc, camera);
         const hit = ray.intersectObjects(pickables, true)[0];
         let o: T.Object3D | null = hit?.object ?? null;
-        while (o && !o.userData.obj) o = o.parent;
-        if (o) pick.current(o.userData.obj as RoomObj);
+        while (o && !o.userData.obj && !o.userData.exit) o = o.parent;
+        if (o?.userData.exit) { leave(); return; }
+        if (o) {
+          // 물건 앞(방 가운데 쪽)까지 걸어간 뒤 연다
+          const wp = new three.Vector3(); o.getWorldPosition(wp);
+          const toward = new three.Vector3(-wp.x, 0, -wp.z + 0.6).normalize();
+          const obj = o.userData.obj as RoomObj; let opened = false;
+          const open = () => { if (!opened) { opened = true; pick.current(obj); } };
+          walkTo(new three.Vector3(wp.x, 0, wp.z).addScaledVector(toward, 1.1), open);
+          setTimeout(open, 1600); // 멀리 있어도 오래 기다리게 하지 않는다
+          return;
+        }
+        const fl = ray.intersectObject(floor)[0];
+        if (fl) walkTo(fl.point);
       };
       const cv = renderer.domElement;
       cv.style.touchAction = full ? "none" : "pan-y";

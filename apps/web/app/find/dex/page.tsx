@@ -21,7 +21,7 @@ export default async function Dex() {
       <section className="screen">
         <h1 style={{ fontSize: 26 }}>도깨비 도감 <span className="muted" style={{ fontSize: 18 }}>{fires.length}칸</span></h1>
         {!me ? <div className="dex-empty">내 대장간이 생기면 도감이 열려. <a href="/find">도깨비불 찾기</a></div>
-          : fires.length === 0 ? <div className="dex-empty">남의 대장간에 들르면 그 집 도깨비불이 여기 한 칸씩 채워져. <a href="/find/random">아무 집이나 가보기</a></div>
+          : fires.length === 0 ? <div className="dex-empty">다른 사람의 대장간에 들르면 그 사람의 도깨비불이 여기 한 칸씩 채워져. <a href="/find/random">아무 집이나 가보기</a></div>
           : ATTRS.map(([kind, label]) => {
             const list = fires.filter((f) => f.reactKind === kind).sort((a, b) => (GRADE_ORDER[a.card?.grade ?? "흔함"] ?? 3) - (GRADE_ORDER[b.card?.grade ?? "흔함"] ?? 3));
             if (!list.length) return null;

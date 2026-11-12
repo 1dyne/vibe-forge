@@ -62,3 +62,48 @@ export function createVillageSound(night: boolean) {
     close() { clearInterval(timer); ctx.close().catch(() => {}); }
   };
 }
+
+/** 대장간 안 소리: 화덕 장작 타닥(늘), 풀무 바람(몇 초마다), 가끔 가야금 같은 한 음(오음계). 마을 소리처럼 직접 합성 */
+export function createForgeSound() {
+  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new AC();
+  const master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const data = noiseBuf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = () => { const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true; return n; };
+  // 화덕 웅웅 (낮은 불 소리)
+  { const n = noise(); const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 260; const g = ctx.createGain(); g.gain.value = 0.09; n.connect(lp).connect(g).connect(master); n.start(); }
+  function burst(freq: number, dur: number, vol: number, type: BiquadFilterType = "highpass") {
+    const n = noise(); const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; const g = ctx.createGain();
+    const t = ctx.currentTime; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    n.connect(f).connect(g).connect(master); n.start(t); n.stop(t + dur + 0.02);
+  }
+  function bellows() { // 풀무: 부풀었다 가라앉는 바람
+    const n = noise(); const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 700; const g = ctx.createGain(); const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    n.connect(lp).connect(g).connect(master); n.start(t); n.stop(t + 1.5);
+  }
+  const SCALE = [293.66, 329.63, 392.0, 440.0, 493.88, 587.33]; // 레 미 솔 라 시 레
+  function pluck() { // 가야금처럼 튕기는 한 음: 빠른 어택, 긴 여운
+    const f = SCALE[Math.floor(Math.random() * SCALE.length)];
+    const o = ctx.createOscillator(); o.type = "triangle"; o.frequency.value = f; const o2 = ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = f * 2;
+    const g = ctx.createGain(); const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
+    const g2 = ctx.createGain(); g2.gain.value = 0.3; o.connect(g); o2.connect(g2).connect(g); g.connect(master);
+    o.frequency.setValueAtTime(f * 1.01, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.15); // 살짝 농현
+    o.start(t); o2.start(t); o.stop(t + 2.5); o2.stop(t + 2.5);
+  }
+  let next = 0, nextB = 2;
+  const timer = window.setInterval(() => {
+    if (ctx.state !== "running") return;
+    if (Math.random() < 0.35) burst(1800 + Math.random() * 2500, 0.02 + Math.random() * 0.04, 0.09);
+    const t = ctx.currentTime;
+    if (t > nextB) { bellows(); nextB = t + 4 + Math.random() * 3; }
+    if (t > next) { pluck(); if (Math.random() < 0.4) setTimeout(pluck, 260); next = t + 1.6 + Math.random() * 2.4; }
+  }, 120);
+  return {
+    resume: () => ctx.resume(),
+    setMuted(m: boolean) { master.gain.setTargetAtTime(m ? 0 : 0.8, ctx.currentTime, 0.3); },
+    close() { clearInterval(timer); ctx.close().catch(() => {}); }
+  };
+}

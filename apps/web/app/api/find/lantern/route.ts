@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const groups = await publicLanternGroups(forge?.id ?? null);
   if (!forge) return NextResponse.json({ groups, mine: null }, { headers: { "cache-control": "no-store" } });
   const [mine, fires] = await Promise.all([forgeLanterns(forge.id), forgeFires(forge.id)]);
-  return NextResponse.json({ groups, mine: { lanterns: mine, allowance: lanternAllowance(fires.length) } }, { headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ groups, mine: { lanterns: mine, allowance: lanternAllowance(fires.length), fires: fires.map((f) => ({ id: f.id, name: f.name })) } }, { headers: { "cache-control": "no-store" } });
 }
 
 const Create = z.object({

@@ -509,3 +509,49 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .find .ide-trouble summary,.find .ide-alt summary{cursor:pointer;font-weight:700}
 .find .ide-alt ul{padding-left:18px;margin:8px 0 0;display:flex;flex-direction:column;gap:6px}
 .find .pill-s{font-size:11px;background:var(--surface-2);border-radius:999px;padding:1px 8px;color:var(--muted)}
+
+/* 오프닝: 달그락 고정 + 말풍선 대사만 바뀜, 이름 칸은 아래 자리 */
+.find .opening{gap:0;justify-content:flex-start}
+.find .op-stage{height:auto;min-height:0;flex:1 1 auto;max-height:58dvh;margin:0;display:flex;align-items:center;justify-content:center;overflow:visible}
+.find .op-body{animation:none;gap:12px;min-height:300px;justify-content:flex-end}
+.find .op-hi{max-width:min(320px,86vw);text-align:center;line-height:1.4;text-wrap:balance}
+.find .op-slot{flex:0 0 auto;min-height:232px;display:flex;flex-direction:column;justify-content:flex-start;padding-top:14px}
+.find .op-slot .op-name{animation:fd-in .3s ease-out;margin-top:0}
+.find .op-slot .op-skip{margin-top:24px}
+/* 달그락 대장간 소개 카드 (옆으로 넘김) */
+.find .explainer{display:flex;flex-direction:column;gap:8px}
+.find .ex-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0;scrollbar-width:none;border-radius:18px;border:1.5px solid var(--line)}
+.find .ex-track::-webkit-scrollbar{display:none}
+.find .ex-card{flex:0 0 100%;scroll-snap-align:start;display:flex;flex-direction:column;gap:6px;padding:16px 18px 18px;background:var(--surface)}
+.find .ex-card p{margin:0;font-size:15px;line-height:1.6;text-wrap:pretty}
+.find .ex-art{width:100%;max-width:300px;height:auto;align-self:center}
+.find .ex-dots{display:flex;justify-content:center;gap:6px}
+.find .ex-dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.find .ex-dots i.on{background:var(--ink)}
+/* 대장간: 작업대 메뉴, 안내 */
+.find .forge-tools{display:flex;gap:6px}
+.find .work-sheet{display:flex;flex-direction:column;gap:10px}
+.find .work-pick{display:flex;flex-direction:column;gap:3px;text-align:left;font:inherit;color:var(--ink);text-decoration:none;background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;cursor:pointer}
+.find .work-pick b{font-family:var(--font-display);font-weight:400;font-size:18px}
+.find .work-pick span{font-size:13.5px;color:var(--muted)}
+.find .overlay.tut{align-items:flex-end}
+.find .tut-card{display:flex;flex-direction:column;gap:10px}
+/* 호수 소원 줄 앞 버튼 셋 */
+.world-enter.two-btn{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:6px;background:rgba(255,255,255,.92)}
+.world-enter.two-btn button{font:inherit;border:0;border-radius:999px;padding:8px 12px;background:#1E1F24;color:#fff;cursor:pointer;white-space:nowrap}
+.world-enter.two-btn button:nth-child(2){background:#fff;color:#1E1F24;border:1.5px solid #1E1F24}
+.world-map .map-ropes{font:inherit;font-size:14px;border:0;border-radius:999px;padding:7px 14px;margin-bottom:6px;background:#FF8F3F;color:#1E1F24;cursor:pointer}
+.find .rope-row{width:100%;text-align:left;font:inherit;background:none;border:0;cursor:pointer;color:inherit}
+/* 마을 첫 안내 */
+.world-tut{position:absolute;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;background:rgba(20,18,16,.35);padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.world-tut-card{width:100%;max-width:440px;background:#F6F0E4;color:#232323;border:2px solid #232323;border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 0 rgba(0,0,0,.3);word-break:keep-all}
+.world-tut-card small{color:#7A6A58;font-size:12px}
+.world-tut-card b{font-family:var(--font-display,Jua),sans-serif;font-weight:400;font-size:21px;text-wrap:balance}
+.world-tut-card p{margin:0;font-size:15px;line-height:1.6;text-wrap:pretty}
+.world-tut-row{display:flex;gap:8px;margin-top:4px}
+.world-tut-row button{flex:1;font:inherit;font-size:16px;border-radius:14px;padding:11px;border:1.5px solid #232323;background:#fff;color:#232323;cursor:pointer}
+.world-tut-row button.go{background:#FF8F3F;font-family:var(--font-display,Jua),sans-serif}
+@media (max-width:440px){ .world-top .world-brand{display:none} .world-top{justify-content:flex-end} }
+/* 화덕 도깨비 질문은 위쪽(제목 아래)에: 바닥과 나가는 화살표를 가리지 않게 */
+.forge-ask{top:calc(86px + env(safe-area-inset-top, 0px));bottom:auto;padding:8px 12px}
+.forge-ask span{font-size:14px}

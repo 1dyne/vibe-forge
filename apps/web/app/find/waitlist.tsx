@@ -6,7 +6,7 @@ type Standing = { code: string; position: number; total: number; referrals: numb
 
 // 대장간 오픈 대기 신청: 손가락 5단계 + 소개 + 이메일. 결과 화면 직후·대장간 설계도·(나중에) 본관에서 같이 쓴다.
 // 대장간이 있는 사람이 이메일을 남기면 달그락 마을 문이 열린다 (enterVillage: 문 앞 화면에서 쓸 때는 바로 들어가는 버튼을 크게)
-export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRestart, enterVillage }: { fire: { id: string; name: string } | null; forgeId?: string | null; refCode: string | null; couponText: string | null; onRestart?: () => void; enterVillage?: boolean }) {
+export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRestart, enterVillage, explain = false }: { explain?: boolean; fire: { id: string; name: string } | null; forgeId?: string | null; refCode: string | null; couponText: string | null; onRestart?: () => void; enterVillage?: boolean }) {
   const [email, setEmail] = useState("");
   const [privacy, setPrivacy] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -15,7 +15,6 @@ export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRest
   const [error, setError] = useState("");
   const [standing, setStanding] = useState<Standing | null>(null);
   const [copied, setCopied] = useState(false);
-  const steps: Array<[string, string]> = [["아이디어", "도깨비불 찾기 완료"], ["부품", "실제로 살 수 있는 부품 추천"], ["회로", "회로도와 연결 순서"], ["하우징", "케이스 설계와 대안"], ["조립", "레고 설명서처럼 단계별로"]];
 
   async function join() {
     setBusy(true); setError("");
@@ -36,18 +35,7 @@ export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRest
 
   return (
     <section className="screen">
-      <h2>불은 찾았어.<br />이제 몸을 만들어줄 차례야.</h2>
-      {steps.map(([t, d], i) => (
-        <div key={t} className={`finger-step ${i === 0 ? "on" : ""}`}>
-          <div className="dot">{i + 1}</div>
-          <div style={{ flex: 1 }}><div className="step-title" style={i ? { color: "var(--muted)" } : undefined}>{t}</div><div className="muted tiny">{d}</div></div>
-          <div className="tiny" style={i ? { color: "#8C8F98" } : { fontWeight: 700 }}>{i ? "오픈하면 켜져" : "불 켜짐"}</div>
-        </div>
-      ))}
-      <div className="pitch">
-        <div className="display" style={{ fontSize: 22, lineHeight: 1.4 }}>말하면, 회로도부터 조립까지.<br />하드웨어 올인원 대장간.</div>
-        <div className="muted tiny" style={{ lineHeight: 1.6 }}>이미 구독 중인 AI에 커넥터로 연결해서 추가 비용 없이 써요. 부품 불량으로 바꾸는 부품값만 해도 서러우니까.</div>
-      </div>
+      {explain ? <Explainer /> : <h2 style={{ fontSize: 20 }}>대장간이 열리면 알려줄게</h2>}
       {standing ? (
         <>
           <div className="queue">
@@ -84,5 +72,70 @@ export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRest
       )}
       {onRestart && <button className="link" type="button" onClick={onRestart}>처음부터 다시</button>}
     </section>
+  );
+}
+
+/** 달그락 대장간이 뭔지 글 대신 넘겨보는 카드 (도깨비불을 받은 직후 한 번) */
+const CARDS: Array<{ title: string; body: string; art: "flow" | "two" | "bench" | "bell" }> = [
+  { title: "달그락 대장간은", body: "만들고 싶은 게 있는데 하드웨어가 처음이어도, 아직 막연해도 괜찮아. AI가 순서대로 같이 만들어주는 대장간이야.", art: "flow" },
+  { title: "편한 방법으로", body: "구독 중인 AI가 있으면 커넥터로 연결해서 쓰고, 여기서는 설계도를 받아봐. 없으면 웹에서 바로 달그락들과 이야기하면 돼.", art: "two" },
+  { title: "보고 따라 해", body: "아이디어를 넣으면 3D 회로도와 설명서가 나와. 화면 속 작업대에서 하나씩 같이 해보면서 만들어.", art: "bench" },
+  { title: "열리면 알려줄게", body: "메일을 남기면 대장간이 열릴 때 네 도깨비불의 설계도 첫 장을 보내주고, 지금 바로 달그락 마을 문이 열려.", art: "bell" },
+];
+function Art({ kind }: { kind: (typeof CARDS)[number]["art"] }) {
+  if (kind === "flow") return (
+    <svg viewBox="0 0 240 90" aria-hidden className="ex-art">
+      {["아이디어", "부품", "회로", "조립"].map((t, i) => (
+        <g key={t} transform={`translate(${12 + i * 58},18)`}>
+          <circle cx="20" cy="20" r="19" fill={i === 0 ? "#FF8F3F" : "var(--surface-2)"} stroke="var(--ink)" strokeWidth="2" />
+          <text x="20" y="62" textAnchor="middle" fontSize="12" fill="var(--ink)">{t}</text>
+          {i < 3 && <path d="M43 20h12" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />}
+        </g>
+      ))}
+    </svg>
+  );
+  if (kind === "two") return (
+    <svg viewBox="0 0 240 90" aria-hidden className="ex-art">
+      <rect x="10" y="12" width="100" height="62" rx="12" fill="var(--surface-2)" stroke="var(--ink)" strokeWidth="2" />
+      <text x="60" y="38" textAnchor="middle" fontSize="12" fill="var(--ink)">내 AI</text>
+      <text x="60" y="58" textAnchor="middle" fontSize="11" fill="var(--muted)">커넥터 연결</text>
+      <rect x="130" y="12" width="100" height="62" rx="12" fill="var(--surface-2)" stroke="var(--ink)" strokeWidth="2" />
+      <text x="180" y="38" textAnchor="middle" fontSize="12" fill="var(--ink)">달그락 웹</text>
+      <text x="180" y="58" textAnchor="middle" fontSize="11" fill="var(--muted)">바로 대화</text>
+    </svg>
+  );
+  if (kind === "bench") return (
+    <svg viewBox="0 0 240 90" aria-hidden className="ex-art">
+      <rect x="62" y="16" width="116" height="62" rx="6" fill="#2C7A70" stroke="var(--ink)" strokeWidth="2" />
+      {Array.from({ length: 8 }).map((_, i) => <circle key={i} cx={78 + i * 12} cy="30" r="2.5" fill="#E9D9A6" />)}
+      <rect x="84" y="44" width="40" height="18" rx="2" fill="#1E1F24" />
+      <circle cx="150" cy="54" r="7" fill="#FF8F3F" stroke="var(--ink)" strokeWidth="1.5" />
+      <path d="M190 20 l24 -10" stroke="var(--ink)" strokeWidth="4" strokeLinecap="round" />
+      <path d="M182 26 l10 -5" stroke="#9C9C9C" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+  return (
+    <svg viewBox="0 0 240 90" aria-hidden className="ex-art">
+      <path d="M120 14c-16 0-26 12-26 28v14l-8 10h68l-8-10V42c0-16-10-28-26-28z" fill="#FF8F3F" stroke="var(--ink)" strokeWidth="2" />
+      <circle cx="120" cy="72" r="6" fill="var(--ink)" />
+    </svg>
+  );
+}
+function Explainer() {
+  const [i, setI] = useState(0);
+  return (
+    <div className="explainer">
+      <div className="ex-track" onScroll={(e) => { const el = e.currentTarget; setI(Math.round(el.scrollLeft / el.clientWidth)); }}>
+        {CARDS.map((c) => (
+          <div key={c.title} className="ex-card">
+            <Art kind={c.art} />
+            <div className="display" style={{ fontSize: 20 }}>{c.title}</div>
+            <p>{c.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="ex-dots" aria-hidden>{CARDS.map((c, k) => <i key={c.title} className={k === i ? "on" : ""} />)}</div>
+      <div className="tiny muted" style={{ textAlign: "center" }}>옆으로 넘겨봐</div>
+    </div>
   );
 }

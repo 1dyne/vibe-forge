@@ -3,46 +3,23 @@ import { useEffect, useRef, useState } from "react";
 import { NAMELESS, NAME_MAX, nicknameProblem } from "../../lib/find/nickname";
 import Dokkaebi from "./dokkaebi";
 
-// 첫 만남 (스토리보드: 손 클로즈업 눈 깜빡 → 줌아웃 → 전신 + 손 흔들며 인사 → 대사 → 이름 묻기)
-const LINES = ["안녕, 나는 달그락. 도깨비불이야.", "너만의 도깨비불도 찾아줄게.", "도깨비가 되면 말이지, 상상만 하던 것도 뚝딱! 만들 수 있거든.", "인간, 이름이 뭐야?"];
-type Stage = "close" | "zoom" | "hello" | "talk" | "name";
+// 첫 만남: 달그락은 한 자리에 서 있고, 검은 말풍선 속 대사만 바뀐다. 마지막에 이름 칸이 달그락 아래 비워둔 자리에 나타난다(달그락은 움직이지 않음).
+const LINES = ["안녕 나는 달그락.", "도깨비불이야.", "너만의 도깨비불도 찾아줄게.", "도깨비가 되면 상상만 하던 것도 뚝딱! 만들 수 있거든.", "인간, 이름이 뭐야?"];
 
 export default function Opening({ onDone }: { onDone: (name: string) => void }) {
-  const [stage, setStage] = useState<Stage>("close");
-  const [closed, setClosed] = useState(false);
-  const [lines, setLines] = useState(0);
+  const [line, setLine] = useState(0);
   const [name, setName] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const later = (ms: number, fn: () => void) => { timers.current.push(setTimeout(fn, ms)); };
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const last = line >= LINES.length - 1;
 
   useEffect(() => {
-    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) { setStage("talk"); setLines(LINES.length); return; }
-    // 깜빡 두 번 → 줌아웃 → 인사
-    later(700, () => setClosed(true)); later(850, () => setClosed(false));
-    later(1350, () => setClosed(true)); later(1500, () => setClosed(false));
-    later(1900, () => setStage("zoom"));
-    later(2900, () => setStage("hello"));
-    later(4300, () => setStage("talk"));
-    return () => timers.current.forEach(clearTimeout);
-  }, []);
+    if (last) return;
+    timer.current = setTimeout(() => setLine((n) => n + 1), line === 0 ? 1800 : 1600);
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [line, last]);
 
-  useEffect(() => {
-    if (stage !== "talk") return;
-    if (lines >= LINES.length) { later(500, () => setStage("name")); return; }
-    later(lines === 0 ? 150 : 1100, () => setLines((n) => n + 1));
-  }, [stage, lines]);
-
-  function skipAhead() {
-    if (stage === "close" || stage === "zoom" || stage === "hello") {
-      timers.current.forEach(clearTimeout); timers.current = [];
-      setStage("talk"); setLines(LINES.length);
-    } else if (stage === "talk") {
-      setLines(LINES.length);
-    }
-  }
-
+  function next() { if (!last) setLine((n) => n + 1); }
   function submit(skip = false) {
     if (skip) return onDone(NAMELESS);
     const p = nicknameProblem(name);
@@ -51,36 +28,25 @@ export default function Opening({ onDone }: { onDone: (name: string) => void }) 
   }
 
   return (
-    <section className="screen opening" onClick={stage === "name" ? undefined : skipAhead}>
-      <div className={`op-stage st-${stage}`}>
-        {(stage === "close" || stage === "zoom") ? (
-          <div className="op-face" aria-hidden>
-            <img src="/find/sprites/blink-open.webp" alt="" className={closed ? "gone" : ""} />
-            <img src="/find/sprites/blink-closed.webp" alt="" className={closed ? "" : "gone"} />
-          </div>
-        ) : (
-          <div className="op-body">
-            {stage === "hello" && <div className="op-hi">안녕 나는 달그락.</div>}
-            <div className="op-wave"><Dokkaebi motion="idle" fire={40} width={stage === "hello" ? 170 : 120} /></div>
-          </div>
-        )}
-      </div>
-      {(stage === "talk" || stage === "name") && (
-        <div className="op-talk" aria-live="polite">
-          {LINES.slice(0, lines).map((l) => <div key={l} className="op-line">{l}</div>)}
+    <section className="screen opening" onClick={last ? undefined : next}>
+      <div className="op-stage">
+        <div className="op-body">
+          <div className="op-hi" key={line} aria-live="polite">{LINES[line]}</div>
+          <Dokkaebi motion="idle" fire={40} width={170} />
         </div>
-      )}
-      {stage === "name" && (
-        <form className="op-name" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-          <label htmlFor="nick" className="sr-only">이름</label>
-          <input id="nick" autoFocus maxLength={NAME_MAX} placeholder="이름 또는 별명" value={name} onChange={(e) => { setName(e.target.value); setProblem(null); }} />
-          {problem && <p className="error" role="alert">{problem}</p>}
-          <p className="fine-left">다른 사람에게 보이는 이름이야. 실명 말고 별명도 좋아.</p>
-          <button className="btn" type="submit" disabled={!name.trim()}>이게 내 이름이야</button>
-          <button className="link" type="button" onClick={() => submit(true)}>건너뛰기 (이름 없는 도깨비로 할래)</button>
-        </form>
-      )}
-      {stage !== "name" && <div className="op-skip">화면을 누르면 넘어가</div>}
+      </div>
+      {/* 이름 칸 자리는 처음부터 잡아둔다: 나타나도 위의 달그락이 밀리지 않게 */}
+      <div className="op-slot">
+        {last ? (
+          <form className="op-name" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+            <label htmlFor="nick" className="sr-only">이름</label>
+            <input id="nick" autoFocus maxLength={NAME_MAX} placeholder="이름 또는 별명" value={name} onChange={(e) => { setName(e.target.value); setProblem(null); }} />
+            {problem && <p className="error" role="alert">{problem}</p>}
+            <button className="btn" type="submit" disabled={!name.trim()}>이게 내 이름이야</button>
+            <button className="link" type="button" onClick={() => submit(true)}>건너뛰기 (이름 없는 도깨비로 할래)</button>
+          </form>
+        ) : <div className="op-skip">화면을 누르면 넘어가</div>}
+      </div>
     </section>
   );
 }

@@ -38,7 +38,7 @@ export default async function Village() {
   const hall = hallProgress(world.totalFuel);
   return (
     <main className="find world-page">
-      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.topics, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} lanterns={await publicLanternGroups(me.id)} giwa={(await listGiwa(1)).total} />
+      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.ideas, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} lanterns={await publicLanternGroups(me.id)} giwa={(await listGiwa(1)).total} myName={me.nickname} />
     </main>
   );
 }

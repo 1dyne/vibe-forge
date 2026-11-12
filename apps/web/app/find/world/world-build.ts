@@ -984,29 +984,67 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       glow(WISP[0], 1.1, 0, eyeY, 0, 0.35, g);
       return g;
     }
+    // 마을마다 이름 있는 물건 도깨비들이 넓게 흩어져 돌아다닌다 (가까이 가면 말풍선)
+    type GK = "broom" | "poker" | "shoe" | "winnow" | "pestle";
+    const NPCS: Record<string, Array<[GK, string, string]>> = {
+      kkomul: [
+        ["broom", "빗자루 도깨비", "마당 쓸다 보면 고양이 털이 한 바구니야. 꼬물마을엔 반려동물·식물·가족을 돌보는 아이디어가 모여."],
+        ["winnow", "키 도깨비", "곡식 까부르듯 좋은 생각만 골라줄게. 화분 물 주기 알림 같은 거 말이야."],
+        ["shoe", "짚신 도깨비", "멀리 사는 부모님 안부가 궁금하면 여기 집들을 구경해봐."],
+        ["pestle", "다듬잇방망이 도깨비", "똑딱똑딱. 밥 먹었는지, 약 먹었는지 챙기는 물건들이 많아."],
+      ],
+      ttukttak: [
+        ["poker", "부지깽이 도깨비", "아궁이 불 대신 스위치를 켜주는 아이디어들이 여기 살아. 뚝딱마을은 살림을 덜어주는 마을이야."],
+        ["poker", "부지깽이 동생", "불 끄러 일어나기 귀찮지? 그런 물건 만드는 대장간이 저쪽에 있어."],
+        ["pestle", "절굿공이 도깨비", "쿵쿵, 냉장고 문 열렸다고 알려주는 녀석 봤어?"],
+        ["broom", "몽당빗자루", "청소는 내가, 귀찮은 건 대장간이. 뚝딱!"],
+      ],
+      jjaekkak: [
+        ["pestle", "절굿공이 도깨비", "쿵, 쿵. 하루 리듬은 내가 맞춰. 째깍마을엔 시간·습관·집중을 돕는 아이디어가 모여."],
+        ["shoe", "나막신 도깨비", "오늘 물 몇 잔 마셨어? 그런 걸 세어주는 물건들이 여기 살아."],
+        ["winnow", "체 도깨비", "자세 무너졌다고 톡 알려주는 방석, 그 대장간 구경 가봐."],
+      ],
+      wagle: [
+        ["shoe", "짚신 도깨비", "씨름 한 판 할래? 와글마을엔 같이 노는 장난감·꼬마 아이디어가 모여."],
+        ["shoe", "짚신 형", "흔들면 춤추는 인형, 그런 거 만드는 대장간이 저기 있어."],
+        ["broom", "빗자루 도깨비", "아이 손이 닿아도 안전한 물건, 와글마을 대장간들이 고민 중이야."],
+        ["poker", "부지깽이 도깨비", "와글와글! 버튼 누르면 표정이 바뀌는 거, 재밌지 않아?"],
+      ],
+      kkambbak: [
+        ["winnow", "키 도깨비", "눈에 안 보이는 걸 알아채는 마을이야. 문 잠갔는지, 공기 탁한지 같은 거."],
+        ["pestle", "방망이 도깨비", "택배 왔는지 자꾸 나가보지? 그런 걸 대신 지켜보는 물건들이 여기 살아."],
+        ["broom", "빗자루 도깨비", "밤엔 갈대밭에 도깨비불이 떠. 가까이 가봐."],
+      ],
+    };
     villages.forEach((v, vi) => {
       const c = centers[vi];
-      if (v.id === "kkomul") { // 빗자루 도깨비가 당산나무 둘레를 쓸고, 키 도깨비가 팔랑인다
-        const broom = goblin("broom"), winnow = goblin("winnow");
-        anim.push((t) => { const a = t * 0.25; const x = c.x + Math.sin(a) * 4.2, z = c.z + Math.cos(a) * 4.2; broom.position.set(x, groundAt(x, z), z); broom.rotation.set(Math.sin(t * 6) * 0.35, a + Math.PI / 2, 0); const b = -t * 0.18 + 2; const x2 = c.x + Math.sin(b) * 6.5, z2 = c.z + Math.cos(b) * 6.5; winnow.position.set(x2, groundAt(x2, z2) + 0.3 + Math.abs(Math.sin(t * 3)) * 0.4, z2); winnow.rotation.y = b; });
-      } else if (v.id === "ttukttak") { // 부지깽이 도깨비가 화톳불 사이를 깡충
-        const pk = [goblin("poker"), goblin("poker")];
-        anim.push((t) => pk.forEach((p, i) => { const a = t * 0.3 + i * Math.PI; const x = c.x + Math.sin(a) * (LOOP_R + 1.2), z = c.z + Math.cos(a) * (LOOP_R + 1.2); p.position.set(x, groundAt(x, z) + Math.abs(Math.sin(t * 5 + i)) * 0.35, z); p.rotation.y = a; }));
-      } else if (v.id === "wagle") { // 짚신 도깨비 둘이 씨름판에서 밀고 당기고, 하나는 뛰어다닌다
-        const s1 = goblin("shoe"), s2 = goblin("shoe"), s3 = goblin("shoe");
+      (NPCS[v.id] ?? []).forEach(([kind, name, line], ni, arr) => {
+        const g = goblin(kind);
+        const spot: Spot = { x: c.x, z: c.z, r: 2.8, kind: "npc", label: name, line };
+        spots.push(spot);
+        // 마을 안쪽 길부터 바깥 집 줄까지 넓게: 반지름이 천천히 바뀌는 고리
+        const base = 6 + (ni / Math.max(1, arr.length - 1)) * 11, ph = ni * 2.1 + vi, sp = (ni % 2 ? -1 : 1) * (0.05 + (ni % 3) * 0.015);
+        const hop = kind === "poker" || kind === "shoe" ? 0.25 : kind === "pestle" ? 0.15 : 0;
         anim.push((t) => {
-          const push = Math.sin(t * 1.4) * 0.35; const ang = Math.atan2(-c.x, -c.z);
-          const fx = Math.sin(ang), fz = Math.cos(ang);
+          const a = t * sp + ph, r = base + Math.sin(t * 0.11 + ph) * 3;
+          let x = c.x + Math.sin(a) * r, z = c.z + Math.cos(a) * r;
+          if (!walkable(x, z)) { x = c.x + Math.sin(a) * base * 0.6; z = c.z + Math.cos(a) * base * 0.6; }
+          g.position.set(x, groundAt(x, z) + (hop ? Math.abs(Math.sin(t * 5 + ni)) * hop : 0) + (kind === "shoe" ? 0.15 : 0), z);
+          g.rotation.y = a + (sp > 0 ? Math.PI / 2 : -Math.PI / 2);
+          if (kind === "broom") g.rotation.x = Math.sin(t * 6 + ni) * 0.3;
+          spot.x = x; spot.z = z;
+        });
+      });
+      if (v.id === "wagle") { // 씨름판의 짚신 둘은 그대로 밀고 당긴다
+        const s1 = goblin("shoe"), s2 = goblin("shoe");
+        anim.push((t) => {
+          const push = Math.sin(t * 1.4) * 0.35; const ang = Math.atan2(-c.x, -c.z); const fx = Math.sin(ang), fz = Math.cos(ang);
           s1.position.set(c.x + fx * (0.5 + push), groundAt(c.x, c.z) + 0.2, c.z + fz * (0.5 + push)); s1.rotation.y = ang + Math.PI;
           s2.position.set(c.x - fx * (0.5 - push), groundAt(c.x, c.z) + 0.2, c.z - fz * (0.5 - push)); s2.rotation.y = ang;
           s1.rotation.z = Math.sin(t * 2.8) * 0.15; s2.rotation.z = -Math.sin(t * 2.8) * 0.15;
-          const a = t * 0.35; const x = c.x + Math.sin(a) * (LOOP_R + 1.4), z = c.z + Math.cos(a) * (LOOP_R + 1.4);
-          s3.position.set(x, groundAt(x, z) + 0.15 + Math.abs(Math.sin(t * 7)) * 0.15, z); s3.rotation.y = a + Math.PI / 2;
         });
-      } else if (v.id === "jjaekkak") { // 절굿공이 도깨비가 서당 길을 또박또박
-        const p = goblin("pestle");
-        anim.push((t) => { const a = -t * 0.2; const x = c.x + Math.sin(a) * LOOP_R, z = c.z + Math.cos(a) * LOOP_R; p.position.set(x, groundAt(x, z) + Math.abs(Math.sin(t * 4)) * 0.2, z); p.rotation.y = a - Math.PI / 2; });
-      } else if (v.id === "kkambbak") { // 갈대밭 위 도깨비불 무리와 반딧불이
+      }
+      if (v.id === "kkambbak") { // 갈대밭 위 도깨비불 무리와 반딧불이
         const fl = Array.from({ length: night ? 40 : 16 }, (_, i) => {
           const m = part(BALL, new three.MeshBasicMaterial({ color: "#E9FF9A", transparent: true }), 0.05, 0.05, 0.05);
           return { m, x: c.x + Math.cos(i * 2.4) * (6 + (i % 7) * 2.4), z: c.z + Math.sin(i * 2.4) * (6 + (i % 7) * 2.4), ph: i * 0.9 };

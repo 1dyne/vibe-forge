@@ -16,7 +16,7 @@ export default function VillageGate({ state, fire, forgeId, couponText }: { stat
         <>
           <h1 style={{ fontSize: 26 }}>마을 문이 아직 닫혀 있어</h1>
           <p className="body">대장간 오픈 알림을 받을 이메일을 남기면 문이 열려. 들어가면 다른 도깨비들이 구상 중인 것들을 구경하고, 네 대장간도 꾸밀 수 있어.</p>
-          <ForgeSignup fire={fire} forgeId={forgeId} refCode={null} couponText={couponText} enterVillage />
+          <ForgeSignup explain fire={fire} forgeId={forgeId} refCode={null} couponText={couponText} enterVillage />
           {forgeId && <a className="link" href={`/f/${forgeId}`} style={{ textAlign: "center" }}>먼저 내 대장간 안 보기</a>}
         </>
       )}
