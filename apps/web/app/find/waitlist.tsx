@@ -76,10 +76,11 @@ export default function ForgeSignup({ fire, forgeId, refCode, couponText, onRest
 }
 
 /** 달그락 대장간이 뭔지 글 대신 넘겨보는 카드 (도깨비불을 받은 직후 한 번) */
-const CARDS: Array<{ title: string; body: string; art: "flow" | "two" | "bench" | "bell" }> = [
-  { title: "달그락 대장간은", body: "만들고 싶은 게 있는데 하드웨어가 처음이어도, 아직 막연해도 괜찮아. AI가 순서대로 같이 만들어주는 대장간이야.", art: "flow" },
-  { title: "편한 방법으로", body: "구독 중인 AI가 있으면 커넥터로 연결해서 쓰고, 여기서는 설계도를 받아봐. 없으면 웹에서 바로 달그락들과 이야기하면 돼.", art: "two" },
-  { title: "보고 따라 해", body: "아이디어를 넣으면 3D 회로도와 설명서가 나와. 화면 속 작업대에서 하나씩 같이 해보면서 만들어.", art: "bench" },
+const CARDS: Array<{ title: string; body: string; art: "flow" | "two" | "bench" | "bell" | "team" }> = [
+  { title: "정해진 키트가 아니라, 내 아이디어로", body: "달그락 대장간은 남이 만든 예제를 따라 하는 곳이 아니야. 방금 찾은 네 도깨비불, 그 아이디어 하나로 시작해.", art: "flow" },
+  { title: "달그락들이 같이 설계해", body: "부품 고르기, 회로, 케이스까지 달그락들이 네 아이디어에 맞춰 같이 설계해줘. 모르는 건 물어보면 쉽게 풀어서 알려줘.", art: "team" },
+  { title: "내 아이디어 전용 설명서", body: "설계가 끝나면 네 아이디어만을 위한 설명서와 3D 회로도가 나와. 개발이 처음이어도 화면 속 작업대에서 한 단계씩 같이 따라 하면 돼.", art: "bench" },
+  { title: "편한 방법으로", body: "구독 중인 AI가 있으면 커넥터로 연결해서 대화하고, 달그락에서는 설계도를 받아봐. 없으면 웹에서 바로 달그락들과 이야기하면 돼.", art: "two" },
   { title: "열리면 알려줄게", body: "메일을 남기면 대장간이 열릴 때 네 도깨비불의 설계도 첫 장을 보내주고, 지금 바로 달그락 마을 문이 열려.", art: "bell" },
 ];
 function Art({ kind }: { kind: (typeof CARDS)[number]["art"] }) {
@@ -90,6 +91,18 @@ function Art({ kind }: { kind: (typeof CARDS)[number]["art"] }) {
           <circle cx="20" cy="20" r="19" fill={i === 0 ? "#FF8F3F" : "var(--surface-2)"} stroke="var(--ink)" strokeWidth="2" />
           <text x="20" y="62" textAnchor="middle" fontSize="12" fill="var(--ink)">{t}</text>
           {i < 3 && <path d="M43 20h12" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />}
+        </g>
+      ))}
+    </svg>
+  );
+  if (kind === "team") return (
+    <svg viewBox="0 0 240 90" aria-hidden className="ex-art">
+      <rect x="86" y="30" width="68" height="44" rx="6" fill="#F3E7C9" stroke="var(--ink)" strokeWidth="2" />
+      <path d="M96 44h48M96 54h34M96 64h40" stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />
+      {[[40, "#4FB3A6"], [200, "#9B7BFF"], [120, "#FF8F3F"]].map(([x, c], k) => (
+        <g key={k} transform={`translate(${x},${k === 2 ? 4 : 30})`}>
+          <path d="M-14 22 C-14 4 -8 -6 0 -6 C8 -6 14 4 14 22 Z" fill={c as string} stroke="var(--ink)" strokeWidth="2" />
+          <circle cx="-4" cy="6" r="1.8" fill="var(--ink)" /><circle cx="4" cy="6" r="1.8" fill="var(--ink)" />
         </g>
       ))}
     </svg>
