@@ -46,6 +46,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
   const [step, setStep] = useState(0);
   const [doneSteps, setDoneSteps] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const advancing = useRef(false);
   const [challenge, setChallenge] = useState(false);
   const [view, setView] = useState<BenchView>(kit.steps[0]?.view ?? "34");
   const [bubble, setBubble] = useState<string | null>(null);
@@ -95,23 +96,25 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
 
   const advance = useCallback(() => {
     const s = stepRef.current;
-    if (!api.current || s >= total) return;
+    // 보여주는 중이거나, 끝나고 다음 단계로 넘어가는 0.95초 사이에는 다시 누르지 못하게 (연타하면 멈추던 문제)
+    if (!api.current || s >= total || advancing.current) return;
+    advancing.current = true;
     setPlaying(true); setFeedback(null); setMistake(null); wrong.current = 0;
     if (kit.steps[s]?.ops.some((o) => o.op === "solder" || o.op === "bridge")) motion("stoke", false);
     api.current.play().then(() => {
-      setPlaying(false);
       const next = s + 1;
       setDoneSteps((d) => Math.max(d, next));
       motion("blaze");
       say(next >= total ? "완성! 진짜 잘했어 🔥" : PRAISE[s % PRAISE.length], 2200);
       try { localStorage.setItem(storeKey, JSON.stringify({ step: next })); } catch { /* 무시 */ }
       if (next >= total) {
+        advancing.current = false; setPlaying(false);
         setFinished(true);
         try { const done = JSON.parse(localStorage.getItem("dalgeurak_practice") ?? "{}"); done[kit.id] = new Date().toISOString(); localStorage.setItem("dalgeurak_practice", JSON.stringify(done)); } catch { /* 무시 */ }
         onFinish?.();
         return;
       }
-      window.setTimeout(() => { setStep(next); api.current?.goto(next); setView(kit.steps[next].view); }, 950);
+      window.setTimeout(() => { setStep(next); api.current?.goto(next); setView(kit.steps[next].view); advancing.current = false; setPlaying(false); }, 950);
     });
   }, [kit, total, say, storeKey, onFinish]);
 
@@ -167,8 +170,10 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
       const root = document.querySelector(".bench") as HTMLElement | null;
       if (panel && root) root.style.setProperty("--panel-real", `${Math.ceil(panel.getBoundingClientRect().height)}px`);
       const top = topRef.current?.getBoundingClientRect().bottom ?? 0;
-      const low = (lowRef.current?.getBoundingClientRect().top ?? H);
-      if (W >= 900) api.current?.setInsets(0, 0, 0, 424); else api.current?.setInsets(top + 4, H - low + 6);
+      // 아래쪽은 시점 알약과 HW 달그락 중 더 높은 것까지 가린 것으로 본다
+      const mascot = document.querySelector(".bench-mascot") as HTMLElement | null;
+      const low = Math.min(lowRef.current?.getBoundingClientRect().top ?? H, mascot?.getBoundingClientRect().top ?? H);
+      if (W >= 900) api.current?.setInsets(0, 0, 0, 424); else api.current?.setInsets(top + 12, H - low + 14);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -287,7 +292,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
 
         {!finished && (
           <div className="actions">
-            <button type="button" className="btn-ghost" disabled={!ready || playing} onClick={() => { api.current?.hint(); say(cur?.tapHint ?? "", 2600); }}>💡 힌트</button>
+            <button type="button" className="btn-ghost hint" disabled={!ready || playing} aria-label="힌트" onClick={() => { api.current?.hint(); say(cur?.tapHint ?? "", 2600); }}>💡<span className="lbl"> 힌트</span></button>
             <button type="button" className="btn-main" disabled={!ready || playing} onClick={advance}>{playing ? "하는 중…" : "보여줘"}</button>
             <button type="button" className={`toggle ${challenge ? "on" : ""}`} aria-pressed={challenge} onClick={() => setChallenge((c) => !c)}><span className="sw" />직접 하기</button>
             <button type="button" className="btn-ghost" disabled={playing || step === 0} onClick={() => goStep(step - 1)} aria-label="이전 단계">◀</button>

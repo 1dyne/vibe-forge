@@ -738,7 +738,8 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     // 보이는 띠(카드에 가리지 않는 부분)에 반지름 R이 들어오도록 거리를 잡는다
     const W = el.clientWidth, H = Math.max(1, el.clientHeight);
     const band = Math.max(120, H - insetTop - insetBottom);
-    const pts = v === "34" || v === "front" ? stepPoints() : stepTargets(current).filter((t) => t.radius <= 7).map((t) => t.pos);
+    // 눌러야 할 자리(전선 끝·구멍)도 띠 안에 들어오게 함께 잰다
+    const pts = v === "34" || v === "front" ? [...stepPoints(), ...stepTargets(current).map((t) => t.pos)] : stepTargets(current).filter((t) => t.radius <= 7).map((t) => t.pos);
     const c = focusFor(v);
     const spread = pts.length ? Math.max(...pts.map((p) => p.distanceTo(c))) : 0;
     const R = v === "34" ? Math.max(70, spread + 44) : v === "front" ? Math.max(55, spread + 25) : Math.max([...parts.values()].some((p) => p.def.kind === "perfboard" || p.def.kind === "sensor_module") ? 19 : 38, spread + 13);

@@ -140,3 +140,24 @@ body:has(.bench){background:#e9e5dd;overflow:hidden}
 .bench-sheet .quick button:disabled{opacity:.5}
 .bench-overlay .bench{z-index:1000}
 .bench-sticker{display:inline-block;margin-top:6px;transform:rotate(-2deg);background:#ffd84d;color:#3b2a00;border:2px dashed #b88a00;border-radius:10px;padding:3px 9px;font-size:12px;font-weight:700;box-shadow:0 2px 0 #e0b400;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 폰 배치: 눌러야 할 부품이 카드·말풍선·달그락에 가리지 않게 (배포 전 배치 점검) */
+.bench .lvl,.bench-card .meta>span{white-space:nowrap;word-break:keep-all}
+.bench-bubble{pointer-events:none}
+@media (max-width:899px){
+  /* HW 달그락은 시점 알약 오른쪽 끝, 3D가 보이는 띠 밖에 앉는다 */
+  .bench-views{right:84px}
+  .bench-mascot{width:68px;height:68px;right:8px;bottom:calc(var(--panel-real,var(--panel-h)) + 10px)}
+  .bench-mascot .dk-sprite{--w:68px}
+  .bench-mascot .aura{left:10px;top:12px;width:48px;height:48px}
+  /* 말풍선은 시점 알약 자리에 잠깐 겹쳐 뜬다 (3D 위로 올라가지 않음) */
+  .bench-bubble{left:12px;right:84px!important;bottom:calc(var(--panel-real,var(--panel-h)) + 14px)!important;max-width:none;z-index:5;font-size:13.5px;padding:8px 12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;border-radius:16px 16px 4px 16px}
+  /* 버튼 줄이 화면 밖으로 넘치지 않게 */
+  .actions{gap:6px}
+  .actions .btn-main{flex:1 1 auto;min-width:0;padding:11px 10px}
+  .actions .btn-ghost,.actions .toggle{padding:10px 11px}
+  .actions .hint .lbl{display:none}
+  .bench .toggle .sw{width:30px}
+  .bench .toggle.on .sw::after{left:13px}
+}
+@media (max-width:360px){ .bench .toggle{font-size:13px} }
