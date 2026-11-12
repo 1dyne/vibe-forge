@@ -1,10 +1,40 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BenchKit, BenchView } from "../../lib/bench/types";
-import type { BenchApi, MistakeKind } from "./bench-scene";
+import type { BenchApi, HoldEvent, MistakeKind } from "./bench-scene";
+import { glossaryIn, lookupGlossary, splitGlossary, type GlossaryEntry } from "../../lib/bench/glossary";
+import { GRADE_TEXT, HOLD_MS, TOOL_NAME, bendableRefs, handsStages, stageText, stepTools, type HandsStage, type HoldGrade } from "../../lib/bench/hands";
 
 type Motion = "idle" | "tilt" | "stoke" | "blaze" | "fallen";
 import "./bench.css";
+
+/** **굵게**와 사전 말(ⓘ)을 함께 그린다. seen = 이 단계에서 이미 ⓘ를 단 말 */
+function rich(text: string, seen: Set<string>, onTerm: (e: GlossaryEntry) => void): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((seg, i) => {
+    const bold = seg.startsWith("**") && seg.endsWith("**") && seg.length > 4;
+    const body = bold ? seg.slice(2, -2) : seg;
+    const kids = splitGlossary(body, seen).map((g, j) => (typeof g === "string" ? g : (
+      <button key={j} type="button" className="gl" onClick={() => onTerm(g.entry)} aria-label={`${g.text} 뜻 보기`}>{g.text}<sup aria-hidden>ⓘ</sup></button>
+    )));
+    return bold ? <b key={i}>{kids}</b> : <span key={i}>{kids}</span>;
+  });
+}
+
+/** 꾹 누르는 동안 손가락 둘레에 차오르는 고리 (자기 rAF로만 다시 그린다) */
+function HoldRing({ x, y, start }: { x: number; y: number; start: number }) {
+  const [ms, setMs] = useState(0);
+  useEffect(() => { let r = 0; const f = () => { setMs(performance.now() - start); r = requestAnimationFrame(f); }; r = requestAnimationFrame(f); return () => cancelAnimationFrame(r); }, [start]);
+  const p = Math.min(1, ms / HOLD_MS.good);
+  const phase = ms < HOLD_MS.heat ? "heat" : ms < HOLD_MS.good ? "feed" : ms < HOLD_MS.warn ? "good" : ms < HOLD_MS.cold ? "warn" : "cold";
+  const text = { heat: "데우는 중…", feed: "납 넣는 중…", good: "좋아요, 떼요!", warn: "이제 떼요!", cold: "너무 오래요" }[phase];
+  const C = 2 * Math.PI * 30;
+  return (
+    <div className={`hold-ring ${phase}`} style={{ left: x, top: y }} aria-hidden>
+      <svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="30" className="bg" /><circle cx="38" cy="38" r="30" className="fg" strokeDasharray={`${C * p} ${C}`} transform="rotate(-90 38 38)" /></svg>
+      <span>{text}</span>
+    </div>
+  );
+}
 
 // 3D 조립 책상 화면 (명세서 2차 v0.1 §1·§4·§5). 연습 키트와 프로젝트 조립이 같이 쓴다.
 // 장면은 bench-scene.ts가 그리고, 여기서는 단계·버튼·달그락 말풍선·HW 서랍을 다룬다.
@@ -25,9 +55,6 @@ type Props = {
 const VIEWS: Array<[BenchView, string]> = [["34", "3/4"], ["top", "위"], ["bottom", "아래"], ["front", "앞"]];
 const PRAISE = ["좋아! 반짝이는 원뿔이야", "깔끔해!", "그렇지, 그거야", "손이 빠른데?", "대장장이 다 됐네"];
 
-function strong(text: string) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((s, i) => (s.startsWith("**") ? <b key={i}>{s.slice(2, -2)}</b> : <span key={i}>{s}</span>));
-}
 function s0Saved() { try { return (JSON.parse(localStorage.getItem("bench:" + (location.pathname.split("/").pop() ?? "")) ?? "null") as { step: number } | null)?.step ?? 0; } catch { return 0; } }
 function fmt(sec: number) { return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`; }
 
@@ -50,7 +77,18 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
   const [challenge, setChallenge] = useState(false);
   const [view, setView] = useState<BenchView>(kit.steps[0]?.view ?? "34");
   const [bubble, setBubble] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string; skip?: boolean } | null>(null);
+  // 직접 하기: 이 단계를 손으로 하는 순서 (뒤집기 → 양손 → 꾹 누르기 …)
+  const [stages, setStages] = useState<HandsStage[]>([]);
+  const [stageIdx, setStageIdx] = useState(0);
+  const [grades, setGrades] = useState<Record<string, HoldGrade>>({});
+  const [holdUi, setHoldUi] = useState<{ x: number; y: number; start: number } | null>(null);
+  const [gloss, setGloss] = useState<GlossaryEntry | null>(null);
+  const stagesRef = useRef<HandsStage[]>([]); stagesRef.current = stages;
+  const stageIdxRef = useRef(0); stageIdxRef.current = stageIdx;
+  const gradesRef = useRef<Record<string, HoldGrade>>({}); gradesRef.current = grades;
+  const userOff = useRef(false);
+  const bendable = useMemo(() => bendableRefs(kit), [kit]);
   const [drawer, setDrawer] = useState(false);
   const [chat, setChat] = useState<Array<{ who: "me" | "hw"; text: string }>>([]);
   const [started, setStarted] = useState<number | null>(null);
@@ -94,29 +132,106 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
     } catch { /* 저장소가 막혀 있어도 처음부터 하면 된다 */ }
   }, [storeKey, total]);
 
+  // 한 단계를 마쳤을 때 (보여줘로 끝났든, 직접 하기로 끝났든)
+  const finishStep = useCallback((s: number) => {
+    const next = s + 1;
+    setDoneSteps((d) => Math.max(d, next));
+    motion("blaze");
+    say(next >= total ? "완성! 진짜 잘했어 🔥" : PRAISE[s % PRAISE.length], 2200);
+    try { localStorage.setItem(storeKey, JSON.stringify({ step: next })); } catch { /* 무시 */ }
+    if (next >= total) {
+      advancing.current = false; setPlaying(false);
+      setFinished(true);
+      try { const done = JSON.parse(localStorage.getItem("dalgeurak_practice") ?? "{}"); done[kit.id] = new Date().toISOString(); localStorage.setItem("dalgeurak_practice", JSON.stringify(done)); } catch { /* 무시 */ }
+      onFinish?.();
+      return;
+    }
+    window.setTimeout(() => { setStep(next); api.current?.goto(next); advancing.current = false; setPlaying(false); }, 950);
+  }, [kit, total, say, storeKey, onFinish, motion]);
+
   const advance = useCallback(() => {
     const s = stepRef.current;
     // 보여주는 중이거나, 끝나고 다음 단계로 넘어가는 0.95초 사이에는 다시 누르지 못하게 (연타하면 멈추던 문제)
     if (!api.current || s >= total || advancing.current) return;
     advancing.current = true;
-    setPlaying(true); setFeedback(null); setMistake(null); wrong.current = 0;
+    setPlaying(true); setFeedback(null); setMistake(null); setHoldUi(null); wrong.current = 0;
     if (kit.steps[s]?.ops.some((o) => o.op === "solder" || o.op === "bridge")) motion("stoke", false);
-    api.current.play().then(() => {
-      const next = s + 1;
-      setDoneSteps((d) => Math.max(d, next));
+    api.current.play().then(() => finishStep(s));
+  }, [kit, total, motion, finishStep]);
+
+  // ── 직접 하기: 한 동작씩 ──
+  const sceneHint = (st: HandsStage | null) => (st?.kind === "tap" || !st ? kit.steps[stepRef.current]?.tapHint : stageText(st));
+  const showStage = useCallback((list: HandsStage[], i: number) => {
+    setStageIdx(i); setGrades({});
+    const st = list[i] ?? null;
+    api.current?.setStage(st, sceneHint(st));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kit]);
+  const nextStage = () => {
+    const list = stagesRef.current, i = stageIdxRef.current + 1;
+    setFeedback(null);
+    if (i < list.length) { showStage(list, i); return; }
+    // 마지막 동작까지 손으로 했다
+    const s = stepRef.current;
+    if (advancing.current) return;
+    advancing.current = true; setPlaying(true);
+    finishStep(s);
+  };
+  const runStage = async (fn: () => Promise<void>, after?: string) => {
+    if (!api.current || advancing.current || playingRef.current) return;
+    playingRef.current = true; setPlaying(true); setFeedback(null);
+    try { await fn(); } finally { playingRef.current = false; setPlaying(false); }
+    if (after) say(after, 2600);
+    nextStage();
+  };
+  const playingRef = useRef(false);
+  const doFlip = () => runStage(() => api.current!.flip(), "구리 면이 위로 왔어요! 반짝이는 동그라미가 패드예요");
+  const doHands = () => { motion("stoke"); return runStage(() => api.current!.ready(), "왼손 실납, 오른손 인두. 준비 끝!"); };
+  const doBend = (ref: string) => runStage(() => api.current!.bend(ref), "다리가 ㄱ자로 꺾였어요. 이제 구멍에 꽂아요");
+  const doTap = (st: Extract<HandsStage, { kind: "tap" }>) => runStage(() => api.current!.playOps(st.from, st.to));
+  const skipHold = () => {
+    const st = stagesRef.current[stageIdxRef.current];
+    if (st?.kind !== "hold") return;
+    api.current?.finishOp(st.op); say("괜찮아요. 연습이니까 다음에 또 해 봐요", 2600);
+    nextStage();
+  };
+
+  // 장면에서 온 신호는 늘 최신 상태로 처리한다 (장면은 한 번만 만든다)
+  const onTargetRef = useRef<(ok: boolean, message?: string) => void>(() => {});
+  onTargetRef.current = (ok, message) => {
+    if (ok) {
+      const st = challenge ? stagesRef.current[stageIdxRef.current] : null;
+      if (st?.kind === "tap") { void doTap(st); return; }
+      if (st?.kind === "bend") { void doBend(st.ref); return; }
+      if (st?.kind === "flip") { void doFlip(); return; }
+      if (st?.kind === "hands" || st?.kind === "hold") return;
+      advance(); return;
+    }
+    wrong.current += 1;
+    setFeedback({ ok: false, text: message ?? "거기가 아니에요" });
+    if (wrong.current >= 3) { motion("fallen"); say("같이 보자! 힌트를 눌러 봐", 3200); wrong.current = 0; }
+    else motion("tilt");
+  };
+  const onHoldRef = useRef<(e: HoldEvent) => void>(() => {});
+  onHoldRef.current = (e) => {
+    if (e.type === "start") { setHoldUi({ x: e.x, y: e.y, start: performance.now() }); setFeedback(null); motion("stoke", false); return; }
+    setHoldUi(null);
+    const st = stagesRef.current[stageIdxRef.current];
+    if (!st || st.kind !== "hold") return;
+    const g = { ...gradesRef.current, [e.key]: e.grade };
+    gradesRef.current = g; setGrades(g);
+    const good = st.keys.filter((k) => g[k] === "good").length;
+    const name = e.key.split("|").map((a) => a.split(".")[1] ?? a).join("–");
+    if (e.grade === "good") {
       motion("blaze");
-      say(next >= total ? "완성! 진짜 잘했어 🔥" : PRAISE[s % PRAISE.length], 2200);
-      try { localStorage.setItem(storeKey, JSON.stringify({ step: next })); } catch { /* 무시 */ }
-      if (next >= total) {
-        advancing.current = false; setPlaying(false);
-        setFinished(true);
-        try { const done = JSON.parse(localStorage.getItem("dalgeurak_practice") ?? "{}"); done[kit.id] = new Date().toISOString(); localStorage.setItem("dalgeurak_practice", JSON.stringify(done)); } catch { /* 무시 */ }
-        onFinish?.();
-        return;
-      }
-      window.setTimeout(() => { setStep(next); api.current?.goto(next); setView(kit.steps[next].view); advancing.current = false; setPlaying(false); }, 950);
-    });
-  }, [kit, total, say, storeKey, onFinish]);
+      if (good >= st.keys.length) { api.current?.finishOp(st.op); say(st.keys.length > 1 ? "전부 반짝이는 원뿔! 잘했어요" : "반짝이는 원뿔! 잘했어요", 2400); nextStage(); }
+      else setFeedback({ ok: true, text: `${name}: ${GRADE_TEXT.good} (${good}/${st.keys.length}) 다음 자리도 꾹 눌러요` });
+    } else {
+      motion("tilt");
+      const text = e.grade === "starved" && e.ms < 450 ? "살짝 눌렀다 뗐어요. 손가락을 떼지 말고 2초쯤 꾹 눌러요" : GRADE_TEXT[e.grade];
+      setFeedback({ ok: false, text: `${name}: ${text}`, skip: true });
+    }
+  };
 
   // 장면 만들기
   useEffect(() => {
@@ -132,13 +247,9 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
         const a = await createBench(mount.current, kit, {
           hue, light: startLight,
           cb: {
-            onTarget: (ok, message) => {
-              if (ok) { advance(); return; }
-              wrong.current += 1;
-              setFeedback({ ok: false, text: message ?? "거기가 아니야" });
-              if (wrong.current >= 3) { motion("fallen"); say("같이 보자! 힌트를 눌러 봐", 3200); wrong.current = 0; }
-              else motion("tilt");
-            },
+            onTarget: (ok, message) => onTargetRef.current(ok, message),
+            onHold: (e) => onHoldRef.current(e),
+            onView: (v) => setView(v),
             onPart: (ref) => { const p = kit.parts.find((x) => x.ref === ref); if (p) say(`${p.label}: ${p.about}`, 4200); }
           }
         });
@@ -161,6 +272,39 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
 
   useEffect(() => { if (!started || finished) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [started, finished]);
   useEffect(() => { api.current?.setChallenge(challenge); }, [challenge, ready]);
+  // 단계가 바뀌거나 직접 하기를 켜고 끌 때: 손으로 할 순서를 다시 짠다
+  useEffect(() => {
+    if (!ready || !api.current) return;
+    setGloss(null); setHoldUi(null);
+    const s = kit.steps[step];
+    if (!challenge || finished || !s) { setStages([]); stagesRef.current = []; api.current.setStage(null); return; }
+    const st = api.current.state();
+    const list = handsStages(s, { canFlip: st.canFlip, flipped: st.flipped, hands: st.hands, bendable });
+    setStages(list); stagesRef.current = list;
+    showStage(list, 0);
+  }, [ready, step, challenge, finished, kit, bendable, showStage]);
+  // 패널이 넘칠 때(키 작은 폰): 단계·동작이 바뀌면 단계 글의 첫 줄이 보이게 (버튼을 누르면 맨 아래로 밀려 있던 문제)
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const p = panelRef.current, sb = p?.querySelector(".step-box") as HTMLElement | null;
+    if (p && sb && p.scrollHeight > p.clientHeight + 2) p.scrollTop = sb.offsetTop;
+  }, [step, stageIdx, challenge, finished]);
+  // 납땜 단계는 직접 해 보기가 기본 (연습). 끈 적이 있으면 말로만 권한다
+  useEffect(() => {
+    if (!ready || finished || intro) return;
+    const s = kit.steps[step];
+    if (!s?.ops.some((o) => o.op === "solder" || o.op === "bridge") || challenge) return;
+    if (mode === "practice" && !userOff.current) { setChallenge(true); say("납땜은 직접 해 봐요! 빛나는 자리를 꾹 누르면 돼요", 3800); }
+    else say("‘직접’을 켜면 손으로 납땜해 볼 수 있어요", 3200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, step, finished, intro]);
+  // 이번 단계에 쓰는 연장·부품을 장면에서 빛내고 이름표를 단다
+  const tools = useMemo(() => (cur && !finished ? stepTools(cur) : []), [cur, finished]);
+  useEffect(() => {
+    if (!ready) return;
+    const ps = finished || !cur ? [] : cur.ops.flatMap((o) => (o.op === "place" || o.op === "insert" || o.op === "seat" || o.op === "mount_on" ? [o.ref] : o.op === "batteries" ? kit.parts.filter((p) => p.kind === "aa_battery").map((p) => p.ref) : []));
+    api.current?.setHighlight(tools, ps);
+  }, [ready, tools, cur, finished, kit]);
   // 카드에 가리지 않는 띠에 장면이 오도록 알려 준다
   useEffect(() => {
     if (!ready) return;
@@ -185,12 +329,12 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
   function begin() { setIntro(false); setStarted(Date.now()); say("두 번 누르면 나한테 물어볼 수 있어!", 3800); }
   function goStep(i: number) {
     if (playing || i < 0 || i >= total || i > doneSteps) return;
-    setStep(i); setFeedback(null); setMistake(null); api.current?.goto(i); setView(kit.steps[i].view);
+    setStep(i); setFeedback(null); setMistake(null); setHoldUi(null); api.current?.goto(i);
   }
   function pickView(v: BenchView) { setView(v); api.current?.setView(v); }
   function toggleMistake(k: MistakeKind) { const next = mistake === k ? null : k; setMistake(next); api.current?.mistake(next); if (next) motion("tilt"); }
   function toggleLight() { const on = !light; setLight(on); api.current?.setLight(on); try { localStorage.setItem("bench_light", on ? "1" : "0"); } catch { /* 무시 */ } }
-  function restart() { try { localStorage.removeItem(storeKey); } catch { /* 무시 */ } setFinished(false); setDoneSteps(0); setStep(0); setStarted(Date.now()); api.current?.goto(0); setView(kit.steps[0].view); }
+  function restart() { try { localStorage.removeItem(storeKey); } catch { /* 무시 */ } setFinished(false); setDoneSteps(0); setStep(0); setStarted(Date.now()); api.current?.goto(0); }
   function ask(q: string, a: string) { setChat((c) => [...c, { who: "me", text: q }, { who: "hw", text: a }]); motion("stoke"); }
   async function askReal(q: string) {
     const text = q.trim(); if (!text || !onAsk || asking) return;
@@ -220,6 +364,14 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
   const elapsed = started ? (now - started) / 1000 : 0;
   const pct = Math.round((doneSteps / total) * 100);
   const contextLine = `[${mode === "practice" ? "연습" : "조립"} · ${kit.title} · ${Math.min(step + 1, total)}/${total} · ${cur?.title ?? "완료"}]`;
+  const stage: HandsStage | null = challenge && !finished ? stages[stageIdx] ?? null : null;
+  // 손으로 할 동작이 버튼 하나면 '보여줘' 자리에 그 버튼을 둔다 (보여줘는 안내 줄 끝에 남는다)
+  const act = stage?.kind === "flip" ? { label: "보드 뒤집기", run: () => void doFlip() }
+    : stage?.kind === "hands" ? { label: "양손 준비", run: () => void doHands() }
+    : stage?.kind === "bend" ? { label: "다리 구부리기", run: () => void doBend(stage.ref) }
+    : null;
+  // HW 서랍의 '말 뜻' 빠른 질문: 이번 단계 글과 연장 이름에 나온 말
+  const terms = cur && !finished ? glossaryIn([cur.action, cur.why, cur.caution ?? "", ...tools.map((t) => TOOL_NAME[t])]).slice(0, 6) : [];
 
   return (
     <div className={`bench ${drawer ? "drawer-open" : ""}`}>
@@ -248,7 +400,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
         {VIEWS.map(([v, label]) => <button key={v} type="button" className={view === v ? "on" : ""} onClick={() => pickView(v)}>{label}</button>)}
       </div>
 
-      <section className="bench-panel" aria-live="polite">
+      <section className="bench-panel" aria-live="polite" ref={panelRef}>
         <div className="bar"><i style={{ width: `${pct}%` }} /></div>
         <div className="count"><span><b>{doneSteps}</b> / {total} 완료</span><span>{fmt(elapsed)}</span></div>
 
@@ -265,12 +417,18 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             <div className="row"><button type="button" className="btn-main" onClick={leave}>돌아가기</button><button type="button" className="btn-ghost" onClick={restart}>처음부터</button></div>
           </div>
         ) : cur && (
-          <div className="step-box">
-            <div className="phase">STEP {step + 1} OF {total} · {cur.phase}</div>
-            <p className="action">{strong(cur.action)}</p>
-            <p className="why">{cur.why}</p>
-            {cur.caution && <p className="caution">⚠ {cur.caution}</p>}
-            {feedback && <p className={`feedback ${feedback.ok ? "ok" : "no"}`}>{feedback.text}</p>}
+          <div className={`step-box ${stage ? "hands" : ""} ${stage?.kind === "hold" ? "hold" : ""}`}>
+            <div className="phase"><span>STEP {step + 1} OF {total} · {cur.phase}</span>
+              {tools.length > 0 && <span className="tools" aria-label="이번에 쓰는 연장">{tools.map((t) => <button key={t} type="button" className={`tool ${gloss?.term === TOOL_NAME[t] ? "on" : ""}`} onClick={() => { const e = lookupGlossary(TOOL_NAME[t]); setGloss(gloss && e && gloss.term === e.term ? null : e); api.current?.peek(t); }}>{TOOL_NAME[t]}<sup aria-hidden>ⓘ</sup></button>)}</span>}
+            </div>
+            {(() => { const seen = new Set<string>(); const onTerm = (e: GlossaryEntry) => setGloss((g) => (g?.term === e.term ? null : e)); return <>
+              <p className="action">{rich(cur.action, seen, onTerm)}</p>
+              <p className="why">{rich(cur.why, seen, onTerm)}</p>
+              {cur.caution && <p className="caution">⚠ {rich(cur.caution, seen, onTerm)}</p>}
+            </>; })()}
+            {gloss && <p className="gloss-note" role="note"><b>{gloss.term}</b> {gloss.short} <button type="button" className="link" onClick={() => { setDrawer(true); ask(`‘${gloss.term}’ 뜻이 뭐예요?`, gloss.short); }}>달그락에게 더 묻기</button><button type="button" className="x" aria-label="닫기" onClick={() => setGloss(null)}>×</button></p>}
+            {feedback ? <p className={`feedback ${feedback.ok ? "ok" : "no"}`}>{feedback.text}{feedback.skip && <> <button type="button" className="link" onClick={skipHold}>이대로 넘어가기</button></>}</p>
+              : stage && <p className="hands-line"><span>👐 {stage.kind === "tap" ? cur.tapHint : stageText(stage, stage.kind === "hold" ? stage.keys.filter((k) => grades[k] === "good").length : 0)}</span>{(stage.kind === "flip" || stage.kind === "hands" || stage.kind === "bend") && <button type="button" className="link" disabled={playing} onClick={advance}>보여줘</button>}</p>}
             {cur.mistakes && cur.mistakes.length > 0 && (
               <div className="mistakes">
                 <span>흔한 실수</span>
@@ -291,12 +449,12 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
         </div>
 
         {!finished && (
-          <div className="actions">
-            <button type="button" className="btn-ghost hint" disabled={!ready || playing} aria-label="힌트" onClick={() => { api.current?.hint(); say(cur?.tapHint ?? "", 2600); }}>💡<span className="lbl"> 힌트</span></button>
-            <button type="button" className="btn-main" disabled={!ready || playing} onClick={advance}>{playing ? "하는 중…" : "보여줘"}</button>
-            <button type="button" className={`toggle ${challenge ? "on" : ""}`} aria-pressed={challenge} onClick={() => setChallenge((c) => !c)}><span className="sw" />직접<span className="lbl2"> 하기</span></button>
-            <button type="button" className="btn-ghost" disabled={playing || step === 0} onClick={() => goStep(step - 1)} aria-label="이전 단계">◀</button>
-            <button type="button" className="btn-ghost" disabled={playing || step >= doneSteps} onClick={() => goStep(step + 1)} aria-label="다음 단계">▶</button>
+          <div className={`actions ${act ? "has-act" : ""}`}>
+            <button type="button" className="btn-ghost hint" disabled={!ready || playing} aria-label="힌트" onClick={() => { api.current?.hint(); say(stage && stage.kind !== "tap" ? stageText(stage) : cur?.tapHint ?? "", 2600); }}>💡<span className="lbl"> 힌트</span></button>
+            <button type="button" className={`btn-main ${act ? "act" : ""}`} disabled={!ready || playing} onClick={act ? act.run : advance}>{playing ? "하는 중…" : act ? act.label : "보여줘"}</button>
+            <button type="button" className={`toggle ${challenge ? "on" : ""}`} aria-pressed={challenge} disabled={playing} onClick={() => { const on = !challenge; if (!on) userOff.current = true; setFeedback(null); setChallenge(on); }}><span className="sw" />직접<span className="lbl2"> 하기</span></button>
+            <button type="button" className="btn-ghost nav" disabled={playing || step === 0} onClick={() => goStep(step - 1)} aria-label="이전 단계">◀</button>
+            <button type="button" className="btn-ghost nav" disabled={playing || step >= doneSteps} onClick={() => goStep(step + 1)} aria-label="다음 단계">▶</button>
           </div>
         )}
         {mode === "project" && onReport && !finished && cur && (
@@ -306,8 +464,9 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             <span className="muted-s">{doneSteps <= step ? "화면에서 먼저 해 보면 눌러져요" : "실물로 마쳤으면 눌러요"}</span>
           </div>
         )}
-        {!finished && <p className="tap-hint">{challenge ? "직접 하기: 장면에서 맞는 곳을 눌러요" : "빛나는 곳을 누르거나 ‘보여줘’"} · 실물: {cur?.doneWhen}</p>}
+        {!finished && <p className="tap-hint">{challenge ? "직접 하기: 손으로 한 동작씩 해요. 막히면 ‘직접’을 끄고 ‘보여줘’" : "빛나는 곳을 누르거나 ‘보여줘’"} · 실물: {cur?.doneWhen}</p>}
       </section>
+      {holdUi && <HoldRing x={holdUi.x} y={holdUi.y} start={holdUi.start} />}
 
       {intro && ready && (
         <div className="bench-sheet intro" role="dialog" aria-label="시작 전 안내">
@@ -332,6 +491,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             {chat.map((m, i) => <p key={i} className={m.who === "me" ? "me-msg" : "hw-msg"}>{m.text}</p>)}
             {asking && <p className="hw-msg typing">HW 달그락이 보고 있어요…</p>}
           </div>
+          {terms.length > 0 && <div className="quick terms" aria-label="말 뜻 묻기">{terms.map((e) => <button key={e.term} type="button" onClick={() => ask(`‘${e.term}’ 뜻이 뭐예요?`, e.short)}>ⓘ {e.term} 뜻?</button>)}</div>}
           {mode === "project" && connectorOnly ? <>
             <div className="quick">{kit.faq.map((f) => <button key={f.q} type="button" onClick={() => copyAsk(f.q)}>{f.q}</button>)}</div>
             <p className="note">대화는 내 Claude에서 해요. 위 문구를 누르면 지금 단계가 담긴 질문이 복사돼요. 내 Claude에 붙여 넣고 사진도 같이 보내 주세요.{copied ? " ✓ 복사했어요" : ""}</p>
