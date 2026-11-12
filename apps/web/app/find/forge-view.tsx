@@ -13,6 +13,7 @@ import FireCardView, { Roast } from "./fire-card";
 import { MailSheet } from "./mailbox";
 import { track } from "./track";
 import ForgeSignup from "./waitlist";
+import { PracticeSheet } from "./practice-sheet";
 
 export type ForgeFire = { id: string; name: string; color: string; reactKind: string; peak: number; sentence: string; card: FireCard | null; stage: 1 | 2 | 3; cats: string[] };
 export type Social = { fuelToday: number; fuelTotal: number; wants: number; notes: Array<{ phrase: string; from: string; nickname: string; at: string }>; neighbors: number; visitsWeek: number; mine: { fuelGivenToday: boolean; wanted: boolean; notedToday: boolean; neighbor: boolean } };
@@ -30,7 +31,7 @@ type Props = {
   memoCount?: number;
 };
 const PHRASES = ["나도 갖고 싶어", "이거 천재다", "만들면 알려줘!", "장작 넣고 감", "응원해"];
-type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern" | "memo";
+type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern" | "memo" | "practice";
 
 // 골목 테마별 방 색 (다인의 방 그림이 오기 전 임시)
 const ROOM_TINT: Record<string, [string, string, string]> = {
@@ -78,6 +79,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   const usedCats = [...new Set(fires.flatMap((f) => f.cats))];
   function pickRoom(o: RoomObj) {
     if (o === "woodpile") { setToast(social.fuelTotal ? `이웃들이 넣어준 장작 ${social.fuelTotal}개가 쌓여 있어. 장작이 많을수록 화로 불이 커져.` : "아직 장작더미가 비어 있어. 이웃이 장작을 넣어주면 여기 쌓여."); track("object_open", { object: o }); return; }
+    if (o === "tools" && isOwner) { show("practice"); return; }
     if (o === "tools") { setToast(`연장 걸이: ${usedCats.join("·")} 갈래를 채워봤어. 네 갈래를 다 채우면 연장이 다 걸려.`); track("object_open", { object: o }); return; }
     if (o === "display") { setToast(`'나도 갖고 싶어' ${social.wants}개. 소반에 메밀묵이 올라가고, 5개가 넘으면 금빛 초롱이 켜져.`); track("object_open", { object: o }); return; }
     show(o);
@@ -237,6 +239,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       </nav>
       <button className="link" type="button" onClick={() => setMore(false)}>닫기</button>
       </div></div>}
+      {open === "practice" && isOwner && <PracticeSheet forgeId={forge.id} hue={REACT_HUE[kind] ?? 0} onClose={() => setOpen(null)} />}
       {open === "memo" && isOwner && <MemoSheet fires={fires.map((f) => ({ id: f.id, name: f.name, sentence: f.sentence }))} onCount={setMemoCount} onClose={() => setOpen(null)} />}
       {open === "lantern" && (isOwner && lanterns.mine
         ? <MyLanterns initial={lanterns.mine} allowance={lanterns.allowance} fires={fires.map((f) => ({ id: f.id, name: f.name }))} onClose={() => setOpen(null)} />
