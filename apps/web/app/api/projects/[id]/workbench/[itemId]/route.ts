@@ -7,7 +7,7 @@ async function handleGET(request: NextRequest, context: { params: Promise<{ id: 
   const { id, itemId } = await context.params;
   const viewer = await getViewer(request);
   const found = await getProject(id);
-  const item = workbenchItems(viewer && canAccess(viewer, found) ? found : null).find(i => i.id === itemId);
+  const item = workbenchItems(viewer && canAccess(viewer, found) ? found : null, { files: true }).find(i => i.id === itemId);
   if (!item) return Response.json({ error: "작업물을 찾을 수 없습니다." }, { status: 404 });
   const fallback = item.filename.replace(/[^A-Za-z0-9._-]/g, "_");
   return new Response(item.content, { headers: {

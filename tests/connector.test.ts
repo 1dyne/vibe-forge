@@ -17,6 +17,7 @@ import { getProject, listProjects } from "../apps/web/lib/local-project-store";
 import { signSession, userSessionValue } from "../apps/web/lib/session";
 import { vaultFor, withVault } from "../apps/web/lib/vault";
 import { workflowFor } from "../apps/web/lib/workflow";
+import { guideToKit } from "../apps/web/lib/bench/from-guide";
 
 const SECRET = "test-secret-for-connector-routes-0123456789";
 let folder: string;
@@ -100,6 +101,18 @@ describe("Claude connector", () => {
     const cookie = "dalgeurak_session=" + userSessionValue(token);
     const approve = await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify({ action: "approve_circuit" }) }), { params: Promise.resolve({ id }) });
     expect(approve.status).toBe(200);
+    await tool(token, "set_test_plan", { projectId: id, cases: [{ id: "t1", stage: 1, title: "버튼", setup: "USB 연결", do: "버튼 누르기", expect: { serial: ["pressed"], observe: "LED 켜짐" } }] });
+    // 데이터 약속: 예시가 규칙에 안 맞으면 거절, 저장되면 실제 줄 검사
+    const msg = { id: "state", direction: "device_to_app", prefix: "state=", description: "램프 상태", fields: [{ name: "state", type: "bool" }], example: "state=1" };
+    expect((await tool(token, "set_data_contract", { projectId: id, contract: { transport: "serial", format: "kv", baud: 115200, messages: [{ ...msg, example: "state=7" }] } })).isError).toBe(true);
+    const contract = await tool(token, "set_data_contract", { projectId: id, contract: { transport: "serial", format: "kv", baud: 115200, messages: [msg] } });
+    expect(contract.isError).toBeFalsy();
+    expect(contract.structuredContent!.dataContractFindings.some((f: { side: string }) => f.side === "firmware")).toBe(true);
+    const checked = await tool(token, "check_data_contract", { projectId: id, source: "device_log", lines: "boot ok\nstate=1\nstate=2" });
+    expect(checked.content[0].text).toContain("2줄 중 1줄");
+    const bleSpec = await tool(token, "write_dev_spec", { projectId: id, title: "앱", goal: "상태 보기", whyCode: "원격", pieces: [{ name: "웹", kind: "web", purpose: "표시" }], features: [{ name: "보기", detail: "상태" }], acceptance: ["보인다"], outOfScope: [], dataInterface: { transport: "ble", format: "state=1" }, stack: [{ name: "HTML", reason: "쉬움" }], learningSteps: [{ step: "폴더", explain: "만들기" }], recommendedTool: "claude_code" });
+    expect(bleSpec.isError).toBe(true);
+    expect(bleSpec.content[0].text).toContain("데이터 약속은 serial");
     const after = await tool(token, "get_project", { projectId: id });
     expect(after.structuredContent!.phase).toBe("mockup");
     expect(after.structuredContent!.files.some((f: { kind: string }) => f.kind === "cad")).toBe(true);
@@ -158,6 +171,29 @@ describe("Claude connector", () => {
     await tool(token, "set_product_form", { projectId: id, form: productForm });
     await tool(token, "set_build_plan", { projectId: id, plan: buildPlan });
     await tool(token, "submit_circuit", { projectId: id, blueprint, review });
+    const housingPlan = { summary: "몸통은 PP 원통 대신 프린트", regions: [{ id: "body", name: "몸통", role: "램프 몸통", shapeRefs: [0], method: "print_fdm", why: "원통은 프린트가 쉬워요", material: { name: "PLA", thicknessMm: 2 }, join: [], toleranceMm: 0.3, outputs: [], process: ["바닥을 아래로 출력, 서포트 없음"], costKRW: 4000, timeHours: 5 }], environment: { indoorOutdoor: "indoor", water: "none", heatSources: [], skinContact: false, childUse: false }, assemblyOrder: ["body"] };
+    expect((await tool(token, "set_housing_plan", { projectId: id, plan: { ...housingPlan, regions: [{ ...housingPlan.regions[0], shapeRefs: [3] }] } })).isError).toBe(true);
+    const housing = await tool(token, "set_housing_plan", { projectId: id, plan: housingPlan });
+    expect(housing.isError).toBeFalsy();
+    expect(housing.structuredContent!.housing.regions[0].outputs[0]).toMatchObject({ kind: "stl", status: "ready" });
+    expect(housing.structuredContent!.buildPlan.fabrication.needs3DPrint).toBe(true);
+    // 전원·테스트·안전: 서버가 다시 계산하고, 결과는 자동 통과가 아니다
+    const comps = housing.structuredContent!.build?.blueprint?.components ?? [];
+    const ref = comps[0]?.ref ?? "U1";
+    const power = await tool(token, "set_power_budget", { projectId: id, budget: { source: { kind: "usb", voltage: 5 }, modes: [{ name: "동작", dutyPct: 100, loads: [{ ref, currentMa: 30, basis: "assumed" }] }], regulatorEfficiency: 1, derating: 0.8, result: { hours: 999 } } });
+    expect(power.isError).toBeFalsy();
+    expect(power.structuredContent!.power.result).toMatchObject({ avgCurrentMa: 30, hours: null, estimated: true });
+    const tests = await tool(token, "set_test_plan", { projectId: id, cases: [{ id: "t1", stage: 1, title: "버튼", setup: "USB 연결", do: "버튼 누르기", expect: { serial: ["pressed"] } }] });
+    expect(tests.isError).toBeFalsy();
+    await tool(token, "record_test_result", { projectId: id, caseId: "t1", status: "unknown", evidence: "로그 없음" });
+    const safety = await tool(token, "set_safety_review", { projectId: id, items: [{ id: "edge", topic: "모서리", text: "출력물 모서리 다듬기", status: "risk" }] });
+    expect(safety.isError).toBeFalsy();
+    await tool(token, "set_test_plan", { projectId: id, cases: [{ id: "t1", stage: 1, title: "버튼", setup: "USB 연결", do: "버튼 누르기", expect: { serial: ["pressed"], observe: "LED 켜짐" } }] });
+    const after = await tool(token, "get_project", { projectId: id });
+    expect(after.structuredContent!.testPlan.cases[0].result.status).toBe("unknown");
+    expect(after.structuredContent!.safety.items.find((i: { id: string }) => i.id === "edge").status).toBe("risk");
+    expect(after.structuredContent!.history.length).toBeGreaterThan(0);
+    expect(after.structuredContent!.provisional.map((r: { key: string }) => r.key)).not.toContain("housing");
     const source = await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "https://example.com/tact-switch", title: "택트 스위치 6x6", price: "100원" });
     expect(source.structuredContent!.partSources.S1[0]).toMatchObject({ url: "https://example.com/tact-switch", price: "100원" });
     expect((await tool(token, "record_part_source", { projectId: id, ref: "S1", url: "javascript:alert(1)", title: "x" })).isError).toBe(true);
@@ -264,6 +300,20 @@ describe("Claude connector", () => {
     const saved = await tool(token, "set_assembly_guide", { projectId: id, guide });
     expect(saved.isError).toBeFalsy();
     expect(saved.structuredContent!.assembly.steps[0].cards[0].id).toBe("s1-c1");
+    // 3D 작업대용 동작: 회로에 없는 핀 납땜은 거절, 맞는 핀은 저장되고 3D 입력으로 바뀐다
+    const badSolder = await tool(token, "set_assembly_guide", { projectId: id, guide: { ...guide, steps: [guide.steps[0], { ...guide.steps[1], ops: [{ op: "solder", joints: ["U1.D9"], side: "top" }] }] } });
+    expect(badSolder.isError).toBe(true);
+    expect(badSolder.content[0].text).toContain("U1.D9");
+    const withOps = await tool(token, "set_assembly_guide", { projectId: id, guide: { ...guide, steps: [guide.steps[0], { ...guide.steps[1], ops: [{ op: "solder", joints: ["U1.D2", "SW1.A"], side: "top" }, { op: "check", how: "continuity", targets: ["U1.D2", "SW1.A"], expected: "삐 소리" }] }] } });
+    expect(withOps.isError).toBeFalsy();
+    const kit = guideToKit((await withVault(vaultFor(token, user.id), () => getProject(id)))!)!;
+    expect(kit.parts.map((p) => p.ref)).toEqual(["BASE", "U1", "SW1"]);
+    expect(kit.steps[0].ops[0]).toMatchObject({ op: "place", ref: "BASE" });
+    expect(kit.steps[1].ops.some((o) => o.op === "jumper" && o.from === "U1.D2" && o.to === "SW1.A")).toBe(true);
+    expect(kit.steps[1].ops.some((o) => o.op === "solder")).toBe(true);
+    const u1 = kit.parts.find((p) => p.ref === "U1")!;
+    expect(u1.spec?.pinXY?.find((p) => p.name === "D2")).toMatchObject({ x: 30, y: 21 });
+    await tool(token, "set_assembly_guide", { projectId: id, guide });
 
     await act({ action: "approve_mockup" });
     await tool(token, "set_team", { projectId: id, agents: ["hw"] });

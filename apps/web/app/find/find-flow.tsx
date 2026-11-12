@@ -342,6 +342,10 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
           <a className="btn btn-fire" href={`/f/${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }} onClick={() => track(forge.isNew ? "forge_created" : "forge_open")}>{forge.isNew ? "내 대장간 짓기" : "내 대장간 가기"}</a>
         </div>
       )}
+      <a className="practice-cta" href="/find/practice" onClick={() => track("practice_from_result")}>
+        <b>이걸 만들려면 납땜 손기술이 필요해</b>
+        <span>부품 사기 전에 3D 작업대에서 미리 해 보기 →</span>
+      </a>
       <div className="blueprint-cta">
         <div className="display">말하면, 회로도부터 조립까지.</div>
         <p>대장간이 열리면 네 도깨비불의 회로도 첫 장을 보내줄게.</p>

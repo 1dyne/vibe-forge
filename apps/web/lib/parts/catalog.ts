@@ -11,7 +11,7 @@ export type PartCard = {
   id: string;
   model: string;
   aliases: string[];
-  type: "board" | "display" | "sensor" | "actuator" | "input" | "indicator" | "passive" | "audio";
+  type: "board" | "display" | "sensor" | "actuator" | "input" | "indicator" | "passive" | "audio" | "power";
   boardCompatibility: string;
   voltageMin: number | null;
   voltageMax: number | null;
@@ -200,6 +200,111 @@ export const PART_CARDS: PartCard[] = [
     sourceUrls: ["https://github.com/wokwi/wokwi-elements"], verifiedAt: null
   }
 ];
+
+
+// 2차 v0.1 §9 추가 카드: 웹 검색 결과 요약으로만 확인했다(데이터시트 페이지를 직접 열지 못함).
+// 그래서 verifiedAt은 null이고, 핀 위치(xMm/yMm)는 확인 전까지 null이다. 값이 자료마다 다르면 겹치는 범위만 쓴다.
+const SNIPPET = "값은 검색 결과 요약 기준(2026-11-11)이에요. 구매 전 판매 페이지의 데이터시트로 확인하세요.";
+const named = (names: Array<[string, PinRole[]]>): CardPin[] => names.map(([name, roles]) => ({ name, roles, xMm: null, yMm: null }));
+const NEW_CARDS: PartCard[] = [
+  {
+    id: "tp4056-protected", model: "TP4056 1셀 리튬 충전 모듈 (보호회로형)", aliases: ["TP4056", "충전 모듈", "리튬 충전 보드", "DW01A"], type: "power", boardCompatibility: "USB 5V 입력 · 1셀(3.7V) 리튬 전지 충전",
+    voltageMin: 4.25, voltageMax: 6.5, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: 1000, interface: ["전원"], i2cAddresses: [],
+    pins: named([["IN+", ["power_in"]], ["IN-", ["ground"]], ["B+", ["passive"]], ["B-", ["ground"]], ["OUT+", ["passive"]], ["OUT-", ["ground"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["B+/B-는 전지에만, OUT+/OUT-는 회로(부하)에만 연결해요. 전지를 OUT에 물리면 보호회로를 거치지 않아요.", "충전 전류는 RPROG 저항으로 정해져요(1.2kΩ ≈ 1A가 흔한 기본값). 작은 LiPo(예: 500mAh, 권장 충전 150mA 이하)는 저항을 바꿔 전류를 낮춰야 해요.", "입력 전압 범위는 데이터시트마다 달라요(4.0~8.0V, 4.25~6.5V). 겹치는 4.25~6.5V를 기준으로 해요.", "보호형(DW01A·8205A가 있는 판)인지 사진으로 확인하세요. 칩만 있는 판은 과방전 보호가 없어요.", SNIPPET],
+    sourceUrls: ["https://datasheet.lcsc.com/lcsc/2311091738_UMW-Youtai-Semiconductor-Co---Ltd--TP4056_C725790.pdf", "https://www.mikrocontroller.net/attachment/273612/TP4056.pdf"], verifiedAt: null
+  },
+  {
+    id: "mt3608-boost", model: "MT3608 승압(부스트) 모듈", aliases: ["MT3608", "승압 모듈", "부스트 컨버터", "DC-DC 승압"], type: "power", boardCompatibility: "3.7V 전지 → 5V 등으로 올리기 · 출력 가변",
+    voltageMin: 2, voltageMax: 24, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: null, interface: ["전원"], i2cAddresses: [],
+    pins: named([["VIN+", ["power_in"]], ["VIN-", ["ground"]], ["VOUT+", ["passive"]], ["VOUT-", ["ground"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["부하를 연결하기 전에 멀티미터를 보며 가변저항으로 출력 전압을 먼저 맞춰요. 처음 출력이 높게 나올 수 있어요.", "칩 스위치 전류 한계(약 2~4A로 자료마다 다름)는 출력 전류가 아니에요. 승압 비율이 클수록 실제로 뽑을 수 있는 전류는 훨씬 작아요.", "출력은 최대 28V까지 올라가요. 5V 회로에 물리기 전에 꼭 재요.", SNIPPET],
+    sourceUrls: ["https://www.radiolocman.com/datasheet/pdf.html?di=177837", "https://components101.com/node/1495"], verifiedAt: null
+  },
+  {
+    id: "ams1117-3v3", model: "AMS1117-3.3 레귤레이터 모듈", aliases: ["AMS1117", "3.3V 레귤레이터", "LDO 3.3V"], type: "power", boardCompatibility: "5V → 3.3V 내리기 (리튬 1셀에서는 부족)",
+    voltageMin: 4.6, voltageMax: 12, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: 800, interface: ["전원"], i2cAddresses: [],
+    pins: named([["VIN", ["power_in"]], ["GND", ["ground"]], ["VOUT", ["power_3v3"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["드롭아웃이 커요(최대 약 1.3V). 3.7V 리튬 전지로는 3.3V가 안정적으로 안 나와요. 입력은 약 4.6V 이상이 필요해요.", "남는 전압은 열로 버려져요. (입력−3.3V)×전류가 크면 뜨거워져요.", "최대 입력 전압과 전류는 제조사(복제품)마다 달라요(800mA~1A, 12~20V). 낮은 쪽을 기준으로 해요.", SNIPPET],
+    sourceUrls: ["https://files.waveshare.com/upload/b/b8/AMS1117-datasheet.pdf", "https://www.radiolocman.com/datasheet/pdf.html?di=102481"], verifiedAt: null
+  },
+  {
+    id: "holder-18650", model: "18650 전지 홀더 (1개, 전선형)", aliases: ["18650 홀더", "18650 케이스", "배터리 홀더"], type: "power", boardCompatibility: "18650 리튬 전지 1개 · 보호회로 없음",
+    voltageMin: null, voltageMax: null, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: null, interface: ["전원"], i2cAddresses: [],
+    pins: named([["+", ["passive"]], ["-", ["ground"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["홀더에는 보호회로가 없어요. 보호회로가 있는 전지를 쓰거나 TP4056 보호형 모듈을 거쳐요.", "극성(+/−)을 홀더 표시와 전선 색으로 두 번 확인해요. 거꾸로 넣으면 회로가 망가질 수 있어요.", "홀더 치수·허용 전류는 제품마다 달라요. 판매 페이지에서 확인하세요.", SNIPPET],
+    sourceUrls: [], verifiedAt: null
+  },
+  {
+    id: "lipo-1s-jstph", model: "LiPo 1셀 3.7V 전지 (JST-PH 2핀)", aliases: ["LiPo", "리튬폴리머", "3.7V 배터리", "JST-PH 배터리"], type: "power", boardCompatibility: "1셀 충전 모듈(TP4056 등)과 함께",
+    voltageMin: 3.0, voltageMax: 4.2, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: null, interface: ["전원"], i2cAddresses: [],
+    pins: named([["+", ["passive"]], ["-", ["ground"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["JST-PH 커넥터의 +/− 배선이 제조사마다 반대일 수 있어요. 꽂기 전에 빨간 선 위치를 보드 표시와 맞춰요.", "충전은 CC/CV 리튬 충전기로만. 작은 용량(예: 500mAh)은 충전 전류를 낮게(예: 150mA 이하) 해요.", "부풀거나 찍히거나 뜨거운 전지는 쓰지 말고, 충전 중에는 자리를 비우지 않아요.", "용량·크기·보호회로 유무는 제품마다 달라요(예: 500mAh 약 29×36×4.75mm).", SNIPPET],
+    sourceUrls: ["https://www.adafruit.com/product/1578"], verifiedAt: null
+  },
+  {
+    id: "slide-switch-spdt", model: "슬라이드 스위치 SPDT (SS12D00형)", aliases: ["슬라이드 스위치", "전원 스위치", "SS12D00", "SPDT"], type: "input", boardCompatibility: "전원 켜고 끄기 · 3핀",
+    voltageMin: null, voltageMax: 50, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: 500, interface: ["스위치"], i2cAddresses: [],
+    pins: named([["1", ["passive"]], ["COM", ["passive"]], ["2", ["passive"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["가운데 핀(COM)이 공통이에요. 레버 위치에 따라 COM이 양 끝 핀 중 하나와 이어져요.", "정격은 DC 50V 0.5A예요. 모터처럼 큰 전류는 이 스위치로 직접 끊지 말아요.", "핀 간격이 2.54mm가 아닌 비슷한 제품(3.0mm)도 있어요. 브레드보드·기판에 맞는지 확인하세요.", SNIPPET],
+    sourceUrls: ["https://akizukidenshi.com/goodsaffix/SS-12D00-G5_spec.pdf"], verifiedAt: null
+  },
+  {
+    id: "hc-sr04", model: "HC-SR04 초음파 거리 센서", aliases: ["HC-SR04", "초음파 센서", "거리 센서"], type: "sensor", boardCompatibility: "5V 보드 · 3.3V 보드는 Echo 분압 필요",
+    voltageMin: 4.5, voltageMax: 5.5, logicVoltage: 5, typicalCurrentMa: 15, maxCurrentMa: 20, interface: ["디지털(Trig 펄스·Echo 펄스)"], i2cAddresses: [],
+    pins: named([["VCC", ["power_in"]], ["Trig", ["gpio"]], ["Echo", ["gpio"]], ["GND", ["ground"]]]), dimensionsMm: [45, 20, 15],
+    renderer: { type: "fallback", ref: null },
+    warnings: ["5V로 쓰면 Echo가 5V 신호예요. ESP32·Pico 같은 3.3V 보드에는 분압 저항(예: 1k/2k)을 거쳐 연결해요.", "측정 범위는 약 2cm~4m, Trig에 10µs 펄스를 줘요.", "3.3V에서 동작하는 신형·변형 모듈도 있어요. 판매 페이지에서 동작 전압을 확인하세요.", SNIPPET],
+    sourceUrls: ["https://www.radiolocman.com/datasheet/pdf.html?di=168043", "https://web.eece.maine.edu/~zhu/book/lab/HC-SR04%20User%20Manual.pdf"], verifiedAt: null
+  },
+  {
+    id: "aht20-module", model: "AHT20 온습도 센서 모듈 (I2C)", aliases: ["AHT20", "온습도 센서", "습도 센서"], type: "sensor", boardCompatibility: "I2C · 3.3V/5V 모듈(제품에 따라)",
+    voltageMin: 3.3, voltageMax: 5, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: null, interface: ["I2C"], i2cAddresses: ["0x38"],
+    pins: named([["VIN", ["power_in"]], ["GND", ["ground"]], ["SCL", ["i2c_scl"]], ["SDA", ["i2c_sda"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["I2C 주소가 0x38로 고정이라 한 버스에 하나만 쓸 수 있어요.", "3.3V/5V 겸용은 레귤레이터·레벨시프터가 있는 모듈(예: Adafruit 4566)이에요. 칩만 있는 모듈은 판매 페이지에서 전압을 확인하세요.", SNIPPET],
+    sourceUrls: ["https://www.adafruit.com/product/4566"], verifiedAt: null
+  },
+  {
+    id: "mpu6050-gy521", model: "MPU-6050 가속도·자이로 모듈 (GY-521)", aliases: ["MPU6050", "GY-521", "자이로 센서", "가속도 센서", "IMU"], type: "sensor", boardCompatibility: "I2C · 주소 0x68/0x69",
+    voltageMin: null, voltageMax: null, logicVoltage: null, typicalCurrentMa: 3.9, maxCurrentMa: null, interface: ["I2C"], i2cAddresses: ["0x68", "0x69"],
+    pins: named([["VCC", ["power_in"]], ["GND", ["ground"]], ["SCL", ["i2c_scl"]], ["SDA", ["i2c_sda"]], ["XDA", ["signal"]], ["XCL", ["signal"]], ["AD0", ["signal"]], ["INT", ["signal"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["칩(MPU-6050) 자체는 2.375~3.46V예요. GY-521 모듈의 레귤레이터가 있어야 5V를 받을 수 있으니 모듈 사진으로 확인하세요.", "AD0를 GND에 두면 0x68, 3.3V에 두면 0x69예요.", "전류 3.9mA는 6축과 DMP를 모두 켰을 때의 칩 기준이에요.", SNIPPET],
+    sourceUrls: ["https://invensense.tdk.com/?p=559"], verifiedAt: null
+  },
+  {
+    id: "inmp441-i2s-mic", model: "INMP441 I2S 디지털 마이크 모듈", aliases: ["INMP441", "I2S 마이크", "MEMS 마이크"], type: "audio", boardCompatibility: "I2S 지원 보드(ESP32 등) · 3.3V 전용",
+    voltageMin: 1.8, voltageMax: 3.3, logicVoltage: 3.3, typicalCurrentMa: 1.4, maxCurrentMa: null, interface: ["I2S"], i2cAddresses: [],
+    pins: named([["VDD", ["power_3v3"]], ["GND", ["ground"]], ["SCK", ["signal"]], ["WS", ["signal"]], ["SD", ["signal"]], ["L/R", ["signal"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["3.3V까지만 받아요. 5V에 연결하면 망가져요.", "I2S 입력이 있는 보드(ESP32 등)가 필요해요. 아두이노 UNO에서는 쓸 수 없어요.", "L/R 핀으로 왼쪽/오른쪽 채널을 정해요(GND 또는 VDD). 띄워 두지 말아요.", SNIPPET],
+    sourceUrls: ["https://invensense.tdk.com/digital/inmp441"], verifiedAt: null
+  },
+  {
+    id: "ws2812b-ring-12", model: "WS2812B 주소지정 LED 링 (12구)", aliases: ["WS2812B", "네오픽셀", "NeoPixel 링", "LED 링", "RGB LED 링"], type: "indicator", boardCompatibility: "디지털 출력 1개 · 5V 전원",
+    voltageMin: null, voltageMax: null, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: 720, interface: ["단선 디지털(DIN)"], i2cAddresses: [],
+    pins: named([["5V", ["power_in"]], ["GND", ["ground"]], ["DIN", ["gpio"]], ["DOUT", ["signal"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null },
+    warnings: ["LED 하나가 흰색 최대 밝기에서 약 60mA예요(12구 = 약 720mA). 평소엔 LED당 약 20mA로 잡지만, 전원은 최대를 기준으로 준비해요.", "+와 − 사이에 500~1000µF(6.3V 이상) 콘덴서, DIN 앞에 300~500Ω 저항을 넣어요.", "3.3V 보드의 신호는 5V 전원 LED에서 불안정할 수 있어요. 안 되면 레벨시프터를 써요.", SNIPPET],
+    sourceUrls: ["https://www.adafruit.com/product/1643", "https://learn.adafruit.com/adafruit-neopixel-uberguide/powering-neopixels"], verifiedAt: null
+  },
+  {
+    id: "drv8833-driver", model: "DRV8833 2채널 모터 드라이버 모듈", aliases: ["DRV8833", "모터 드라이버", "N20 모터 드라이버"], type: "actuator", boardCompatibility: "작은 DC 모터 2개(N20 등) · 로직 2.7V 이상",
+    voltageMin: 2.7, voltageMax: 10.8, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: 1200, interface: ["PWM", "디지털 출력"], i2cAddresses: [],
+    pins: named([["VM", ["power_in"]], ["GND", ["ground"]], ["AIN1", ["pwm"]], ["AIN2", ["pwm"]], ["BIN1", ["pwm"]], ["BIN2", ["pwm"]], ["AOUT1", ["signal"]], ["AOUT2", ["signal"]], ["BOUT1", ["signal"]], ["BOUT2", ["signal"]], ["SLP", ["gpio"]]]), dimensionsMm: null,
+    renderer: { type: "fallback", ref: null }, isMotor: true,
+    warnings: ["모터 전원 VM은 10.8V를 넘기지 않아요.", "채널당 연속 1.2A로 설계해요. 2A는 짧은 순간 최대값이에요.", "흔한 빨간 복제 보드는 전류 제한 저항이 없을 수 있어요. 모터가 멈춰 있을 때 전류가 크게 흘러요.", "SLP(슬립)를 HIGH로 둬야 동작하는 보드가 있어요. 모듈 표시를 확인하세요.", SNIPPET],
+    sourceUrls: ["https://www.adafruit.com/product/3297", "https://learn.adafruit.com/adafruit-drv8833-dc-stepper-motor-driver-breakout-board/overview"], verifiedAt: null
+  }
+];
+PART_CARDS.push(...NEW_CARDS);
 
 export function findCard(id: string | undefined | null): PartCard | null {
   return id ? PART_CARDS.find((card) => card.id === id) ?? null : null;
