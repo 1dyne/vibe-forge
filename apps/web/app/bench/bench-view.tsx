@@ -294,7 +294,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
           <div className="actions">
             <button type="button" className="btn-ghost hint" disabled={!ready || playing} aria-label="힌트" onClick={() => { api.current?.hint(); say(cur?.tapHint ?? "", 2600); }}>💡<span className="lbl"> 힌트</span></button>
             <button type="button" className="btn-main" disabled={!ready || playing} onClick={advance}>{playing ? "하는 중…" : "보여줘"}</button>
-            <button type="button" className={`toggle ${challenge ? "on" : ""}`} aria-pressed={challenge} onClick={() => setChallenge((c) => !c)}><span className="sw" />직접 하기</button>
+            <button type="button" className={`toggle ${challenge ? "on" : ""}`} aria-pressed={challenge} onClick={() => setChallenge((c) => !c)}><span className="sw" />직접<span className="lbl2"> 하기</span></button>
             <button type="button" className="btn-ghost" disabled={playing || step === 0} onClick={() => goStep(step - 1)} aria-label="이전 단계">◀</button>
             <button type="button" className="btn-ghost" disabled={playing || step >= doneSteps} onClick={() => goStep(step + 1)} aria-label="다음 단계">▶</button>
           </div>

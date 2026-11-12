@@ -161,3 +161,31 @@ body:has(.bench){background:#e9e5dd;overflow:hidden}
   .bench .toggle.on .sw::after{left:13px}
 }
 @media (max-width:360px){ .bench .toggle{font-size:13px} }
+
+/* 키가 작은 폰(높이 760px 이하): 3D가 보이는 띠가 36px까지 줄어들던 문제. 위 카드·아래 패널을 줄여 띠를 넓힌다 */
+@media (max-width:899px) and (max-height:760px){
+  .bench-top{padding:8px 8px 0}
+  .bench-brand{padding:8px 10px;font-size:14px;border-radius:14px}
+  .bench-card{padding:7px 12px;border-radius:14px}
+  .bench-card .eyebrow,.bench-card .meta,.bench-sticker{display:none!important}
+  .bench-card h1{font-size:16px;margin:0}
+  .bench-panel{bottom:8px;left:8px;right:8px;border-radius:18px}
+  .bench-panel .bar{margin:8px var(--pad) 4px}
+  .bench-panel .count{padding-bottom:6px;font-size:12px}
+  .step-box{padding:8px var(--pad)}
+  .step-box .action{font-size:14.5px;line-height:1.45;margin:2px 0}
+  .step-box .why{-webkit-line-clamp:1!important;font-size:12.5px}
+  .parts-row{display:none}
+  .actions{padding:8px var(--pad) 8px}
+  .bench .btn-main,.bench .btn-ghost,.bench .toggle{min-height:40px}
+  .bench-views{right:72px;bottom:calc(var(--panel-real,var(--panel-h)) + 12px);padding:3px}
+  .bench-views button{padding:5px 0;font-size:13px}
+  .bench-mascot{width:56px;height:56px;right:6px;bottom:calc(var(--panel-real,var(--panel-h)) + 8px)}
+  .bench-mascot .dk-sprite{--w:56px}
+  .bench-mascot .aura{left:8px;top:10px;width:40px;height:40px}
+  .bench-bubble{right:72px!important;bottom:calc(var(--panel-real,var(--panel-h)) + 10px)!important}
+}
+@media (max-width:899px){ .actions .btn-main{white-space:nowrap;flex:1 0 auto} .actions button{white-space:nowrap} }
+@media (max-width:380px){ .bench-panel{--pad:12px} .actions{gap:5px} .actions .toggle .lbl2{display:none} .actions .btn-ghost{padding:10px 9px} .actions .toggle{padding:10px 9px} }
+.bench{word-break:keep-all;overflow-wrap:break-word}
+@media (max-width:899px) and (max-height:760px){ .bench .tap-hint{display:none} }
