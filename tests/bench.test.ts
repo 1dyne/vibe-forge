@@ -1,6 +1,109 @@
 import { describe, expect, it } from "vitest";
 import { KITS } from "../apps/web/lib/bench/kits";
 import type { BenchOp } from "../apps/web/lib/bench/types";
+import { GRADE_TEXT, HOLD_MS, bendableRefs, gradeHold, handsStages, holdFill, kitCanFlip, stepNeedsFlip, stepTools } from "../apps/web/lib/bench/hands";
+import { GLOSSARY, glossaryIn, lookupGlossary, splitGlossary } from "../apps/web/lib/bench/glossary";
+
+describe("hold-to-solder grading", () => {
+  it("is lenient: early release is starved, far too long is cold, anything between is good", () => {
+    expect(gradeHold(0)).toBe("starved");
+    expect(gradeHold(300)).toBe("starved");
+    expect(gradeHold(HOLD_MS.good - 1)).toBe("starved");
+    expect(gradeHold(HOLD_MS.good)).toBe("good");
+    expect(gradeHold(2200)).toBe("good");
+    expect(gradeHold(3000)).toBe("good");
+    expect(gradeHold(HOLD_MS.cold)).toBe("good");
+    expect(gradeHold(HOLD_MS.cold + 1)).toBe("cold");
+    expect(gradeHold(9000)).toBe("cold");
+    expect(gradeHold(Number.NaN)).toBe("starved");
+  });
+  it("forms the cone between heating and the good mark", () => {
+    expect(HOLD_MS.good).toBeGreaterThanOrEqual(1500);
+    expect(HOLD_MS.good).toBeLessThanOrEqual(3000);
+    expect(HOLD_MS.cold).toBeGreaterThan(HOLD_MS.warn);
+    expect(holdFill(0)).toBe(0);
+    expect(holdFill(HOLD_MS.heat)).toBe(0);
+    expect(holdFill(HOLD_MS.good)).toBe(1);
+    expect(holdFill(5000)).toBe(1);
+    const mid = holdFill((HOLD_MS.heat + HOLD_MS.good) / 2);
+    expect(mid).toBeGreaterThan(0.3); expect(mid).toBeLessThan(0.7);
+  });
+  it("has gentle copy for every grade, with a way to fix", () => {
+    for (const g of ["good", "starved", "cold"] as const) expect(GRADE_TEXT[g].length).toBeGreaterThan(5);
+    expect(GRADE_TEXT.starved).toMatch(/다시/);
+    expect(GRADE_TEXT.cold).toMatch(/고쳐/);
+  });
+});
+
+describe("hands-on stages", () => {
+  const kit = KITS.find((k) => k.id === "solder-basics")!;
+  const step = (title: string) => kit.steps.find((s) => s.title === title)!;
+  const base = { canFlip: kitCanFlip(kit), flipped: false, hands: false, bendable: bendableRefs(kit) };
+  it("flips the perfboard kit only", () => {
+    expect(kitCanFlip(kit)).toBe(true);
+    for (const k of KITS.filter((x) => x.id !== "solder-basics")) expect(kitCanFlip(k)).toBe(false);
+  });
+  it("solders a joint: flip, both hands, then hold each joint", () => {
+    expect(handsStages(step("저항 납땜"), base)).toEqual([{ kind: "flip" }, { kind: "hands" }, { kind: "hold", op: 0, keys: ["PB.C5", "PB.G5"] }]);
+    // 이미 뒤집고 양손에 들고 있으면 바로 꾹 누르기
+    expect(handsStages(step("LED 납땜"), { ...base, flipped: true, hands: true })).toEqual([{ kind: "hold", op: 0, keys: ["PB.H5", "PB.I5"] }]);
+  });
+  it("inserts wires from the top before flipping to solder them", () => {
+    expect(handsStages(step("전선 꽂고 납땜"), base).map((s) => s.kind)).toEqual(["tap", "flip", "hands", "hold"]);
+  });
+  it("bends resistor legs before inserting, and flips before trimming", () => {
+    expect(handsStages(step("저항 꽂기"), base)).toEqual([{ kind: "bend", ref: "R1" }, { kind: "tap", from: 0, to: 1 }]);
+    expect(handsStages(step("LED 꽂기"), base)).toEqual([{ kind: "tap", from: 0, to: 1 }]);
+    expect(handsStages(step("다리 자르기"), base)).toEqual([{ kind: "flip" }, { kind: "tap", from: 0, to: 1 }]);
+    expect(stepNeedsFlip(step("전지 넣고 켜기"), true)).toBe(false);
+  });
+  it("bridges are held too", () => {
+    const st = handsStages(step("이웃 패드 잇기"), { ...base, flipped: true, hands: true });
+    expect(st).toEqual([{ kind: "hold", op: 0, keys: ["PB.B5|PB.C5", "PB.G5|PB.H5", "PB.I5|PB.J5"] }]);
+  });
+  it("covers every op of every step in every kit exactly once", () => {
+    for (const k of KITS) for (const s of k.steps) {
+      const st = handsStages(s, { canFlip: kitCanFlip(k), flipped: false, hands: false, bendable: bendableRefs(k) });
+      expect(st.length, `${k.id} ${s.title}`).toBeGreaterThan(0);
+      const covered: number[] = [];
+      for (const x of st) { if (x.kind === "tap") for (let i = x.from; i < x.to; i++) covered.push(i); if (x.kind === "hold") covered.push(x.op); }
+      expect(covered.sort((a, b) => a - b), `${k.id} ${s.title}`).toEqual(s.ops.map((_, i) => i));
+      for (const x of st) if (x.kind === "hold") expect(x.keys.length).toBeGreaterThan(0);
+    }
+  });
+  it("names the tool each step needs", () => {
+    expect(stepTools(step("저항 납땜"))).toEqual(["iron", "solder"]);
+    expect(stepTools(step("다리 자르기"))).toEqual(["cutter"]);
+    expect(stepTools(step("전선 준비"))).toEqual(expect.arrayContaining(["stripper", "iron", "solder"]));
+    expect(stepTools(step("합선 검사"))).toEqual(["meter"]);
+  });
+});
+
+describe("bench glossary", () => {
+  it("looks up terms and aliases, ignoring case and spaces", () => {
+    expect(lookupGlossary("피복")?.term).toBe("피복");
+    expect(lookupGlossary(" 니퍼 ")?.short).toMatch(/자르/);
+    expect(lookupGlossary("led")?.term).toBe("LED");
+    expect(lookupGlossary("단락")?.term).toBe("합선");
+    expect(lookupGlossary("없는 말")).toBeNull();
+  });
+  it("covers the words beginners stumble on", () => {
+    for (const w of ["피복", "피복 벗기기", "니퍼", "실납", "플럭스", "냉납", "브리지", "만능기판", "헤더 핀", "패드", "극성", "인두", "와이어 스트리퍼"]) expect(lookupGlossary(w), w).not.toBeNull();
+    for (const e of GLOSSARY) { expect(e.short.length).toBeGreaterThan(10); expect(e.short).toMatch(/요[.!]?$/); }
+  });
+  it("marks the longest term once and keeps the text intact", () => {
+    const text = "피복 벗기기를 하면 피복 속 구리가 보여요. 피복은 비닐이에요.";
+    const segs = splitGlossary(text);
+    expect(segs.map((s) => (typeof s === "string" ? s : s.text)).join("")).toBe(text);
+    const marked = segs.flatMap((s) => (typeof s === "string" ? [] : [s.entry.term]));
+    expect(marked).toEqual(["피복 벗기기", "피복"]);
+  });
+  it("finds the terms in each kit's step text", () => {
+    const kit = KITS.find((k) => k.id === "solder-basics")!;
+    const all = glossaryIn(kit.steps.flatMap((s) => [s.action, s.why])).map((e) => e.term);
+    for (const w of ["만능기판", "패드", "저항", "LED", "극성", "인두", "실납", "니퍼", "피복", "와이어 스트리퍼", "예비납", "브리지", "합선", "멀티미터", "통전"]) expect(all, w).toContain(w);
+  });
+});
 
 // 연습 키트 데이터가 3D 엔진의 규칙을 지키는지 (명세서 2차 v0.1 §3·§5)
 const hole = /^[A-Z]\d+$/;
