@@ -98,6 +98,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
       } else if (input.action === "restore_version") {
         const snap = p.history?.find((h) => h.id === input.snapshotId);
         if (!snap || !RESTORABLE.includes(snap.field)) throw new Error("이 기록은 되돌릴 수 없어요. 완성품 형태·회로는 '단계 다시'로 바꿔 주세요.");
+        if ((JSON.parse(snap.snapshot) as { omitted?: boolean }).omitted) throw new Error("너무 커서 내용을 보관하지 않은 기록이라 되돌릴 수 없어요.");
         snapshot(p, snap.field, "restore_version", `${FIELD_LABEL[snap.field]} 되돌리기 전`);
         (p as unknown as Record<string, unknown>)[snap.field] = JSON.parse(snap.snapshot);
         announce(`${FIELD_LABEL[snap.field]}를 ${new Date(snap.at).toLocaleString("ko-KR")} 버전으로 되돌렸어요. 되돌리기 전 버전도 기록에 남아 있어요.`);

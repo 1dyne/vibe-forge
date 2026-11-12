@@ -1,4 +1,4 @@
-// 도깨비 마을: 골목 = 관심사. 도깨비불이 태어나면 장작과 가장 많이 겹치는 골목의 빈 터에 대장간을 짓는다.
+// 달그락 마을: 골목 = 관심사. 도깨비불이 태어나면 장작과 가장 많이 겹치는 골목의 빈 터에 대장간을 짓는다.
 // 골목마다 터 CAPACITY개. 다 차면 같은 주제의 다음 골목("냥집사 2골목")이 열린다.
 
 export type AlleyTheme = { id: string; name: string; street: string; chips: string[] };

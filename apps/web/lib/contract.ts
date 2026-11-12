@@ -102,6 +102,9 @@ export function crossCheck(project: LocalProject): ContractFinding[] {
   return out;
 }
 
+// 생성 코드에 들어가는 사용자 글: 주석은 한 줄로·주석 닫기 기호 제거, 문자열은 이스케이프
+const note = (t: string | undefined) => (t ?? "").replace(/[\r\n]+/g, " ").replace(/\*\//g, "* /").slice(0, 200);
+const cstr = (t: string) => t.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]/g, "");
 const cType = (f: ContractField) => (f.type === "float" ? "float" : f.type === "int" || f.type === "bool" ? "int" : "const char*");
 const tsType = (f: ContractField) => (f.type === "int" || f.type === "float" ? "number" : f.type === "bool" ? "boolean" : f.type === "enum" ? (f.values ?? []).map((v) => JSON.stringify(v)).join(" | ") || "string" : "string");
 
@@ -112,12 +115,12 @@ export function contractHeader(c: DataContract, project: Pick<LocalProject, "nam
     const body = c.format === "json"
       ? `  Serial.print("{\\"t\\":\\"${m.id}\\"");\n${m.fields.map((f) => `  Serial.print(",\\"${f.name}\\":"); ${f.type === "string" || f.type === "enum" ? `Serial.print("\\""); Serial.print(${f.name}); Serial.print("\\"");` : `Serial.print(${f.name});`}`).join("\n")}\n  Serial.println("}");`
       : c.format === "csv"
-        ? `  Serial.print("${m.prefix}");\n${m.fields.map((f) => `  Serial.print(","); Serial.print(${f.name});`).join("\n")}\n  Serial.println();`
+        ? `  Serial.print("${cstr(m.prefix)}");\n${m.fields.map((f) => `  Serial.print(","); Serial.print(${f.name});`).join("\n")}\n  Serial.println();`
         : `${m.fields.map((f, i) => `  Serial.print("${i ? ";" : ""}${f.name}="); Serial.print(${f.name});`).join("\n")}\n  Serial.println();`;
-    return `// ${m.description}${m.every ? ` (${m.every})` : ""}\n// 예: ${m.example}\ninline void send_${m.id}(${args}) {\n${body}\n}`;
+    return `// ${note(m.description)}${m.every ? ` (${note(m.every)})` : ""}\n// 예: ${note(m.example)}\ninline void send_${m.id}(${args}) {\n${body}\n}`;
   }).join("\n\n");
-  const recv = c.messages.filter((m) => m.direction === "app_to_device").map((m) => `// 받기: ${m.description} · 예: ${m.example}\nconst char* MSG_${m.id.toUpperCase()} = "${m.prefix.replace(/"/g, '\\"')}";`).join("\n");
-  return `// ${project.name} · 데이터 약속 (달그락 대장간이 만든 파일, 손으로 고치지 말고 약속을 고쳐 다시 받기)
+  const recv = c.messages.filter((m) => m.direction === "app_to_device").map((m) => `// 받기: ${note(m.description)} · 예: ${note(m.example)}\nconst char* MSG_${m.id.toUpperCase()} = "${cstr(m.prefix)}";`).join("\n");
+  return `// ${note(project.name)} · 데이터 약속 (달그락 대장간이 만든 파일, 손으로 고치지 말고 약속을 고쳐 다시 받기)
 // 방식: ${c.transport}${c.baud ? ` · ${c.baud}bps` : ""} · 형식: ${c.format} · 한 줄 = 메시지 하나
 #pragma once
 #include <Arduino.h>
@@ -131,7 +134,7 @@ ${recv}
 
 /** 앱(웹)에 넣을 TypeScript: 타입과 한 줄 읽기 함수 */
 export function contractTs(c: DataContract): string {
-  const types = c.messages.map((m) => `/** ${m.description} · 예: ${m.example} */\nexport type ${m.id[0].toUpperCase()}${m.id.slice(1)}Msg = { id: "${m.id}"; ${m.fields.map((f) => `${f.name}: ${tsType(f)}`).join("; ")} };`).join("\n\n");
+  const types = c.messages.map((m) => `/** ${note(m.description)} · 예: ${note(m.example)} */\nexport type ${m.id[0].toUpperCase()}${m.id.slice(1)}Msg = { id: "${m.id}"; ${m.fields.map((f) => `${f.name}: ${tsType(f)}`).join("; ")} };`).join("\n\n");
   const union = c.messages.map((m) => `${m.id[0].toUpperCase()}${m.id.slice(1)}Msg`).join(" | ");
   return `// 데이터 약속 (달그락 대장간이 만든 파일). 펌웨어의 contract.h와 같은 약속이에요.
 // 방식: ${c.transport}${c.baud ? ` · ${c.baud}bps` : ""} · 형식: ${c.format}
@@ -155,7 +158,7 @@ export function parseLine(raw: string): Msg | null {
   }
   return out as Msg;
 }
-${c.messages.filter((m) => m.direction === "app_to_device").map((m) => `\n/** 보내기: ${m.description} · 예: ${m.example} */\nexport function make_${m.id}(${m.fields.map((f) => `${f.name}: ${tsType(f)}`).join(", ")}): string {\n  return ${c.format === "json" ? `JSON.stringify({ t: "${m.id}", ${m.fields.map((f) => f.name).join(", ")} }) + "\\n"` : c.format === "csv" ? `["${m.prefix.replace(/,$/, "")}", ${m.fields.map((f) => f.type === "bool" ? `${f.name} ? 1 : 0` : f.name).join(", ")}].join(",") + "\\n"` : `[${m.fields.map((f) => `\`${f.name}=\${${f.type === "bool" ? `${f.name} ? 1 : 0` : f.name}}\``).join(", ")}].join(";") + "\\n"`};\n}`).join("\n")}
+${c.messages.filter((m) => m.direction === "app_to_device").map((m) => `\n/** 보내기: ${note(m.description)} · 예: ${note(m.example)} */\nexport function make_${m.id}(${m.fields.map((f) => `${f.name}: ${tsType(f)}`).join(", ")}): string {\n  return ${c.format === "json" ? `JSON.stringify({ t: "${m.id}", ${m.fields.map((f) => f.name).join(", ")} }) + "\\n"` : c.format === "csv" ? `[${JSON.stringify(m.prefix.replace(/,$/, ""))}, ${m.fields.map((f) => f.type === "bool" ? `${f.name} ? 1 : 0` : f.name).join(", ")}].join(",") + "\\n"` : `[${m.fields.map((f) => `\`${f.name}=\${${f.type === "bool" ? `${f.name} ? 1 : 0` : f.name}}\``).join(", ")}].join(";") + "\\n"`};\n}`).join("\n")}
 `;
 }
 

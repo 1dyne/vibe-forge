@@ -288,7 +288,7 @@ describe.skipIf(!pgUrl)("Postgres 저장소", () => {
   });
 });
 
-describe("도깨비 마을 (Phase 2)", () => {
+describe("달그락 마을 (Phase 2)", () => {
   it("장작과 가장 많이 겹치는 골목, 같으면 덜 찬 골목으로 간다", async () => {
     const { pickTheme, plotFor, plotLine, alleyName } = await import("../apps/web/lib/find/village");
     expect(pickTheme(["w_cat", "f_bowl", "r_light"], {}).id).toBe("cat");

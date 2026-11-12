@@ -336,7 +336,7 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
       </div>
       {forge && (
         <div className="forge-made">
-          <span className="tiny muted">{forge.isNew ? "도깨비 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span>
+          <span className="tiny muted">{forge.isNew ? "달그락 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span>
           <b>{forge.line}</b>
           <a className="tiny" href={`/find/village?house=${forge.id}`} onClick={() => track("world_from_result")}>마을로 나가서 내 대장간 앞에 서보기</a>
           <a className="btn btn-fire" href={`/f/${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }} onClick={() => track(forge.isNew ? "forge_created" : "forge_open")}>{forge.isNew ? "내 대장간 짓기" : "내 대장간 가기"}</a>

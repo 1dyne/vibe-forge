@@ -49,5 +49,8 @@ describe("data contract", () => {
     const ts = contractTs(kv);
     expect(ts).toContain("export function parseLine");
     expect(ts).toContain("export function make_cmd(cmd: \"on\" | \"off\")");
+    const evil: DataContract = { ...kv, messages: [{ ...kv.messages[0], description: "끝 */ process.exit(1) /*\n둘째 줄", prefix: 'state=' }] };
+    expect(contractTs(evil)).not.toContain("*/ process.exit");
+    expect(contractHeader(evil, { name: "a\nb" }).split("\n")[0]).toContain("a b");
   });
 });

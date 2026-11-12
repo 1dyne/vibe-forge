@@ -13,6 +13,9 @@ const landingHosts = () => (process.env.FIND_HOSTS ?? "").split(",").map((h) => 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").split(":")[0].toLowerCase();
+  // www.<대표 도메인>은 대표 도메인으로 보낸다. 로그인 쿠키와 요청 출처 검사(APP_BASE_URL)가 한 주소여야 해서.
+  const base = process.env.APP_BASE_URL ? new URL(process.env.APP_BASE_URL) : null;
+  if (base && host === `www.${base.hostname}`) return NextResponse.redirect(new URL(`${pathname}${request.nextUrl.search}`, base.origin), 308);
   if (pathname === "/" && landingHosts().includes(host)) {
     const url = request.nextUrl.clone();
     url.pathname = "/find";

@@ -312,7 +312,7 @@ export async function fuelByFire(fireIds: string[]): Promise<Map<string, number>
   return new Map(fireIds.map((id) => [id, counts.get(fires.find((f) => f.id === id)?.forgeId ?? "") ?? 0]));
 }
 
-// ── Phase 4: 도깨비 마을 ─────────────────────────────────
+// ── Phase 4: 달그락 마을 ─────────────────────────────────
 export type HouseView = {
   forgeId: string | null; plotNo: number; nickname: string; locked: boolean;
   color: string; reactKind: string; peak: number; fuel: number; wants: number; visits7: number; fires: number;

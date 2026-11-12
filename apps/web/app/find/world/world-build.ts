@@ -3,7 +3,7 @@ import type { Decor, RoofId } from "../../../lib/find/decor";
 import type { LanternGroup } from "../../../lib/find/lantern";
 import { buildEras, eraCenter, eraTint, ERA_R, ERA_RADIUS, ERAS } from "./world-eras";
 
-// 도깨비 마을 3D 세계. 하회마을처럼 물이 감싸 도는 땅에 다섯 마을이 앉고, 한가운데 호수 섬에 본관 대장간이 있다.
+// 달그락 마을 3D 세계. 하회마을처럼 물이 감싸 도는 땅에 다섯 마을이 앉고, 한가운데 호수 섬에 본관 대장간이 있다.
 // 고증 원칙(docs/FIND-WORLD.md): 조선 민가 문법(초가·기와·흙벽·창호·장승·솟대), 단청·오니·청사초롱 가로등 없음.
 // 빛은 두 가지: 사람의 불빛(창호지 창·초롱·화톳불, 따뜻한 주황)과 도깨비불(청록·연보라, 서늘함).
 
@@ -310,7 +310,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
           c += vec3(0.35, 0.18, 0.05) * pow(west, 6.0) * (1.0 - smoothstep(0.0, 0.3, abs(h)));
           gl_FragColor = vec4(c, 1.0); }`
     }));
-    sky.renderOrder = -1; scene.add(sky);
+    sky.renderOrder = -1; sky.name = "sky"; scene.add(sky);
     // 초승달 (신윤복 「월하정인」의 밤처럼)
     const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d")!;
     x.fillStyle = "#FFF4D6"; x.beginPath(); x.arc(64, 64, 46, 0, 6.283); x.fill();
@@ -1028,7 +1028,7 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   /** 지금 서 있는 곳: 다섯 마을 또는 시대 마을 (마을 이름 띠용) */
   function placeAt(x: number, z: number): WorldVillage | null {
     const v = villageAt(x, z); if (v) return v;
-    for (const e of ERAS) { const c = eraCenter(e); if (Math.hypot(x - c.x, z - c.z) < ERA_RADIUS + 2) return { id: e.id, name: `${e.name} · ${e.period}`, topics: e.topics, mood: "", themes: [] }; }
+    for (const e of ERAS) { const c = eraCenter(e); if (Math.hypot(x - c.x, z - c.z) < ERA_RADIUS + 2) return { id: e.id, name: e.name, topics: e.topics, mood: "", themes: [] }; }
     return null;
   }
   function villageAt(x: number, z: number) {
