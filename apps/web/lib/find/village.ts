@@ -58,13 +58,13 @@ export function plotLine(themeId: string, _seq: number, _plotNo: number, _left: 
 // ── 마을 5개 ─────────────────────────────────
 // 마을 = 큰 제작 분야, 골목 = 그 안의 구체적인 용도. 가운데 광장엔 공사 중인 달그락 대장간 본관.
 export type VillageId = "kkomul" | "ttukttak" | "jjaekkak" | "wagle" | "kkambbak";
-export type Village = { id: VillageId; name: string; topics: string; mood: string; themes: string[] };
+export type Village = { id: VillageId; name: string; topics: string; mood: string; themes: string[]; /** 마을 이름 띠에 보이는 한 줄: 여기 어떤 아이디어가 모여 있나 */ ideas: string };
 export const VILLAGES: Village[] = [
-  { id: "kkomul", name: "꼬물마을", topics: "돌봄 · 반려동물 · 식물 · 가족", mood: "식물과 작은 생명들이 함께 사는 정원 마을", themes: ["cat", "dog", "plant", "family"] },
-  { id: "ttukttak", name: "뚝딱마을", topics: "생활 편의 · 살림 · 자동화", mood: "기계 장치와 공구들이 곳곳에 놓인 공방 마을", themes: ["kitchen", "switch"] },
-  { id: "jjaekkak", name: "째깍마을", topics: "시간 · 습관 · 집중 · 업무", mood: "작은 종소리가 하루의 리듬을 알려주는 차분한 마을", themes: ["desk", "sleep", "water"] },
-  { id: "wagle", name: "와글마을", topics: "놀이 · 장난감 · 상호작용", mood: "장난감과 작은 로봇들이 움직이는 놀이 마을", themes: ["toy", "kid"] },
-  { id: "kkambbak", name: "깜빡마을", topics: "관찰 · 감지 · 상태 확인", mood: "눈에 보이지 않는 변화를 발견하는 관측 마을", themes: ["door", "air", "noise"] }
+  { id: "kkomul", name: "꼬물마을", topics: "돌봄 · 반려동물 · 식물 · 가족", mood: "식물과 작은 생명들이 함께 사는 정원 마을", themes: ["cat", "dog", "plant", "family"], ideas: "반려동물·식물·가족을 돌보는 아이디어가 모인 마을" },
+  { id: "ttukttak", name: "뚝딱마을", topics: "생활 편의 · 살림 · 자동화", mood: "기계 장치와 공구들이 곳곳에 놓인 공방 마을", themes: ["kitchen", "switch"], ideas: "귀찮은 집안일과 살림을 덜어주는 아이디어가 모인 마을" },
+  { id: "jjaekkak", name: "째깍마을", topics: "시간 · 습관 · 집중 · 업무", mood: "작은 종소리가 하루의 리듬을 알려주는 차분한 마을", themes: ["desk", "sleep", "water"], ideas: "시간·습관·집중을 챙겨주는 아이디어가 모인 마을" },
+  { id: "wagle", name: "와글마을", topics: "놀이 · 장난감 · 상호작용", mood: "장난감과 작은 로봇들이 움직이는 놀이 마을", themes: ["toy", "kid"], ideas: "같이 놀고 움직이는 장난감 아이디어가 모인 마을" },
+  { id: "kkambbak", name: "깜빡마을", topics: "관찰 · 감지 · 상태 확인", mood: "눈에 보이지 않는 변화를 발견하는 관측 마을", themes: ["door", "air", "noise"], ideas: "눈에 안 보이는 변화를 알아채는 아이디어가 모인 마을" }
 ];
 export function villageOf(themeId: string) {
   return VILLAGES.find((v) => v.themes.includes(themeId)) ?? null;

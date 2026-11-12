@@ -297,6 +297,11 @@ export const fireRarity = (comboKey: string, peak: number) => backend().rarity(c
 export const getFire = (id: string) => (/^[A-Za-z0-9]{4,16}$/.test(id) ? backend().getFire(id) : Promise.resolve(null));
 export const recordEvent = (e: EventRecord) => backend().event(e);
 export const eventCounts = () => backend().eventCounts();
+/** 운영 화면용: 최근 이벤트 몇 개 (이름으로) — 실제 폰 성능(world_fps) 확인 */
+export async function recentEvents(name: string, limit = 40): Promise<EventRecord[]> {
+  if (storageKind() === "postgres") return (await (await db()).query("SELECT name, session, props, created_at FROM find_events WHERE name = $1 ORDER BY created_at DESC LIMIT $2", [name, limit])).rows.map((r) => ({ name: r.name, session: r.session, props: r.props ?? {}, createdAt: new Date(r.created_at).toISOString() }));
+  return serial(async () => (await readData()).events.filter((e) => e.name === name).slice(-limit).reverse());
+}
 export const allWaitlist = () => backend().allWaitlist();
 export const markCoupon = (id: string, sent: boolean) => backend().markCoupon(id, sent);
 export const removeEntry = (id: string) => backend().removeEntry(id);

@@ -19,7 +19,7 @@ async function patch(id: string, action: "done" | "remove" | "make" | "unmake") 
 }
 
 /** 소원 줄 하나: 같은 소원을 빈 도깨비들, 만들어볼게, 같이 고민할 사람 연결 */
-export function RopeSheet({ group: initial, hasForge, onClose }: { group: LanternGroup; hasForge: boolean; onClose: () => void }) {
+export function RopeSheet({ group: initial, hasForge, onClose, onHang }: { group: LanternGroup; hasForge: boolean; onClose: () => void; onHang?: () => void }) {
   const [group, setGroup] = useState(initial);
   const [msg, setMsg] = useState("");
   const lit = group.lanterns.filter((l) => l.status === "lit");
@@ -62,7 +62,8 @@ export function RopeSheet({ group: initial, hasForge, onClose }: { group: Lanter
           </div>
         )}
         {msg && <div className="error" role="status">{msg}</div>}
-        <a className="btn btn-ghost" href={hasForge ? "/find/home#lantern" : "/find"} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>{hasForge ? "나도 등불 걸러 가기" : "내 도깨비불 찾고 등불 걸기"}</a>
+        {hasForge && onHang ? <button className="btn btn-fire" type="button" onClick={onHang}>여기에 내 등불 걸기</button>
+        : <a className="btn btn-ghost" href={hasForge ? "/find/village" : "/find"} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>{hasForge ? "마을 호수에서 등불 걸기" : "내 도깨비불 찾고 등불 걸기"}</a>}
         <button className="link" type="button" onClick={onClose}>닫기</button>
       </div>
     </div>
@@ -136,7 +137,30 @@ export function MyLanterns({ initial, allowance, fires, onClose }: { initial: La
           </form>
         ) : <div className="note small">등불을 다 걸었어. 새 도깨비불을 찾으면 하나 더 걸 수 있어.</div>}
         {msg && <div className="small" role="status">{msg}</div>}
-        <a className="btn btn-ghost" href="/find/village" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>마을 소원 줄 보러 가기</a>
+                <button className="link" type="button" onClick={onClose}>닫기</button>
+      </div>
+    </div>
+  );
+}
+
+/** 마을 호수의 소원 줄 모아보기: 줄마다 같은 소원을 빈 등불 수 */
+export function AllRopes({ groups, onPick, onHang, onClose }: { groups: LanternGroup[]; onPick: (g: LanternGroup) => void; onHang?: () => void; onClose: () => void }) {
+  const list = groups.slice().sort((a, b) => b.count - a.count);
+  return (
+    <div className="overlay" role="dialog" aria-label="소원 줄 모아보기" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet tall lantern-sheet">
+        <div className="display" style={{ fontSize: 22 }}>호수의 소원 줄</div>
+        <div className="small body">같은 소원을 빈 등불끼리 한 줄에 꿰여 호수 위에 걸려 있어. 줄을 눌러 누가 무슨 소원을 빌었는지 봐.</div>
+        {list.length === 0 ? <div className="note small">아직 걸린 등불이 없어. 첫 등불을 걸어봐.</div> : (
+          <div className="lantern-list">
+            {list.map((g) => (
+              <button key={g.key} type="button" className="lantern-row rope-row" onClick={() => onPick(g)}>
+                <i aria-hidden /><div className="lantern-text"><b>{g.label}</b><small>등불 {g.count}개{g.done ? ` · 이뤄진 소원 ${g.done}` : ""}</small></div>
+              </button>
+            ))}
+          </div>
+        )}
+        {onHang && <button className="btn btn-fire" type="button" onClick={onHang}>내 등불 걸기</button>}
         <button className="link" type="button" onClick={onClose}>닫기</button>
       </div>
     </div>

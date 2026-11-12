@@ -32,3 +32,25 @@ export function PracticeSheet({ forgeId, hue, onClose }: { forgeId: string; hue:
     </div>
   );
 }
+
+/** 연장 걸이: 끝낸 손 기술 연습마다 연장 하나 (이 기기 기준) */
+export function SkillsSheet({ onPractice, onClose }: { onPractice: () => void; onClose: () => void }) {
+  const [done, setDone] = useState<Record<string, string>>({});
+  useEffect(() => { try { setDone(JSON.parse(localStorage.getItem("dalgeurak_practice") ?? "{}")); } catch { /* 무시 */ } }, []);
+  const kits = KITS.filter((k) => !k.draft);
+  const got = kits.filter((k) => done[k.id]);
+  return (
+    <div className="overlay" role="dialog" aria-label="연장 걸이" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="sheet">
+        <div className="display" style={{ fontSize: 22 }}>연장 걸이</div>
+        <div className="small body">작업대에서 손 기술을 하나 익힐 때마다 여기에 연장이 하나씩 걸려.</div>
+        {got.length ? (
+          <div className="practice-list">{got.map((k) => <div key={k.id} className="practice-kit"><div className="pk-top"><b>✓ {k.title}</b><span>{done[k.id].slice(0, 10)}</span></div></div>)}</div>
+        ) : <div className="note small">아직 걸린 연장이 없어. 작업대에서 첫 손 기술을 익혀봐.</div>}
+        <div className="tiny muted">익힌 기록은 이 기기에만 남아.</div>
+        <button className="btn btn-fire" type="button" onClick={onPractice}>작업대에서 연습하기</button>
+        <button className="link" type="button" onClick={onClose}>닫기</button>
+      </div>
+    </div>
+  );
+}

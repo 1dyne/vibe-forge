@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FireCard } from "../../lib/find/card";
 import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
 import Dokkaebi from "./dokkaebi";
@@ -13,7 +13,8 @@ import FireCardView, { Roast } from "./fire-card";
 import { MailSheet } from "./mailbox";
 import { track } from "./track";
 import ForgeSignup from "./waitlist";
-import { PracticeSheet } from "./practice-sheet";
+import { PracticeSheet, SkillsSheet } from "./practice-sheet";
+import { createForgeSound } from "./world/world-sound";
 
 export type ForgeFire = { id: string; name: string; color: string; reactKind: string; peak: number; sentence: string; card: FireCard | null; stage: 1 | 2 | 3; cats: string[] };
 export type Social = { fuelToday: number; fuelTotal: number; wants: number; notes: Array<{ phrase: string; from: string; nickname: string; at: string }>; neighbors: number; visitsWeek: number; mine: { fuelGivenToday: boolean; wanted: boolean; notedToday: boolean; neighbor: boolean } };
@@ -31,7 +32,7 @@ type Props = {
   memoCount?: number;
 };
 const PHRASES = ["나도 갖고 싶어", "이거 천재다", "만들면 알려줘!", "장작 넣고 감", "응원해"];
-type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern" | "memo" | "practice";
+type Obj = "hearth" | "blueprint" | "shelf" | "invention" | "mailbox" | "decor" | "lantern" | "memo" | "practice" | "work" | "skills" | "share";
 
 // 골목 테마별 방 색 (다인의 방 그림이 오기 전 임시)
 const ROOM_TINT: Record<string, [string, string, string]> = {
@@ -43,6 +44,22 @@ const VIS_LABEL = { public: "전체 공개", link: "링크로만", private: "비
 
 export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news, memoCount: initialMemos = 0 }: Props) {
   const [memoCount, setMemoCount] = useState(initialMemos);
+  const [mailNews, setMailNews] = useState(false);
+  // 처음 들어온 주인에게 대장간에서 할 수 있는 일을 알려준다 (이 기기에서 한 번, ? 버튼으로 다시)
+  const [tut, setTut] = useState<number | null>(null);
+  useEffect(() => { if (!isOwner) return; try { if (!localStorage.getItem("forge_tut_v1")) setTut(0); } catch { /* 저장소 막힘: 안내 생략 */ } }, [isOwner]);
+  const endTut = () => { setTut(null); try { localStorage.setItem("forge_tut_v1", "1"); } catch { /* 무시 */ } };
+  // 대장간 소리: 화덕 타닥, 풀무, 가끔 가야금 한 음 (켜야 난다)
+  const snd = useRef<ReturnType<typeof createForgeSound> | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  function toggleSound() {
+    if (!snd.current) snd.current = createForgeSound();
+    const on = !soundOn; setSoundOn(on);
+    snd.current.resume(); snd.current.setMuted(!on);
+    try { localStorage.setItem("find_sound", on ? "1" : "0"); } catch { /* 무시 */ }
+    track("world_sound", { on: String(on), where: "forge" });
+  }
+  useEffect(() => () => snd.current?.close(), []);
   const [question, setQuestion] = useQuestion(isOwner);
   const [asking, setAsking] = useState(false);
   const [more, setMore] = useState(false);
@@ -79,7 +96,9 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   const usedCats = [...new Set(fires.flatMap((f) => f.cats))];
   function pickRoom(o: RoomObj) {
     if (o === "woodpile") { setToast(social.fuelTotal ? `이웃들이 넣어준 장작 ${social.fuelTotal}개가 쌓여 있어. 장작이 많을수록 화로 불이 커져.` : "아직 장작더미가 비어 있어. 이웃이 장작을 넣어주면 여기 쌓여."); track("object_open", { object: o }); return; }
-    if (o === "tools" && isOwner) { show("practice"); return; }
+    if (o === "tools" && isOwner) { show("skills"); return; }
+    if (o === "invention") { show(isOwner ? "work" : "blueprint"); return; }
+    if (o === "mailbox" && isOwner && news) { setMailNews(true); track("object_open", { object: o }); return; }
     if (o === "tools") { setToast(`연장 걸이: ${usedCats.join("·")} 갈래를 채워봤어. 네 갈래를 다 채우면 연장이 다 걸려.`); track("object_open", { object: o }); return; }
     if (o === "display") { setToast(`'나도 갖고 싶어' ${social.wants}개. 소반에 메밀묵이 올라가고, 5개가 넘으면 금빛 초롱이 켜져.`); track("object_open", { object: o }); return; }
     show(o);
@@ -102,7 +121,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   return (
     <section className="forge-full" style={{ ["--fire" as string]: latest?.color ?? "#4FB3A6" }}>
       <div className="forge-stage">
-      <ForgeRoom full memos={memoCount} lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
+      <ForgeRoom full onExit={() => { track("forge_exit"); window.location.href = `/find/village?house=${forge.id}`; }} memos={memoCount} lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
       <div className="room" style={{ ["--wall" as string]: wall, ["--wall2" as string]: wall2, ["--floor" as string]: floor }}>
         <svg className="room-bg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           <polygon points="4,64 4,24 50,4 50,44" fill="var(--wall)" stroke="#232323" strokeWidth=".6" />
@@ -131,7 +150,10 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </button>
       </div>} />
       <header className="forge-top">
-        <a className="forge-back" href={`/find/village?house=${forge.id}`} aria-label="마을로 나가기">← 마을</a>
+        <span className="forge-tools">
+          <button type="button" className="forge-back" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button>
+          {isOwner && <button type="button" className="forge-back" onClick={() => setTut(0)} aria-label="대장간 안내 다시 보기">?</button>}
+        </span>
         <div className="forge-title">
           <b>{forge.nickname}의 대장간</b>
           <span>{forge.alley} · {STAGE_NAME[topStage - 1]} · 도깨비불 {fires.length}</span>
@@ -147,22 +169,20 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </button>
       )}
       {asking && question && <QuestionSheet q={question} onClose={() => setAsking(false)} onDone={(msg) => { setAsking(false); setQuestion(null); setToast(msg); setTimeout(() => window.location.reload(), 1400); }} />}
-      <p className="forge-hint">물건을 눌러봐 · 옆으로 끌면 둘러볼 수 있어</p>
+      <p className="forge-hint">바닥을 누르면 달그락이 걸어가 · 물건을 눌러봐 · 옆으로 끌면 둘러보기</p>
       <nav className={`forge-dock ${isOwner ? "owner" : ""}`} aria-label="대장간에서 할 일">
         {isOwner ? (
           <>
-            <a href="/find" className="dock-main">새 불</a>
+            <button type="button" className="dock-main" onClick={() => show("work")}>작업대</button>
             <button type="button" onClick={() => show("memo")}>메모{memoCount ? ` ${memoCount}` : ""}</button>
-            <button type="button" onClick={() => show("lantern")}>등불{lanterns.mine?.length ? ` ${lanterns.mine.length}` : ""}</button>
             <button type="button" onClick={() => show("decor")}>꾸미기</button>
-            <button type="button" onClick={() => { setMore(true); track("forge_sheet"); }}>더보기</button>
+            <button type="button" onClick={() => show("share")}>자랑하기</button>
           </>
         ) : (
           <>
             <button type="button" className="dock-main" disabled={social.mine.fuelGivenToday} onClick={() => act("fuel")}>{social.mine.fuelGivenToday ? "장작 넣었어" : "장작 넣기"}</button>
             <button type="button" disabled={social.mine.wanted} onClick={() => act("want")}>{social.mine.wanted ? "갖고 싶어 ✓" : "갖고 싶어"}</button>
-            <button type="button" onClick={() => show("lantern")}>등불{lanterns.shown.length ? ` ${lanterns.shown.length}` : ""}</button>
-            <button type="button" onClick={() => { setMore(true); track("forge_sheet"); }}>더보기</button>
+            <button type="button" onClick={() => { setMore(true); track("forge_sheet"); }}>쪽지·이웃</button>
           </>
         )}
       </nav>
@@ -171,7 +191,6 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       {more && <div className="overlay" role="dialog" aria-label="대장간 살림" onClick={(e) => { if (e.target === e.currentTarget) setMore(false); }}>
       <div className="sheet tall forge-more">
       {news}
-      {isOwner && <button type="button" className="btn btn-fire" onClick={() => { setMore(false); show("practice"); }}>🔧 손 기술 연습 (3D 작업대)</button>}
       <div className="social-stats">
         <div><b>{social.fuelToday}</b><small>오늘 받은 장작</small></div>
         <div><b>{social.wants}</b><small>나도 갖고 싶어</small></div>
@@ -240,6 +259,43 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       </nav>
       <button className="link" type="button" onClick={() => setMore(false)}>닫기</button>
       </div></div>}
+      {open === "work" && isOwner && (
+        <div className="overlay" role="dialog" aria-label="작업대" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
+          <div className="sheet work-sheet">
+            <div className="display" style={{ fontSize: 22 }}>작업대</div>
+            <button type="button" className="work-pick" onClick={() => show("practice")}><b>🔧 손 기술 연습</b><span>부품을 사기 전에 3D 작업대에서 납땜·조립을 먼저 해봐</span></button>
+            <a className="work-pick" href="/find" onClick={() => track("forge_sheet", { sheet: "new-fire" })}><b>🔥 새 아이디어로 불 피우기</b><span>다른 아이디어로 도깨비불을 하나 더 찾아</span></a>
+            <button className="link" type="button" onClick={() => setOpen(null)}>닫기</button>
+          </div>
+        </div>
+      )}
+      {open === "skills" && isOwner && <SkillsSheet onPractice={() => show("practice")} onClose={() => setOpen(null)} />}
+      {open === "share" && isOwner && (
+        <div className="overlay" role="dialog" aria-label="대장간 자랑하기" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
+          <div className="sheet">
+            <div className="display" style={{ fontSize: 22 }}>대장간 자랑하기</div>
+            <button className="btn btn-fire" type="button" onClick={share}>{copied ? "링크 복사했어!" : "링크 보내기"}</button>
+            <label className="vis" htmlFor="vis-sel"><span className="small">누가 볼 수 있어?</span>
+              <select id="vis-sel" value={visibility} onChange={(e) => changeVisibility(e.target.value as typeof visibility)}>
+                {(Object.keys(VIS_LABEL) as Array<keyof typeof VIS_LABEL>).map((v) => <option key={v} value={v}>{VIS_LABEL[v]}</option>)}
+              </select>
+            </label>
+            <p className="fine-left">처음 쓴 문장은 너만 봐. 놀러 온 사람에게는 도깨비불 이름·속성·장작만 보여.</p>
+            <button className="link" type="button" onClick={() => setOpen(null)}>닫기</button>
+          </div>
+        </div>
+      )}
+      {mailNews && (
+        <div className="overlay" role="dialog" aria-label="편지함" onClick={(e) => { if (e.target === e.currentTarget) setMailNews(false); }}>
+          <div className="sheet tall">
+            <div className="display" style={{ fontSize: 22 }}>편지함</div>
+            {news}
+            <button className="btn btn-ghost" type="button" onClick={() => { setMailNews(false); setOpen("mailbox"); }}>달그락 만든 사람에게 편지 쓰기</button>
+            <button className="link" type="button" onClick={() => setMailNews(false)}>닫기</button>
+          </div>
+        </div>
+      )}
+      {tut !== null && <ForgeTutorial step={tut} onStep={setTut} onDone={endTut} />}
       {open === "practice" && isOwner && <PracticeSheet forgeId={forge.id} hue={REACT_HUE[kind] ?? 0} onClose={() => setOpen(null)} />}
       {open === "memo" && isOwner && <MemoSheet fires={fires.map((f) => ({ id: f.id, name: f.name, sentence: f.sentence }))} onCount={setMemoCount} onClose={() => setOpen(null)} />}
       {open === "lantern" && (isOwner && lanterns.mine
@@ -248,7 +304,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
 
       {open === "mailbox" && <MailSheet screen={`forge:${forge.id}`} onClose={() => setOpen(null)} />}
       {open === "decor" && <DecorSheet initial={forge.decor} village={forge.village} stats={{ neighbors: social.neighbors, fuel: social.fuelTotal, wants: social.wants, notes: social.notes.length }} houseId={forge.id} onClose={() => setOpen(null)} />}
-      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && open !== "memo" && open !== "practice" && (
+      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && open !== "memo" && open !== "practice" && open !== "work" && open !== "skills" && open !== "share" && (
         <div className="overlay" role="dialog" aria-label="대장간 물건" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
           <div className="sheet tall">
             {open === "hearth" && (latest?.card ? (
@@ -359,4 +415,28 @@ function ReportLink({ forgeId }: { forgeId: string }) {
       {REASONS.map((r) => <button key={r} type="button" className="chip" onClick={async () => { await fetch("/api/find/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ host: forgeId, reason: r }) }).catch(() => undefined); track("report_sent"); setDone(true); }}>{r}</button>)}
     </div>
   ) : <button className="link" type="button" style={{ fontSize: 12 }} onClick={() => setOpen(true)}>이 집 신고하기</button>;
+}
+
+const TUT: Array<{ title: string; body: string }> = [
+  { title: "여기가 네 대장간이야", body: "바닥을 누르면 달그락이 그리로 걸어가. 물건을 누르면 그 앞까지 가서 열어줘. 옆으로 끌면 방을 둘러볼 수 있어." },
+  { title: "작업대에서 미리 해봐", body: "작업대를 누르면 3D로 납땜·조립을 미리 연습할 수 있어. 부품을 사기 전에 손으로 하는 순서를 익혀둬. 새 아이디어로 불을 하나 더 피우는 것도 여기서." },
+  { title: "설계도와 화덕", body: "설계도에는 도깨비가 받아 적은 설계 한 줄이 있어. 화덕 도깨비는 하루에 한 번 질문을 해. 답할수록 네 도깨비불이 자라고 대장간도 커져." },
+  { title: "꾸미고, 적고, 나가기", body: "꾸미기로 마을에서 보이는 집 모양을 바꾸고, 메모에 떠오른 생각을 모아둬. 앞쪽 바닥의 주황 화살표를 누르면 마을로 나가. 소원 등불은 마을 호수의 소원 줄에 걸어." },
+];
+function ForgeTutorial({ step, onStep, onDone }: { step: number; onStep: (n: number) => void; onDone: () => void }) {
+  const c = TUT[step];
+  const last = step === TUT.length - 1;
+  return (
+    <div className="overlay tut" role="dialog" aria-label="대장간 안내">
+      <div className="sheet tut-card">
+        <div className="tiny muted">{step + 1} / {TUT.length}</div>
+        <div className="display" style={{ fontSize: 22 }}>{c.title}</div>
+        <p className="body" style={{ margin: 0 }}>{c.body}</p>
+        <div className="two">
+          <button className="btn btn-ghost" type="button" onClick={onDone}>건너뛰기</button>
+          <button className="btn btn-fire" type="button" onClick={() => (last ? onDone() : onStep(step + 1))}>{last ? "시작하기" : "다음"}</button>
+        </div>
+      </div>
+    </div>
+  );
 }

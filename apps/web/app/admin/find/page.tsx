@@ -1,5 +1,5 @@
 import { isOperator } from "../../../lib/find/admin-auth";
-import { allWaitlist, eventCounts, storageKind } from "../../../lib/find/store";
+import { allWaitlist, eventCounts, recentEvents, storageKind } from "../../../lib/find/store";
 import { notFound } from "next/navigation";
 import { ClearEvents, DeleteEntry } from "./admin-actions";
 import { MailRow, NoticeForm, PlanAdmin, ReportRow, SyncButton } from "./village-admin";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // 도깨비불 찾기 운영 화면 (로그인한 사람만). HANDOFF §8 핵심 지표 + 대기열.
 export default async function FindAdmin() {
   if (!(await isOperator())) notFound();
-  const [counts, waitlist, mails, notices, plans, reports] = await Promise.all([eventCounts(), allWaitlist(), listMail(), latestNotices(10), listPlans(null), listReports()]);
+  const [counts, waitlist, mails, notices, plans, reports, fps] = await Promise.all([eventCounts(), allWaitlist(), listMail(), latestNotices(10), listPlans(null), listReports(), recentEvents("world_fps", 40)]);
   const n = (k: string) => counts[k] ?? 0;
   const referred = waitlist.filter((w) => w.referredBy).length;
   const rate = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "-");
@@ -58,7 +58,7 @@ export default async function FindAdmin() {
           </tbody>
         </table>
       </div>
-      <h2 style={{ fontSize: 16, marginTop: 24 }}>달그락 우체통 ({mails.length})</h2>
+      <h2 style={{ fontSize: 16, marginTop: 24 }}>만든 사람에게 온 편지 ({mails.length})</h2>
       <p><SyncButton enabled={notionEnabled()} /></p>
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", background: "white" }}>
@@ -72,6 +72,11 @@ export default async function FindAdmin() {
       <PlanAdmin plans={plans.map((p) => ({ id: p.id, title: p.title, status: p.status, fuel: p.fuel }))} />
       <h2 style={{ fontSize: 16, marginTop: 24 }}>신고된 집 ({reports.filter((r) => !r.resolved).length})</h2>
       <table style={{ borderCollapse: "collapse", width: "100%", background: "white" }}><tbody>{reports.map((r) => <ReportRow key={r.id} report={r} />)}</tbody></table>
+      <h2 style={{ fontSize: 16, marginTop: 24 }}>3D 마을 실제 기기 성능 (최근 {fps.length})</h2>
+      <p className="muted small">마을에 들어와 12초 뒤 한 번 기록. fps 30 이상이면 부드러움, 20 이하면 버벅임(20 아래는 20으로 찍힘). 가벼운 모드가 켜져도 낮으면 기기 한계.</p>
+      <table className="small" style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr><th align="left">때</th><th>fps</th><th>가볍게</th><th>메모리</th><th>코어</th><th>배율</th></tr></thead><tbody>
+        {fps.map((e, i) => <tr key={i}><td>{e.createdAt.slice(5, 16).replace("T", " ")}</td><td align="center" style={{ color: Number(e.props.fps) < 25 ? "#C23B2F" : undefined }}>{String(e.props.fps ?? "")}</td><td align="center">{String(e.props.light ?? "")}</td><td align="center">{String(e.props.mem ?? "")}</td><td align="center">{String(e.props.cores ?? "")}</td><td align="center">{String(e.props.dpr ?? "")}</td></tr>)}
+      </tbody></table>
       <h2 style={{ fontSize: 16, marginTop: 24 }}>이벤트 수</h2>
       <p><ClearEvents /></p>
       <p className="muted">{Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" · ") || "아직 없음"}</p>

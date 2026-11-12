@@ -15,6 +15,7 @@ import { track } from "./track";
 
 const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
 const DICE = ["현관문 잠갔는지 매번 불안해", "화분에 물 줄 때를 모르겠어", "밤에 불 끄러 일어나기 귀찮아", "택배 왔는지 자꾸 나가봐", "스트레칭을 자꾸 까먹어", "방이 건조한지 모르겠어", "공부할 때 폰을 자꾸 만져", "강아지가 물을 얼마나 마셨는지 궁금해"];
+const PH = [...EXAMPLES, ...DICE];
 const CAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
 const STEP: Record<Screen, string> = { opening: "", intro: "1 / 4", thinking: "1 / 4", software: "1 / 4", unsafe: "1 / 4", stoke: "2 / 4", reveal: "3 / 4", forge: "4 / 4" };
 const VIBE_PROMPT = (idea: string) => `나는 개발자가 아니야. "${idea.trim().slice(0, 200)}" 이걸 해결하는 걸 만들고 싶어.\n1) 하루 만에 써볼 수 있는 가장 작은 버전을 기능 3개 이내로 제안해줘.\n2) 모르는 용어는 풀어서 설명하고, 정할 건 선택지로 물어봐줘.\n3) 동작하는 첫 화면부터 만들고 하나씩 붙여가자.`;
@@ -29,6 +30,9 @@ const EMPTY_TREE: ChipTree = { root: [], follow: {} };
 export default function FindFlow({ couponText }: { couponText: string | null }) {
   const [screen, setScreen] = useState<Screen>("opening");
   const [nickname, setNickname] = useState("");
+  // 입력칸 예시는 몇 초마다 바뀐다 (비워두고 누르면 그때 보이던 예시로 시작)
+  const [ph, setPh] = useState(0);
+  useEffect(() => { const t = setInterval(() => setPh((n) => (n + 1) % PH.length), 3200); return () => clearInterval(t); }, []);
   const [idea, setIdea] = useState("");
   const [analysis, setAnalysis] = useState<FindAnalysis | null>(null);
   const [tree, setTree] = useState<ChipTree>(EMPTY_TREE);
@@ -109,13 +113,15 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   }
 
   async function submitIdea(forceHardware = false) {
-    if (!idea.trim()) return;
+    // 비워두고 누르면 입력칸에 보이던 예시를 그대로 내 아이디어로 쓴다
+    const text = idea.trim() || PH[ph];
+    if (!idea.trim()) setIdea(text);
     setError("");
-    if (!forceHardware) track("idea_submit", { length: idea.trim().length });
+    if (!forceHardware) track("idea_submit", { length: text.length, example: String(!idea.trim()) });
     go("thinking");
     const started = Date.now();
     try {
-      const response = await fetch("/api/find/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: idea.trim(), forceHardware }) });
+      const response = await fetch("/api/find/analyze", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: text, forceHardware }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "다시 해줘.");
       // 판별 중 연출(갸웃)을 최소 1.4초는 보여준다
@@ -189,7 +195,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           <h1>내 도깨비불 찾기</h1>
           <div className="field">
             <label htmlFor="idea">뭘 만들고 싶어?</label>
-            <textarea id="idea" rows={3} maxLength={300} placeholder="예: 물 마시는 걸 자꾸 까먹어" value={idea} onChange={(e) => setIdea(e.target.value)}
+            <textarea id="idea" rows={3} maxLength={300} placeholder={`예: ${PH[ph]}`} value={idea} onChange={(e) => setIdea(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submitIdea(); } }} />
           </div>
           <div className="chips">
@@ -201,7 +207,8 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           </div>
           {error && <p className="error" role="alert">{error}</p>}
           <div className="spacer" />
-          <button className="btn" type="button" disabled={!idea.trim()} onClick={() => submitIdea()}>나와라, 뚝딱!</button>
+          <button className="btn" type="button" onClick={() => submitIdea()}>나와라, 뚝딱!</button>
+          {!idea.trim() && <div className="muted small" style={{ textAlign: "center" }}>비워두고 누르면 예시로 해볼게</div>}
         </section>
       )}
 
@@ -277,7 +284,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       )}
 
       {screen === "forge" && (
-        <ForgeSignup fire={result?.fire ?? null} forgeId={result?.forge?.id ?? null} refCode={ref} couponText={couponText} onRestart={() => { setIdea(""); setAnalysis(null); setTree(EMPTY_TREE); resetFire(); go("intro"); }} />
+        <ForgeSignup explain fire={result?.fire ?? null} forgeId={result?.forge?.id ?? null} refCode={ref} couponText={couponText} onRestart={() => { setIdea(""); setAnalysis(null); setTree(EMPTY_TREE); resetFire(); go("intro"); }} />
       )}
 
       {shareOpen && result && <ShareSheet fire={result.fire} onClose={() => setShareOpen(false)} />}
@@ -334,23 +341,12 @@ function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge 
         <div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div>
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
       </div>
-      {forge && (
-        <div className="forge-made">
-          <span className="tiny muted">{forge.isNew ? "달그락 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span>
-          <b>{forge.line}</b>
-          <a className="tiny" href={`/find/village?house=${forge.id}`} onClick={() => track("world_from_result")}>마을로 나가서 내 대장간 앞에 서보기</a>
-          <a className="btn btn-fire" href={`/f/${forge.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }} onClick={() => track(forge.isNew ? "forge_created" : "forge_open")}>{forge.isNew ? "내 대장간 짓기" : "내 대장간 가기"}</a>
-        </div>
-      )}
+      {forge && <div className="forge-made"><span className="tiny muted">{forge.isNew ? "달그락 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span><b>{forge.line}</b></div>}
+      <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>다음</button>
       <a className="practice-cta" href="/find/practice" onClick={() => track("practice_from_result")}>
-        <b>이걸 만들려면 납땜 손기술이 필요해</b>
-        <span>부품 사기 전에 3D 작업대에서 미리 해 보기 →</span>
+        <b>먼저 손으로 해보고 싶다면</b>
+        <span>3D 작업대에서 납땜 미리 해 보기 →</span>
       </a>
-      <div className="blueprint-cta">
-        <div className="display">말하면, 회로도부터 조립까지.</div>
-        <p>대장간이 열리면 네 도깨비불의 회로도 첫 장을 보내줄게.</p>
-        <button className="btn" type="button" style={{ background: "#fff", color: "var(--ink)" }} onClick={onForge}>이 도깨비불의 회로도 받기</button>
-      </div>
       <details className="fold">
         <summary>지금 더 해보면 좋은 것</summary>
         <div className="fold-body">
