@@ -205,7 +205,7 @@ export function breadboard(k: Kit3D, rowsN = 30): GridBoard {
 // 다리 꽂는 부품의 원점 = 첫 구멍과 둘째 구멍의 가운데, 기판 윗면 높이. x축 = 첫 구멍 → 둘째 구멍.
 // tails: 기판 아래로 나오는 다리 (다리 자르기에서 줄어든다). 원점 = 기판 아랫면.
 
-export type LeadPart = { group: T.Group; tails: T.Mesh[]; boardT: number };
+export type LeadPart = { group: T.Group; tails: T.Mesh[]; boardT: number; /** 다리 구부리기: 0 = 곧게 펴짐(새 부품), 1 = ㄱ자로 꺾여 구멍에 들어갈 모양 */ bend?: (b: number) => void };
 
 const BAND: Record<number, string> = { 0: "#1c1c1c", 1: "#7a4a22", 2: "#d22b22", 3: "#f07b1a", 4: "#f2cf1e", 5: "#2f9a3d", 6: "#2a5bd7", 7: "#8a3fc4", 8: "#8d8d8d", 9: "#f4f4f4" };
 function bands(ohms: number) {
@@ -233,13 +233,20 @@ export function resistor(k: Kit3D, pitch: number, ohms: number, boardT = 1.6): L
   cols.forEach((c, i) => { const b = k.mesh(new three.CylinderGeometry(bandAt[i] < -1.9 ? R + 0.13 : R - 0.08, bandAt[i] < -1.9 ? R + 0.13 : R - 0.08, 0.5, 24), k.std(c, { rough: 0.5 }), group); b.rotation.z = Math.PI / 2; b.position.set(bandAt[i], cy, 0); });
   const gb = k.mesh(new three.CylinderGeometry(R + 0.12, R + 0.12, 0.45, 24), k.gold, group); gb.rotation.z = Math.PI / 2; gb.position.set(2.15, cy, 0);
   const lr = 0.3;
+  // 다리 = 몸통에서 꺾이는 곳까지(고정) + 꺾인 뒤 아래로 가는 부분(돌쩌귀에 달려 펴졌다 꺾였다 한다)
+  const tails: T.Mesh[] = [];
+  const hinges: Array<{ g: T.Group; s: number }> = [];
   for (const s of [-1, 1]) {
-    const x0 = s * (L / 2), xe = s * (pitch / 2);
-    const pts = [new three.Vector3(x0, cy, 0), new three.Vector3(xe - s * 0.9, cy, 0), new three.Vector3(xe - s * 0.15, cy - 0.15, 0), new three.Vector3(xe, cy - 0.9, 0), new three.Vector3(xe, 0, 0), new three.Vector3(xe, -boardT, 0)];
-    k.tube(pts, lr, k.tin, group, 32, 8);
+    const x0 = s * (L / 2), xe = s * (pitch / 2), xb = xe - s * 0.9;
+    k.tube([new three.Vector3(x0, cy, 0), new three.Vector3((x0 + xb) / 2, cy, 0), new three.Vector3(xb, cy, 0)], lr, k.tin, group, 6, 8);
+    const hinge = new three.Group(); hinge.position.set(xb, cy, 0); group.add(hinge);
+    k.tube([new three.Vector3(0, 0, 0), new three.Vector3(s * 0.75, -0.15, 0), new three.Vector3(s * 0.9, -0.9, 0), new three.Vector3(s * 0.9, -cy, 0), new three.Vector3(s * 0.9, -cy - boardT, 0)], lr, k.tin, hinge, 24, 8);
+    const t = addTail(k, hinge, s * 0.9, 0, 8, lr, boardT); t.position.y = -cy - boardT;
+    tails.push(t); hinges.push({ g: hinge, s });
   }
-  const tails = [addTail(k, group, -pitch / 2, 0, 8, lr, boardT), addTail(k, group, pitch / 2, 0, 8, lr, boardT)];
-  return { group, tails, boardT };
+  const bend = (b: number) => { for (const h of hinges) h.g.rotation.z = h.s * (1 - Math.min(1, Math.max(0, b))) * (Math.PI / 2); };
+  bend(1);
+  return { group, tails, boardT, bend };
 }
 
 /** LED 5mm. 첫 구멍 = 애노드(긴 다리), 둘째 = 캐소드. */
@@ -408,6 +415,34 @@ export function solderingIron(k: Kit3D) {
 }
 
 /** 니퍼. 원점 = 날 끝. */
+/** 실납 한 토막. 원점 = 녹는 끝, 몸은 +y 쪽 (인두와 같은 규칙). 끝에 몇 바퀴 감긴 실납 */
+export function solderWire(k: Kit3D) {
+  const three = k.three, group = new three.Group();
+  const pts: T.Vector3[] = [new three.Vector3(0, 0, 0), new three.Vector3(0.6, 6, 0), new three.Vector3(0.8, 22, 0), new three.Vector3(0.4, 40, 0)];
+  for (let i = 0; i <= 40; i++) { const a = i * 0.5; pts.push(new three.Vector3(Math.cos(a) * 4, 42 + i * 0.35, Math.sin(a) * 4)); }
+  k.tube(pts, 0.42, k.tin, group, 160, 6);
+  return group;
+}
+/** 공구를 쥔 손 (단순한 장갑 모양). 원점 = 손바닥 가운데, 공구 몸(+y)을 감싼다 */
+export function hand(k: Kit3D, side: "left" | "right") {
+  const three = k.three, group = new three.Group();
+  const skin = k.std("#f0c3a0", { rough: 0.75 });
+  const s = side === "left" ? -1 : 1;
+  const palm = k.mesh(new three.CapsuleGeometry(7.5, 14, 6, 14), skin, group); palm.scale.set(1, 1, 0.62); palm.position.set(s * 8.5, 0, 0);
+  const thumb = k.mesh(new three.CapsuleGeometry(2.6, 9, 4, 10), skin, group); thumb.position.set(s * 2.5, -9, 4.5); thumb.rotation.set(0.5, 0, s * 0.5);
+  for (let i = 0; i < 3; i++) { const f = k.mesh(new three.CapsuleGeometry(2.3, 7, 4, 10), skin, group); f.position.set(s * 1.5, 4 - i * 5.2, -4.2); f.rotation.set(Math.PI / 2, 0, 0); }
+  return group;
+}
+/** 와이어 스트리퍼. 원점 = 홈(전선 들어가는 곳), 손잡이는 +z */
+export function wireStripper(k: Kit3D) {
+  const three = k.three, group = new three.Group();
+  const jaw = k.std("#8f959c", { metal: 1, rough: 0.35 });
+  k.box(4.5, 3, 16, jaw, -2.4, 0, 6, group); k.box(4.5, 3, 16, jaw, 2.4, 0, 6, group);
+  for (let i = 0; i < 4; i++) k.box(10.5, 3.2, 0.7, k.std("#2b2d31", { rough: 0.6 }), 0, 0.1, 2 + i * 3, group);
+  k.mesh(new three.CylinderGeometry(3.6, 3.6, 4.4, 16), jaw, group).position.set(0, 0, 16);
+  for (const s of [-1, 1]) { const h = k.rbox(8, 6.5, 58, 3, k.std("#e8b62e", { rough: 0.7 }), group); h.position.set(s * 7, -3.2, 47); h.rotation.y = s * -0.1; }
+  return group;
+}
 export function flushCutter(k: Kit3D) {
   const three = k.three, group = new three.Group();
   const jaw = k.std("#8f959c", { metal: 1, rough: 0.35 });

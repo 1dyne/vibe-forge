@@ -189,3 +189,59 @@ body:has(.bench){background:#e9e5dd;overflow:hidden}
 @media (max-width:380px){ .bench-panel{--pad:12px} .actions{gap:5px} .actions .toggle .lbl2{display:none} .actions .btn-ghost{padding:10px 9px} .actions .toggle{padding:10px 9px} }
 .bench{word-break:keep-all;overflow-wrap:break-word}
 @media (max-width:899px) and (max-height:760px){ .bench .tap-hint{display:none} }
+
+/* 직접 하기: 손으로 하는 납땜·뒤집기·다리 구부리기 */
+.bench-stage{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.step-box .phase{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.step-box .phase .tools{display:inline-flex;flex-wrap:wrap;gap:4px}
+.step-box .phase .tool{border:1px solid #efc2ae;background:#fff;border-radius:999px;padding:1px 8px;font-family:var(--body);font-size:11.5px;letter-spacing:0;text-transform:none;color:#7a3b26;line-height:1.6}
+.step-box .phase .tool.on{background:#7a3b26;color:#fff;border-color:#7a3b26}
+.bench sup{font-size:.62em;margin-left:1px;color:var(--teal);font-weight:700}
+.step-box .gl{border:none;background:none;padding:0;margin:0;font:inherit;color:inherit;text-decoration:underline dotted #2C7A70;text-underline-offset:3px;cursor:pointer}
+.step-box .gloss-note{margin:6px 0 0;background:#fff;border:1px solid #cfe3de;border-radius:10px;padding:6px 30px 6px 10px;font-size:13px;line-height:1.5;color:#1f3f3a;position:relative}
+.step-box .gloss-note b{color:var(--teal);margin-right:2px}
+.step-box .gloss-note .x{position:absolute;right:4px;top:3px;border:none;background:none;font-size:18px;line-height:1;color:var(--muted);padding:2px 6px}
+.bench .link{border:none;background:none;padding:0 2px;font:inherit;font-size:12.5px;color:var(--teal);font-weight:700;text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.bench .link:disabled{opacity:.45}
+.step-box .hands-line{margin:6px 0 0;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#e6f4f1;color:#1f5c54;font-size:13px;line-height:1.45;padding:6px 10px;border-radius:10px;font-weight:600}
+.step-box .feedback.ok{background:#e3f4ef;color:#1f5c54;border:1px solid #bfe3d9}
+.bench .btn-main.act{background:var(--teal)}
+.hold-ring{position:absolute;z-index:4;width:76px;height:76px;transform:translate(-50%,-50%);pointer-events:none}
+.hold-ring svg{display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25))}
+.hold-ring circle{fill:none;stroke-width:7}
+.hold-ring .bg{stroke:rgba(255,255,255,.55)}
+.hold-ring .fg{stroke:#f0a35a;stroke-linecap:round;transition:stroke .2s}
+.hold-ring.feed .fg{stroke:#e9c45a}
+.hold-ring.good .fg{stroke:#2fe0a0}
+.hold-ring.warn .fg{stroke:#ffb020}
+.hold-ring.cold .fg{stroke:#9c9c97}
+.hold-ring span{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;background:rgba(20,24,28,.88);color:#fff;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:999px}
+.hold-ring.good span{background:#1f7a5c}
+.hold-ring.warn span,.hold-ring.cold span{background:#a5541a}
+.bench-sheet .quick.terms button{background:#fff;border-color:#e3d6c9;color:#5a3b2e}
+@media (max-width:380px){ .actions.has-act .nav{display:none} }
+@media (max-width:899px) and (max-height:760px){
+  .step-box .hands-line,.step-box .gloss-note,.step-box .feedback{font-size:12.5px;padding:4px 8px;margin-top:4px}
+}
+@media (max-width:899px) and (max-height:760px){
+  .step-box .phase{letter-spacing:.06em;font-size:11px}
+  .step-box .phase .tool{font-size:11px;padding:0 6px}
+  .step-box.hands .hands-line>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .step-box.hold .why{display:none}
+}
+@media (max-width:899px) and (max-height:760px){
+  /* 직접 하기 중에는 실수 카드 대신 판정 문구가 같은 내용을 알려 준다 (패널이 3D 띠를 덮지 않게) */
+  .step-box.hands .mistakes,.step-box.hands .mistake-note{display:none}
+  .step-box .phase .tools{flex-wrap:nowrap}
+}
+@media (max-width:899px) and (max-height:760px){
+  .bench-panel:has(.step-box.hands) .count{display:none}
+  .step-box.hands .caution{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 8px;font-size:12px;margin-top:4px}
+}
+@media (max-width:899px){
+  /* 폰 전체: 직접 하기 중에는 패널을 줄여 3D 띠를 지킨다 (부품 줄·실수 카드는 판정 문구가 대신한다) */
+  .bench-panel:has(.step-box.hands) .parts-row{display:none}
+  .step-box.hands .mistakes,.step-box.hands .mistake-note{display:none}
+  .step-box.hands .hands-line>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .step-box.hold .why{display:none}
+}
