@@ -171,6 +171,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
       {more && <div className="overlay" role="dialog" aria-label="대장간 살림" onClick={(e) => { if (e.target === e.currentTarget) setMore(false); }}>
       <div className="sheet tall forge-more">
       {news}
+      {isOwner && <button type="button" className="btn btn-fire" onClick={() => { setMore(false); show("practice"); }}>🔧 손 기술 연습 (3D 작업대)</button>}
       <div className="social-stats">
         <div><b>{social.fuelToday}</b><small>오늘 받은 장작</small></div>
         <div><b>{social.wants}</b><small>나도 갖고 싶어</small></div>
@@ -247,7 +248,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
 
       {open === "mailbox" && <MailSheet screen={`forge:${forge.id}`} onClose={() => setOpen(null)} />}
       {open === "decor" && <DecorSheet initial={forge.decor} village={forge.village} stats={{ neighbors: social.neighbors, fuel: social.fuelTotal, wants: social.wants, notes: social.notes.length }} houseId={forge.id} onClose={() => setOpen(null)} />}
-      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && open !== "memo" && (
+      {open && open !== "mailbox" && open !== "decor" && open !== "lantern" && open !== "memo" && open !== "practice" && (
         <div className="overlay" role="dialog" aria-label="대장간 물건" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
           <div className="sheet tall">
             {open === "hearth" && (latest?.card ? (
