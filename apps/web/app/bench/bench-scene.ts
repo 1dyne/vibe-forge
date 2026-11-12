@@ -752,10 +752,31 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     camera.setViewOffset(W, H, (insetRight - insetLeft) / 2, (insetBottom - insetTop) / 2, W, H);
     camera.aspect = W / H; camera.updateProjectionMatrix();
   };
+  // 실제로 화면에 비춰 보고, 눌러야 할 자리가 하나라도 카드·알약 밑이면 조금씩 물러난다 (폰 배치 점검에서 찾은 문제)
+  const probeCam = new three.PerspectiveCamera();
+  const fitDist = (v: BenchView, tgt: T.Vector3) => {
+    let d = distFor(v);
+    const W = el.clientWidth, H = el.clientHeight; if (!W || !H) return d;
+    const pts = [...stepTargets(current).map((t) => ({ p: t.pos, r: t.radius })), ...(v === "34" || v === "front" ? stepPoints().map((p) => ({ p, r: 0 })) : [])];
+    if (!pts.length) return d;
+    const right = new three.Vector3(), tmp = new three.Vector3(), edge = new three.Vector3();
+    for (let i = 0; i < 8; i++) {
+      probeCam.copy(camera); probeCam.position.copy(tgt).addScaledVector(DIR[v], d); probeCam.lookAt(tgt); probeCam.updateMatrixWorld(); probeCam.updateProjectionMatrix();
+      right.setFromMatrixColumn(probeCam.matrixWorld, 0);
+      const ok = pts.every(({ p, r }) => {
+        tmp.copy(p).project(probeCam); edge.copy(p).addScaledVector(right, Math.max(r, 1.5)).project(probeCam);
+        const x = (tmp.x + 1) / 2 * W, y = (1 - tmp.y) / 2 * H, rp = Math.min(40, Math.abs(edge.x - tmp.x) / 2 * W) + 6;
+        return y - rp >= insetTop && y + rp <= H - insetBottom && x - rp >= insetLeft && x + rp <= W - insetRight;
+      });
+      if (ok) break;
+      d *= 1.12;
+    }
+    return d;
+  };
   let view: BenchView = "34";
   const setView = (v: BenchView, instant = false) => {
     view = v;
-    const tgt = focusFor(v), pos = tgt.clone().add(DIR[v].clone().multiplyScalar(distFor(v)));
+    const tgt = focusFor(v), pos = tgt.clone().add(DIR[v].clone().multiplyScalar(fitDist(v, tgt)));
     if (instant) { camera.position.copy(pos); controls.target.copy(tgt); controls.update(); camT = 1; return; }
     camFrom = { p: camera.position.clone(), t: controls.target.clone() }; camTo = { p: pos, t: tgt }; camT = 0; camStart = performance.now();
   };
