@@ -10,7 +10,43 @@ export const PITCH = 2.54;
 export class Kit3D {
   private mats = new Map<string, T.Material>();
   private texCache = new Map<string, T.Texture>();
+  private geos = new Map<string, T.BufferGeometry>();
+  /** 저사양 모드: 가장 작은 장식(다리·SMD 부품)을 뺀다 */
+  light = false;
+  /** 미리 그려 둔 Wokwi 부품 그림 (태그 → 캔버스). wokwi-art.ts가 채운다 */
+  readonly art = new Map<string, HTMLCanvasElement>();
   constructor(readonly three: Three, readonly maxAniso: number) {}
+
+  /** 같은 모양은 한 번만 만든다 */
+  geo(key: string, make: () => T.BufferGeometry) {
+    let g = this.geos.get(key);
+    if (!g) { g = make(); this.geos.set(key, g); }
+    return g;
+  }
+  /** 작은 부품 여러 개를 InstancedMesh 하나로. at = [x, y, z, 회전Y?] */
+  inst(g: T.BufferGeometry, m: T.Material, at: Array<[number, number, number, number?]>, parent?: T.Object3D, shadow = false) {
+    const im = new this.three.InstancedMesh(g, m, Math.max(1, at.length));
+    const o = new this.three.Object3D();
+    at.forEach(([x, y, z, r], i) => { o.position.set(x, y, z); o.rotation.set(0, r ?? 0, 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+    im.count = at.length;
+    im.castShadow = shadow; im.receiveShadow = true;
+    im.computeBoundingSphere();
+    parent?.add(im);
+    return im;
+  }
+  /** Wokwi 그림을 텍스처로 (미리 불러온 것만, 없으면 null) */
+  artTex(tag: string) {
+    const cv = this.art.get(tag);
+    if (!cv) return null;
+    const key = `art:${tag}`;
+    let t = this.texCache.get(key);
+    if (!t) {
+      t = new this.three.CanvasTexture(cv);
+      t.colorSpace = this.three.SRGBColorSpace; t.anisotropy = this.maxAniso;
+      this.texCache.set(key, t);
+    }
+    return t;
+  }
 
   std(color: string, o: { metal?: number; rough?: number; emissive?: string; opacity?: number; map?: T.Texture; key?: string } = {}) {
     const k = o.key ?? JSON.stringify([color, o.metal, o.rough, o.emissive, o.opacity]);
@@ -168,28 +204,59 @@ export function perfboard(k: Kit3D, cols = 18, rows = 14): GridBoard {
  * 행 1..30 = x(왼→오), 열 A..J = z(뒤→앞), 가운데 홈.
  */
 export function breadboard(k: Kit3D, rowsN = 30): GridBoard {
-  const three = k.three, H = 8.5, W = 82, D = 54.6, pxmm = 14;
+  const three = k.three, H = 8.5, W = 82, D = 54.6, CH = 1.3; // CH = 가운데 홈 반폭
+  const pxmm = Math.min(20, 2048 / W);
   const rx = (r: number) => -((rowsN - 1) * PITCH) / 2 + (r - 1) * PITCH;
   const cz = (c: number) => (c < 5 ? -(3.81 + (4 - c) * PITCH) : 3.81 + (c - 5) * PITCH);
   const railZ = [-(13.97 + 5.3), -(13.97 + 7.84), 13.97 + 5.3, 13.97 + 7.84];
-  const tex = k.canvasTex(`bb-${rowsN}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
-    x.fillStyle = "#f3f1ea"; x.fillRect(0, 0, w, h);
-    const X = (v: number) => (v + W / 2) * pxmm, Z = (v: number) => (v + D / 2) * pxmm;
-    x.fillStyle = "#e4e1d8"; x.fillRect(0, Z(-1.3), w, 2.6 * pxmm);
-    const sq = (px: number, py: number) => { x.fillStyle = "#cfcac0"; x.fillRect(px - 0.75 * pxmm, py - 0.75 * pxmm, 1.5 * pxmm, 1.5 * pxmm); x.fillStyle = "#26231f"; x.fillRect(px - 0.48 * pxmm, py - 0.48 * pxmm, 0.96 * pxmm, 0.96 * pxmm); };
-    for (let r = 1; r <= rowsN; r++) for (let c = 0; c < 10; c++) sq(X(rx(r)), Z(cz(c)));
-    for (const z of railZ) for (let r = 1; r <= rowsN; r++) if ((r - 1) % 6 !== 5) sq(X(rx(r)), Z(z));
-    x.lineWidth = 0.35 * pxmm;
-    for (const [z, col] of [[railZ[1] - 2, "#d43b32"], [railZ[0] + 2, "#2d63c8"], [railZ[2] - 2, "#d43b32"], [railZ[3] + 2, "#2d63c8"]] as Array<[number, string]>) { x.strokeStyle = col; x.beginPath(); x.moveTo(X(-W / 2 + 4), Z(z)); x.lineTo(X(W / 2 - 4), Z(z)); x.stroke(); }
-    x.fillStyle = "#8c877c"; x.font = `600 ${1.5 * pxmm}px "IBM Plex Sans KR", sans-serif`; x.textAlign = "center"; x.textBaseline = "middle";
-    for (let c = 0; c < 10; c++) { x.fillText(COLS[c], X(-W / 2 + 2.2), Z(cz(c))); x.fillText(COLS[c], X(W / 2 - 2.2), Z(cz(c))); }
-    for (let r = 1; r <= rowsN; r++) if (r === 1 || r % 5 === 0) { x.fillText(String(r), X(rx(r)), Z(cz(0) - 2.3)); x.fillText(String(r), X(rx(r)), Z(cz(9) + 2.3)); }
+  const tex = k.canvasTex(`bb2-${rowsN}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
+    const X = (v: number) => (v + W / 2) * pxmm, Z = (v: number) => (v + D / 2) * pxmm, P = pxmm;
+    x.fillStyle = "#f5f3ee"; x.fillRect(0, 0, w, h);
+    // 아주 옅은 플라스틱 결
+    x.globalAlpha = 0.05; for (let i = 0; i < 1400; i++) { x.fillStyle = i % 2 ? "#000" : "#fff"; x.fillRect((i * 997) % w, (i * 613) % h, 2, 2); } x.globalAlpha = 1;
+    // 전원 레일과 본판 사이의 얕은 홈
+    x.fillStyle = "rgba(0,0,0,.07)"; for (const zz of [-(13.97 + 3.1), 13.97 + 3.1]) x.fillRect(0, Z(zz) - 0.25 * P, w, 0.5 * P);
+    // 가운데 홈 (실제 홈은 모델 모양으로 판다. 여기선 가장자리 그늘)
+    const g = x.createLinearGradient(0, Z(-CH - 0.6), 0, Z(CH + 0.6)); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.3, "rgba(0,0,0,.14)"); g.addColorStop(0.7, "rgba(0,0,0,.14)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = g; x.fillRect(0, Z(-CH - 0.6), w, (2 * CH + 1.2) * P);
+    // 구멍: 네모 입구 + 안쪽 그늘 + 아래쪽 밝은 턱
+    const hole = (px: number, py: number) => {
+      x.fillStyle = "#dedad1"; x.fillRect(px - 0.78 * P, py - 0.78 * P, 1.56 * P, 1.56 * P);
+      x.fillStyle = "#1f1d1a"; x.fillRect(px - 0.5 * P, py - 0.5 * P, 1.0 * P, 1.0 * P);
+      x.fillStyle = "#4a4640"; x.fillRect(px - 0.5 * P, py + 0.22 * P, 1.0 * P, 0.28 * P);
+      x.fillStyle = "rgba(255,255,255,.7)"; x.fillRect(px - 0.78 * P, py + 0.66 * P, 1.56 * P, 0.12 * P);
+    };
+    for (let r = 1; r <= rowsN; r++) for (let c = 0; c < 10; c++) hole(X(rx(r)), Z(cz(c)));
+    for (const z of railZ) for (let r = 1; r <= rowsN; r++) if ((r - 1) % 6 !== 5) hole(X(rx(r)), Z(z));
+    // 레일 선과 +/− 표시
+    x.lineWidth = 0.32 * P; x.lineCap = "round";
+    const rails: Array<[number, string, string]> = [[railZ[1] - 2, "#d43b32", "+"], [railZ[0] + 2, "#2d63c8", "−"], [railZ[2] - 2, "#d43b32", "+"], [railZ[3] + 2, "#2d63c8", "−"]];
+    x.font = `700 ${2.0 * P}px "IBM Plex Sans KR", sans-serif`; x.textAlign = "center"; x.textBaseline = "middle";
+    for (const [z, col, sign] of rails) {
+      x.strokeStyle = col; x.beginPath(); x.moveTo(X(-W / 2 + 5), Z(z)); x.lineTo(X(W / 2 - 5), Z(z)); x.stroke();
+      x.fillStyle = col; x.fillText(sign, X(-W / 2 + 2.4), Z(z)); x.fillText(sign, X(W / 2 - 2.4), Z(z));
+    }
+    // 열 글자, 행 번호
+    x.fillStyle = "#77736b"; x.font = `600 ${1.45 * P}px "IBM Plex Sans KR", sans-serif`;
+    for (let c = 0; c < 10; c++) { x.fillText(COLS[c].toLowerCase(), X(rx(1) - 2.6), Z(cz(c))); x.fillText(COLS[c].toLowerCase(), X(rx(rowsN) + 2.6), Z(cz(c))); }
+    x.font = `600 ${1.2 * P}px "IBM Plex Sans KR", sans-serif`;
+    for (let r = 1; r <= rowsN; r++) if (r === 1 || r % 5 === 0) { x.fillText(String(r), X(rx(r)), Z(cz(0) - 2.1)); x.fillText(String(r), X(rx(r)), Z(cz(9) + 2.1)); }
   });
-  const side = k.std("#e9e6dd", { rough: 0.7 });
-  const topM = k.std("#ffffff", { map: tex, rough: 0.7 });
+  const side = k.std("#ebe8e0", { rough: 0.7 });
+  const topM = k.std("#ffffff", { map: tex, rough: 0.7, key: `bb2-top-${rowsN}` });
   const group = new three.Group();
-  const me = k.mesh(new three.BoxGeometry(W, H, D), [side, side, topM, side, side, side], group);
-  me.position.y = H / 2; me.userData.board = true;
+  // 몸통 = 앞·뒤 두 판 + 가운데 홈 바닥 (홈 깊이 1.6mm)
+  const half = (D / 2 - CH);
+  for (const s of [-1, 1]) {
+    const cz0 = s * (CH + half / 2);
+    const g = new three.BoxGeometry(W, H, half); mapTopUV(g, 0, cz0, W, D);
+    const me = k.mesh(g, [side, side, topM, side, side, side], group);
+    me.position.set(0, H / 2, cz0); me.userData.board = true;
+  }
+  const floor = k.mesh(new three.BoxGeometry(W, H - 1.6, CH * 2), k.std("#d9d5cc", { rough: 0.75 }), group);
+  floor.position.y = (H - 1.6) / 2; floor.userData.board = true;
+  // 옆면 끼움 홈(다른 브레드보드와 잇는 돌기 자리)
+  if (!k.light) for (const s of [-1, 1]) for (const zz of [-16, 16]) k.box(0.6, H - 2, 3.2, k.std("#dcd8cf", { rough: 0.7 }), s * (W / 2 + 0.3), H / 2, zz, group);
   const hole = (name: string) => { const p = parseHole(name); if (!p || p.c < 0 || p.c > 9 || p.r < 1 || p.r > rowsN) return null; return new three.Vector3(rx(p.r), H, cz(p.c)); };
   const nearest = (l: T.Vector3) => {
     const r = Math.round((l.x - rx(1)) / PITCH) + 1;
@@ -462,10 +529,266 @@ export function probe(k: Kit3D, color: string) {
   return group;
 }
 
+// ───────────────────────── 실물 부품 디테일 ─────────────────────────
+
+/** 박스 윗면(+y) UV를 큰 판(W×D, 가운데 원점) 안의 자리로 맞춘다. cx, cz = 이 박스의 가운데 */
+function mapTopUV(g: T.BufferGeometry, cx: number, cz: number, W: number, D: number) {
+  const pos = g.attributes.position as T.BufferAttribute, uv = g.attributes.uv as T.BufferAttribute;
+  for (let i = 8; i < 12; i++) uv.setXY(i, (pos.getX(i) + cx + W / 2) / W, 1 - (pos.getZ(i) + cz + D / 2) / D);
+  uv.needsUpdate = true;
+}
+
+/** 암 헤더 윗면 한 칸 (네모 구멍). u를 칸 수만큼 늘려 반복한다 */
+function femaleCellTex(k: Kit3D) {
+  const t = k.canvasTex("hdr-f-cell", 64, 64, (x, w, h) => {
+    x.fillStyle = "#1c1c1e"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#2a2a2d"; x.fillRect(w * 0.16, h * 0.16, w * 0.68, h * 0.68);
+    x.fillStyle = "#050505"; x.fillRect(w * 0.27, h * 0.27, w * 0.46, h * 0.46);
+    x.fillStyle = "rgba(226,183,90,.55)"; x.fillRect(w * 0.42, h * 0.36, w * 0.16, h * 0.28);
+  });
+  t.wrapS = k.three.RepeatWrapping;
+  return t;
+}
+/** 암 헤더 n칸. 원점 = 바닥 가운데, 길이 방향 x */
+export function headerFemale(k: Kit3D, n: number, parent: T.Object3D, x: number, y: number, z: number, rotY = 0, h = 8.5) {
+  const g = k.geo(`hdrF-${n}-${h}`, () => {
+    const b = new k.three.BoxGeometry(n * PITCH, h, PITCH);
+    const uv = b.attributes.uv as T.BufferAttribute;
+    for (let i = 8; i < 12; i++) uv.setX(i, uv.getX(i) * n);
+    b.translate(0, h / 2, 0);
+    return b;
+  });
+  const black = k.std("#1c1c1e", { rough: 0.6 });
+  const top = k.std("#ffffff", { map: femaleCellTex(k), rough: 0.6, key: "hdrF-top" });
+  const me = k.mesh(g, [black, black, top, black, black, black], parent);
+  me.position.set(x, y, z); me.rotation.y = rotY;
+  return me;
+}
+
+/** 금색 수 핀 여러 개 (검은 받침 위). at = 핀 자리 [x, z], 받침은 따로 */
+function malePins(k: Kit3D, parent: T.Object3D, y0: number, at: Array<[number, number]>, above = 6, base = 2.5) {
+  const g = k.geo(`mpin-${above}-${base}`, () => { const b = new k.three.BoxGeometry(0.64, above + base, 0.64); b.translate(0, (above + base) / 2, 0); return b; });
+  k.inst(g, k.gold, at.map(([x, z]) => [x, y0, z]), parent, true);
+}
+
+/** 앞면에 그림이 있는 상자 (USB 소켓·DC 잭 등). face: BoxGeometry 면 번호 */
+function facedBox(k: Kit3D, w: number, h: number, d: number, base: T.Material, faceMat: T.Material, face: number, topMat?: T.Material) {
+  const mats = [base, base, topMat ?? base, base, base, base]; mats[face] = faceMat;
+  return k.mesh(new k.three.BoxGeometry(w, h, d), mats);
+}
+
+function usbBFaceTex(k: Kit3D) {
+  return k.canvasTex("usbB-face", 128, 128, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#dfe3e8"); g.addColorStop(1, "#a9aeb5");
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    // USB-B 입구: 위 두 모서리가 깎인 네모
+    const L = w * 0.2, R = w * 0.8, Tp = h * 0.18, B = h * 0.86, c = w * 0.12;
+    x.fillStyle = "#121315"; x.beginPath(); x.moveTo(L + c, Tp); x.lineTo(R - c, Tp); x.lineTo(R, Tp + c); x.lineTo(R, B); x.lineTo(L, B); x.lineTo(L, Tp + c); x.closePath(); x.fill();
+    x.fillStyle = "#ecebe6"; x.fillRect(w * 0.34, h * 0.36, w * 0.32, h * 0.34);
+    x.fillStyle = "#c9a54e"; for (const u of [0.38, 0.6]) for (const v of [0.4, 0.6]) x.fillRect(w * u, h * v, w * 0.04, h * 0.06);
+    x.strokeStyle = "rgba(0,0,0,.25)"; x.lineWidth = 3; x.strokeRect(2, 2, w - 4, h - 4);
+  });
+}
+function usbBTopTex(k: Kit3D) {
+  return k.canvasTex("usbB-top", 128, 128, (x, w, h) => {
+    x.fillStyle = "#c3c8ce"; x.fillRect(0, 0, w, h);
+    x.strokeStyle = "rgba(60,64,70,.35)"; x.lineWidth = 2;
+    x.strokeRect(w * 0.08, h * 0.1, w * 0.84, h * 0.8);
+    x.beginPath(); x.moveTo(w * 0.25, h * 0.1); x.lineTo(w * 0.25, h * 0.9); x.stroke();
+    x.fillStyle = "rgba(60,64,70,.3)"; for (const v of [0.3, 0.7]) x.fillRect(w * 0.5, h * v - 4, w * 0.3, 8);
+  });
+}
+function jackFaceTex(k: Kit3D) {
+  return k.canvasTex("jack-face", 128, 128, (x, w, h) => {
+    x.fillStyle = "#1d1d20"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#08080a"; x.beginPath(); x.arc(w / 2, h * 0.5, w * 0.3, 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#b9bec6"; x.beginPath(); x.arc(w / 2, h * 0.5, w * 0.08, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = "rgba(255,255,255,.08)"; x.lineWidth = 3; x.strokeRect(3, 3, w - 6, h - 6);
+  });
+}
+function dipTopTex(k: Kit3D, mark: string, sub: string) {
+  return k.canvasTex(`dip-${mark}`, 1024, 192, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#2c2e31"); g.addColorStop(1, "#232527");
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#141516"; x.beginPath(); x.arc(w, h / 2, h * 0.13, 0, Math.PI * 2); x.fill(); // 홈(1번 핀 쪽)
+    x.fillStyle = "#1a1b1d"; for (const u of [0.11, 0.86]) { x.beginPath(); x.arc(w * u, h / 2, h * 0.14, 0, Math.PI * 2); x.fill(); }
+    x.fillStyle = "#9a9ea3"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = `600 ${h * 0.24}px "IBM Plex Sans KR", monospace`; x.fillText(mark, w * 0.48, h * 0.4);
+    x.font = `500 ${h * 0.17}px "IBM Plex Sans KR", monospace`; x.fillText(sub, w * 0.48, h * 0.7);
+  });
+}
+function chipTopTex(k: Kit3D, mark: string) {
+  return k.canvasTex(`chip-${mark}`, 128, 128, (x, w, h) => {
+    x.fillStyle = "#1e1f21"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#3a3c40"; x.beginPath(); x.arc(w * 0.18, h * 0.18, w * 0.07, 0, Math.PI * 2); x.fill();
+    x.fillStyle = "#8d9196"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = `600 ${h * 0.2}px monospace`; x.fillText(mark, w / 2, h * 0.55);
+  });
+}
+/** SMD 전해 캐패시터 윗면: 알루미늄, 십자 벤트, 극성 표시(검은 반달) */
+function capTopTex(k: Kit3D) {
+  return k.canvasTex("ecap-top", 128, 128, (x, w, h) => {
+    const g = x.createRadialGradient(w * 0.4, h * 0.4, 4, w / 2, h / 2, w / 2); g.addColorStop(0, "#f1f3f5"); g.addColorStop(1, "#aeb4bb");
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#24262a"; x.beginPath(); x.arc(w / 2, h / 2, w / 2, Math.PI * 0.62, Math.PI * 1.38); x.closePath(); x.fill();
+    x.strokeStyle = "rgba(70,74,80,.75)"; x.lineWidth = 4;
+    x.beginPath(); x.moveTo(w * 0.5, h * 0.24); x.lineTo(w * 0.5, h * 0.76); x.moveTo(w * 0.28, h * 0.5); x.lineTo(w * 0.72, h * 0.5); x.stroke();
+  });
+}
+function crystalTopTex(k: Kit3D) {
+  return k.canvasTex("xtal-top", 256, 100, (x, w, h) => {
+    x.fillStyle = "#d3d7dc"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#5b6067"; x.font = `700 ${h * 0.42}px monospace`; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("16.000", w / 2, h / 2 + 2);
+  });
+}
+
+/** 스테디움(양 끝이 반원) 모양 기둥: 크리스털 캔 */
+function stadium(k: Kit3D, len: number, wid: number, h: number) {
+  return k.geo(`stadium-${len}-${wid}-${h}`, () => {
+    const three = k.three, r = wid / 2, a = len / 2 - r, s = new three.Shape();
+    s.moveTo(-a, -r); s.lineTo(a, -r); s.absarc(a, 0, r, -Math.PI / 2, Math.PI / 2, false); s.lineTo(-a, r); s.absarc(-a, 0, r, Math.PI / 2, Math.PI * 1.5, false);
+    const g = new three.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 8 });
+    g.rotateX(-Math.PI / 2);
+    return g;
+  });
+}
+
+/**
+ * Arduino UNO R3. 좌표는 Wokwi 그림(2D 기판과 같은 그림)의 SVG 좌표(mm)로 적는다.
+ * 자리(foot) 72.58×53.34 중 왼쪽 4mm는 USB·DC 잭이 기판 밖으로 나온 자리다.
+ */
+function unoBoard(k: Kit3D, body: T.Group, lift: number, W: number, D: number, art: T.Texture | null) {
+  const three = k.three, T2 = 1.6, y0 = lift + T2;
+  const X = (sx: number) => sx + 4 - W / 2, Z = (sy: number) => sy - D / 2;
+  // 기판 외곽 (오른쪽 위 모서리가 깎이고, 오른쪽 끝이 계단 모양)
+  const outline: Array<[number, number]> = [[0.999, 0], [64.514, 0], [66.038, 1.525], [66.038, 12.955], [68.577, 15.494], [68.577, 48.26], [66.038, 50.799], [66.038, 52.339], [65.039, 53.338], [0.999, 53.338], [0, 52.339], [0, 0.999]];
+  const holes: Array<[number, number]> = [[15.24, 2.54], [13.97, 50.8], [66.04, 17.78], [66.04, 45.72]];
+  const g = k.geo(`uno-pcb-${W}-${D}`, () => {
+    const s = new three.Shape();
+    outline.forEach(([sx, sy], i) => (i ? s.lineTo(X(sx), -Z(sy)) : s.moveTo(X(sx), -Z(sy))));
+    for (const [hx, hy] of holes) { const p = new three.Path(); p.absarc(X(hx), -Z(hy), 1.6, 0, Math.PI * 2, true); s.holes.push(p); }
+    const e = new three.ExtrudeGeometry(s, { depth: T2, bevelEnabled: false, curveSegments: 10 });
+    e.rotateX(-Math.PI / 2);
+    const pos = e.attributes.position as T.BufferAttribute, uv = e.attributes.uv as T.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + W / 2) / W, 1 - (pos.getZ(i) + D / 2) / D);
+    return e;
+  });
+  const tex = art ?? k.canvasTex("uno-fallback", 1024, 752, (x, w, h) => {
+    x.fillStyle = "#2b6b99"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "rgba(255,255,255,.9)"; x.textAlign = "center"; x.font = `800 ${h * 0.12}px "IBM Plex Sans KR", sans-serif`; x.fillText("UNO R3", w * 0.55, h * 0.36);
+  });
+  const pcb = k.mesh(g, [k.std("#ffffff", { map: tex, rough: 0.55, key: `uno-top-${art ? "art" : "fb"}` }), k.std("#1f5578", { rough: 0.6 })], body);
+  pcb.position.y = lift;
+  pcb.userData.board = true;
+
+  // USB-B 소켓 (기판 밖으로 4mm 나온다), DC 잭
+  const usb = facedBox(k, 14.46, 10.9, 11.85, k.std("#c3c8ce", { metal: 0.9, rough: 0.32 }), k.std("#ffffff", { map: usbBFaceTex(k), metal: 0.6, rough: 0.35, key: "usbB-face" }), 1, k.std("#ffffff", { map: usbBTopTex(k), metal: 0.85, rough: 0.32, key: "usbB-top" }));
+  usb.position.set(X(3.23), y0 + 5.45, Z(15.295)); body.add(usb);
+  const jack = facedBox(k, 13.9, 11, 8.9, k.std("#1b1b1e", { rough: 0.5 }), k.std("#ffffff", { map: jackFaceTex(k), rough: 0.5, key: "jack-face" }), 1);
+  jack.position.set(X(4.375), y0 + 5.5, Z(45.61)); body.add(jack);
+
+  // 암 헤더 4줄 (Wokwi 그림의 헤더 자리와 같다)
+  for (const [sx, sy, n] of [[17.497, 1.27, 10], [44.421, 1.27, 8], [26.641, 49.53, 8], [49.501, 49.53, 6]] as const) headerFemale(k, n, body, X(sx + 0.19 + (n * PITCH) / 2), y0, Z(sy + 1.27));
+
+  // ATmega328P (DIP-28)
+  const dip = k.mesh(k.geo("dip28", () => new three.BoxGeometry(37.35, 3.1, 7.05)), [k.std("#26282a", { rough: 0.5 }), k.std("#26282a", { rough: 0.5 }), k.std("#ffffff", { map: dipTopTex(k, "ATMEGA328P-PU", "1839  AU"), rough: 0.5, key: "dip-top" }), k.std("#26282a"), k.std("#26282a"), k.std("#26282a")], body);
+  dip.position.set(X(46.575), y0 + 0.9 + 1.55, Z(36.975));
+  if (!k.light) {
+    const sh = k.geo("dip-shoulder", () => new three.BoxGeometry(0.5, 0.25, 0.7));
+    const lg = k.geo("dip-leg", () => { const b = new three.BoxGeometry(0.45, 1.9, 0.25); b.translate(0, -0.95, 0); return b; });
+    const sAt: Array<[number, number, number]> = [], lAt: Array<[number, number, number]> = [];
+    for (let i = 0; i < 14; i++) {
+      const lx = X(29.965 + i * PITCH);
+      for (const [ez, out] of [[33.45, -1], [40.5, 1]] as const) { sAt.push([lx, y0 + 1.7, Z(ez + out * 0.3)]); lAt.push([lx, y0 + 1.75, Z(ez + out * 0.6)]); }
+    }
+    k.inst(sh, k.tin, sAt, body); k.inst(lg, k.tin, lAt, body);
+  }
+
+  // ICSP 헤더 2개 (2×3 수 핀)
+  const blackP = k.std("#1d1e20", { rough: 0.55 });
+  const icsp: Array<[number, number]> = [];
+  k.box(7.62, 2.5, 5.08, blackP, X(17.64), y0 + 1.25, Z(6.8), body);
+  for (let i = 0; i < 3; i++) for (const v of [5.53, 8.07]) icsp.push([X(15.1 + i * PITCH), Z(v)]);
+  k.box(5.08, 2.5, 7.62, blackP, X(65.4), y0 + 1.25, Z(23.66), body);
+  for (let i = 0; i < 3; i++) for (const u of [64.13, 66.67]) icsp.push([X(u), Z(26.2 - i * PITCH)]);
+  malePins(k, body, y0, icsp);
+
+  // 리셋 택트 스위치
+  k.box(6, 2.2, 6, k.std("#2a2b2e", { rough: 0.5 }), X(6.96), y0 + 1.1, Z(4.53), body);
+  k.box(6.2, 0.3, 6.2, k.steel, X(6.96), y0 + 2.35, Z(4.53), body);
+  const cap = k.mesh(k.geo("tact-cap", () => new three.CylinderGeometry(1.75, 1.75, 1.2, 16)), k.std("#8f1d1d", { rough: 0.45 }), body); cap.position.set(X(6.96), y0 + 3.1, Z(4.53));
+
+  // USB 변환 칩(ATmega16U2), 16MHz 크리스털, 전해 캐패시터 2개, 레귤레이터
+  const qfn = k.mesh(k.geo("qfn5", () => new three.BoxGeometry(5, 0.9, 5)), [k.std("#1e1f21"), k.std("#1e1f21"), k.std("#ffffff", { map: chipTopTex(k, "16U2"), key: "chip-16u2" }), k.std("#1e1f21"), k.std("#1e1f21"), k.std("#1e1f21")], body);
+  qfn.position.set(X(19.6), y0 + 0.45, Z(15.4)); qfn.rotation.y = Math.PI / 4;
+  const xt = k.mesh(stadium(k, 11, 4.6, 3.5), k.std("#c9cdd2", { metal: 0.9, rough: 0.3 }), body); xt.position.set(X(19), y0, Z(24.2));
+  const xl = k.mesh(k.geo("xtal-label", () => new three.PlaneGeometry(8, 3)), k.std("#ffffff", { map: crystalTopTex(k), metal: 0.6, rough: 0.35, key: "xtal-top" }), body, false); xl.rotation.x = -Math.PI / 2; xl.position.set(X(19), y0 + 3.52, Z(24.2));
+  const can = k.geo("ecap-can", () => new three.CylinderGeometry(3.15, 3.15, 5.4, 20));
+  const canM = [k.std("#b9bfc6", { metal: 0.85, rough: 0.35 }), k.std("#ffffff", { map: capTopTex(k), metal: 0.6, rough: 0.35, key: "ecap-top" }), k.std("#888")];
+  for (const sx of [15.6, 22.4]) {
+    k.box(6.6, 0.9, 6.6, k.std("#1d1e20", { rough: 0.6 }), X(sx), y0 + 0.45, Z(44.8), body);
+    const c = k.mesh(can, canM, body); c.position.set(X(sx), y0 + 0.9 + 2.7, Z(44.8)); c.rotation.y = Math.PI / 2;
+  }
+  k.box(6.5, 1.7, 3.5, k.std("#1e1f21", { rough: 0.5 }), X(15.2), y0 + 0.85, Z(36.6), body);
+  k.box(3.2, 0.3, 1.6, k.tin, X(15.2), y0 + 0.15, Z(38.9), body);
+  if (!k.light) {
+    // 작은 SMD 저항·캐패시터 (0805)
+    const smdB = k.geo("smd0805", () => new three.BoxGeometry(1.4, 0.55, 1.25));
+    const smdE = k.geo("smd0805e", () => new three.BoxGeometry(0.35, 0.6, 1.27));
+    const tan: Array<[number, number, number, number?]> = [], blk: Array<[number, number, number, number?]> = [], ends: Array<[number, number, number, number?]> = [];
+    const spots: Array<[number, number, number, number]> = [[24.2, 13.6, 0, 1], [24.2, 16.4, 0, 0], [24.2, 19.2, 0, 1], [15.4, 19.8, 1, 0], [13.6, 12.2, 1, 1], [22.6, 8.4, 0, 0], [13.2, 29.4, 0, 1], [17.2, 29.4, 0, 0], [21.2, 29.4, 0, 1], [11.6, 33.6, 1, 0], [19.6, 36.4, 1, 1], [21.4, 40.2, 0, 0], [56.4, 22.6, 0, 1], [60.4, 22.6, 0, 0], [52.6, 28.6, 1, 1]];
+    for (const [sx, sy, rot, kind] of spots) {
+      const r = rot ? Math.PI / 2 : 0, x0 = X(sx), z0 = Z(sy);
+      (kind ? blk : tan).push([x0, y0 + 0.28, z0, r]);
+      for (const s of [-1, 1]) ends.push(rot ? [x0, y0 + 0.3, z0 + s * 0.85, r] : [x0 + s * 0.85, y0 + 0.3, z0, r]);
+    }
+    k.inst(smdB, k.std("#c9a77a", { rough: 0.5 }), tan, body); k.inst(smdB, k.std("#1b1b1c", { rough: 0.5 }), blk, body); k.inst(smdE, k.tin, ends, body);
+  }
+}
+
+/** FSR 402: 둥근 감지 패드(Ø18.3, 감지 영역 Ø12.7) + 가는 꼬리 + 두 다리. 핀 자리는 카드/가이드 그대로 */
+function fsrModel(k: Kit3D, body: T.Group, bodyPins: Array<{ x: number; z: number }>, W: number, D: number) {
+  const three = k.three;
+  const pc = bodyPins.length ? bodyPins.reduce((a, p) => ({ x: a.x + p.x / bodyPins.length, z: a.z + p.z / bodyPins.length }), { x: 0, z: 0 }) : { x: 0, z: D / 2 - 2 };
+  const R = Math.min(9.15, Math.max(5, Math.min(W, D) / 2));
+  // 패드는 핀 반대쪽 끝에
+  let dx = -pc.x, dz = -pc.z; const dl = Math.hypot(dx, dz);
+  if (dl < 1) { dx = 0; dz = -1; } else { dx /= dl; dz /= dl; }
+  const reach = Math.max(0, Math.max(W, D) / 2 - R);
+  const padC = { x: dx * reach, z: dz * reach };
+  const y = 1.0, th = 0.4;
+  const padTex = k.canvasTex("fsr-pad", 256, 256, (x, w, h) => {
+    x.fillStyle = "#2b2c2e"; x.beginPath(); x.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2); x.fill();
+    const g = x.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w * 0.35); g.addColorStop(0, "#c9b98a"); g.addColorStop(1, "#a8996d");
+    x.fillStyle = g; x.beginPath(); x.arc(w / 2, h / 2, w * 0.35, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = "rgba(90,78,50,.45)"; x.lineWidth = 3;
+    for (let i = -6; i <= 6; i++) { const yy = h / 2 + i * w * 0.05; const half = Math.sqrt(Math.max(0, (w * 0.33) ** 2 - (yy - h / 2) ** 2)); x.beginPath(); x.moveTo(w / 2 - half, yy); x.lineTo(w / 2 + half, yy); x.stroke(); }
+  });
+  const pad = k.mesh(k.geo(`fsr-pad-${R}`, () => new three.CylinderGeometry(R, R, th, 32)), [k.std("#2b2c2e", { rough: 0.6 }), k.std("#ffffff", { map: padTex, rough: 0.45, key: "fsr-pad" }), k.std("#2b2c2e")], body);
+  pad.position.set(padC.x, y, padC.z);
+  // 꼬리: 패드 → 핀 사이
+  const len = Math.max(2, Math.hypot(pc.x - padC.x, pc.z - padC.z) + 1.5);
+  const spread = bodyPins.length > 1 ? Math.max(...bodyPins.map((p) => Math.abs((p.x - pc.x) * dz - (p.z - pc.z) * dx))) * 2 : 2.54;
+  const tw = Math.max(7, spread + 3);
+  const tailTex = k.canvasTex("fsr-tail", 64, 256, (x, w, h) => {
+    x.fillStyle = "#2b2c2e"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#b8bcc2"; x.fillRect(w * 0.22, 0, w * 0.14, h); x.fillRect(w * 0.64, 0, w * 0.14, h);
+  });
+  const tail = k.mesh(new three.BoxGeometry(tw, th * 0.8, len), [k.std("#2b2c2e"), k.std("#2b2c2e"), k.std("#ffffff", { map: tailTex, rough: 0.5, key: "fsr-tail" }), k.std("#2b2c2e"), k.std("#2b2c2e"), k.std("#2b2c2e")], body);
+  // 패드 가운데에서 핀 너머 1.5mm까지
+  tail.position.set((padC.x + pc.x) / 2 - dx * 0.75, y - 0.02, (padC.z + pc.z) / 2 - dz * 0.75); tail.rotation.y = Math.atan2(dx, dz);
+  // 다리 끝 금속 집게(크림프)
+  for (const p of bodyPins) { const c = k.box(1.8, 0.7, 3, k.steel, p.x, y, p.z, body); c.rotation.y = Math.atan2(dx, dz); }
+}
+
 // ───────────────────────── 프로젝트 부품 (부품 카드 기반) ─────────────────────────
 
 export type ModuleSpec = {
   catalogId?: string; partType?: string; model: string; color?: string;
+  /** 가이드의 부품 이름 (저항 값 등을 읽는다: "10k", "220Ω") */
+  label?: string;
+  /** 부품 카드의 Wokwi 태그 (있으면 2D와 같은 그림을 윗면에 쓴다) */
+  wokwiTag?: string;
   foot: { x: number; y: number; w: number; h: number; rotation: number };
   pinXY: Array<{ name: string; x: number; y: number }>;
 };
@@ -505,7 +828,7 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
     const ax = along();
     const sub = new three.Group(); sub.position.copy(ax.mid); sub.rotation.y = ax.ang; group.add(sub);
     let led: ModuleModel["led"];
-    if (id === "resistor") { const r = resistor(k, Math.max(7.62, ax.len), 220, onBreadboard ? 6 : 1.6); sub.add(r.group); r.tails.forEach((t) => (t.visible = false)); }
+    if (id === "resistor") { const r = resistor(k, Math.max(7.62, ax.len), parseOhms(spec.label) ?? parseOhms(spec.model) ?? 220, onBreadboard ? 6 : 1.6); sub.add(r.group); r.tails.forEach((t) => (t.visible = false)); }
     else { const l = led5(k, spec.color ?? "#ff3b2f", onBreadboard ? 6 : 1.6); sub.add(l.group); l.tails.forEach((t) => (t.visible = false)); led = { lens: l.lens, glow: l.glow as T.PointLight }; }
     for (const p of pins) pinLocal.set(p.name, new three.Vector3(p.x, 0.6, p.z));
     return { group, pinLocal, lift: 0, led, tails };
@@ -516,9 +839,16 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
   const pcbCol = PCB_COLOR[id] ?? spec.color ?? TYPE_COLOR[spec.partType ?? ""] ?? "#2a6f5f";
   const pcbLike = !["sg90-servo", "active-buzzer", "tact-switch-12mm", "potentiometer-10k", "fsr-402", "ws2812b-ring-12", "holder-18650", "lipo-1s-jstph", "slide-switch-spdt"].includes(id);
 
-  if (pcbLike) {
+  const art = spec.wokwiTag ? k.artTex(spec.wokwiTag) : null;
+  // 몸체 좌표(회전 전)의 핀 자리
+  const bodyPins = pins.map((p) => { const v = new three.Vector3(p.x, 0, p.z).applyAxisAngle(new three.Vector3(0, 1, 0), -body.rotation.y); return { name: p.name, x: v.x, z: v.z }; });
+  const uno = id === "arduino-uno-r3";
+
+  if (uno) {
+    unoBoard(k, body, lift, W, D, art);
+  } else if (pcbLike) {
     const pxmm = 14;
-    const tex = k.canvasTex(`mod-${id || spec.model}-${W.toFixed(1)}x${D.toFixed(1)}-${pins.length}`, Math.max(64, Math.round(W * pxmm)), Math.max(64, Math.round(D * pxmm)), (x, w, h) => {
+    const tex = art ?? k.canvasTex(`mod-${id || spec.model}-${W.toFixed(1)}x${D.toFixed(1)}-${pins.length}`, Math.max(64, Math.round(W * pxmm)), Math.max(64, Math.round(D * pxmm)), (x, w, h) => {
       x.fillStyle = pcbCol; x.fillRect(0, 0, w, h);
       x.strokeStyle = "rgba(255,255,255,.07)"; x.lineWidth = 5; for (let i = 0; i < 12; i++) { x.beginPath(); x.moveTo((i * 0.13 * w) % w, h * 0.2); x.lineTo(((i * 0.13 + 0.08) * w) % w, h * 0.8); x.stroke(); }
       x.fillStyle = "rgba(255,255,255,.88)"; x.textAlign = "center"; x.textBaseline = "middle";
@@ -528,13 +858,12 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
     const side = k.std(pcbCol, { rough: 0.6 });
     const pcb = k.mesh(new three.BoxGeometry(W, T2, D), [side, side, k.std("#fff", { map: tex, rough: 0.55 }), side, side, side], body);
     pcb.position.y = lift + T2 / 2;
-    // 보드: 마이크로컨트롤러 칩 + USB
-    if (spec.partType === "board" || id.startsWith("arduino") || id.startsWith("esp32") || id.startsWith("xiao") || id.startsWith("raspberry")) {
+    // 보드: 마이크로컨트롤러 칩 + USB (Wokwi 그림이 있으면 그림이 보여 준다)
+    if (!art && (spec.partType === "board" || id.startsWith("arduino") || id.startsWith("esp32") || id.startsWith("xiao") || id.startsWith("raspberry"))) {
       const chipW = Math.min(W, D) * 0.32;
       k.box(chipW, 1.1, chipW, k.std("#141414", { rough: 0.45 }), W * 0.08, lift + T2 + 0.55, 0, body);
       const usbW = Math.min(9, Math.min(W, D) * 0.45);
       const usb = k.box(usbW, 3.2, 6.5, k.steel, -W / 2 + 3.2, lift + T2 + 1.6, 0, body); usb.rotation.y = Math.PI / 2;
-      if (id === "arduino-uno-r3") { k.box(12, 11, 16, k.steel, -W / 2 + 6, lift + T2 + 5.5, -D / 2 + 13, body); k.box(14, 11, 9, k.std("#151515"), -W / 2 + 7, lift + T2 + 5.5, D / 2 - 9, body); }
       if (id === "esp32-devkit-v1") { k.box(W * 0.62, 0.9, D * 0.3, k.steel, 0, lift + T2 + 0.45, -D / 2 + D * 0.2, body); }
     }
     if (id === "ssd1306-oled-128x64") {
@@ -546,6 +875,8 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
     if (id === "mt3608-boost") { k.box(6.5, 4.5, 3.5, k.std("#2563c9"), W * 0.2, lift + T2 + 2.25, -D * 0.2, body); const coil = k.mesh(new three.CylinderGeometry(2.8, 2.8, 3, 20), k.std("#3a3a3a"), body); coil.position.set(-W * 0.12, lift + T2 + 1.5, 0); }
     if (id === "drv8833-driver" || id === "ams1117-3v3" || id === "inmp441-i2s-mic") k.box(Math.min(W, D) * 0.3, 1, Math.min(W, D) * 0.3, k.std("#151515"), 0, lift + T2 + 0.5, 0, body);
     if (spec.partType === "sensor" && id !== "fsr-402" && id !== "hc-sr04") k.box(Math.min(W, D) * 0.25, 1, Math.min(W, D) * 0.25, k.std("#151515"), 0, lift + T2 + 0.5, -D * 0.15, body);
+  } else if (id === "fsr-402") {
+    fsrModel(k, body, bodyPins, W, D);
   } else if (id === "sg90-servo") {
     // 실제 몸체(22.2×11.8×22.7mm)는 자리 오른쪽에, 3핀 커넥터는 카드 핀 위치에. 둘을 케이블로 잇는다.
     const blue = k.std("#2563c9", { rough: 0.5 });
@@ -587,19 +918,24 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
     k.rbox(Math.max(4, W), 2.4, Math.max(4, D), 1.2, k.std(spec.color ?? "#3b3e44", { rough: 0.5 }), body);
   }
 
-  // 핀: 브레드보드면 아래로 꽂히는 금색 핀, 아니면 패드 위로 짧게 나온 핀
+  // 핀: 브레드보드면 아래로 꽂히는 금색 핀, 아니면 패드 위로 짧게 나온 핀. 같은 모양은 InstancedMesh 하나로.
+  // UNO는 암 헤더 안에 핀 자리가 있어 패드·짧은 핀을 그리지 않는다 (pinLocal은 그대로).
+  const padAt: Array<[number, number, number]> = [], legAt: Array<[number, number, number]> = [], stubAt: Array<[number, number, number]> = [], tinAt: Array<[number, number, number]> = [];
   for (const p of pins) {
     const topY = pcbLike ? lift + T2 : 2.5;
     if (pcbLike) {
-      const pad = k.mesh(new three.CylinderGeometry(0.95, 0.95, 0.12, 16), k.gold, group); pad.position.set(p.x, topY + 0.06, p.z);
-      if (lift > 0) { const leg = k.mesh(new three.BoxGeometry(0.64, lift + T2 + 2, 0.64), k.gold, group); leg.position.set(p.x, (lift + T2 + 2) / 2 - 0.2, p.z); }
-      const stub = k.mesh(new three.BoxGeometry(0.64, 2.2, 0.64), k.gold, group); stub.position.set(p.x, topY + 1.1, p.z);
+      if (!uno) { padAt.push([p.x, topY + 0.06, p.z]); stubAt.push([p.x, topY + 1.1, p.z]); }
+      if (lift > 0) legAt.push([p.x, (lift + T2 + 2) / 2 - 0.2, p.z]);
       pinLocal.set(p.name, new three.Vector3(p.x, topY, p.z));
     } else {
-      const leg = k.mesh(new three.BoxGeometry(0.6, 6, 0.6), k.tin, group); leg.position.set(p.x, onBreadboard ? -1 : 1, p.z);
+      tinAt.push([p.x, onBreadboard ? -1 : 1, p.z]);
       pinLocal.set(p.name, new three.Vector3(p.x, 1.0, p.z));
     }
   }
+  if (padAt.length) k.inst(k.geo("mod-pad", () => new three.CylinderGeometry(0.95, 0.95, 0.12, 12)), k.gold, padAt, group);
+  if (stubAt.length) k.inst(k.geo("mod-stub", () => new three.BoxGeometry(0.64, 2.2, 0.64)), k.gold, stubAt, group, true);
+  if (legAt.length) k.inst(k.geo(`mod-leg-${lift}`, () => new three.BoxGeometry(0.64, lift + T2 + 2, 0.64)), k.gold, legAt, group, true);
+  if (tinAt.length) k.inst(k.geo("mod-tinleg", () => new three.BoxGeometry(0.6, 6, 0.6)), k.tin, tinAt, group, true);
   if (lift > 0 && pins.length) {
     // 헤더 플라스틱 (핀 줄마다)
     const rows = new Map<string, typeof pins>();
@@ -610,6 +946,29 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
     }
   }
   return { group, pinLocal, lift, tails };
+}
+
+/** "10k", "4.7kΩ", "220", "1M" → 옴. 못 읽으면 null */
+export function parseOhms(s?: string): number | null {
+  const m = /(\d+(?:\.\d+)?)\s*([kKmM])?\s*(?:Ω|ohm|옴)?(?![\d.])/.exec(s ?? "");
+  if (!m) return null;
+  const v = Number(m[1]) * (m[2] ? (m[2].toLowerCase() === "k" ? 1e3 : 1e6) : 1);
+  return v >= 1 && v < 1e10 ? v : null;
+}
+
+/** 점퍼선 끝(듀폰 커넥터). 원점 = 핀 끝(구멍 입구), 몸은 +y로 13mm. 검은 하우징 + 금속 집게 + 선 피복 */
+export function dupontEnd(k: Kit3D, wire: T.Material) {
+  const three = k.three, group = new three.Group();
+  const housing = k.mesh(k.geo("dp-house", () => { const g = new three.BoxGeometry(2.5, 9, 2.5); g.translate(0, 4.5, 0); return g; }), k.std("#18191b", { rough: 0.5 }), group);
+  void housing;
+  if (!k.light) {
+    const win = k.mesh(k.geo("dp-win", () => { const g = new three.BoxGeometry(1.1, 2.2, 0.08); g.translate(0, 5.6, 1.27); return g; }), k.std("#2c2d30", { rough: 0.4 }), group, false);
+    void win;
+  }
+  const crimp = k.mesh(k.geo("dp-crimp", () => { const g = new three.CylinderGeometry(0.75, 0.95, 2.2, 8); g.translate(0, 10.1, 0); return g; }), k.tin, group);
+  void crimp;
+  k.mesh(k.geo("dp-sleeve", () => { const g = new three.CylinderGeometry(0.8, 0.8, 1.8, 8); g.translate(0, 12.1, 0); return g; }), wire, group);
+  return group;
 }
 
 /** 받침판(나무 작업판). 원점 = 바닥 가운데, 윗면 y = 3. */
