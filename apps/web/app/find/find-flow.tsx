@@ -16,6 +16,7 @@ import { track } from "./track";
 const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
 const DICE = ["현관문 잠갔는지 매번 불안해", "화분에 물 줄 때를 모르겠어", "밤에 불 끄러 일어나기 귀찮아", "택배 왔는지 자꾸 나가봐", "스트레칭을 자꾸 까먹어", "방이 건조한지 모르겠어", "공부할 때 폰을 자꾸 만져", "강아지가 물을 얼마나 마셨는지 궁금해"];
 const PH = [...EXAMPLES, ...DICE];
+const WORDS_BASE = 12; // 칩 하나(6)의 두 배부터
 const CAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
 const STEP: Record<Screen, string> = { opening: "", intro: "1 / 4", thinking: "1 / 4", software: "1 / 4", unsafe: "1 / 4", stoke: "2 / 4", reveal: "3 / 4", forge: "4 / 4" };
 const VIBE_PROMPT = (idea: string) => `나는 개발자가 아니야. "${idea.trim().slice(0, 200)}" 이걸 해결하는 걸 만들고 싶어.\n1) 하루 만에 써볼 수 있는 가장 작은 버전을 기능 3개 이내로 제안해줘.\n2) 모르는 용어는 풀어서 설명하고, 정할 건 선택지로 물어봐줘.\n3) 동작하는 첫 화면부터 만들고 하나씩 붙여가자.`;
@@ -44,6 +45,10 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   const [peak, setPeak] = useState<number>(FIRE.start);
   const [shown, setShown] = useState("");
   const [gulp, setGulp] = useState(0);
+  // 내 말로 넣은 장작: 칩 말고 직접 쓴 한 줄. 처음 쓴 문장처럼 본인만 본다.
+  const [words, setWords] = useState<string[]>([]);
+  const [draft, setDraft] = useState("");
+  const writingRef = useRef(false);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -57,8 +62,8 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   const color = REACT_FIRE[kind];
   const scrollText = useMemo(() => {
     const body = compose(picked, find);
-    return `“${idea.trim()}”` + (body ? `\n${body}` : "");
-  }, [picked, find, idea]);
+    return `“${idea.trim()}”` + (body ? `\n${body}` : "") + words.map((w) => `\n+ ${w}`).join("");
+  }, [picked, find, idea, words]);
 
   useEffect(() => {
     try {
@@ -90,11 +95,12 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   // 불이 사그라드는 시계 — 타이머 대신 시간 압박
   useEffect(() => {
     if (screen !== "stoke") return;
-    const t = setInterval(() => setFire((f) => {
+    // 글을 쓰는 동안에는 불이 줄지 않는다 — 생각하며 쓰는 게 손해가 되지 않게
+    const t = setInterval(() => { if (!writingRef.current) setFire((f) => {
       const next = Math.max(FIRE.floor, f - FIRE.decayPerTick);
       if (next === FIRE.floor && f > FIRE.floor) track("fire_out");
       return next;
-    }), FIRE.tickMs);
+    }); }, FIRE.tickMs);
     return () => clearInterval(t);
   }, [screen]);
 
@@ -112,7 +118,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   }, [screen, scrollText]);
 
   function resetFire() {
-    setPicked([]); setFire(FIRE.start); setPeak(FIRE.start); setShown(""); setResult(null);
+    setPicked([]); setWords([]); setDraft(""); setFire(FIRE.start); setPeak(FIRE.start); setShown(""); setResult(null);
   }
 
   async function submitIdea(forceHardware = false) {
@@ -152,13 +158,27 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     track("chip_pick", { id: chip.id, fire: Math.round(next) });
   }
 
+  // 직접 쓴 장작은 칩보다 크게 탄다. 길게 쓸수록 조금 더 (최대 +22)
+  function addWords() {
+    const w = draft.trim().replace(/\s+/g, " ");
+    if (w.length < 2) return;
+    const add = WORDS_BASE + Math.min(10, Math.floor(w.length / 4));
+    const next = Math.min(FIRE.max, fireRef.current + add);
+    setWords((ws) => [...ws, w]);
+    setDraft("");
+    setFire(next);
+    setPeak((p) => Math.max(p, next));
+    setGulp((g) => g + 1);
+    track("words_add", { length: w.length, fire: Math.round(next) });
+  }
+
   async function lockFire() {
     if (!picked.length || busy) return;
     setBusy(true);
     setError("");
     track("fire_locked", { peak: Math.round(peak), picked });
     try {
-      const response = await fetch("/api/find/fires", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: idea.trim(), picked: picked.map((id) => find(id)), peak, nickname }) });
+      const response = await fetch("/api/find/fires", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: [idea.trim(), ...words].join(" / ").slice(0, 300), picked: picked.map((id) => find(id)), peak, nickname }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "불을 저장하지 못했어.");
       setResult(body as Result);
@@ -275,6 +295,14 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
               </button>
             ))}
           </div>
+          <form className="words-in" onSubmit={(e) => { e.preventDefault(); addWords(); }}>
+            <input aria-label="내 말로 장작 넣기" value={draft} maxLength={80} placeholder="내 말로 장작 넣기"
+              onChange={(e) => setDraft(e.target.value)} onFocus={() => { writingRef.current = true; }} onBlur={() => { writingRef.current = false; }}
+              onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }} />
+            {/* 누를 때 입력칸 포커스를 뺏지 않아 키보드가 내려가지 않고, 이어서 쓰는 동안 불도 안 준다 */}
+            <button type="submit" className="btn btn-fire" disabled={draft.trim().length < 2} onMouseDown={(e) => e.preventDefault()}>넣기</button>
+          </form>
+          <div className="muted tiny">쓰는 동안엔 불이 안 줄어. 직접 쓴 장작은 더 크게 타!</div>
           {error && <p className="error" role="alert">{error}</p>}
           <div className="spacer" />
           <button className="btn btn-fire lock" type="button" disabled={!picked.length || busy} onClick={lockFire}>{busy ? "불 옮겨 담는 중…" : "이 불로 할래!"}</button>

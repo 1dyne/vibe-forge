@@ -589,3 +589,9 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .find .grade-epic .grade{background:#8E4BFF;box-shadow:0 0 0 2px #fff,0 0 10px rgba(142,75,255,.6)}
 .find .grade-legend .grade{background:linear-gradient(135deg,#FFD36B,#F2A516,#E0702A);box-shadow:0 0 0 2px #fff,0 0 14px rgba(242,165,22,.8)}
 .find .back-forge{text-decoration:none;color:var(--ink);font-weight:700;border:1.5px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--surface)}
+
+/* 장작 화면: 내 말로 장작 넣기 */
+.find .words-in { display: flex; gap: 8px; }
+.find .words-in input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--outline); background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
+.find .words-in input:focus { outline: 2px solid var(--fire); outline-offset: 1px; }
+.find .words-in .btn { width: auto; padding: 0 18px; flex-shrink: 0; }
