@@ -4,7 +4,7 @@ import { NAMELESS, NAME_MAX, nicknameProblem } from "../../lib/find/nickname";
 import Dokkaebi from "./dokkaebi";
 
 // 첫 만남: 달그락은 한 자리에 서 있고, 검은 말풍선 속 대사만 바뀐다. 마지막에 이름 칸이 달그락 아래 비워둔 자리에 나타난다(달그락은 움직이지 않음).
-const LINES = ["안녕 나는 달그락.", "도깨비불이야.", "너만의 도깨비불도 찾아줄게.", "도깨비가 되면 상상만 하던 것도 뚝딱! 만들 수 있거든.", "참, 우리 대장간엔 도깨비들이랑 같이 노는 대장장이가 하나 있어. 다인이라고.", "대장간 소식은 까치가 물어다 줘. 다인한테 할 말도 까치한테 맡기면 돼.", "인간, 이름이 뭐야?"];
+const LINES = ["안녕 나는 달그락.", "도깨비불이야.", "너만의 도깨비불도 찾아줄게.", "도깨비가 되면 상상만 하던 것도 뚝딱! 만들 수 있거든.", "인간, 이름이 뭐야?"];
 
 export default function Opening({ onDone }: { onDone: (name: string) => void }) {
   const [line, setLine] = useState(0);
