@@ -3,8 +3,9 @@ import type { BenchKit, BenchOp, BenchPart, BenchView } from "../../lib/bench/ty
 import { HOLD_MS, TOOL_NAME, gradeHold, holdFill, kitCanFlip, stepNeedsFlip, type HandsStage, type HoldGrade, type ToolId } from "../../lib/bench/hands";
 import {
   Kit3D, PITCH, aaBattery, batteryHolder2AA, breadboard, coldGeometry, filletGeometry, flushCutter, hand, headerMale,
-  led5, moduleModel, perfboard, plate, probe, resistor, roundedRect, sensorModule, solderWire, solderingIron, wireStripper, type GridBoard
+  dupontEnd, led5, moduleModel, perfboard, plate, probe, resistor, roundedRect, sensorModule, solderWire, solderingIron, wireStripper, type GridBoard
 } from "./bench-models";
+import { wokwiArt, wokwiSize, wokwiTagOf } from "./wokwi-art";
 
 // 3D 조립 책상 엔진 (명세서 2차 v0.1 §1). 단위 mm, 매트 윗면 y = 0.
 // 상태는 "단계별 진행도(0~1)"의 함수다: 같은 진행도면 언제 그려도 같은 장면이 나온다.
@@ -80,6 +81,8 @@ type Target = { pos: T.Vector3; label?: string; radius: number; part?: string };
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const smooth = (t: number) => { t = clamp(t); return t * t * (3 - 2 * t); };
 const seg = (t: number, a: number, b: number) => clamp((t - a) / (b - a));
+/** 윗면 무늬로 Wokwi 그림을 쓰는 부품 (기판·화면 모듈). 저항·LED는 3D 모양 그대로 */
+const ART_TAGS = new Set(["wokwi-arduino-uno", "wokwi-arduino-nano", "wokwi-esp32-devkit-v1", "wokwi-ssd1306"]);
 const OP_SECONDS: Record<BenchOp["op"], number> = { place: 0.9, insert: 1.2, mount_on: 1.2, prep_wire: 1.6, insert_wire: 0.9, solder: 1.0, bridge: 0.7, trim: 0.6, batteries: 1.1, check: 0.7, seat: 1.0, jumper: 0.9, enclose: 1.4 };
 function opSeconds(op: BenchOp) {
   if (op.op === "solder") return 0.25 + op.joints.length * 0.95;
@@ -214,6 +217,10 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
   }
 
   // ── 부품 만들기 ──
+  k.light = light;
+  // 카드에 Wokwi 그림이 있는 부품은 2D와 같은 그림을 윗면 무늬로 미리 그려 둔다 (실패하면 절차적 무늬)
+  const artTags = [...new Set(kit.parts.map((p) => (p.kind === "module" ? wokwiTagOf(p.spec?.catalogId) : undefined)).filter((t): t is string => !!t && ART_TAGS.has(t) && !!wokwiSize(t)))];
+  await Promise.all(artTags.map(async (t) => { const cv = await wokwiArt(t, light ? 10 : 16); if (cv) k.art.set(t, cv); }));
   const parts = new Map<string, PartRec>();
   const allOps = kit.steps.flatMap((s) => s.ops);
   const boardOf = (ref: string) => parts.get(ref)?.board ?? null;
@@ -301,7 +308,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
     } else if (def.kind === "module" && def.spec?.foot) {
       const seat = allOps.find((o) => o.op === "seat" && o.ref === def.ref) as Extract<BenchOp, { op: "seat" }> | undefined;
       const base = seat ? parts.get(seat.onto) : undefined;
-      const m = moduleModel(k, { catalogId: def.spec.catalogId, partType: def.spec.partType, model: def.spec.model ?? def.label, color: def.spec.color, foot: def.spec.foot, pinXY: def.spec.pinXY ?? [] }, base?.baseKind === "breadboard");
+      const m = moduleModel(k, { catalogId: def.spec.catalogId, partType: def.spec.partType, model: def.spec.model ?? def.label, label: def.label, wokwiTag: wokwiTagOf(def.spec.catalogId), color: def.spec.color, foot: def.spec.foot, pinXY: def.spec.pinXY ?? [] }, base?.baseKind === "breadboard");
       obj = m.group; rec.pinLocal = m.pinLocal; if (m.led) rec.led = m.led;
       if (base?.final && base.baseMap) { const f = def.spec.foot; const local = base.baseMap(f.x + f.w / 2, f.y + f.h / 2); final = { p: local.applyMatrix4(poseMatrix(base.final)), q: base.final.q.clone() }; }
     } else { obj = new three.Group(); }
@@ -509,7 +516,7 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
       const h = 8 + a.distanceTo(b) * 0.16;
       const mid = a2.clone().lerp(b2, 0.5).add(new three.Vector3(0, h, 0));
       rec.curve = new three.CatmullRomCurve3([a2, a2.clone().add(new three.Vector3(0, h * 0.45, 0)), mid, b2.clone().add(new three.Vector3(0, h * 0.45, 0)), b2], false, "centripetal");
-      if (onBreadboard) for (const e of [a, b]) { const box = k.box(2.5, 13, 2.5, k.std("#18191b", { rough: 0.5 }), e.x, e.y + 6.5, e.z, scene); box.visible = false; rec.ends.push(box); }
+      if (onBreadboard) for (const e of [a, b]) { const end = dupontEnd(k, mat); end.position.copy(e); end.visible = false; scene.add(end); rec.ends.push(end); }
     }
     jumpers.set(o, rec);
   }
@@ -1226,10 +1233,15 @@ export async function createBench(el: HTMLElement, kit: BenchKit, opts: { hue: n
   setView(kit.steps[0]?.view ?? "34", true);
   tick();
   // 점검용 (?benchdebug): 지금 눌러야 할 자리의 화면 좌표
-  if (/[?&]benchdebug\b/.test(location.search)) {
+  if (/[?&]benchdebug\b/.test(location.search) || (window as unknown as { __benchdebug?: boolean }).__benchdebug) {
     (window as unknown as { __bench?: unknown }).__bench = {
       targets: () => { const r = renderer.domElement.getBoundingClientRect(); return curTargets().map((t) => { const sp = t.pos.clone().project(camera); return { x: r.left + ((sp.x + 1) / 2) * r.width, y: r.top + ((1 - sp.y) / 2) * r.height, label: t.label ?? t.part ?? "" }; }); },
-      state: () => ({ stage, flipped, flipT, handsT, current, busy, tweens: tweens.length })
+      state: () => ({ stage, flipped, flipT, handsT, current, busy, tweens: tweens.length }),
+      info: () => ({ ...renderer.info.render, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures }),
+      goto: (i: number) => goto(i),
+      vis: (ref: string, on: boolean) => { const o = parts.get(ref)?.obj; if (o) o.visible = on; },
+      where: (ref: string) => { const o = parts.get(ref)?.obj; if (!o) return null; const v = new three.Vector3(); o.getWorldPosition(v); return [v.x, v.y, v.z]; },
+      look: (p: [number, number, number], t: [number, number, number]) => { camera.position.set(...p); controls.target.set(...t); camT = 1; camTo = null; controls.update(); }
     };
   }
 
