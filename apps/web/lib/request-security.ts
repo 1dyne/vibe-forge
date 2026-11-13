@@ -11,6 +11,25 @@ export function publicOrigin(request: NextRequest): string {
   return request.nextUrl.origin;
 }
 
+// 이 서비스가 직접 받는 주소들. 커넥터(OAuth) 메타데이터는 요청이 들어온 주소 그대로 답해야 한다:
+// Claude 같은 MCP 클라이언트는 등록한 주소와 메타데이터의 resource가 같은지 확인하고, 다르면 연결을 멈춘다.
+// (dalgrak.app 으로 옮기기 전에 Railway 주소로 등록한 커넥터가 그대로 동작하게)
+function ownHosts(): Set<string> {
+  const hosts = new Set<string>();
+  const add = (h?: string | null) => { if (h) hosts.add(h.trim().toLowerCase()); };
+  try { if (process.env.APP_BASE_URL) add(new URL(process.env.APP_BASE_URL).host); } catch { /* 무시 */ }
+  for (const h of (process.env.FIND_HOSTS ?? "").split(",")) add(h);
+  for (const h of (process.env.OWN_HOSTS ?? "").split(",")) add(h);
+  add(process.env.RAILWAY_PUBLIC_DOMAIN);
+  return hosts;
+}
+
+export function arrivedOrigin(request: NextRequest): string {
+  const host = (request.headers.get("x-forwarded-host")?.split(",")[0].trim() ?? request.headers.get("host") ?? "").toLowerCase();
+  if (host && (ownHosts().has(host) || host.endsWith(".up.railway.app"))) return `https://${host}`;
+  return publicOrigin(request);
+}
+
 export function publicUrl(request: NextRequest, path: string): URL {
   return new URL(path, publicOrigin(request));
 }
