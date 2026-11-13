@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS find_lantern (id text PRIMARY KEY, forge_id text NOT 
 CREATE INDEX IF NOT EXISTS find_lantern_group ON find_lantern(group_key);
 CREATE INDEX IF NOT EXISTS find_lantern_forge ON find_lantern(forge_id);
 CREATE TABLE IF NOT EXISTS find_lantern_maker (lantern_id text NOT NULL, forge_id text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (lantern_id, forge_id));
+CREATE TABLE IF NOT EXISTS find_lantern_cheer (lantern_id text NOT NULL, forge_id text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (lantern_id, forge_id));
 CREATE TABLE IF NOT EXISTS find_report (id bigserial PRIMARY KEY, forge_id text NOT NULL, reporter text, reason text NOT NULL, resolved boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS find_fires_combo ON find_fires(combo_key);
 `;
