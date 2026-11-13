@@ -1,0 +1,56 @@
+/* 소원 선착장 (/find/wish). 밤 호수 위 전체 화면 3D + 위 이름줄·거르기, 아래 할 일·등불 카드 */
+.wish-full { --fire: #FF8F3F; position: fixed; inset: 0; overflow: hidden; background: linear-gradient(180deg, #0C1030 0%, #232B55 55%, #4A4678 100%); color: #F6F0E4; word-break: keep-all; overflow-wrap: break-word; }
+.wish-stage { position: absolute; inset: 0; }
+.wish-stage canvas { display: block; }
+
+.wish-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 6px max(12px, env(safe-area-inset-left, 0px)); background: linear-gradient(180deg, rgba(10,12,30,.65), rgba(10,12,30,0)); pointer-events: none; }
+.wish-top > * { pointer-events: auto; }
+.wish-pill { flex-shrink: 0; border: 0; color: #1E1F24; background: rgba(246,240,228,.92); padding: 6px 12px; border-radius: 999px; font: 15px var(--font-display, Jua), sans-serif; cursor: pointer; }
+.wish-title { flex: 1; min-width: 0; display: grid; line-height: 1.25; text-align: center; pointer-events: none; }
+.wish-title b { font: 400 19px var(--font-display, Jua), sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
+.wish-title span { font-size: 12px; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.wish-filters { position: absolute; left: 0; right: 0; top: calc(56px + env(safe-area-inset-top, 0px)); display: flex; justify-content: center; gap: 6px; padding: 0 12px; overflow-x: auto; scrollbar-width: none; }
+.wish-filters::-webkit-scrollbar { display: none; }
+.wish-filters button { flex-shrink: 0; border: 1.5px solid rgba(246,240,228,.5); background: rgba(20,22,44,.55); color: #F6F0E4; border-radius: 999px; padding: 5px 12px; font: 14px var(--font-display, Jua), sans-serif; cursor: pointer; backdrop-filter: blur(4px); }
+.wish-filters button.on { background: #F3E7C9; color: #2A2118; border-color: #F3E7C9; box-shadow: 0 0 12px rgba(242,166,90,.6); }
+
+.wish-toast { position: absolute; left: 50%; top: calc(96px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(340px, calc(100% - 32px)); background: rgba(246,240,228,.95); color: #1E1F24; border-radius: 14px; padding: 9px 14px; font-size: 13px; text-align: center; text-wrap: balance; z-index: 3; }
+.wish-empty { position: absolute; left: 50%; top: 42%; transform: translateX(-50%); width: min(300px, calc(100% - 40px)); text-align: center; font: 17px var(--font-display, Jua), sans-serif; text-shadow: 0 1px 6px rgba(0,0,0,.6); pointer-events: none; }
+
+.wish-hint { position: absolute; left: 0; right: 0; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); margin: 0; text-align: center; font-size: 12px; color: rgba(246,240,228,.85); text-shadow: 0 1px 4px rgba(0,0,0,.6); pointer-events: none; text-wrap: balance; padding: 0 16px; }
+.wish-dock { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; padding: 10px max(12px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: linear-gradient(0deg, rgba(10,12,30,.75), rgba(10,12,30,0)); }
+.wish-dock button { min-height: 50px; border-radius: 14px; border: 2px solid #232323; background: #F6F0E4; color: #1E1F24; font: 16px var(--font-display, Jua), sans-serif; cursor: pointer; white-space: nowrap; }
+.wish-dock button.main { background: #F2A65A; box-shadow: 0 3px 0 #232323; }
+
+/* 등불 카드: 아래쪽 시트 (고른 등불은 카메라가 화면 위쪽으로 데려온다) */
+.wish-card { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); width: min(440px, 100%); max-height: 52dvh; overflow-y: auto; background: #FBF6EA; color: #1E1F24; border-radius: 22px 22px 0 0; padding: 16px 16px calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; box-shadow: 0 -6px 30px rgba(242,166,90,.25); animation: wish-up .22s ease-out; z-index: 2; }
+@keyframes wish-up { from { transform: translate(-50%, 30px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.wish-x { position: absolute; top: 8px; right: 10px; width: 36px; height: 36px; border: 0; background: transparent; font-size: 26px; line-height: 1; color: #6B6E78; cursor: pointer; }
+.wish-for { font: 400 22px var(--font-display, Jua), sans-serif; padding-right: 36px; }
+.wish-line { margin: 0; font-size: 16px; line-height: 1.5; text-wrap: pretty; }
+.wish-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: #4A4D56; }
+.wish-meta a { color: #A3561B; font-weight: 600; text-decoration: none; }
+.wish-stats { display: flex; gap: 14px; font-size: 13px; color: #4A4D56; }
+.wish-stats b { color: #1E1F24; }
+.wish-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.wish-actions.one { grid-template-columns: 1fr; }
+.wish-btn { min-height: 48px; border-radius: 14px; border: 2px solid #232323; background: #fff; color: #1E1F24; font: 16px var(--font-display, Jua), sans-serif; cursor: pointer; }
+.wish-btn.main { background: #F2A65A; box-shadow: 0 3px 0 #232323; }
+.wish-btn.on { background: #F3E7C9; box-shadow: inset 0 0 0 2px #F2A65A; }
+.wish-btn:disabled { opacity: .6; }
+
+/* 3D가 안 될 때: 목록 */
+.wish-fallback { position: absolute; inset: calc(96px + env(safe-area-inset-top, 0px)) 0 calc(80px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; padding: 0 16px; display: grid; gap: 12px; align-content: start; }
+.wish-fb-rope { display: grid; gap: 6px; }
+.wish-fb-rope b { font: 400 16px var(--font-display, Jua), sans-serif; }
+.wish-fb-lantern { text-align: left; border: 0; border-radius: 12px; padding: 10px 12px; background: rgba(243,231,201,.95); color: #2A2118; font-size: 14px; box-shadow: 0 0 10px rgba(242,166,90,.5); cursor: pointer; }
+.wish-fb-lantern.done { background: rgba(255,210,122,.9); }
+
+@media (max-height: 620px) {
+  .wish-filters { top: calc(50px + env(safe-area-inset-top, 0px)); }
+  .wish-hint { display: none; }
+  .wish-card { max-height: 56dvh; padding-top: 12px; gap: 6px; }
+  .wish-for { font-size: 20px; }
+}
+.wish-full .sheet { color: var(--ink, #1E1F24); }

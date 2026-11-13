@@ -2,6 +2,7 @@
 // - 같은 소원(같은 대상 갈래·감지·반응 장작)끼리 한 줄에 꿰여 호수 위 '소원 줄'이 된다(하회 줄불처럼).
 // - 솜씨 도깨비(메이커)는 "만들어볼게"를 누를 수 있다. 완성 인증(사진)은 받지 않는다 — 관리 부담이 없게.
 // - 주인이 "이뤄졌어"를 누르면 등불은 호수에 띄운 유등이 된다(진주 남강유등처럼).
+// - 응원하기: 대장간 하나당 등불 하나에 한 번(다시 누르면 취소). 글은 받지 않는다 — 관리할 댓글이 없게. 응원이 많을수록 등불이 조금 더 밝다.
 // - 무료 등불: 내 대장간의 도깨비불 수만큼(최소 1개). 공개 범위: 전체 / 대상 이름 가리기 / 나만 보기, 도깨비불 카드 함께 공개는 선택.
 import { FOLLOW, ROOTS, type Chip } from "./chips";
 import { nicknameProblem } from "./nickname";
@@ -16,6 +17,7 @@ export type LanternRecord = {
   hideTarget: boolean; private: boolean; shareCard: boolean; groupKey: string; status: LanternStatus; createdAt: string; doneAt: string | null;
 };
 type MakerRecord = { lanternId: string; forgeId: string; at: string };
+type CheerRecord = { lanternId: string; forgeId: string; at: string };
 
 const ALL: Chip[] = [...ROOTS, ...Object.values(FOLLOW).flat()];
 const chip = (id: string) => ALL.find((c) => c.id === id);
@@ -55,7 +57,7 @@ const toLantern = (r: Record<string, unknown>): LanternRecord => ({
 async function fileState() {
   const d = await readData();
   const social = (d.social ??= {}) as Record<string, unknown[]>;
-  return { d, lanterns: (social.lanterns ??= []) as LanternRecord[], makers: (social.lanternMakers ??= []) as MakerRecord[] };
+  return { d, lanterns: (social.lanterns ??= []) as LanternRecord[], makers: (social.lanternMakers ??= []) as MakerRecord[], cheers: (social.lanternCheers ??= []) as CheerRecord[] };
 }
 
 export async function forgeLanterns(forgeId: string): Promise<LanternRecord[]> {
@@ -83,8 +85,18 @@ export async function markDone(id: string) {
   await serial(async () => { const s = await fileState(); const l = s.lanterns.find((x) => x.id === id); if (l) { l.status = "done"; l.doneAt = new Date().toISOString(); } await writeData(s.d); });
 }
 export async function removeLantern(id: string) {
-  if (pg()) { const pool = await db(); await pool.query("DELETE FROM find_lantern_maker WHERE lantern_id = $1", [id]); await pool.query("DELETE FROM find_lantern WHERE id = $1", [id]); return; }
-  await serial(async () => { const s = await fileState(); s.lanterns.splice(0, s.lanterns.length, ...s.lanterns.filter((l) => l.id !== id)); s.makers.splice(0, s.makers.length, ...s.makers.filter((m) => m.lanternId !== id)); await writeData(s.d); });
+  if (pg()) {
+    const pool = await db();
+    await pool.query("DELETE FROM find_lantern_maker WHERE lantern_id = $1", [id]); await pool.query("DELETE FROM find_lantern_cheer WHERE lantern_id = $1", [id]);
+    await pool.query("DELETE FROM find_lantern WHERE id = $1", [id]); return;
+  }
+  await serial(async () => {
+    const s = await fileState();
+    s.lanterns.splice(0, s.lanterns.length, ...s.lanterns.filter((l) => l.id !== id));
+    s.makers.splice(0, s.makers.length, ...s.makers.filter((m) => m.lanternId !== id));
+    s.cheers.splice(0, s.cheers.length, ...s.cheers.filter((c) => c.lanternId !== id));
+    await writeData(s.d);
+  });
 }
 export async function setMaker(lanternId: string, forgeId: string, on: boolean) {
   if (pg()) {
@@ -101,25 +113,45 @@ export async function setMaker(lanternId: string, forgeId: string, on: boolean) 
   });
 }
 
-export type PublicLantern = { id: string; target: string | null; wish: string; nickname: string; forgeId: string | null; fireName: string | null; status: LanternStatus; makers: number; iMake: boolean; mine: boolean };
+/** 응원하기: 대장간 하나당 등불 하나에 한 번. on=false면 취소. 같은 상태로 다시 불러도 그대로다. */
+export async function setCheer(lanternId: string, forgeId: string, on: boolean) {
+  if (pg()) {
+    if (on) await (await db()).query("INSERT INTO find_lantern_cheer (lantern_id, forge_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [lanternId, forgeId]);
+    else await (await db()).query("DELETE FROM find_lantern_cheer WHERE lantern_id = $1 AND forge_id = $2", [lanternId, forgeId]);
+    return;
+  }
+  await serial(async () => {
+    const s = await fileState();
+    const has = s.cheers.some((c) => c.lanternId === lanternId && c.forgeId === forgeId);
+    if (on && !has) s.cheers.push({ lanternId, forgeId, at: new Date().toISOString() });
+    if (!on && has) s.cheers.splice(0, s.cheers.length, ...s.cheers.filter((c) => !(c.lanternId === lanternId && c.forgeId === forgeId)));
+    await writeData(s.d);
+  });
+}
+
+export type PublicLantern = { id: string; target: string | null; wish: string; nickname: string; forgeId: string | null; fireName: string | null; status: LanternStatus; makers: number; iMake: boolean; mine: boolean; cheers: number; iCheered: boolean };
 export type LanternGroup = { key: string; label: string; count: number; done: number; lanterns: PublicLantern[] };
 
 /** 마을에 보이는 등불: 공개 대장간의, '나만 보기'가 아닌 등불을 소원 줄별로. 대상 이름 가리기·카드 공개 여부를 반영한다. */
 export async function publicLanternGroups(viewerForgeId: string | null): Promise<LanternGroup[]> {
+  const cheerBy = new Map<string, { n: number; mine: boolean }>();
   let lanterns: LanternRecord[]; let makers: MakerRecord[]; let forges: Array<{ id: string; nickname: string; visibility: string }>; let fires: Array<{ id: string; name: string }>;
   if (pg()) {
     const pool = await db();
-    const [l, m, f, fi] = await Promise.all([
+    const [l, m, f, fi, c] = await Promise.all([
       pool.query("SELECT * FROM find_lantern WHERE NOT private ORDER BY created_at"),
       pool.query("SELECT lantern_id, forge_id, created_at FROM find_lantern_maker"),
       pool.query("SELECT id, nickname, visibility FROM find_forges"),
-      pool.query("SELECT id, name FROM find_fires WHERE id IN (SELECT fire_id FROM find_lantern WHERE share_card AND fire_id IS NOT NULL)")
+      pool.query("SELECT id, name FROM find_fires WHERE id IN (SELECT fire_id FROM find_lantern WHERE share_card AND fire_id IS NOT NULL)"),
+      pool.query("SELECT lantern_id, count(*)::int AS n, coalesce(bool_or(forge_id = $1), false) AS mine FROM find_lantern_cheer GROUP BY lantern_id", [viewerForgeId ?? ""])
     ]);
+    for (const r of c.rows) cheerBy.set(r.lantern_id, { n: Number(r.n), mine: Boolean(r.mine) && Boolean(viewerForgeId) });
     lanterns = l.rows.map(toLantern); makers = m.rows.map((r) => ({ lanternId: r.lantern_id, forgeId: r.forge_id, at: new Date(r.created_at).toISOString() }));
     forges = f.rows; fires = fi.rows;
   } else {
     const s = await serial(async () => fileState());
     lanterns = s.lanterns.filter((x) => !x.private); makers = s.makers;
+    for (const ch of s.cheers) { const e = cheerBy.get(ch.lanternId) ?? { n: 0, mine: false }; e.n++; if (viewerForgeId && ch.forgeId === viewerForgeId) e.mine = true; cheerBy.set(ch.lanternId, e); }
     forges = ((s.d.forges as Array<{ id: string; nickname: string; visibility: string }> | undefined) ?? []);
     fires = s.d.fires.map((x) => ({ id: x.id, name: x.name }));
   }
@@ -134,7 +166,8 @@ export async function publicLanternGroups(viewerForgeId: string | null): Promise
     g.lanterns.push({
       id: l.id, target: l.hideTarget ? null : l.target, wish: l.wish, nickname: f.nickname,
       forgeId: l.shareCard || l.forgeId === viewerForgeId ? l.forgeId : null, fireName: l.shareCard && l.fireId ? fireBy.get(l.fireId) ?? null : null,
-      status: l.status, makers: ms.length, iMake: Boolean(viewerForgeId && ms.some((m) => m.forgeId === viewerForgeId)), mine: l.forgeId === viewerForgeId
+      status: l.status, makers: ms.length, iMake: Boolean(viewerForgeId && ms.some((m) => m.forgeId === viewerForgeId)), mine: l.forgeId === viewerForgeId,
+      cheers: cheerBy.get(l.id)?.n ?? 0, iCheered: cheerBy.get(l.id)?.mine ?? false
     });
     g.count++; if (l.status === "done") g.done++;
     groups.set(l.groupKey, g);

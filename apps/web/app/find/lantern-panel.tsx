@@ -5,14 +5,14 @@ import { track } from "./track";
 
 const TARGET_MAX = 12, WISH_MAX = 30;
 /** "엄마를 위해" / "콩이를 위해" / "동생을 위해": 받침에 따라 을·를 */
-function forWhom(t: string | null) {
+export function forWhom(t: string | null) {
   if (!t) return "누군가를 위해";
   const c = t.charCodeAt(t.length - 1);
   const batchim = c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0;
   return `${t}${batchim ? "을" : "를"} 위해`;
 }
 
-async function patch(id: string, action: "done" | "remove" | "make" | "unmake") {
+export async function patchLantern(id: string, action: "done" | "remove" | "make" | "unmake" | "cheer" | "uncheer") {
   const res = await fetch("/api/find/lantern", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, action }) });
   const json = await res.json().catch(() => ({}));
   return { ok: res.ok, json };
@@ -27,7 +27,7 @@ export function RopeSheet({ group: initial, hasForge, onClose, onHang }: { group
   const open = group.lanterns.filter((l) => l.forgeId && !l.mine);
   async function make(l: PublicLantern) {
     if (!hasForge) { setMsg("너만의 도깨비불부터 찾아야 솜씨 도깨비가 될 수 있어."); return; }
-    const { ok, json } = await patch(l.id, l.iMake ? "unmake" : "make");
+    const { ok, json } = await patchLantern(l.id, l.iMake ? "unmake" : "make");
     if (!ok) { setMsg(json.error ?? json.message ?? "바꾸지 못했어."); return; }
     const g = (json.groups as LanternGroup[]).find((x) => x.key === group.key);
     if (g) setGroup(g);
@@ -71,7 +71,8 @@ export function RopeSheet({ group: initial, hasForge, onClose, onHang }: { group
 }
 
 /** 내 대장간: 내 등불 목록과 새 등불 걸기 */
-export function MyLanterns({ initial, allowance, fires, onClose }: { initial: LanternRecord[]; allowance: number; fires: Array<{ id: string; name: string }>; onClose: () => void }) {
+/** onHung: 걸고 나서 바로 부른다 (소원 선착장은 시트를 닫고 등불이 줄로 올라가는 걸 보여준다) · onChanged: 이뤄졌어·내리기 뒤 */
+export function MyLanterns({ initial, allowance, fires, onClose, onHung, onChanged }: { initial: LanternRecord[]; allowance: number; fires: Array<{ id: string; name: string }>; onClose: () => void; onHung?: (l: LanternRecord) => void; onChanged?: () => void }) {
   const [list, setList] = useState(initial);
   const [form, setForm] = useState({ fireId: fires[0]?.id ?? "", target: "", wish: "", hideTarget: false, private: false, shareCard: true });
   const [msg, setMsg] = useState("");
@@ -86,12 +87,14 @@ export function MyLanterns({ initial, allowance, fires, onClose }: { initial: La
     setList([json.lantern, ...list]); setForm({ ...form, target: "", wish: "" });
     setMsg("등불을 걸었어! 마을 호수 위 소원 줄에 매달렸어.");
     track("lantern_hung", { private: String(form.private), share: String(form.shareCard), hide: String(form.hideTarget) });
+    onHung?.(json.lantern as LanternRecord);
   }
   async function act(l: LanternRecord, action: "done" | "remove") {
-    const { ok, json } = await patch(l.id, action);
+    const { ok, json } = await patchLantern(l.id, action);
     if (!ok) { setMsg(json.error ?? "바꾸지 못했어."); return; }
     setList(action === "remove" ? list.filter((x) => x.id !== l.id) : list.map((x) => (x.id === l.id ? { ...x, status: "done" } : x)));
     track(action === "done" ? "lantern_done" : "lantern_removed");
+    onChanged?.();
   }
   return (
     <div className="overlay" role="dialog" aria-label="소원 등불" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -137,7 +140,7 @@ export function MyLanterns({ initial, allowance, fires, onClose }: { initial: La
           </form>
         ) : <div className="note small">등불을 다 걸었어. 새 도깨비불을 찾으면 하나 더 걸 수 있어.</div>}
         {msg && <div className="small" role="status">{msg}</div>}
-                <button className="link" type="button" onClick={onClose}>닫기</button>
+        <button className="link" type="button" onClick={onClose}>닫기</button>
       </div>
     </div>
   );
