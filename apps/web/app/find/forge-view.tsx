@@ -292,7 +292,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
           <div className="sheet tall">
             <div className="display" style={{ fontSize: 22 }}>편지함</div>
             {news}
-            <button className="btn btn-ghost" type="button" onClick={() => { setMailNews(false); setOpen("mailbox"); }}>대장장이 다인에게 편지 쓰기</button>
+            <button className="btn btn-ghost" type="button" onClick={() => { setMailNews(false); setOpen("mailbox"); }}>만든 사람 dyne에게 편지 쓰기</button>
             <button className="link" type="button" onClick={() => setMailNews(false)}>닫기</button>
           </div>
         </div>
@@ -411,7 +411,7 @@ const REASONS = ["불쾌한 이름", "개인정보가 보여요", "광고·도�
 function ReportLink({ forgeId }: { forgeId: string }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(false);
-  if (done) return <p className="fine-left" style={{ textAlign: "center" }}>신고했어. 다인이 확인할게.</p>;
+  if (done) return <p className="fine-left" style={{ textAlign: "center" }}>신고했어. 만든 사람 dyne이 확인할게.</p>;
   return open ? (
     <div className="report-row">
       {REASONS.map((r) => <button key={r} type="button" className="chip" onClick={async () => { await fetch("/api/find/report", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ host: forgeId, reason: r }) }).catch(() => undefined); track("report_sent"); setDone(true); }}>{r}</button>)}
@@ -423,7 +423,7 @@ const TUT: Array<{ title: string; body: string }> = [
   { title: "여기가 네 대장간이야", body: "바닥을 누르면 달그락이 그리로 걸어가. 물건을 누르면 그 앞까지 가서 열어줘. 옆으로 끌면 방을 둘러볼 수 있어." },
   { title: "작업대에서 미리 해봐", body: "작업대를 누르면 3D로 납땜·조립을 미리 연습할 수 있어. 부품을 사기 전에 손으로 하는 순서를 익혀둬. 새 아이디어로 불을 하나 더 피우는 것도 여기서." },
   { title: "설계도와 화덕", body: "설계도에는 도깨비가 받아 적은 설계 한 줄이 있어. 화덕 도깨비는 하루에 한 번 질문을 해. 답할수록 네 도깨비불이 자라고 대장간도 커져." },
-  { title: "꾸미고, 적고, 나가기", body: "꾸미기로 마을에서 보이는 집 모양을 바꾸고, 메모에 떠오른 생각을 모아둬. 앞쪽 바닥의 주황 화살표를 누르면 마을로 나가. 소원 등불은 마을의 소원 선착장에서 달아. 새 소식과 다인에게 보내는 말은 왼쪽 위 까치에게." },
+  { title: "꾸미고, 적고, 나가기", body: "꾸미기로 마을에서 보이는 집 모양을 바꾸고, 메모에 떠오른 생각을 모아둬. 앞쪽 바닥의 주황 화살표를 누르면 마을로 나가. 소원 등불은 마을의 소원 선착장에서 달아. 새 소식과 만든 사람 dyne에게 보내는 말은 왼쪽 위 까치에게." },
 ];
 function ForgeTutorial({ step, onStep, onDone }: { step: number; onStep: (n: number) => void; onDone: () => void }) {
   const c = TUT[step];

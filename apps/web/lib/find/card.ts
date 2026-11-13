@@ -5,7 +5,11 @@ import { partRoles, type PartRole } from "./parts";
 // 결과 화면의 트레이딩 카드: 등급(희귀도+화력), 능력치, 특기·약점, 도깨비 한 줄 평, 뒷면 설계 정보.
 // 전부 규칙으로 만든다. 숫자를 지어내지 않도록 부품·난이도는 고른 장작에서만 어림하고, 화면에 '어림'이라고 밝힌다.
 
-export type Grade = "전설" | "희귀" | "흔함";
+export type Grade = "전설" | "영웅" | "희귀" | "고급" | "흔함";
+/** 등급마다 정해진 색 (불 색과 상관없이). 카드 테두리·등급 표·공유 이미지에 같이 쓴다 */
+export const GRADE_COLOR: Record<Grade, string> = { 전설: "#F2A516", 영웅: "#8E4BFF", 희귀: "#3E7BFA", 고급: "#2FA36B", 흔함: "#A7A39A" };
+export const GRADE_CLASS: Record<string, string> = { 전설: "legend", 영웅: "epic", 희귀: "rare", 고급: "uncommon", 흔함: "common" };
+export const GRADE_ORDER: Record<string, number> = { 전설: 0, 영웅: 1, 희귀: 2, 고급: 3, 흔함: 4 };
 export type Rarity = { total: number; sameCombo: number; higherPeak: number };
 
 export type FireCard = {
@@ -39,7 +43,9 @@ export function gradeOf(rarity: Rarity, peak: number): Grade {
   const unique = rarity.sameCombo === 0;
   const topShare = (rarity.higherPeak + 1) / (rarity.total + 1);
   if (unique && peak >= 80) return "전설";
+  if ((unique && peak >= 70) || (!unique && topShare <= 0.03)) return "영웅";
   if (unique || rarity.sameCombo / Math.max(1, rarity.total) < 0.05 || topShare <= 0.2) return "희귀";
+  if (topShare <= 0.4 || peak >= 65) return "고급";
   return "흔함";
 }
 

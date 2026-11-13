@@ -33,11 +33,11 @@ function dokkaebi(kind: string) {
 const INK = "#1E1F24", MUTED = "#62656F", SURFACE = "#F6F5F1", LINE = "#E3E0D7";
 const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
-const GRADE_BG: Record<string, string> = { 전설: "linear-gradient(135deg, #7A55FF, #C04BD8, #FF8F3F)", 희귀: "", 흔함: "#EEECE5" };
+const GRADE_BG: Record<string, string> = { 전설: "linear-gradient(135deg, #FFD36B, #F2A516, #E0702A)", 영웅: "#8E4BFF", 희귀: "#3E7BFA", 고급: "#2FA36B", 흔함: "#EEECE5" };
 function gradePill(fire: FireRecord, size: number) {
   const grade = fire.card?.grade;
   if (!grade) return null;
-  const bg = grade === "희귀" ? fire.color : GRADE_BG[grade];
+  const bg = GRADE_BG[grade] ?? "#EEECE5";
   return (
     <div style={{ display: "flex", fontFamily: "Jua", fontSize: size, color: grade === "흔함" ? MUTED : "#fff", ...(bg.startsWith("linear") ? { backgroundImage: bg } : { backgroundColor: bg }), borderRadius: size * 0.4, padding: `${size * 0.2}px ${size * 0.55}px`, letterSpacing: 2 }}>{grade}</div>
   );

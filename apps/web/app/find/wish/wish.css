@@ -54,3 +54,4 @@
   .wish-for { font-size: 20px; }
 }
 .wish-full .sheet { color: var(--ink, #1E1F24); }
+.wish-right { display: flex; gap: 6px; flex-shrink: 0; }

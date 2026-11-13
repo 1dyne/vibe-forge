@@ -773,3 +773,14 @@ describe("소원 선착장 응원하기", () => {
     for (const l of [...rest, secret]) await ln.removeLantern(l.id); // 같은 DB로 마을을 띄워봐도 시험 등불이 남지 않게
   });
 });
+
+describe("카드 등급 5단계", () => {
+  it("흔함·고급·희귀·영웅·전설로 나뉜다", () => {
+    expect(gradeOf({ total: 300, sameCombo: 0, higherPeak: 3 }, 92)).toBe("전설");
+    expect(gradeOf({ total: 300, sameCombo: 0, higherPeak: 10 }, 74)).toBe("영웅");
+    expect(gradeOf({ total: 300, sameCombo: 40, higherPeak: 5 }, 90)).toBe("영웅"); // 화력 상위 2%
+    expect(gradeOf({ total: 300, sameCombo: 0, higherPeak: 200 }, 50)).toBe("희귀");
+    expect(gradeOf({ total: 300, sameCombo: 40, higherPeak: 100 }, 55)).toBe("고급"); // 화력 상위 34%
+    expect(gradeOf({ total: 300, sameCombo: 40, higherPeak: 150 }, 50)).toBe("흔함");
+  });
+});

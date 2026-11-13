@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { LanternGroup, LanternRecord, PublicLantern } from "../../../lib/find/lantern";
 import { AllRopes, MyLanterns, RopeSheet, forWhom, patchLantern } from "../lantern-panel";
 import { track } from "../track";
+import { createWishSound } from "../world/world-sound";
 import type { WishFilter, WishScene } from "./wish-scene";
 
 type Mine = { lanterns: LanternRecord[]; allowance: number; fires: Array<{ id: string; name: string }> };
@@ -24,6 +25,15 @@ const TUT: Array<{ title: string; body: string }> = [
 export default function WishView({ groups: initialGroups, hue, mine: initialMine }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<WishScene | null>(null);
+  // 선착장 소리: 물결·바람·풀벌레·대금 가락 (켜야 난다, 브라우저 규칙)
+  const snd = useRef<ReturnType<typeof createWishSound> | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  function toggleSound() {
+    if (!snd.current) snd.current = createWishSound();
+    const on = !soundOn; setSoundOn(on); snd.current.resume(); snd.current.setMuted(!on);
+    track("world_sound", { on: String(on), where: "wish" });
+  }
+  useEffect(() => () => snd.current?.close(), []);
   const [groups, setGroups] = useState(initialGroups);
   const [mine, setMine] = useState(initialMine);
   const [failed, setFailed] = useState(false);
@@ -127,7 +137,8 @@ export default function WishView({ groups: initialGroups, hue, mine: initialMine
       <header className="wish-top">
         <button type="button" className="wish-pill" onClick={() => (sceneRef.current ? sceneRef.current.leave() : exit())}>← 마을로</button>
         <div className="wish-title"><b>소원 선착장</b><span>소원 줄 {groups.filter((g) => g.count > g.done).length} · 걸린 등불 {lit}{done ? ` · 이뤄진 소원 ${done}` : ""}</span></div>
-        <button type="button" className="wish-pill" onClick={() => setTut(0)} aria-label="선착장 안내 다시 보기">?</button>
+        <span className="wish-right"><button type="button" className="wish-pill" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button>
+        <button type="button" className="wish-pill" onClick={() => setTut(0)} aria-label="선착장 안내 다시 보기">?</button></span>
       </header>
       <div className="wish-filters" role="radiogroup" aria-label="등불 골라 보기">
         {FILTERS.map((f) => <button key={f.id} type="button" role="radio" aria-checked={filter === f.id} className={filter === f.id ? "on" : ""} onClick={() => pickFilter(f.id)}>{f.label}</button>)}
