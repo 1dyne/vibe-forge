@@ -15,4 +15,5 @@ RUN npm run build
 ENV NODE_ENV=production
 # Railway mounts volumes as root, so this image keeps the default user. To
 # run as "node", set RAILWAY_RUN_UID or chown the volume first.
-CMD ["npm", "run", "start"]
+# npm을 거치지 않고 바로 띄운다: npm은 종료 신호를 받으면 실패로 보고해서 배포 교체 때마다 "Deploy Crashed" 메일이 갔다
+CMD ["node", "scripts/run-next.mjs", "start"]
