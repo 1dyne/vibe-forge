@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { publicUrl } from "./request-security";
+import { arrivedOrigin, publicUrl } from "./request-security";
 
 // Dashboard links keep the token after "#": browsers never send the fragment
 // to the server, so it stays out of hosting access logs. The connector URL has
@@ -21,5 +21,6 @@ export function withLinkParams(dashboardUrl: string, params: Record<string, stri
 export const legacyConnectorLink = (request: NextRequest, token: string) => publicUrl(request, `/api/mcp/${token}`).toString();
 
 // The OAuth connector address: the same for everyone, safe to show anywhere.
-export const mcpResource = (request: NextRequest) => publicUrl(request, "/api/mcp").toString();
-export const issuer = (request: NextRequest) => publicUrl(request, "/").origin;
+// 요청이 들어온 주소 기준: Railway 주소로 등록한 커넥터와 dalgrak.app 으로 등록한 커넥터가 둘 다 맞는 메타데이터를 받는다.
+export const mcpResource = (request: NextRequest) => new URL("/api/mcp", arrivedOrigin(request)).toString();
+export const issuer = (request: NextRequest) => arrivedOrigin(request);

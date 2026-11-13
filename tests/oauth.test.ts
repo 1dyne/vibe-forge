@@ -64,6 +64,18 @@ describe("MCP OAuth", () => {
     expect(anonymous.headers.get("www-authenticate")).toContain(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/api/mcp"`);
   });
 
+  it("answers discovery with the address the connector was added at", async () => {
+    // dalgrak.app 으로 옮기기 전 Railway 주소로 등록한 커넥터: resource가 등록 주소와 같아야 Claude가 연결을 이어간다
+    const at = (host: string, path: string) => new NextRequest(`${ORIGIN}${path}`, { headers: { "x-forwarded-host": host } });
+    const railway = await (await resourceMetadata(at("web-production-x.up.railway.app", "/.well-known/oauth-protected-resource/api/mcp"))).json();
+    expect(railway).toMatchObject({ resource: "https://web-production-x.up.railway.app/api/mcp", authorization_servers: ["https://web-production-x.up.railway.app"] });
+    const server = await (await serverMetadata(at("web-production-x.up.railway.app", "/.well-known/oauth-authorization-server"))).json();
+    expect(server.token_endpoint).toBe("https://web-production-x.up.railway.app/api/oauth/token");
+    // 모르는 주소는 따라가지 않고 대표 주소로 답한다
+    const stranger = await (await resourceMetadata(at("evil.example", "/.well-known/oauth-protected-resource/api/mcp"))).json();
+    expect(stranger.resource).toBe(`${ORIGIN}/api/mcp`);
+  });
+
   it("refuses redirect URIs that are not https or loopback", async () => {
     expect((await register(json(`${ORIGIN}/api/oauth/register`, { redirect_uris: ["http://evil.example/cb"] }))).status).toBe(400);
     expect((await register(json(`${ORIGIN}/api/oauth/register`, { redirect_uris: ["http://127.0.0.1:5555/callback"] }))).status).toBe(201);

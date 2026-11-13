@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { methodNotAllowed, rpcError, serveMcp } from "../../../lib/mcp-server";
 import { corsHeaders, preflight } from "../../../lib/oauth-metadata";
 import { authenticateAccess } from "../../../lib/oauth";
-import { publicUrl } from "../../../lib/request-security";
+import { arrivedOrigin, publicUrl } from "../../../lib/request-security";
 import { getActiveUser } from "../../../lib/users";
 
 // The connector address everyone adds: /api/mcp with an OAuth bearer token.
 // No secret in the URL, so nothing sensitive reaches hosting access logs or
 // the conversation where Claude repeats the address.
 function unauthorized(request: NextRequest, description: string) {
-  const metadata = publicUrl(request, "/.well-known/oauth-protected-resource/api/mcp").toString();
+  const metadata = new URL("/.well-known/oauth-protected-resource/api/mcp", arrivedOrigin(request)).toString();
   return NextResponse.json(rpcError(null, -32001, description), {
     status: 401,
     headers: { ...corsHeaders, "www-authenticate": `Bearer resource_metadata="${metadata}", error="invalid_token", error_description="${description.replace(/"/g, "'")}"` }

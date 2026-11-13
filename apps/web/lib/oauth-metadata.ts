@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { issuer, mcpResource } from "./links";
-import { publicUrl } from "./request-security";
+import { arrivedOrigin } from "./request-security";
 
 const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "content-type, authorization, mcp-protocol-version", "cache-control": "no-store" };
 export const corsHeaders = cors;
@@ -14,9 +14,9 @@ export function protectedResourceMetadata(request: NextRequest) {
 export function authorizationServerMetadata(request: NextRequest) {
   return NextResponse.json({
     issuer: issuer(request),
-    authorization_endpoint: publicUrl(request, "/oauth/authorize").toString(),
-    token_endpoint: publicUrl(request, "/api/oauth/token").toString(),
-    registration_endpoint: publicUrl(request, "/api/oauth/register").toString(),
+    authorization_endpoint: new URL("/oauth/authorize", arrivedOrigin(request)).toString(),
+    token_endpoint: new URL("/api/oauth/token", arrivedOrigin(request)).toString(),
+    registration_endpoint: new URL("/api/oauth/register", arrivedOrigin(request)).toString(),
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
