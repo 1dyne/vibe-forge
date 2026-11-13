@@ -6,6 +6,7 @@ import { track } from "../track";
 import { createVillageSound, type Ambience } from "./world-sound";
 import { ERAS, ERA_R, ERA_RADIUS, eraCenter } from "./world-eras";
 import { AllRopes, MyLanterns, RopeSheet } from "../lantern-panel";
+import Kkachi from "../kkachi";
 import type { LanternGroup } from "../../../lib/find/lantern";
 import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type WorldHouse, type WorldVillage } from "./world-build";
 
@@ -164,6 +165,8 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         heading = Math.atan2(dx / len, -(dz / len));
       } else if (process.env.NODE_ENV !== "production" && new URLSearchParams(location.search).get("pos")) { // 개발 확인용 ?pos=x,z,heading
         const [px, pz, ph] = new URLSearchParams(location.search).get("pos")!.split(",").map(Number); pos.x = px; pos.z = pz; heading = ph || 0;
+      } else if (at === "wish") { // 소원 선착장에서 나왔을 때: 선착장 앞에서 마을 쪽을 바라보며
+        const a0 = Math.PI - 0.42, d = 26; pos.x = Math.sin(a0) * d; pos.z = -Math.cos(a0) * d; heading = a0 + Math.PI;
       } else if (atEra) { // 시대 마을 입구 앞에서 그 마을을 바라보며
         const d = ERA_R - ERA_RADIUS - 4; pos.x = Math.sin(atEra.angle) * d; pos.z = -Math.cos(atEra.angle) * d; heading = Math.PI + atEra.angle;
       } else if (atIdx >= 0) { const c = villageCenter(atIdx); const d = Number(new URLSearchParams(location.search).get("d") ?? 31); pos.x = Math.sin(c.a) * d; pos.z = -Math.cos(c.a) * d; heading = Math.PI + c.a; }
@@ -177,6 +180,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
           pos.x = mine.x + (dx / len) * 2.6; pos.z = mine.z + (dz / len) * 2.6; heading = Math.atan2(dx / len, -(dz / len));
         } else if (e) { const d = ERA_R - ERA_RADIUS - 4; pos.x = Math.sin(e.angle) * d; pos.z = -Math.cos(e.angle) * d; heading = Math.PI + e.angle; }
         else if (vi >= 0) { const c = villageCenter(vi); pos.x = Math.sin(c.a) * 31; pos.z = -Math.cos(c.a) * 31; heading = Math.PI + c.a; }
+        else if (id === "wish") { const a0 = Math.PI - 0.42; pos.x = Math.sin(a0) * 24.5; pos.z = -Math.cos(a0) * 24.5; heading = a0; }
         else { pos.x = 0; pos.z = 24; heading = Math.PI; }
         first = true;
       };
@@ -202,6 +206,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
           ...villages.map((v, i) => { const c = villageCenter(i); return { id: v.id, name: v.name, x: c.x, z: c.z, kind: "village" as const }; }),
           ...ERAS.map((e) => { const c = eraCenter(e); return { id: e.id, name: e.name, x: c.x, z: c.z, kind: "era" as const }; })
         ];
+        { const a0 = Math.PI - 0.42; tags.push({ id: "wish", name: "소원 선착장", x: Math.sin(a0) * 22, z: -Math.cos(a0) * 22, kind: "hall" }); }
         const mine = world.spots.find((sp) => sp.kind === "house" && sp.house!.id === myForgeId);
         if (mine) tags.push({ id: "mine", name: "내 대장간", x: mine.x, z: mine.z, kind: "mine" });
         return { url, hx, hz, me: { x: pos.x, z: pos.z }, tags };
@@ -227,7 +232,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         const ndc = new three.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
         const rc = new three.Raycaster(); rc.setFromCamera(ndc, camera);
         if (!rc.intersectObject(arrowG, true).length) return false;
-        const sp = lastNear; const href = sp.kind === "hall" ? "/find/map#hall" : sp.kind === "plot" ? "/find" : sp.house ? `/f/${sp.house.id}` : "";
+        const sp = lastNear; const href = sp.kind === "wish" ? "/find/wish" : sp.kind === "hall" ? "/find/map#hall" : sp.kind === "plot" ? "/find" : sp.house ? `/f/${sp.house.id}` : "";
         if (href) walkIn.current?.(sp, href);
         return Boolean(href);
       };
@@ -306,7 +311,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
         for (const s of world.spots) { const d = Math.hypot(s.x - pos.x, s.z - pos.z); if (d < s.r && d < bestD) { bestD = d; best = s; } }
         if (best && best.kind === "plot" && myForgeId) best = null;
         if (best !== lastNear) { lastNear = best; setNear(best); }
-        if (lastNear && (lastNear.kind === "house" || lastNear.kind === "hall" || lastNear.kind === "plot")) {
+        if (lastNear && (lastNear.kind === "house" || lastNear.kind === "hall" || lastNear.kind === "plot" || lastNear.kind === "wish")) {
           arrowG.visible = true; arrowG.position.set(lastNear.x, world.heightAt(lastNear.x, lastNear.z) + 2.6 + Math.abs(Math.sin(t * 3)) * 0.4, lastNear.z); arrowG.rotation.y = t;
         } else arrowG.visible = false;
         const v = world.placeAt(pos.x, pos.z);
@@ -383,8 +388,8 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
     </div>
   );
 
-  const enterHref = near ? (near.kind === "hall" ? "/find/map#hall" : near.kind === "plot" ? "/find" : near.house ? `/f/${near.house.id}` : "") : "";
-  const enterText = near ? (near.kind === "hall" ? "본관 게시판 보기" : near.kind === "plot" ? "내 도깨비불 찾고 여기 입주하기" : `${near.label} 들어가기`) : "";
+  const enterHref = near ? (near.kind === "wish" ? "/find/wish" : near.kind === "hall" ? "/find/map#hall" : near.kind === "plot" ? "/find" : near.house ? `/f/${near.house.id}` : "") : "";
+  const enterText = near ? (near.kind === "wish" ? "소원 선착장 들어가기" : near.kind === "hall" ? "본관 게시판 보기" : near.kind === "plot" ? "내 도깨비불 찾고 여기 입주하기" : `${near.label} 들어가기`) : "";
 
   return (
     <div className="world">
@@ -403,16 +408,17 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       <div className="world-pad" ref={pad} onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture(e.pointerId); setHint(false); move(e); }} onPointerMove={(e) => { if (stick.current.active) move(e); }} onPointerUp={end} onPointerCancel={end}>
         <div className="world-knob" ref={knob} />
       </div>
-      {near && near.kind === "rope" && <span className="world-enter two-btn"><button type="button" onClick={() => { setRope(lanterns.find((g) => g.key === near.group) ?? null); track("rope_open"); }}>이 소원 줄 보기</button><button type="button" onClick={() => setRopes(true)}>모아보기</button>{myForgeId && <button type="button" onClick={openHang}>내 등불 걸기</button>}</span>}
+      {near && near.kind === "rope" && <a className="world-enter" href="/find/wish" onClick={() => track("rope_open", { via: "to-wish" })}>↓ 소원 선착장에서 보기</a>}
       {near && near.kind === "npc" && <div className="world-say" role="status"><b>{near.label}</b><span>{near.line}</span></div>}
       {near && near.kind !== "rope" && near.kind !== "npc" && <a className="world-enter" href={enterHref} onClick={(e) => { if (walkIn.current && enterHref) { e.preventDefault(); walkIn.current(near, enterHref); } }}>↓ {enterText}</a>}
       {tut !== null && (() => {
         const who = myName && myName !== "이름 없는 도깨비" ? myName : "너";
         const T = [
           { t: `달그락 마을에 온 걸 환영해${who !== "너" ? `, ${who}` : ""}!`, b: "가운데 호수 섬에 본관이 있고, 둘레에 다섯 마을이 있어. 마을마다 비슷한 아이디어를 가진 대장간들이 모여 살아. 마을에 들어서면 위에 어떤 아이디어가 모인 마을인지 떠." },
-          { t: "도깨비는 어디서 왔을까", b: `오래 쓴 물건에는 도깨비가 깃든대. 빗자루, 짚신, 다이얼 전화기… 마을 곳곳에 물건 도깨비들이 돌아다녀. 가까이 가면 말을 걸어. ${who}가 아는 도깨비도 있는지 찾아봐. 섬 바깥 은빛 언덕·꼼지락 골목·와글 뒷산엔 더 오래된 물건들이 살아.` },
-          { t: "왜 사람은 안 보여?", b: "여긴 도깨비 마을이니까. 대신 굴뚝 연기와 창에 비치는 불빛으로 방금 누가 다녀갔는지 알 수 있어. 집 가까이 가면 문 위에 주황 화살표가 떠. 누르면 그 대장간에 놀러 가서 장작을 넣어주고 '갖고 싶어'를 남길 수 있어." },
-          { t: "소원은 호수에서", b: "호수 위에 걸린 소원 줄 가까이 가면 내 등불을 걸 수 있어. 같은 소원을 빈 도깨비들과 한 줄에 꿰여. 위쪽 '지도'를 누르면 어디든 바로 갈 수 있고, '내 대장간'은 내 집 앞으로 데려다줘." },
+          { t: "도깨비는 어디서 왔을까", b: `오래 쓰인 물건에는 도깨비가 깃든대. 부싯돌, 측우기, 금속활자, 다이얼 전화기… 사람들의 삶을 바꾼 물건과 기술이 도깨비가 돼서 돌아다녀. 가까이 가면 말을 걸어. ${who}가 아는 도깨비도 있는지 찾아봐. 섬 바깥 은빛 언덕·꼼지락 골목·와글 뒷산엔 더 오래된 도깨비들이 살아.` },
+          { t: "왜 사람은 안 보여?", b: `${who === "너" ? "너" : who}도, 대장간 주인들도 다 사람이야. 그런데 여긴 도깨비 마을이라 사람은 눈에 안 보여. 대신 굴뚝 연기와 창에 비치는 불빛으로 방금 누가 다녀갔는지 알 수 있어. 집 가까이 가면 문 위에 주황 화살표가 떠. 누르면 그 대장간에 놀러 가서 장작을 넣어주고 '갖고 싶어'를 남길 수 있어.` },
+          { t: "대장장이 다인과 까치", b: "마을 한가운데 본관 대장간에는 도깨비들이랑 같이 노는 대장장이 다인이 있어. 대장간과 마을의 새 소식은 왼쪽 위 까치가 물어다 줘. 다인한테 하고 싶은 말이나 고장 신고도 까치를 누르면 바로 보낼 수 있어." },
+          { t: "소원은 소원 선착장에서", b: "호숫가 소원 선착장에 들어가면 같은 소원끼리 걸린 등불을 보고, 응원하고, 내 등도 달 수 있어. 위쪽 '지도'를 누르면 어디든 바로 갈 수 있고, '내 대장간'은 내 집 앞으로 데려다줘." },
         ];
         const c = T[tut]; const last = tut === T.length - 1;
         return (
@@ -435,15 +441,15 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
           ))}
           <i className="map-me" style={{ left: `${(mapShot.me.x / mapShot.hx + 1) * 50}%`, top: `${(mapShot.me.z / mapShot.hz + 1) * 50}%` }} />
           <div className="map-head"><span>달그락 마을 지형도</span><button type="button" onClick={() => setMapShot(null)}>닫기</button></div>
-          <div className="map-foot"><button type="button" className="map-ropes" onClick={() => { setMapShot(null); setRopes(true); }}>호수의 소원 줄 모아보기</button><br />이름을 누르면 그 앞으로 바로 가{mapShot.tags.some((t) => t.kind === "mine") ? " · 주황 깃발이 내 대장간" : ""} · <a href="/find/map" style={{ color: "#FFD27A" }}>본관 게시판</a></div>
+          <div className="map-foot"><a className="map-ropes" href="/find/wish">소원 선착장으로</a><br />이름을 누르면 그 앞으로 바로 가{mapShot.tags.some((t) => t.kind === "mine") ? " · 주황 깃발이 내 대장간" : ""} · <a href="/find/map" style={{ color: "#FFD27A" }}>본관 게시판</a></div>
         </div>
       )}
       {rope && <RopeSheet group={rope} hasForge={Boolean(myForgeId)} onHang={myForgeId ? openHang : undefined} onClose={() => setRope(null)} />}
       {ropes && <AllRopes groups={lanterns} onPick={(g) => { setRopes(false); setRope(g); }} onHang={myForgeId ? openHang : undefined} onClose={() => setRopes(false)} />}
       {hang && <MyLanterns initial={hang.lanterns} allowance={hang.allowance} fires={hang.fires} onClose={() => setHang(null)} />}
       <div className="world-top">
-        <a href="/find" className="world-brand">달그락</a>
-        <span><button type="button" className="world-sound" onClick={toggleLight} aria-pressed={lightOn} title="느린 폰이면 켜줘">{lightOn ? "가볍게 ✓" : "가볍게"}</button><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><button type="button" className="world-sound" onClick={openMap}>지도</button><button type="button" className="world-sound" onClick={() => setTut(0)} aria-label="마을 안내 다시 보기">?</button>{myForgeId ? <a href="/find/village?house=me">내 대장간</a> : <a href="/find">내 대장간 짓기</a>}</span>
+        <span className="world-left"><Kkachi where="village" onTutorial={() => setTut(0)} /><a href="/find" className="world-brand">달그락</a></span>
+        <span><button type="button" className="world-sound" onClick={toggleLight} aria-pressed={lightOn} title="느린 폰이면 켜줘">{lightOn ? "가볍게 ✓" : "가볍게"}</button><button type="button" className="world-sound" onClick={toggleSound} aria-pressed={soundOn} aria-label={soundOn ? "소리 끄기" : "소리 켜기"}>{soundOn ? "소리 끔" : "소리"}</button><button type="button" className="world-sound" onClick={openMap}>지도</button>{myForgeId ? <a href="/find/village?house=me">내 대장간</a> : <a href="/find">내 대장간 짓기</a>}</span>
       </div>
     </div>
   );

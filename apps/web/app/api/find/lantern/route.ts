@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createLantern, forgeLanterns, getLantern, groupKeyOf, lanternAllowance, lanternTextProblem, markDone, publicLanternGroups, removeLantern, setMaker, TARGET_MAX, WISH_MAX } from "../../../../lib/find/lantern";
+import { createLantern, forgeLanterns, getLantern, groupKeyOf, lanternAllowance, lanternTextProblem, markDone, publicLanternGroups, removeLantern, setCheer, setMaker, TARGET_MAX, WISH_MAX } from "../../../../lib/find/lantern";
 import { ownerHashFromRequest } from "../../../../lib/find/owner";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
 import { hasValidOrigin } from "../../../../lib/request-security";
-import { forgeFires, forgeForOwner } from "../../../../lib/find/village-store";
+import { forgeFires, forgeForOwner, getForge } from "../../../../lib/find/village-store";
 
 async function me(request: NextRequest) {
   const hash = ownerHashFromRequest(request);
@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ lantern }, { status: 201 });
 }
 
-const Patch = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{4,20}$/), action: z.enum(["done", "remove", "make", "unmake"]) }).strict();
+const Patch = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{4,20}$/), action: z.enum(["done", "remove", "make", "unmake", "cheer", "uncheer"]) }).strict();
 
-/** 내 등불: 이뤄졌어(호수에 띄우기)·내리기 / 남의 등불: 만들어볼게·그만두기 */
+/** 내 등불: 이뤄졌어(호수에 띄우기)·내리기 / 남의 등불: 만들어볼게·그만두기, 응원하기·응원 취소(글 없음, 대장간당 한 번) */
 export async function PATCH(request: NextRequest) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   if (!allow("find-lantern-patch", clientKey(request), 30)) return NextResponse.json({ error: "잠깐 쉬었다 해줘." }, { status: 429 });
@@ -67,6 +67,14 @@ export async function PATCH(request: NextRequest) {
   const own = lantern.forgeId === forge.id;
   if ((action === "done" || action === "remove") && !own) return NextResponse.json({ error: "내 등불만 바꿀 수 있어." }, { status: 403 });
   if ((action === "make" || action === "unmake") && own) return NextResponse.json({ error: "내 등불은 내가 이미 만드는 중이야." }, { status: 400 });
+  if (action === "cheer" || action === "uncheer") {
+    // 내 등불엔 응원하지 않는다 (스스로 밝기를 올리지 못하게). 남에게 안 보이는 등불(나만 보기·비공개 대장간)도 응원할 수 없다.
+    if (own) return NextResponse.json({ error: "내 등불은 응원할 수 없어. 다른 도깨비 등불을 응원해줘." }, { status: 400 });
+    const owner = lantern.private ? null : await getForge(lantern.forgeId);
+    if (!owner || owner.visibility !== "public") return NextResponse.json({ error: "not found" }, { status: 404 });
+    if (!allow("find-lantern-cheer", `${forge.id}`, 60)) return NextResponse.json({ error: "잠깐 쉬었다 해줘." }, { status: 429 });
+    await setCheer(lantern.id, forge.id, action === "cheer");
+  }
   if (action === "done") await markDone(lantern.id);
   if (action === "remove") await removeLantern(lantern.id);
   if (action === "make" || action === "unmake") await setMaker(lantern.id, forge.id, action === "make");

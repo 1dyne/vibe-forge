@@ -14,7 +14,7 @@ export const ERAS: Era[] = [
 ];
 /** 지도 안내용: 시대 마을마다 사는 물건 도깨비 */
 export const ERA_DOKKAEBI: Record<string, string[]> = {
-  prehistory: ["빗살무늬토기", "간석기 도끼"],
+  prehistory: ["부싯돌", "반달돌칼", "빗살무늬토기"],
   modern: ["브라운관", "다이얼 전화기", "카세트테이프"],
   y2k: ["폴더폰", "삐삐", "플로피디스크", "걸어다니는 C언어", "디도스 도깨비 떼", "전화 모뎀"]
 };
@@ -135,9 +135,16 @@ export function buildEras(c: EraCtx) {
     for (let k = 0; k < 30; k++) { const q = k * 2.4, r = 5 + (k % 9) * 1.2; const s = at(Math.sin(q) * r, Math.cos(q) * r); for (let i = 0; i < 3; i++) { const b = part(CONE, mat("#8FA06A"), 0.06, 0.9, 0.06, (i - 1) * 0.1, 0.45, 0, s); b.rotation.z = (i - 1) * 0.2; } }
     // 이 시대 물건 도깨비
     const pot = new three.Group(); const pj = part(CONE, mat("#9C6B4E"), 0.22, 0.5, 0.22, 0, 0.3, 0, pot); pj.rotation.x = Math.PI; ink(pj, 1.08);
-    npc("빗살무늬토기 도깨비", "나는 이 땅에서 제일 오래된 그릇이야. 바닥이 뾰족해서 모래에 꽂아 썼지.", pot, circle(E("prehistory"), 5.5, 0.25, 0, 0.25));
-    const axe = new three.Group(); part(CYL6, mat("#6E5236"), 0.035, 0.8, 0.035, 0, 0.5, 0, axe); const head = part(BOX, mat("#7A766C"), 0.3, 0.16, 0.08, 0.1, 0.85, 0, axe); ink(head, 1.1);
-    npc("간석기 도끼 도깨비", "돌을 갈아서 날을 세웠어. 처음 장작을 팬 것도 나야.", axe, circle(E("prehistory"), 11.5, -0.18, 1.5, 0.15));
+    npc("빗살무늬토기 도깨비", "곡식을 담아 둘 그릇이 생기니 사람들이 겨울을 버틸 수 있었어. 바닥이 뾰족해서 모래에 꽂아 썼지.", pot, circle(E("prehistory"), 5.5, 0.25, 0, 0.25));
+    // 부싯돌: 사람이 불을 마음대로 피우게 한 돌 (모든 도깨비불의 시작)
+    const flint = new three.Group(); const fl = part(BALL, mat("#5E5A55"), 0.22, 0.18, 0.2, 0, 0.22, 0, flint); ink(fl, 1.1);
+    const spark = part(BALL, new three.MeshBasicMaterial({ color: "#FFD27A" }), 0.04, 0.04, 0.04, 0.18, 0.4, 0, flint);
+    c.anim.push((t) => { spark.visible = Math.sin(t * 7) > 0.85; });
+    npc("부싯돌 도깨비", "탁! 내가 불꽃을 튀겨서 사람들이 불을 마음대로 피우게 됐어. 모든 도깨비불의 시작이 나야.", flint, circle(E("prehistory"), 3.4, -0.3, 2, 0.2));
+    // 반달돌칼: 이삭을 거두며 사람들이 한곳에 눌러살게 됐다
+    const knife = new three.Group(); const kb = part(DOME, mat("#8C877C"), 0.3, 0.16, 0.05, 0, 0.3, 0, knife); kb.rotation.x = Math.PI / 2; ink(kb, 1.1);
+    for (const sx of [-0.08, 0.08]) part(CYL6, mat("#3E3530"), 0.015, 0.06, 0.015, sx, 0.4, 0, knife);
+    npc("반달돌칼 도깨비", "벼 이삭을 똑똑 따던 칼이야. 곡식을 거두면서 사람들이 떠돌지 않고 한곳에 눌러살기 시작했지.", knife, circle(E("prehistory"), 11.5, -0.18, 1.5, 0.15));
   }
 
   // ── 꼼지락 골목 (1970–80년대 모습) ──
@@ -265,7 +272,7 @@ export function buildEras(c: EraCtx) {
     // 걸어다니는 C언어와 뒤따르는 세미콜론
     const cTag = c.textSprite("C", { bg: "#1E1F24", fg: "#7FE0D2", size: 80, scale: 0.7 }); const cl = new three.Group(); cTag.position.y = 0.55; cl.add(cTag);
     const semi = c.textSprite(";", { bg: "#1E1F24", fg: "#FFD27A", size: 60, scale: 0.4 }); c.scene.add(semi);
-    npc("걸어다니는 C언어", "나 아직 살아 있다. 너희 냉장고 속에도 내가 있어.", cl, (t) => { const k = (Math.sin(t * 0.1) + 1) / 2; const v = w(0, -9 + k * 20); return { x: v.x, z: v.z, y: Math.abs(Math.sin(t * 4)) * 0.12 }; });
+    npc("걸어다니는 C언어", "나 아직 살아 있다. 너희 냉장고 속 작은 칩에도 내가 있어.", cl, (t) => { const k = (Math.sin(t * 0.1) + 1) / 2; const v = w(0, -9 + k * 20); return { x: v.x, z: v.z, y: Math.abs(Math.sin(t * 4)) * 0.12 }; });
     c.anim.push((t) => { const k = (Math.sin((t - 1.2) * 0.1) + 1) / 2; const v = w(0.4, -9 + k * 20); semi.position.set(v.x, 0.45 + Math.abs(Math.sin(t * 4 + 1)) * 0.12, v.z); });
     // 디도스 도깨비: 작은 상자들이 한꺼번에 몰려다닌다
     const swarm = new three.Group(); const bits = Array.from({ length: 14 }, (_, i) => part(BOX, mat(i % 2 ? "#B9A3E3" : "#7FE0D2", { emissive: i % 2 ? "#B9A3E3" : "#7FE0D2", ei: 0.6 }), 0.1, 0.1, 0.1, 0, 0.4, 0, swarm));

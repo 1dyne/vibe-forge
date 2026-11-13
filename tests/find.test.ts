@@ -726,3 +726,50 @@ describe("여러 주소와 다시 시작", () => {
     expect(await vs.villageOpenFor(forge.id)).toBe(true);
   });
 });
+
+describe("소원 선착장 응원하기", () => {
+  const patchReq = (body: unknown, token: string) =>
+    new NextRequest(`${origin}/api/find/lantern`, { method: "PATCH", headers: { origin, "content-type": "application/json", cookie: `find_owner=${token}` }, body: JSON.stringify(body) });
+  beforeEach(() => resetRateLimits());
+
+  it("대장간 하나당 등불 하나에 한 번만 응원되고, 다시 누르면 취소된다 (내 등불·나만 보기는 응원 불가)", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const ln = await import("../apps/web/lib/find/lantern");
+    const { PATCH } = await import("../apps/web/app/api/find/lantern/route");
+    const stamp = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    const tokA = `cheerA${stamp}`.padEnd(40, "a"), tokB = `cheerB${stamp}`.padEnd(40, "b"), tokC = `cheerC${stamp}`.padEnd(40, "c");
+    const a = (await vs.ensureForge(vs.hashToken(tokA), "응원A", ["w_family"])).forge;
+    const b = (await vs.ensureForge(vs.hashToken(tokB), "응원B", ["w_family"])).forge;
+    const c = (await vs.ensureForge(vs.hashToken(tokC), "응원C", ["w_family"])).forge;
+    const key = `w_family|s_time|r_sound${stamp}`;
+    const lan = await ln.createLantern({ forgeId: a.id, fireId: null, target: "할머니", wish: "약 드시게", hideTarget: false, private: false, shareCard: false, groupKey: key });
+    const secret = await ln.createLantern({ forgeId: a.id, fireId: null, target: "비밀", wish: "몰래", hideTarget: false, private: true, shareCard: false, groupKey: key });
+    const find = async (viewer: string | null) => (await ln.publicLanternGroups(viewer)).find((g) => g.key === key)!.lanterns.find((l) => l.id === lan.id)!;
+    expect(await find(b.id)).toMatchObject({ cheers: 0, iCheered: false });
+
+    expect((await PATCH(patchReq({ id: lan.id, action: "cheer" }, tokB))).status).toBe(200);
+    const again = await (await PATCH(patchReq({ id: lan.id, action: "cheer" }, tokB))).json(); // 두 번 눌러도 한 번
+    expect(again.groups.find((g: { key: string }) => g.key === key).lanterns[0]).toMatchObject({ cheers: 1, iCheered: true });
+    await ln.setCheer(lan.id, c.id, true);
+    expect(await find(b.id)).toMatchObject({ cheers: 2, iCheered: true });
+    expect(await find(a.id)).toMatchObject({ cheers: 2, iCheered: false, mine: true });
+    expect(await find(null)).toMatchObject({ cheers: 2, iCheered: false });
+
+    expect((await PATCH(patchReq({ id: lan.id, action: "uncheer" }, tokB))).status).toBe(200);
+    expect(await find(b.id)).toMatchObject({ cheers: 1, iCheered: false });
+    expect(await find(c.id)).toMatchObject({ cheers: 1, iCheered: true });
+
+    expect((await PATCH(patchReq({ id: lan.id, action: "cheer" }, tokA))).status).toBe(400); // 내 등불
+    expect((await PATCH(patchReq({ id: secret.id, action: "cheer" }, tokB))).status).toBe(404); // 나만 보기
+    expect((await PATCH(patchReq({ id: lan.id, action: "cheer", text: "글" }, tokB))).status).toBe(400); // 글은 받지 않는다
+    await vs.setVisibility(a.id, "private");
+    expect((await PATCH(patchReq({ id: lan.id, action: "cheer" }, tokB))).status).toBe(404); // 비공개 대장간
+    await vs.setVisibility(a.id, "public");
+
+    await ln.removeLantern(lan.id); // 등불을 내리면 응원도 같이 사라진다
+    await ln.createLantern({ forgeId: a.id, fireId: null, target: "엄마", wish: "푹 주무시게", hideTarget: false, private: false, shareCard: false, groupKey: key });
+    const rest = (await ln.publicLanternGroups(b.id)).find((g) => g.key === key)!.lanterns;
+    expect(rest.every((l) => l.cheers === 0)).toBe(true);
+    for (const l of [...rest, secret]) await ln.removeLantern(l.id); // 같은 DB로 마을을 띄워봐도 시험 등불이 남지 않게
+  });
+});

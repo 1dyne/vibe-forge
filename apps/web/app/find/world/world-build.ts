@@ -9,7 +9,7 @@ import { buildEras, eraCenter, eraTint, ERA_R, ERA_RADIUS, ERAS } from "./world-
 
 export type WorldHouse = { id: string; nickname: string; theme: string; alleySeq: number; plotNo: number; color: string; peak: number; fuel: number; wants: number; lit: boolean; stage: 1 | 2 | 3; fires: number; active: boolean; recent: boolean; decor: Decor };
 export type WorldVillage = { id: string; name: string; topics: string; mood: string; themes: string[] };
-export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot" | "rope" | "npc"; house?: WorldHouse; village?: string; group?: string; label: string; line?: string };
+export type Spot = { x: number; z: number; r: number; kind: "house" | "hall" | "plot" | "rope" | "npc" | "wish"; house?: WorldHouse; village?: string; group?: string; label: string; line?: string };
 export type NameTag = { s: T.Sprite; x: number; z: number; always: boolean };
 export type Phase = "dusk" | "night";
 
@@ -984,66 +984,71 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
       glow(WISP[0], 1.1, 0, eyeY, 0, 0.35, g);
       return g;
     }
-    // 마을마다 이름 있는 물건 도깨비들이 넓게 흩어져 돌아다닌다 (가까이 가면 말풍선)
-    type GK = "broom" | "poker" | "shoe" | "winnow" | "pestle";
-    const NPCS: Record<string, Array<[GK, string, string]>> = {
+    // 역사를 바꾼 물건·기술이 변한 도깨비들 (마을 주제와 맞춘다). 가까이 가면 말풍선
+    type HK = "plow" | "ondol" | "hanji" | "spinwheel" | "wheel" | "sundial" | "waterclock" | "hangul" | "type" | "raingauge" | "armillary";
+    function relic(kind: HK) {
+      const g = new three.Group(); scene.add(g); const spin = new three.Group(); g.add(spin);
+      const wood = mat("#8A6A4A"), bronze = mat("#8C6B3E"), stone = mat("#8C877C");
+      let eyeY = 0.6, eyeZ = 0.1;
+      if (kind === "plow") { const h = part(CYL6, wood, 0.04, 1.1, 0.04, -0.15, 0.6, 0, g); h.rotation.z = 0.6; part(BOX, wood, 0.9, 0.08, 0.08, 0.15, 0.2, 0, g); const sh = part(CONE, mat("#5E5A55"), 0.12, 0.3, 0.06, 0.62, 0.15, 0, g); sh.rotation.z = -Math.PI / 2; eyeY = 0.35; }
+      else if (kind === "ondol") { const sl = part(BOX, stone, 0.8, 0.14, 0.6, 0, 0.3, 0, g); ink(sl, 1.06); part(BOX, mat("#5A4636"), 0.5, 0.2, 0.3, 0, 0.12, 0, g); part(BALL, mat("#FF8A3A", { emissive: "#FF5A10", ei: 1 }), 0.1, 0.07, 0.1, 0, 0.12, 0.16, g); eyeY = 0.4; eyeZ = 0.31; }
+      else if (kind === "hanji") { const r = part(CYL, mat("#F3E7C9"), 0.13, 0.7, 0.13, 0, 0.5, 0, g); r.rotation.z = Math.PI / 2; part(BOX, mat("#EFE3C4"), 0.6, 0.02, 0.45, 0, 0.36, 0.2, g); eyeY = 0.52; eyeZ = 0.14; }
+      else if (kind === "spinwheel") { const w = part(TORUS, wood, 0.32, 0.32, 0.6, 0, 0.62, 0, spin); w.rotation.y = Math.PI / 2; for (const a of [0, 1.05, 2.1]) { const k = part(BOX, wood, 0.02, 0.6, 0.02, 0, 0.62, 0, spin); k.rotation.x = a; } spin.position.set(0, 0, 0); part(CYL6, wood, 0.03, 0.62, 0.03, -0.12, 0.31, 0, g); part(CYL6, wood, 0.03, 0.62, 0.03, 0.12, 0.31, 0, g); part(BOX, wood, 0.5, 0.06, 0.25, 0.25, 0.06, 0, g); eyeY = 0.62; eyeZ = 0.08; }
+      else if (kind === "wheel") { const w = part(TORUS, wood, 0.38, 0.38, 0.9, 0, 0.4, 0, spin); w.rotation.y = Math.PI / 2; for (const a of [0, 0.79, 1.57, 2.36]) { const k = part(BOX, wood, 0.03, 0.72, 0.03, 0, 0.4, 0, spin); k.rotation.x = a; } part(CYL6, wood, 0.06, 0.12, 0.06, 0, 0.4, 0, spin).rotation.z = Math.PI / 2; eyeY = 0.42; eyeZ = 0.05; }
+      else if (kind === "sundial") { part(CYL6, stone, 0.12, 0.5, 0.12, 0, 0.25, 0, g); const b = part(DOME, bronze, 0.3, 0.2, 0.3, 0, 0.7, 0, g); b.rotation.x = Math.PI; ink(b, 1.06); part(CYL6, mat("#3E3530"), 0.01, 0.3, 0.01, 0, 0.72, 0, g); eyeY = 0.58; eyeZ = 0.29; }
+      else if (kind === "waterclock") { part(CYL, bronze, 0.18, 0.5, 0.18, 0, 0.25, 0, g); part(CYL, bronze, 0.13, 0.35, 0.13, 0.2, 0.75, 0, g); part(CYL6, wood, 0.03, 0.9, 0.03, -0.18, 0.45, 0, g); eyeY = 0.3; eyeZ = 0.19; }
+      else if (kind === "hangul") { const bk = part(BOX, mat("#C9A86A"), 0.42, 0.56, 0.08, 0, 0.5, 0, g); ink(bk, 1.06); for (const y of [0.62, 0.52, 0.42]) part(BOX, mat("#3E3530"), 0.22, 0.03, 0.01, 0.04, y, 0.045, g); eyeY = 0.66; eyeZ = 0.05; }
+      else if (kind === "type") { const t = part(BOX, bronze, 0.3, 0.3, 0.3, 0, 0.3, 0, g); ink(t, 1.08); part(BOX, mat("#C9A86A"), 0.2, 0.03, 0.2, 0, 0.46, 0, g); eyeY = 0.34; eyeZ = 0.16; }
+      else if (kind === "raingauge") { part(BOX, stone, 0.45, 0.3, 0.45, 0, 0.15, 0, g); const c = part(CYL, bronze, 0.13, 0.55, 0.13, 0, 0.58, 0, g); ink(c, 1.08); eyeY = 0.6; eyeZ = 0.14; }
+      else { part(CYL6, wood, 0.04, 0.5, 0.04, 0, 0.25, 0, g); for (const [rx, ry] of [[0, 0], [Math.PI / 2, 0], [Math.PI / 2, Math.PI / 2]]) { const r = part(TORUS, bronze, 0.3, 0.3, 0.3, 0, 0.78, 0, spin); r.rotation.set(rx, ry, 0); } part(BALL, mat("#5E7FA8"), 0.07, 0.07, 0.07, 0, 0.78, 0, g); eyeY = 0.45; eyeZ = 0.05; }
+      for (const sx of [-0.05, 0.05]) part(BALL, new three.MeshBasicMaterial({ color: "#FFFFFF" }), 0.025, 0.03, 0.02, sx, eyeY, eyeZ, g);
+      glow(WISP[0], 1.1, 0, eyeY, 0, 0.35, g);
+      return { g, spin };
+    }
+    const NPCS: Record<string, Array<[HK, string, string]>> = {
       kkomul: [
-        ["broom", "빗자루 도깨비", "마당 쓸다 보면 고양이 털이 한 바구니야. 꼬물마을엔 반려동물·식물·가족을 돌보는 아이디어가 모여."],
-        ["winnow", "키 도깨비", "곡식 까부르듯 좋은 생각만 골라줄게. 화분 물 주기 알림 같은 거 말이야."],
-        ["shoe", "짚신 도깨비", "멀리 사는 부모님 안부가 궁금하면 여기 집들을 구경해봐."],
-        ["pestle", "다듬잇방망이 도깨비", "똑딱똑딱. 밥 먹었는지, 약 먹었는지 챙기는 물건들이 많아."],
+        ["plow", "쟁기 도깨비", "소가 나를 끌면서 사람들이 한곳에 모여 농사짓고 마을을 이뤘어. 꼬물마을엔 식물과 생명을 돌보는 아이디어가 모여."],
+        ["ondol", "구들장 도깨비", "아궁이 불 하나로 온 방을 데웠지. 가족이 한 방에 모여 겨울을 났어. 가족을 챙기는 물건이라면 여기야."],
+        ["hanji", "한지 도깨비", "내 덕에 편지를 쓰고 기록을 남겼어. 멀리 사는 가족에게 안부를 전하는 아이디어들이 여기 살아."],
       ],
       ttukttak: [
-        ["poker", "부지깽이 도깨비", "아궁이 불 대신 스위치를 켜주는 아이디어들이 여기 살아. 뚝딱마을은 살림을 덜어주는 마을이야."],
-        ["poker", "부지깽이 동생", "불 끄러 일어나기 귀찮지? 그런 물건 만드는 대장간이 저쪽에 있어."],
-        ["pestle", "절굿공이 도깨비", "쿵쿵, 냉장고 문 열렸다고 알려주는 녀석 봤어?"],
-        ["broom", "몽당빗자루", "청소는 내가, 귀찮은 건 대장간이. 뚝딱!"],
+        ["spinwheel", "물레 도깨비", "목화솜으로 실을 자아서 누구나 무명옷을 입게 됐어. 집안일을 덜어주는 아이디어는 뚝딱마을 몫이야."],
+        ["wheel", "수레바퀴 도깨비", "무거운 짐을 굴려 나르게 한 게 나야. 사람 힘을 덜어주는 물건, 여기 대장간들이 잘 알지."],
       ],
       jjaekkak: [
-        ["pestle", "절굿공이 도깨비", "쿵, 쿵. 하루 리듬은 내가 맞춰. 째깍마을엔 시간·습관·집중을 돕는 아이디어가 모여."],
-        ["shoe", "나막신 도깨비", "오늘 물 몇 잔 마셨어? 그런 걸 세어주는 물건들이 여기 살아."],
-        ["winnow", "체 도깨비", "자세 무너졌다고 톡 알려주는 방석, 그 대장간 구경 가봐."],
+        ["sundial", "앙부일구 도깨비", "길가에 놓인 해시계라 누구나 시간을 알게 됐어. 째깍마을은 시간과 습관을 챙기는 마을이야."],
+        ["waterclock", "자격루 도깨비", "때가 되면 저절로 종을 치는 물시계, 조선의 자동 장치가 나야. 알아서 시간을 알려주는 물건을 만든다면 날 찾아와."],
       ],
       wagle: [
-        ["shoe", "짚신 도깨비", "씨름 한 판 할래? 와글마을엔 같이 노는 장난감·꼬마 아이디어가 모여."],
-        ["shoe", "짚신 형", "흔들면 춤추는 인형, 그런 거 만드는 대장간이 저기 있어."],
-        ["broom", "빗자루 도깨비", "아이 손이 닿아도 안전한 물건, 와글마을 대장간들이 고민 중이야."],
-        ["poker", "부지깽이 도깨비", "와글와글! 버튼 누르면 표정이 바뀌는 거, 재밌지 않아?"],
+        ["hangul", "훈민정음 도깨비", "쉬운 글자라 아이도 며칠이면 배워. 누구나 마음을 주고받게 됐지. 와글마을엔 같이 노는 아이디어가 모여."],
+        ["type", "금속활자 도깨비", "이야기책을 많이 찍어내서 여럿이 같이 읽게 했어. 함께 즐기는 물건을 만드는 대장간이 여기 많아."],
       ],
       kkambbak: [
-        ["winnow", "키 도깨비", "눈에 안 보이는 걸 알아채는 마을이야. 문 잠갔는지, 공기 탁한지 같은 거."],
-        ["pestle", "방망이 도깨비", "택배 왔는지 자꾸 나가보지? 그런 걸 대신 지켜보는 물건들이 여기 살아."],
-        ["broom", "빗자루 도깨비", "밤엔 갈대밭에 도깨비불이 떠. 가까이 가봐."],
+        ["raingauge", "측우기 도깨비", "비가 얼마나 왔는지 처음으로 재서 기록했어. 깜빡마을은 눈에 안 보이는 변화를 알아채는 마을이야."],
+        ["armillary", "혼천의 도깨비", "하늘의 해와 별이 어떻게 움직이는지 살폈지. 지켜보고 알려주는 물건들이 여기 살아."],
       ],
     };
     villages.forEach((v, vi) => {
       const c = centers[vi];
       (NPCS[v.id] ?? []).forEach(([kind, name, line], ni, arr) => {
-        const g = goblin(kind);
+        const { g, spin } = relic(kind);
         const spot: Spot = { x: c.x, z: c.z, r: 2.8, kind: "npc", label: name, line };
         spots.push(spot);
         // 마을 안쪽 길부터 바깥 집 줄까지 넓게: 반지름이 천천히 바뀌는 고리
         const base = 6 + (ni / Math.max(1, arr.length - 1)) * 11, ph = ni * 2.1 + vi, sp = (ni % 2 ? -1 : 1) * (0.05 + (ni % 3) * 0.015);
-        const hop = kind === "poker" || kind === "shoe" ? 0.25 : kind === "pestle" ? 0.15 : 0;
+        const hop = kind === "type" || kind === "hangul" ? 0.22 : kind === "plow" || kind === "sundial" ? 0.12 : 0;
         anim.push((t) => {
           const a = t * sp + ph, r = base + Math.sin(t * 0.11 + ph) * 3;
           let x = c.x + Math.sin(a) * r, z = c.z + Math.cos(a) * r;
           if (!walkable(x, z)) { x = c.x + Math.sin(a) * base * 0.6; z = c.z + Math.cos(a) * base * 0.6; }
-          g.position.set(x, groundAt(x, z) + (hop ? Math.abs(Math.sin(t * 5 + ni)) * hop : 0) + (kind === "shoe" ? 0.15 : 0), z);
+          g.position.set(x, groundAt(x, z) + (hop ? Math.abs(Math.sin(t * 5 + ni)) * hop : 0), z);
           g.rotation.y = a + (sp > 0 ? Math.PI / 2 : -Math.PI / 2);
-          if (kind === "broom") g.rotation.x = Math.sin(t * 6 + ni) * 0.3;
+          if (kind === "wheel") spin.rotation.x = -t * 3 * Math.sign(sp); // 굴러간다
+          else if (kind === "spinwheel") spin.rotation.x = t * 2;
+          else if (kind === "armillary") spin.rotation.y = t * 0.8;
           spot.x = x; spot.z = z;
         });
       });
-      if (v.id === "wagle") { // 씨름판의 짚신 둘은 그대로 밀고 당긴다
-        const s1 = goblin("shoe"), s2 = goblin("shoe");
-        anim.push((t) => {
-          const push = Math.sin(t * 1.4) * 0.35; const ang = Math.atan2(-c.x, -c.z); const fx = Math.sin(ang), fz = Math.cos(ang);
-          s1.position.set(c.x + fx * (0.5 + push), groundAt(c.x, c.z) + 0.2, c.z + fz * (0.5 + push)); s1.rotation.y = ang + Math.PI;
-          s2.position.set(c.x - fx * (0.5 - push), groundAt(c.x, c.z) + 0.2, c.z - fz * (0.5 - push)); s2.rotation.y = ang;
-          s1.rotation.z = Math.sin(t * 2.8) * 0.15; s2.rotation.z = -Math.sin(t * 2.8) * 0.15;
-        });
-      }
       if (v.id === "kkambbak") { // 갈대밭 위 도깨비불 무리와 반딧불이
         const fl = Array.from({ length: night ? 40 : 16 }, (_, i) => {
           const m = part(BALL, new three.MeshBasicMaterial({ color: "#E9FF9A", transparent: true }), 0.05, 0.05, 0.05);
@@ -1083,5 +1088,25 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   }
   function setActive(ids: Set<string>) { for (const [id, st] of houseState) st.active = ids.has(id); }
   buildEras({ three, scene, night, part, mat, ink, glow, textSprite, smokeMat, G: { BOX, CYL, CYL6, BALL, CONE, DOME, DISC, TORUS }, solids, anim, spots, nameTags, occluders, firePoints, wispSpots, player });
+  // ── 소원 선착장: 출발점 옆 호숫가의 나무 선착장. 들어가면 등불 페이지(/find/wish) ──
+  {
+    const a0 = Math.PI - 0.42, sx = Math.sin(a0) * (LAKE_OUT + 1.6), sz = -Math.cos(a0) * (LAKE_OUT + 1.6);
+    const y0 = groundAt(sx, sz) + 0.2;
+    const pier = new three.Group(); pier.position.set(sx, y0, sz); pier.rotation.y = Math.PI - a0; scene.add(pier); occluders.push(pier);
+    const plank = mat("#8A6A4A"), post = mat("#5E4430");
+    for (let k = 0; k < 9; k++) part(BOX, plank, 2.4, 0.12, 0.5, 0, 0, -0.2 - k * 0.56, pier);
+    for (const px of [-1.1, 1.1]) for (let k = 0; k < 3; k++) part(CYL6, post, 0.1, 1.6, 0.1, px, -0.6, -0.4 - k * 2.0, pier);
+    for (const px of [-1.1, 1.1]) { // 끝에 매단 한지 초롱 둘
+      part(CYL6, post, 0.06, 1.6, 0.06, px, 0.8, -4.7, pier);
+      const lan = part(CYL, mat("#F3E7C9", { emissive: AMBER, ei: 1 }), 0.18, 0.36, 0.18, px, 1.25, -4.7, pier);
+      glow(AMBER, 2.2, px, 1.25, -4.7, 0.8, pier);
+      const ph = px; anim.push((t) => { lan.rotation.z = Math.sin(t * 1.4 + ph) * 0.1; });
+    }
+    const boat = part(DOME, mat("#7A5A3A"), 0.6, 0.3, 1.5, 1.9, -0.35, -3.2, pier); boat.rotation.x = Math.PI; ink(boat, 1.05); // 매어 둔 나룻배
+    const sign = textSprite("소원 선착장", { bg: "#2A2118", fg: "#F3E7C9", size: 44, scale: 0.75 });
+    sign.position.set(sx, y0 + 2.4, sz); scene.add(sign);
+    nameTags.push({ s: sign, x: sx, z: sz, always: true });
+    spots.push({ x: sx, z: sz, r: 3.4, kind: "wish", label: "소원 선착장" });
+  }
   return { spots, anim, nameTags, fades, occluders, heightAt, walkable, villageAt, placeAt, setActive, player, ambienceAt };
 }
