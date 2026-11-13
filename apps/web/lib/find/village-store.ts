@@ -96,6 +96,7 @@ export async function setDecor(forgeId: string, decor: Decor) {
 
 /** 마을 문: 이 대장간의 도깨비불로 대장간 오픈 알림(이메일)을 신청했으면 열린다 */
 export async function villageOpenFor(forgeId: string): Promise<boolean> {
+  if (await getMeta(`village_open:${forgeId}`)) return true; // 이미 줄 선 메일로 다시 남긴 대장간
   if (pg()) {
     const { rows } = await (await db()).query("SELECT 1 FROM find_waitlist w JOIN find_fires f ON f.id = w.fire_id WHERE f.forge_id = $1 LIMIT 1", [forgeId]);
     return rows.length > 0;

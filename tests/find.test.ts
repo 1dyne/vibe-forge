@@ -705,3 +705,24 @@ describe("본관 기와", () => {
     expect((await gw.listGiwa()).list.some((g) => g.forgeId === forge.id)).toBe(false);
   });
 });
+
+describe("여러 주소와 다시 시작", () => {
+  it("대표 도메인이 따로 있어도 요청이 들어온 주소에서 보낸 것은 받고, 다른 사이트는 막는다", async () => {
+    const { hasValidOrigin } = await import("../apps/web/lib/request-security");
+    const prev = process.env.APP_BASE_URL; process.env.APP_BASE_URL = "https://dalgrak.app";
+    const req = (origin: string, host: string) => new NextRequest("http://internal:3000/api/find/waitlist", { method: "POST", headers: { origin, "x-forwarded-host": host } });
+    expect(hasValidOrigin(req("https://dalgrak.app", "dalgrak.app"))).toBe(true);
+    expect(hasValidOrigin(req("https://find.dalgrak.app", "find.dalgrak.app"))).toBe(true);
+    expect(hasValidOrigin(req("https://web-production-f9d84b.up.railway.app", "web-production-f9d84b.up.railway.app"))).toBe(true);
+    expect(hasValidOrigin(req("https://evil.example", "find.dalgrak.app"))).toBe(false);
+    if (prev === undefined) delete process.env.APP_BASE_URL; else process.env.APP_BASE_URL = prev;
+  });
+  it("이미 줄 선 메일로 새 대장간에서 다시 남기면 그 대장간의 마을 문이 열린다", async () => {
+    const vs = await import("../apps/web/lib/find/village-store");
+    const stamp = Date.now();
+    const forge = (await vs.ensureForge(vs.hashToken(`reopen-${stamp}`), "다시", ["w_me"])).forge;
+    expect(await vs.villageOpenFor(forge.id)).toBe(false);
+    await vs.setMeta(`village_open:${forge.id}`, "1");
+    expect(await vs.villageOpenFor(forge.id)).toBe(true);
+  });
+});

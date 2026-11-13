@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getFire, joinWaitlist } from "../../../../lib/find/store";
 import { allow, clientKey } from "../../../../lib/find/rate-limit";
 import { hasValidOrigin } from "../../../../lib/request-security";
+import { setMeta } from "../../../../lib/find/village-store";
 
 const Body = z.object({
   email: z.string().trim().email().max(254),
@@ -28,6 +29,8 @@ export async function POST(request: NextRequest) {
       email: d.email!, fireId: fire?.id ?? null, idea: fire?.idea ?? null, sentence: fire?.sentence ?? null, picked: fire?.picked ?? [],
       peakFire: fire?.peak ?? null, fireColor: fire?.color ?? null, referredBy: d.ref ?? null, marketingConsent: d.marketingConsent === true
     });
+    // 이미 줄 선 메일로 새 대장간(새 기기·다시 시작)에서 남겨도 그 대장간의 마을 문은 열어준다 (줄 순서는 그대로)
+    if (standing.alreadyJoined && fire?.forgeId) await setMeta(`village_open:${fire.forgeId}`, "1");
     return NextResponse.json({ standing }, { status: standing.alreadyJoined ? 200 : 201 });
   } catch (error) {
     console.error("find waitlist failed", error instanceof Error ? error.message : "unknown");
