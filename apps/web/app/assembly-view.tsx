@@ -6,6 +6,7 @@ import { stepBasis, wireLengths } from "../lib/assembly-utils";
 import { PartsBoard, placeParts } from "./parts-board";
 import { createPortal } from "react-dom";
 import BenchViewScreen, { type BenchPhoto } from "./bench/bench-view";
+import GuideBench from "./bench/guide-bench";
 import { guideToKit } from "../lib/bench/from-guide";
 import { workflowFor } from "../lib/workflow";
 
@@ -22,7 +23,10 @@ function rangeText(range: ExpectedRange | null): string {
 export function AssemblyView({ project, busy, onAction, connectorOnly = false }: { project: LocalProject; busy: boolean; onAction: (input: Record<string, unknown>) => void; connectorOnly?: boolean }) {
   const guide = project.assembly!;
   const [bench, setBench] = useState(false);
-  const kit = useMemo(() => (bench ? guideToKit(project) : null), [bench, project.assembly, project.build, project.buildPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kit = useMemo(() => guideToKit(project), [project.assembly, project.build, project.buildPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 단계 그림은 3D 작업대 장면으로 보여주고, WebGL을 못 쓰거나 평면 배치도를 고르면 예전 그림을 쓴다
+  const [flat, setFlat] = useState(false);
+  const [no3d, setNo3d] = useState(false);
   // HW 작업실에 실제로 묻는다 (대장간 단계가 아니면 대장 방으로 간다)
   const askHw = async (text: string, photos: BenchPhoto[]) => {
     const w = workflowFor(project);
@@ -91,10 +95,11 @@ export function AssemblyView({ project, busy, onAction, connectorOnly = false }:
   return <div className="assembly-view">
     <div className="artifact-title"><span className="pill">조립 가이드</span><h3>{guide.stage}</h3></div>
     {blocked.length > 0 && <p className="notice danger-notice">회로에 꼭 고쳐야 할 문제가 있어 조립을 진행할 수 없어요: {blocked.map((c) => c.message).join(" / ")}</p>}
-    <PartsBoard base={guide.base} placed={placed} label={`${guide.base.name} · ${W}×${H}mm 실제 비율`} replayKey={`${step}-${replay}`}
+    {kit && !flat && !no3d && !bench ? <GuideBench kit={kit} step={step} replayKey={replay} onFail={() => setNo3d(true)} />
+    : <PartsBoard base={guide.base} placed={placed} label={`${guide.base.name} · ${W}×${H}mm 실제 비율`} replayKey={`${step}-${replay}`}
       wires={wires.map((w) => ({ from: w.from, to: w.to, stroke: w.stroke, fresh: w.fresh }))} freshRefs={new Set(visible.filter((p) => placedAt.get(p.ref) === step).map((p) => p.ref))}
-      pastRefs={new Set(visible.filter((p) => (placedAt.get(p.ref) ?? 0) < step).map((p) => p.ref))} activePins={activePins} />
-    <div className="board-actions"><button className="primary bench-open" onClick={() => setBench(true)}>🔥 3D 작업대에서 따라 하기</button><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button></div>
+      pastRefs={new Set(visible.filter((p) => (placedAt.get(p.ref) ?? 0) < step).map((p) => p.ref))} activePins={activePins} />}
+    <div className="board-actions"><button className="primary bench-open" onClick={() => setBench(true)}>🔥 3D 작업대에서 따라 하기</button><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button>{kit && !no3d && <button aria-pressed={flat} onClick={() => setFlat(!flat)}>{flat ? "3D로 보기" : "평면 배치도"}</button>}</div>
     {bench && kit && typeof document !== "undefined" && createPortal(
       <div className="bench-overlay"><BenchViewScreen kit={kit} mode="project" onClose={() => setBench(false)} onAsk={connectorOnly ? undefined : askHw} connectorOnly={connectorOnly} reported={reportedSteps}
         onReport={(n, text) => onAction({ action: "assembly_report", step: n, text })} /></div>, document.body)}
