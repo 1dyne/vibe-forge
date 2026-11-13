@@ -137,18 +137,20 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
     return s;
   }
 
+  const TEXT_RES = 3;
+  const crispTex = (t: T.CanvasTexture) => { t.colorSpace = three.SRGBColorSpace; t.anisotropy = 8; t.minFilter = three.LinearMipmapLinearFilter; t.generateMipmaps = true; return t; };
   function textSprite(text: string, o: { bg?: string; fg?: string; size?: number; scale?: number } = {}) {
     const c = document.createElement("canvas");
     const ctx = c.getContext("2d")!;
-    const size = o.size ?? 44;
+    const size = (o.size ?? 44) * TEXT_RES; // 여러 배로 그려야 가까이서도 멀리서도 안 깨진다
     ctx.font = `${size}px Jua, sans-serif`;
     c.width = Math.ceil(ctx.measureText(text).width) + size; c.height = Math.ceil(size * 1.7);
     ctx.font = `${size}px Jua, sans-serif`;
     ctx.fillStyle = o.bg ?? "rgba(255,255,255,.93)";
     ctx.beginPath(); ctx.roundRect(0, 0, c.width, c.height, c.height / 2); ctx.fill();
     ctx.fillStyle = o.fg ?? "#1E1F24"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(text, c.width / 2, c.height / 2 + 2);
-    const tex = new three.CanvasTexture(c); tex.colorSpace = three.SRGBColorSpace;
+    ctx.fillText(text, c.width / 2, c.height / 2 + 2 * TEXT_RES);
+    const tex = crispTex(new three.CanvasTexture(c));
     const s = new three.Sprite(new three.SpriteMaterial({ map: tex, depthWrite: false }));
     const k = o.scale ?? 0.75;
     s.scale.set((c.width / c.height) * k, k, 1);
@@ -157,14 +159,15 @@ export function buildWorld(three: typeof T, scene: T.Scene, opts: { houses: Worl
   /** 나무판에 먹 글씨 (마을 목패·빈 터 표지·소식판) */
   function woodBoard(text: string, w: number, h: number, font = 64) {
     const c = document.createElement("canvas");
-    c.width = Math.round(w * 128); c.height = Math.round(h * 128);
-    const ctx = c.getContext("2d")!;
-    ctx.fillStyle = "#B8946A"; ctx.fillRect(0, 0, c.width, c.height);
+    c.width = Math.round(w * 128 * TEXT_RES); c.height = Math.round(h * 128 * TEXT_RES);
+    const ctx = c.getContext("2d")!; ctx.scale(TEXT_RES, TEXT_RES);
+    const W = c.width / TEXT_RES, H = c.height / TEXT_RES;
+    ctx.fillStyle = "#B8946A"; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = "rgba(90,60,30,.35)"; ctx.lineWidth = 2;
-    for (let y = 8; y < c.height; y += 14) { ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(c.width * 0.3, y + 4, c.width * 0.7, y - 4, c.width, y); ctx.stroke(); }
+    for (let y = 8; y < H; y += 14) { ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(W * 0.3, y + 4, W * 0.7, y - 4, W, y); ctx.stroke(); }
     ctx.fillStyle = "#2A2118"; ctx.font = `${font}px "Gowun Batang", Jua, serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(text, c.width / 2, c.height / 2 + 4);
-    const tex = new three.CanvasTexture(c); tex.colorSpace = three.SRGBColorSpace;
+    ctx.fillText(text, W / 2, H / 2 + 4);
+    const tex = crispTex(new three.CanvasTexture(c));
     return new three.Mesh(new three.PlaneGeometry(w, h), new three.MeshStandardMaterial({ map: tex, roughness: 1, side: three.DoubleSide }));
   }
 

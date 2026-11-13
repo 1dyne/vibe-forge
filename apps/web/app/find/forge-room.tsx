@@ -97,11 +97,12 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
         return g;
       };
       const label = (text: string, x: number, y: number, z: number) => {
+        const R = 3; // 여러 배로 그려야 글씨가 안 깨진다
         const c = document.createElement("canvas"); const ctx = c.getContext("2d")!;
-        ctx.font = "34px Jua, sans-serif"; c.width = Math.ceil(ctx.measureText(text).width) + 30; c.height = 54;
-        ctx.font = "34px Jua, sans-serif"; ctx.fillStyle = "rgba(30,31,36,.82)"; ctx.beginPath(); ctx.roundRect(0, 0, c.width, c.height, 27); ctx.fill();
-        ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, c.width / 2, c.height / 2 + 2);
-        const tex = new three.CanvasTexture(c); tex.colorSpace = three.SRGBColorSpace;
+        ctx.font = "34px Jua, sans-serif"; const w = Math.ceil(ctx.measureText(text).width) + 30; c.width = w * R; c.height = 54 * R;
+        ctx.scale(R, R); ctx.font = "34px Jua, sans-serif"; ctx.fillStyle = "rgba(30,31,36,.82)"; ctx.beginPath(); ctx.roundRect(0, 0, w, 54, 27); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, w / 2, 29);
+        const tex = new three.CanvasTexture(c); tex.colorSpace = three.SRGBColorSpace; tex.anisotropy = 8;
         const s = new three.Sprite(new three.SpriteMaterial({ map: tex, depthTest: false })); s.scale.set((c.width / c.height) * 0.32, 0.32, 1); s.position.set(x, y, z); s.renderOrder = 10; scene.add(s);
       };
 

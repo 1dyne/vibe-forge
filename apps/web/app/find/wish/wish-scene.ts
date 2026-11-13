@@ -40,7 +40,7 @@ type Entry = {
 export async function createWishScene(three: typeof T, o: Opts): Promise<WishScene> {
   const { el } = o;
   const renderer = new three.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(el.clientWidth, el.clientHeight);
   renderer.outputColorSpace = three.SRGBColorSpace;
   el.appendChild(renderer.domElement);
@@ -90,14 +90,18 @@ export async function createWishScene(three: typeof T, o: Opts): Promise<WishSce
   const part = (g: T.BufferGeometry, m: T.Material, sx: number, sy: number, sz: number, x: number, y: number, z: number, parent: T.Object3D = scene) => {
     const mesh = new three.Mesh(g, m); mesh.scale.set(sx, sy, sz); mesh.position.set(x, y, z); parent.add(mesh); return mesh;
   };
+  const TEXT_RES = 3;
+  const maxAniso = renderer.capabilities.getMaxAnisotropy();
+  const crisp = (t: T.CanvasTexture) => { t.colorSpace = three.SRGBColorSpace; t.anisotropy = maxAniso; t.minFilter = three.LinearMipmapLinearFilter; t.generateMipmaps = true; return t; };
   const textSprite = (text: string, o2: { bg?: string; fg?: string; size?: number; scale?: number } = {}) => {
     const c = document.createElement("canvas"); const ctx = c.getContext("2d")!;
-    const size = o2.size ?? 36; ctx.font = `${size}px Jua, sans-serif`;
+    // 글씨는 화면에 보일 크기의 여러 배로 그려야 확대·축소돼도 깨지지 않는다
+    const size = (o2.size ?? 36) * TEXT_RES; ctx.font = `${size}px Jua, sans-serif`;
     c.width = Math.ceil(ctx.measureText(text).width) + size; c.height = Math.ceil(size * 1.7);
     ctx.font = `${size}px Jua, sans-serif`; ctx.fillStyle = o2.bg ?? "rgba(42,33,24,.86)";
     ctx.beginPath(); ctx.roundRect(0, 0, c.width, c.height, c.height / 2); ctx.fill();
-    ctx.fillStyle = o2.fg ?? HANJI; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, c.width / 2, c.height / 2 + 2);
-    const tex = new three.CanvasTexture(c); tex.colorSpace = three.SRGBColorSpace;
+    ctx.fillStyle = o2.fg ?? HANJI; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(text, c.width / 2, c.height / 2 + 2 * TEXT_RES);
+    const tex = crisp(new three.CanvasTexture(c));
     const s = new three.Sprite(new three.SpriteMaterial({ map: tex, depthWrite: false, fog: true }));
     const k = o2.scale ?? 0.4; s.scale.set((c.width / c.height) * k, k, 1);
     return s;
@@ -159,10 +163,10 @@ export async function createWishScene(three: typeof T, o: Opts): Promise<WishSce
   }
   // 선착장 목패
   {
-    const c = document.createElement("canvas"); c.width = 384; c.height = 128; const x = c.getContext("2d")!;
+    const c = document.createElement("canvas"); c.width = 1152; c.height = 384; const x = c.getContext("2d")!; x.scale(3, 3);
     x.fillStyle = "#8C6A48"; x.fillRect(0, 0, 384, 128); x.fillStyle = "rgba(0,0,0,.12)"; for (let k = 0; k < 6; k++) x.fillRect(0, 18 + k * 20, 384, 3);
     x.fillStyle = "#2A2118"; x.font = "64px Jua, sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("소원 선착장", 192, 68);
-    const t = new three.CanvasTexture(c); t.colorSpace = three.SRGBColorSpace; disposables.push(t);
+    const t = crisp(new three.CanvasTexture(c)); disposables.push(t);
     const sign = new three.Mesh(new three.PlaneGeometry(1.5, 0.5), new three.MeshStandardMaterial({ map: t, roughness: 0.9 }));
     sign.position.set(PIER.x + 0.5, DECK_Y + 1.0, PIER.near - 0.4); sign.rotation.y = -0.5; scene.add(sign);
     part(CYL, mat(WOOD3), 0.05, 1.2, 0.05, PIER.x + 0.5, DECK_Y + 0.25, PIER.near - 0.38);
@@ -291,7 +295,7 @@ export async function createWishScene(three: typeof T, o: Opts): Promise<WishSce
         const lg = new three.BufferGeometry().setFromPoints(pts); layerDisposables.push(lg);
         layer.add(new three.Line(lg, new three.LineBasicMaterial({ color: "#C9B98F" })));
         // 줄 이름표
-        const tag = textSprite(`${p.r.g.label} · ${p.r.lit.length}`, { size: 34, scale: 0.3 }); tag.position.set((ax + bx) / 2, H + 0.4, z); layer.add(tag);
+        const tag = textSprite(`${p.r.g.label} · ${p.r.lit.length}`, { size: 34, scale: 0.32 }); tag.position.set((ax + bx) / 2, H + 0.4, z); layer.add(tag);
         layerDisposables.push(tag.material.map!, tag.material);
         if (p.r.lit.length > p.n) { const more = textSprite(`+${p.r.lit.length - p.n}`, { size: 30, scale: 0.3 }); more.position.set(bx + 0.05, H + 0.05, z); layer.add(more); layerDisposables.push(more.material.map!, more.material); }
         // 응원 많은 등불이 가운데 오도록

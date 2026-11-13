@@ -79,7 +79,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
     let cleanup = () => {};
     (async () => {
       const three = await import("three");
-      if ("fonts" in document) await document.fonts.load("44px Jua").catch(() => {});
+      if ("fonts" in document) await Promise.all([document.fonts.load("44px Jua"), document.fonts.load('64px "Gowun Batang"')]).catch(() => {});
       if (disposed || !mount.current) return;
       let renderer: T.WebGLRenderer;
       try { renderer = new three.WebGLRenderer({ antialias: true }); } catch { setFailed(true); return; }
