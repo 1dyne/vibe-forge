@@ -556,11 +556,11 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .forge-ask{top:calc(86px + env(safe-area-inset-top, 0px));bottom:auto;padding:8px 12px}
 .forge-ask span{font-size:14px}
 /* 까치: 왼쪽 위 소식 버튼 (마을·대장간) */
-.kkachi{position:relative;display:inline-grid;place-items:center;width:44px;height:40px;border-radius:999px;border:0;background:rgba(255,255,255,.9);cursor:pointer;pointer-events:auto;flex:none;padding:0}
+.kkachi{position:relative;display:inline-grid;place-items:center;width:48px;height:48px;border-radius:999px;border:0;background:rgba(255,255,255,.9);cursor:pointer;pointer-events:auto;flex:none;padding:0}
 .kkachi i{position:absolute;top:4px;right:5px;width:10px;height:10px;border-radius:50%;background:#E0453A;border:2px solid #fff}
-.kkachi.has-news svg{animation:kk-hop 1.6s ease-in-out infinite}
+.kkachi.has-news img{animation:kk-hop 1.6s ease-in-out infinite}
 @keyframes kk-hop{0%,70%,100%{transform:translateY(0)}80%{transform:translateY(-3px)}}
-@media (prefers-reduced-motion:reduce){.kkachi.has-news svg{animation:none}}
+@media (prefers-reduced-motion:reduce){.kkachi.has-news img{animation:none}}
 .kkachi:focus-visible{outline:3px solid #FF8F3F}
 .world-left{display:flex;gap:8px;align-items:center}
 @media (max-width:440px){ .world-top .world-brand{display:none} .world-top{justify-content:space-between} }
@@ -574,3 +574,5 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .kk-maker{display:flex;flex-direction:column;gap:8px;border-top:1.5px dashed var(--line,#E3E0D7);padding-top:12px}
 .kk-email{display:flex;gap:8px;align-items:center;justify-content:center;font-size:13.5px;color:var(--muted,#6A6C73)}
 .kk-email span{user-select:all;font-family:ui-monospace,Menlo,monospace}
+.kkachi img{display:block;width:40px;height:40px;object-fit:contain;pointer-events:none}
+.kkachi i{top:3px;right:3px}
