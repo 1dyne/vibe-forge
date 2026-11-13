@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import type { BuildBlueprint, LocalProject, ProductForm } from "../lib/project-types";
 import { AGENTS, workflowFor } from "../lib/workflow";
 import { CircuitPartsView } from "./circuit-parts";
+import Mockup3D, { type MockSolid } from "./mockup-3d";
 
 export function CircuitView({ blueprint }: { blueprint: BuildBlueprint }) {
   // Circuits built from part cards are drawn as real parts; older circuits
@@ -45,7 +46,57 @@ function NetDiagram({ blueprint }: { blueprint: BuildBlueprint }) {
 }
 
 type Point = [number, number, number];
+// 완성품 미리보기에 들어갈 도형 목록 (3D와 SVG가 같은 치수를 쓴다)
+function mockSolids(blueprint: BuildBlueprint, form?: ProductForm): MockSolid[] {
+  const out: MockSolid[] = [];
+  const palette = ["#94D2C9", "#b7d7cf", "#e9e3cf", "#d9b8c4", "#a9b7d9", "#424b48"];
+  const shape = form?.shape ?? blueprint.shape ?? [];
+  if (shape.length) {
+    shape.forEach((p, i) => out.push({ primitive: p.primitive, size: p.size, base: p.position, color: p.color ?? palette[i % palette.length], role: "shell", label: p.name }));
+    const featureColor = { screen: "#1f2a2e", camera: "#111111", button: "#e0a43a", speaker: "#59636a", mic: "#59636a", port: "#7a7f84", light: "#f3d36b", other: "#8a8f94" } as const;
+    for (const f of form?.features ?? []) {
+      const [a, b] = f.size; const t = 1.5;
+      const dims: Record<typeof f.facing, [number, number, number]> = { front: [a, t, b], back: [a, t, b], left: [t, a, b], right: [t, a, b], top: [a, b, t], bottom: [a, b, t] };
+      const d = dims[f.facing];
+      out.push({ primitive: "box", size: d, base: [f.position[0], f.position[1], f.position[2] - d[2] / 2], color: featureColor[f.kind], role: "feature", label: `${f.name} (${f.kind})` });
+    }
+    for (const part of form?.internals ?? []) out.push({ primitive: "box", size: part.size, base: part.position, color: "#2e786b", role: "internal", label: `${part.ref} · ${part.label} (${part.size.join("×")}mm)` });
+    return out;
+  }
+  const { widthMm: w, depthMm: d, heightMm: h, wallMm: wall } = blueprint.enclosure;
+  const wallBox = (x0: number, y0: number, z0: number, bw: number, bd: number, bh: number, color: string, label: string, role: MockSolid["role"] = "shell") =>
+    out.push({ primitive: "box", size: [bw, bd, bh], base: [x0 + bw / 2, y0 + bd / 2, z0], color, role, label });
+  wallBox(-w/2,-d/2,0,w,d,wall,"#b5d8d1","하우징 바닥");
+  wallBox(-w/2,-d/2,wall,w,wall,h-wall,"#cbe0db","후면 벽");
+  wallBox(-w/2,d/2-wall,wall,w,wall,h-wall,"#a6ccc3","전면 벽");
+  wallBox(-w/2,-d/2,wall,wall,d,h-wall,"#b7d7cf","측면 벽");
+  wallBox(w/2-wall,-d/2,wall,wall,d,h-wall,"#b7d7cf","측면 벽");
+  wallBox(-w*.30,-d*.29,wall+1,w*.55,d*.50,3,"#2e786b",(blueprint.board || "보드") + " 자리표시자","internal");
+  wallBox(w*.13,-d*.12,wall+5,w*.1,d*.15,h*.18,"#424b48","부품 자리표시자","internal");
+  return out;
+}
+
 export function MockupView({ blueprint, form }: { blueprint: BuildBlueprint; form?: ProductForm }) {
+  const [webgl, setWebgl] = useState(true);
+  const [zoom, setZoom] = useState(1);
+  const [inside, setInside] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+  const solids = useMemo(() => mockSolids(blueprint, form), [blueprint, form]);
+  const { widthMm: w, depthMm: d, heightMm: h, wallMm: wall } = blueprint.enclosure;
+  if (!webgl) return <MockupSvg blueprint={blueprint} form={form} />;
+  return <div className="mockup-view">
+    <div className="view-toolbar"><span>{form ? "완성품 미리보기" : `${w} × ${d} × ${h} mm`}</span><button aria-pressed={inside} onClick={() => setInside(!inside)}>{inside ? "겉모습 보기" : "속 보기"}</button><button onClick={() => { setZoom(1); setResetKey((k) => k + 1); }}>시점 초기화</button></div>
+    <Mockup3D solids={solids} inside={inside} zoom={zoom} resetKey={resetKey} onFail={() => setWebgl(false)} />
+    <div className="mockup3d-hint">드래그로 돌려보고, 부품을 누르면 이름이 나와요 · 치수 기반 기구 목업</div>
+    <label className="zoom-slider">확대 <input aria-label="3D 확대" type="range" min=".5" max="1.8" step=".05" value={zoom} onChange={(e)=>setZoom(Number(e.target.value))}/></label>
+    {form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
+    {!form && !blueprint.shape?.length && <p className="notice">아직 완성품 형태가 정해지지 않아 기본 상자로 보여주고 있어요. Claude에게 “완성품 모양부터 정하자”라고 말하면 형태 질문을 하고 완성품 미리보기를 만들어요.</p>}
+    <p className="muted">{form ? "실제 부품 치수로 안에 들어갈 자리를 표시했어요. 출력 전 실측과 간섭 확인이 필요해요." : blueprint.shape?.length ? `설명한 형태를 ${blueprint.shape.length}개의 기본 도형으로 만든 외형 목업이에요. 내부 전자부품 공간은 ${w}×${d}×${h}mm 기준이에요. ` : ""}벽 두께 {wall} mm. 보드와 부품은 자리표시자이며, 실제 부품 치수를 받으면 기구 설계를 조정합니다. 출력 전 CAD 렌더와 간섭 확인이 필요합니다.</p>
+  </div>;
+}
+
+// WebGL을 못 쓰는 기기용: 예전 SVG 목업
+function MockupSvg({ blueprint, form }: { blueprint: BuildBlueprint; form?: ProductForm }) {
   const [rotation, setRotation] = useState({ yaw: -.6, pitch: .55, zoom: 1 });
   const [inside, setInside] = useState(false);
   const drag = useRef<{ x: number; y: number } | null>(null);

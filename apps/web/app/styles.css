@@ -149,3 +149,10 @@
 .contract-input{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px;border:1px solid #dfe5e3;border-radius:10px;padding:8px;margin:6px 0}
 .contract-result ol{font-size:12px;padding-left:20px;max-height:240px;overflow:auto}.contract-result li.fail{color:#b3402f}.contract-result li.noise{color:#8a8f98}
 .contract-runs{font-size:12px;padding-left:18px}
+
+/* 완성품 미리보기: 로우폴리 3D */
+.mockup3d { position: relative; width: 100%; aspect-ratio: 14 / 10; max-height: 460px; border: 1px solid #dce7d6; border-top: 0; border-radius: 0 0 7px 7px; overflow: hidden; background: radial-gradient(ellipse at 50% 35%, #fffdf7 0%, #f3efe4 70%, #e9e4d6 100%); touch-action: none; cursor: grab; }
+.mockup3d:active { cursor: grabbing; }
+.mockup3d canvas { display: block; width: 100% !important; height: 100% !important; }
+.mockup3d-tip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); padding: 6px 10px; border-radius: 10px; background: rgba(30, 31, 36, .88); color: #fff; font-size: 13px; white-space: nowrap; pointer-events: none; max-width: 90%; overflow: hidden; text-overflow: ellipsis; }
+.mockup3d-hint { font-size: 12px; color: #64736e; margin-top: 6px; }
