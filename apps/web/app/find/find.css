@@ -514,7 +514,7 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .find .opening{gap:0;justify-content:flex-start}
 .find .op-stage{height:auto;min-height:0;flex:1 1 auto;max-height:58dvh;margin:0;display:flex;align-items:center;justify-content:center;overflow:visible}
 .find .op-body{animation:none;gap:12px;min-height:300px;justify-content:flex-end}
-.find .op-hi{max-width:min(320px,86vw);text-align:center;line-height:1.4;text-wrap:balance}
+.find .op-hi{max-width:min(320px,86vw);text-align:center;line-height:1.4;text-wrap:balance;white-space:pre-line}
 .find .op-slot{flex:0 0 auto;min-height:232px;display:flex;flex-direction:column;justify-content:flex-start;padding-top:14px}
 .find .op-slot .op-name{animation:fd-in .3s ease-out;margin-top:0}
 .find .op-slot .op-skip{margin-top:24px}
