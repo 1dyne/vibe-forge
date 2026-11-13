@@ -576,3 +576,16 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .kk-email span{user-select:all;font-family:ui-monospace,Menlo,monospace}
 .kkachi img{display:block;width:40px;height:40px;object-fit:contain;pointer-events:none}
 .kkachi i{top:3px;right:3px}
+/* 카드 등급 5단계: 등급마다 정해진 색 (흔함 회색 · 고급 초록 · 희귀 파랑 · 영웅 보라 · 전설 금빛) */
+.find .fcard.grade-uncommon{--grade:#2FA36B}
+.find .fcard.grade-rare{--grade:#3E7BFA}
+.find .fcard.grade-epic{--grade:#8E4BFF}
+.find .fcard.grade-legend{--grade:#F2A516}
+.find .fcard.grade-uncommon .fcard-face,.find .fcard.grade-rare .fcard-face,.find .fcard.grade-epic .fcard-face{background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,color-mix(in srgb,var(--grade) 35%,#fff),var(--grade) 45%,color-mix(in srgb,var(--grade) 60%,#fff) 75%,var(--grade)) border-box;box-shadow:0 14px 40px -16px color-mix(in srgb,var(--grade) 75%,transparent)}
+.find .fcard.grade-legend .fcard-face{background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#FFE7A3,#F2A516 30%,#FFF4CF 50%,#E0702A 70%,#FFD36B) border-box;box-shadow:0 14px 44px -14px rgba(242,165,22,.85)}
+.find .fcard.grade-uncommon .holo{display:none}
+.find .grade-uncommon .grade{background:#2FA36B}
+.find .grade-rare .grade{background:#3E7BFA}
+.find .grade-epic .grade{background:#8E4BFF;box-shadow:0 0 0 2px #fff,0 0 10px rgba(142,75,255,.6)}
+.find .grade-legend .grade{background:linear-gradient(135deg,#FFD36B,#F2A516,#E0702A);box-shadow:0 0 0 2px #fff,0 0 14px rgba(242,165,22,.8)}
+.find .back-forge{text-decoration:none;color:var(--ink);font-weight:700;border:1.5px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--surface)}

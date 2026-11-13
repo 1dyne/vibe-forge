@@ -107,3 +107,46 @@ export function createForgeSound() {
     close() { clearInterval(timer); ctx.close().catch(() => {}); }
   };
 }
+
+/** 소원 선착장 소리: 밤 호수 물결(늘), 느린 바람, 풀벌레, 가끔 대금처럼 숨이 섞인 긴 음(오음계)과 풍경. 직접 합성 */
+export function createWishSound() {
+  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  const ctx = new AC();
+  const master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const data = noiseBuf.getChannelData(0); for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = () => { const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true; return n; };
+  // 물결: 선착장 기둥에 찰랑이는 낮은 물소리
+  { const n = noise(); const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 380; const g = ctx.createGain(); g.gain.value = 0.11; const lfo = ctx.createOscillator(); lfo.frequency.value = 0.21; const lg = ctx.createGain(); lg.gain.value = 0.06; lfo.connect(lg).connect(g.gain); n.connect(lp).connect(g).connect(master); n.start(); lfo.start(); }
+  // 느린 바람
+  { const n = noise(); const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 700; bp.Q.value = 0.5; const g = ctx.createGain(); g.gain.value = 0.025; const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05; const lg = ctx.createGain(); lg.gain.value = 0.02; lfo.connect(lg).connect(g.gain); n.connect(bp).connect(g).connect(master); n.start(); lfo.start(); }
+  // 풀벌레
+  { const o = ctx.createOscillator(); o.frequency.value = 4100; const am = ctx.createGain(); am.gain.value = 0; const lfo = ctx.createOscillator(); lfo.type = "square"; lfo.frequency.value = 8; const lg = ctx.createGain(); lg.gain.value = 0.5; lfo.connect(lg).connect(am.gain); const g = ctx.createGain(); g.gain.value = 0.008; o.connect(am).connect(g).connect(master); o.start(); lfo.start(); }
+  const SCALE = [293.66, 349.23, 392.0, 440.0, 523.25, 587.33]; // 레 파 솔 라 도 레 (계면조 느낌)
+  function flute(f: number, dur: number) { // 대금처럼: 사인파 + 천천히 깊어지는 떨림 + 숨소리
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const vib = ctx.createOscillator(); vib.frequency.value = 5; const vg = ctx.createGain(); vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f * 0.012, t + dur * 0.6); vib.connect(vg).connect(o.frequency);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.35); g.gain.setValueAtTime(0.05, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const n = noise(); const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = f * 2; bp.Q.value = 2; const ng = ctx.createGain(); ng.gain.setValueAtTime(0.0001, t); ng.gain.exponentialRampToValueAtTime(0.012, t + 0.2); ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master); n.connect(bp).connect(ng).connect(master);
+    o.start(t); vib.start(t); n.start(t); o.stop(t + dur + 0.1); vib.stop(t + dur + 0.1); n.stop(t + dur + 0.1);
+  }
+  function chime() { const f = [1568, 1760, 2093][Math.floor(Math.random() * 3)]; const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); const t = ctx.currentTime; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.025, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.5); o.connect(g).connect(master); o.start(t); o.stop(t + 2.6); }
+  let nextPhrase = 1.5, nextChime = 4;
+  const timer = window.setInterval(() => {
+    if (ctx.state !== "running") return;
+    const t = ctx.currentTime;
+    if (t > nextPhrase) { // 두세 음짜리 느린 가락
+      let i = Math.floor(Math.random() * 4), at = 0;
+      for (let k = 0; k < 2 + Math.floor(Math.random() * 2); k++) { const f = SCALE[i], d = 1.6 + Math.random() * 1.4; setTimeout(() => flute(f, d), at * 1000); at += d * 0.85; i = Math.max(0, Math.min(SCALE.length - 1, i + (Math.random() < 0.5 ? -1 : 1))); }
+      nextPhrase = t + at + 5 + Math.random() * 5;
+    }
+    if (t > nextChime) { chime(); nextChime = t + 6 + Math.random() * 8; }
+  }, 200);
+  return {
+    resume: () => ctx.resume(),
+    setMuted(m: boolean) { master.gain.setTargetAtTime(m ? 0 : 0.85, ctx.currentTime, 0.3); },
+    close() { clearInterval(timer); ctx.close().catch(() => {}); }
+  };
+}

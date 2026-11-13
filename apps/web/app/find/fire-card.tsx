@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { fireLabel, type ReactKind } from "../../lib/find/chips";
 import type { FireCard } from "../../lib/find/card";
+import { GRADE_CLASS } from "../../lib/find/card";
 import { NAMELESS } from "../../lib/find/nickname";
 import { PARTS_NOTE } from "../../lib/find/parts";
 import Dokkaebi from "./dokkaebi";
@@ -13,7 +14,7 @@ export default function FireCardView({ name, owner, peak, kind, card }: { name: 
   const [flipped, setFlipped] = useState(false);
   const stars = "★".repeat(card.build.difficulty) + "☆".repeat(5 - card.build.difficulty);
   return (
-    <div className={`fcard grade-${card.grade === "전설" ? "legend" : card.grade === "희귀" ? "rare" : "common"}${flipped ? " flipped" : ""}`}
+    <div className={`fcard grade-${GRADE_CLASS[card.grade] ?? "common"}${flipped ? " flipped" : ""}`}
       role="button" tabIndex={0} aria-pressed={flipped} aria-label={flipped ? "카드 앞면 보기" : "카드 뒤집어서 설계 정보 보기"}
       onClick={() => setFlipped((f) => !f)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setFlipped((f) => !f); } }}>
       <div className="fcard-inner">

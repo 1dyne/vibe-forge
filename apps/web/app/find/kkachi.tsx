@@ -33,7 +33,7 @@ export default function Kkachi({ where, onTutorial }: { where: "village" | "forg
   }
   return (
     <>
-      <button type="button" className={`kkachi ${unread ? "has-news" : ""}`} onClick={openSheet} aria-label={unread ? "까치: 새 소식 있음" : "까치: 소식과 다인에게 보내기"}>
+      <button type="button" className={`kkachi ${unread ? "has-news" : ""}`} onClick={openSheet} aria-label={unread ? "까치: 새 소식 있음" : "까치: 소식, 만든 사람에게 보내기"}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/find/kkachi.png" alt="" width={40} height={40} />
         {unread && <i aria-hidden />}
@@ -56,7 +56,7 @@ function KkachiSheet({ notices, replies, where, onTutorial, onReplySeen, onClose
     const res = await fetch("/api/find/mail", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "bug", body: body.trim(), screen: `${where}:${location.pathname}`.slice(0, 120) }) }).catch(() => null);
     setBusy(false);
     if (!res?.ok) { setMsg("못 보냈어. 잠시 뒤 다시 해줘."); return; }
-    setBody(""); setMode("news"); setMsg("다인에게 전했어! 답이 오면 까치가 물어다 줄게.");
+    setBody(""); setMode("news"); setMsg("만든 사람 dyne에게 전했어! 답이 오면 까치가 물어다 줄게.");
     track("mail_sent", { kind: "bug", via: "kkachi" });
   }
   async function seenReply(id: string) {
@@ -72,7 +72,7 @@ function KkachiSheet({ notices, replies, where, onTutorial, onReplySeen, onClose
           <>
             {replies.map((r) => (
               <div key={r.id} className="note kk-reply">
-                <div className="tiny muted">대장장이 다인의 답장 · “{r.asked}…”</div>
+                <div className="tiny muted">만든 사람 dyne의 답장 · “{r.asked}…”</div>
                 <span className="body">{r.reply}</span>
                 <button className="link" type="button" onClick={() => seenReply(r.id)}>고마워</button>
               </div>
@@ -90,7 +90,7 @@ function KkachiSheet({ notices, replies, where, onTutorial, onReplySeen, onClose
             )}
             {msg && <div className="small" role="status">{msg}</div>}
             <div className="kk-maker">
-              <div className="tiny muted">대장장이 다인에게</div>
+              <div className="tiny muted">만든 사람 dyne에게 · 버그·요청은 고장 신고로, 길게 할 이야기는 메일로</div>
               <div className="two">
                 <button className="btn btn-ghost" type="button" onClick={() => { setMode("bug"); setMsg(""); }}>고장 신고</button>
                 <a className="btn btn-ghost" href={`mailto:${MAKER_EMAIL}?subject=${encodeURIComponent("[달그락] ")}`} onClick={() => track("mail_sent", { kind: "email", via: "kkachi" })} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>메일 쓰기</a>
@@ -103,11 +103,11 @@ function KkachiSheet({ notices, replies, where, onTutorial, onReplySeen, onClose
           <form className="lantern-form" onSubmit={(e) => { e.preventDefault(); if (body.trim().length >= 2) sendBug(); }}>
             <label htmlFor="kk-bug">어디서 뭐가 이상했어?</label>
             <textarea id="kk-bug" rows={5} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} placeholder="예: 대장간에서 작업대를 눌렀는데 아무것도 안 떠" />
-            <div className="tiny muted">지금 보고 있던 화면과 기기 종류가 같이 가. 이름이나 연락처는 안 받아. 답이 오면 까치가 물어다 줘.</div>
+            <div className="tiny muted">달그락 대장간을 만드는 dyne에게만 가. 다른 사람에게는 안 보여. 지금 보던 화면과 기기 종류가 같이 가고, 이름이나 연락처는 안 받아. 답이 오면 까치가 물어다 줘.</div>
             {msg && <div className="error" role="alert">{msg}</div>}
             <div className="two">
               <button className="btn btn-ghost" type="button" onClick={() => setMode("news")}>뒤로</button>
-              <button className="btn btn-fire" type="submit" disabled={busy || body.trim().length < 2}>{busy ? "보내는 중…" : "다인에게 보내기"}</button>
+              <button className="btn btn-fire" type="submit" disabled={busy || body.trim().length < 2}>{busy ? "보내는 중…" : "dyne에게 보내기"}</button>
             </div>
           </form>
         )}

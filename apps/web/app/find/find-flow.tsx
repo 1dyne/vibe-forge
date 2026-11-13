@@ -30,6 +30,9 @@ const EMPTY_TREE: ChipTree = { root: [], follow: {} };
 export default function FindFlow({ couponText }: { couponText: string | null }) {
   const [screen, setScreen] = useState<Screen>("opening");
   const [nickname, setNickname] = useState("");
+  // 이미 대장간이 있는 사람이 실수로 새 불 피우기에 들어왔을 때 돌아갈 수 있게
+  const [myForge, setMyForge] = useState<string | null>(null);
+  useEffect(() => { fetch("/api/find/me", { cache: "no-store" }).then((r) => r.json()).then((j) => setMyForge(j?.forge?.id ?? null)).catch(() => undefined); }, []);
   // 입력칸 예시는 몇 초마다 바뀐다 (비워두고 누르면 그때 보이던 예시로 시작)
   const [ph, setPh] = useState(0);
   useEffect(() => { const t = setInterval(() => setPh((n) => (n + 1) % PH.length), 3200); return () => clearInterval(t); }, []);
@@ -180,7 +183,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     <main className="find" style={{ ["--fire" as string]: result?.fire.color ?? color }}>
       <header className="top">
         <a className="brand" href="/find">달그락 대장간</a>
-        <div className="step">{STEP[screen]}</div>
+        {myForge && screen !== "opening" && screen !== "reveal" && screen !== "forge" ? <a className="step back-forge" href={`/f/${myForge}`} onClick={() => track("forge_open", { via: "back-from-find" })}>← 내 대장간</a> : <div className="step">{STEP[screen]}</div>}
       </header>
 
       {screen === "opening" && <Opening onDone={finishOpening} />}
