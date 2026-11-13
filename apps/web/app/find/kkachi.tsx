@@ -34,14 +34,8 @@ export default function Kkachi({ where, onTutorial }: { where: "village" | "forg
   return (
     <>
       <button type="button" className={`kkachi ${unread ? "has-news" : ""}`} onClick={openSheet} aria-label={unread ? "까치: 새 소식 있음" : "까치: 소식과 다인에게 보내기"}>
-        <svg viewBox="0 0 40 32" aria-hidden width="30" height="24">
-          <path d="M6 20c4-9 13-12 20-9l8-5-3 7c2 3 1 7-3 9-6 4-16 4-22-2z" fill="#1E1F24" />
-          <path d="M14 21c3 3 9 3 13 0-2 4-10 5-13 0z" fill="#F6F0E4" />
-          <path d="M16 14c4-3 9-3 12 0-4-1-8-1-12 0z" fill="#3E6FA8" />
-          <circle cx="27" cy="12" r="1.3" fill="#F6F0E4" />
-          <path d="M34 9l5-1-4 3z" fill="#1E1F24" />
-          <path d="M6 20l-5 3 6-1z" fill="#1E1F24" />
-        </svg>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/find/kkachi.png" alt="" width={40} height={40} />
         {unread && <i aria-hidden />}
       </button>
       {open && <KkachiSheet notices={notices} replies={replies} where={where} onTutorial={onTutorial} onReplySeen={(id) => setReplies((r) => r.filter((x) => x.id !== id))} onClose={() => setOpen(false)} />}
