@@ -595,3 +595,27 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .find .words-in input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--outline); background: var(--bg); color: var(--ink); font: inherit; font-size: 16px; }
 .find .words-in input:focus { outline: 2px solid var(--fire); outline-offset: 1px; }
 .find .words-in .btn { width: auto; padding: 0 18px; flex-shrink: 0; }
+
+/* 장작 화면 v2: 질문 하나씩 + 바뀌는 3D 물건 */
+.find .stoke2{gap:12px}
+.find .s2-head{display:grid;gap:4px}
+.find .s2-title{font-family:var(--font-display);font-size:21px;line-height:1.3}
+.find .s2-idea{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.find .s2-stage{position:relative}
+.find .s2-stage .mockup3d{aspect-ratio:auto;height:min(42vh,320px);border:0;border-radius:18px;background:radial-gradient(ellipse at 50% 35%,#fffdf7 0%,#f3efe4 70%,#e9e4d6 100%)}
+.find .s2-stage .stage{height:min(42vh,320px)}
+.find .s2-fire{position:absolute;left:10px;right:auto;width:min(230px,60%);top:10px;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.86);border:1px solid var(--line);border-radius:14px;padding:6px 10px;backdrop-filter:blur(6px)}
+.find .s2-fire-dk{width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;overflow:visible}
+.find .s2-fire-bar{flex:1;display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.find .s2-fire-bar .bar{height:8px}
+.find .s2-q{display:grid;gap:10px;animation:fd-in .3s ease-out}
+.find .s2-q h2{margin:0;font-size:22px}
+.find .s2-step{font-size:12px;color:var(--teal-ink);font-weight:600}
+.find .s2-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.find .s2-opt{padding:14px 12px;border-radius:14px;border:1.5px solid var(--outline);background:var(--bg);font:inherit;font-size:15px;color:var(--ink);text-align:center;cursor:pointer}
+.find .s2-opt:active{transform:scale(.97);background:var(--surface)}
+.find .s2-spec{margin:0;font-size:15px;line-height:1.6;background:var(--surface);border-radius:12px;padding:12px 14px}
+.find .stoke2 .lock{background-clip:padding-box}
+.find .stoke2 .lock:disabled{opacity:1;background:var(--surface-2);color:var(--muted)}
+.find .s2-q{grid-template-columns:minmax(0,1fr)}
+.find .s2-q .chips{flex-wrap:wrap}

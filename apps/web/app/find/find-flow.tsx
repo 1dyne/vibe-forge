@@ -12,6 +12,16 @@ import ForgeSignup from "./waitlist";
 import Mailbox from "./mailbox";
 import VillageNews from "./village-news";
 import { track } from "./track";
+import Mockup3D from "../mockup-3d";
+import { productSolids } from "./product-shape";
+
+// 장작 화면 질문: 각 질문은 한 갈래의 장작만 보여준다
+const QUESTIONS: Array<{ cat: Chip["cat"]; q: string }> = [
+  { cat: "형태", q: "어디에 두는 물건이면 좋겠어?" },
+  { cat: "감지", q: "언제 알려주면 돼?" },
+  { cat: "반응", q: "어떻게 알려줄까?" },
+  { cat: "누구", q: "누구를 위한 거야?" }
+];
 
 const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
 const DICE = ["현관문 잠갔는지 매번 불안해", "화분에 물 줄 때를 모르겠어", "밤에 불 끄러 일어나기 귀찮아", "택배 왔는지 자꾸 나가봐", "스트레칭을 자꾸 까먹어", "방이 건조한지 모르겠어", "공부할 때 폰을 자꾸 만져", "강아지가 물을 얼마나 마셨는지 궁금해"];
@@ -49,6 +59,9 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   const [words, setWords] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const writingRef = useRef(false);
+  // 장작 화면: 질문 하나씩 (어디에 → 언제 → 어떻게 → 누구)
+  const [qi, setQi] = useState(0);
+  const [no3d, setNo3d] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -92,17 +105,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     go("intro");
   }
 
-  // 불이 사그라드는 시계 — 타이머 대신 시간 압박
-  useEffect(() => {
-    if (screen !== "stoke") return;
-    // 글을 쓰는 동안에는 불이 줄지 않는다 — 생각하며 쓰는 게 손해가 되지 않게
-    const t = setInterval(() => { if (!writingRef.current) setFire((f) => {
-      const next = Math.max(FIRE.floor, f - FIRE.decayPerTick);
-      if (next === FIRE.floor && f > FIRE.floor) track("fire_out");
-      return next;
-    }); }, FIRE.tickMs);
-    return () => clearInterval(t);
-  }, [screen]);
+  // 장작 화면은 질문을 하나씩 고르는 흐름이라 불이 저절로 줄지 않는다 (시간 압박 없이 생각하게)
 
   // 받아 적기: 바뀐 지점까지 빠르게 지우고(2글자/틱) 한 글자씩 다시 쓴다
   useEffect(() => {
@@ -118,7 +121,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   }, [screen, scrollText]);
 
   function resetFire() {
-    setPicked([]); setWords([]); setDraft(""); setFire(FIRE.start); setPeak(FIRE.start); setShown(""); setResult(null);
+    setPicked([]); setWords([]); setDraft(""); setQi(0); setFire(FIRE.start); setPeak(FIRE.start); setShown(""); setResult(null);
   }
 
   async function submitIdea(forceHardware = false) {
@@ -198,6 +201,10 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   const freshIds = new Set(picked.length ? (tree.follow[picked[picked.length - 1]] ?? []).map((c) => c.id) : []);
   const filledCats = CATS.filter((c) => picked.some((id) => find(id)?.cat === c)).length;
   const stokeMotion = fire <= FIRE.floor + 0.01 ? "fallen" : fire >= 55 ? "blaze" : "stoke";
+  // 질문마다 그 갈래의 뿌리 장작을 첫 입력과 관련 있는 순서로 4개까지
+  const optionsFor = (cat: Chip["cat"]) => tree.root.filter((c) => c.cat === cat && !picked.includes(c.id)).slice(0, 4);
+  const more = follows.slice(0, 6);
+  const solids = useMemo(() => productSolids(picked, idea), [picked, idea]);
 
   return (
     <main className="find" style={{ ["--fire" as string]: result?.fire.color ?? color }}>
@@ -272,40 +279,49 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       )}
 
       {screen === "stoke" && (
-        <section className="screen" style={{ gap: 14 }}>
-          <div className="stoke-top">
-          <div className="stage">
-            <Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} className={gulp ? "gulp" : ""} once={stokeMotion === "fallen"} />
-            {gulp > 0 && <Embers key={`e${gulp}`} />}
+        <section className="screen stoke2">
+          <div className="s2-head">
+            <div className="s2-title">네 고민을 풀어 줄 물건을 같이 만들어 보자</div>
+            <div className="muted small s2-idea">“{idea.trim()}”</div>
           </div>
-          <div className="meter">
-            <div className="meter-row"><div className="fire-label">{fireLabel(fire)}</div><div className="muted small">화력 <span className="fire-num">{Math.round(fire)}</span></div></div>
-            <div className="bar"><i style={{ width: `${fire}%` }} /></div>
-            <div className="muted tiny">{fire <= FIRE.floor + 0.01 ? "불이 꺼지려 해! 장작을 넣어줘." : "가만두면 불이 줄어. 장작을 넣어!"} · 채운 갈래 <b>{filledCats}</b>/4</div>
+          <div className="s2-stage">
+            {no3d ? <div className="stage"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} once={stokeMotion === "fallen"} /></div>
+              : <Mockup3D solids={solids} inside={false} zoom={1} resetKey={0} onFail={() => setNo3d(true)} />}
+            <div className="s2-fire" aria-label={`도깨비불 ${fireLabel(fire)} ${Math.round(fire)}`}>
+              <div className="s2-fire-dk"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} width={44} className={gulp ? "gulp" : ""} /></div>
+              <div className="s2-fire-bar"><span>도깨비불 · {fireLabel(fire)}</span><div className="bar"><i style={{ width: `${fire}%` }} /></div></div>
+            </div>
           </div>
-          </div>
-          <div className="scroll" aria-live="polite">
-            <div className="scroll-head"><span>도깨비가 받아 적는 중</span><span>장작 {picked.length}개</span></div>
-            <div className="scroll-text"><span>{shown}</span><span className="caret" /></div>
-          </div>
-          <div className="chips">
-            {visible.map((c) => (
-              <button key={c.id} type="button" className={`chip${freshIds.has(c.id) ? " fresh" : ""}`} onClick={() => pick(c)}>
-                <span className="tag" style={{ background: CAT_COLOR[c.cat] }}>{c.cat}</span>{c.label}
-              </button>
-            ))}
-          </div>
-          <form className="words-in" onSubmit={(e) => { e.preventDefault(); addWords(); }}>
-            <input aria-label="내 말로 장작 넣기" value={draft} maxLength={80} placeholder="내 말로 장작 넣기"
-              onChange={(e) => setDraft(e.target.value)} onFocus={() => { writingRef.current = true; }} onBlur={() => { writingRef.current = false; }}
-              onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }} />
-            {/* 누를 때 입력칸 포커스를 뺏지 않아 키보드가 내려가지 않고, 이어서 쓰는 동안 불도 안 준다 */}
-            <button type="submit" className="btn btn-fire" disabled={draft.trim().length < 2} onMouseDown={(e) => e.preventDefault()}>넣기</button>
-          </form>
-          <div className="muted tiny">쓰는 동안엔 불이 안 줄어. 직접 쓴 장작은 더 크게 타!</div>
+          {qi < QUESTIONS.length ? (
+            <div className="s2-q" key={qi}>
+              <div className="s2-step">질문 {qi + 1} / {QUESTIONS.length} · 고르면 위 물건이 바뀌어</div>
+              <h2>{QUESTIONS[qi].q}</h2>
+              <div className="s2-opts">
+                {optionsFor(QUESTIONS[qi].cat).map((c) => (
+                  <button key={c.id} type="button" className="s2-opt" onClick={() => { pick(c); setQi(qi + 1); }}>{c.label}</button>
+                ))}
+              </div>
+              <button className="link" type="button" onClick={() => setQi(qi + 1)}>잘 모르겠어, 다음 질문</button>
+            </div>
+          ) : (
+            <div className="s2-q">
+              <h2>이런 물건이 될 거야!</h2>
+              <p className="s2-spec">{compose(picked, find) || "아직 정한 게 없어. 처음부터 다시 골라 볼래?"}{words.map((w) => ` ${w}`).join("")}</p>
+              {more.length > 0 && <>
+                <div className="muted small">더 다듬고 싶으면 골라 (안 골라도 돼)</div>
+                <div className="chips">{more.map((c) => <button key={c.id} type="button" className="chip" onClick={() => pick(c)}>{c.label}</button>)}</div>
+              </>}
+              <form className="words-in" onSubmit={(e) => { e.preventDefault(); addWords(); }}>
+                <input aria-label="내 말로 더하기" value={draft} maxLength={80} placeholder="내 말로 더하기 (예: 밤엔 조용히)"
+                  onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && e.nativeEvent.isComposing) e.preventDefault(); }} />
+                <button type="submit" className="btn btn-fire" disabled={draft.trim().length < 2} onMouseDown={(e) => e.preventDefault()}>더하기</button>
+              </form>
+              <button className="link" type="button" onClick={() => { resetFire(); setQi(0); }}>처음부터 다시 고르기</button>
+            </div>
+          )}
           {error && <p className="error" role="alert">{error}</p>}
           <div className="spacer" />
-          <button className="btn btn-fire lock" type="button" disabled={!picked.length || busy} onClick={lockFire}>{busy ? "불 옮겨 담는 중…" : "이 불로 할래!"}</button>
+          <button className="btn btn-fire lock" type="button" disabled={!picked.length || busy} onClick={lockFire}>{busy ? "물건 설계 담는 중…" : picked.length ? "이 물건으로 할래!" : "질문에 하나 이상 골라 줘"}</button>
         </section>
       )}
 
