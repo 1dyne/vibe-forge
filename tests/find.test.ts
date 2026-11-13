@@ -43,6 +43,8 @@ describe("규칙 기반 판별", () => {
   it("앱·웹 일은 소프트웨어, 손에 잡히는 단서가 있으면 하드웨어", () => {
     expect(classify("동네 모임 예약 앱 만들고 싶어").kind).toBe("software");
     expect(classify("가계부 자동화 엑셀").kind).toBe("software");
+    expect(classify("미국 정치 분석 중 텍사스 기준으로 카운티 벌 데모그라피와 중간선거 투표 분석 해보고 싶어").kind).toBe("software");
+    expect(classify("화분 흙이 마르면 불빛으로 알려주는 데이터 분석").kind).toBe("hardware");
     expect(classify("물 마시는 걸 자꾸 까먹어").kind).toBe("hardware");
     expect(classify("화분 물 줄 때 알려주는 앱").kind).toBe("hardware");
   });
