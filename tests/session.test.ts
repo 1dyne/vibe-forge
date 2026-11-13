@@ -13,7 +13,7 @@ function login(fields: Record<string, string>, origin = "http://localhost:3000")
 describe("private workspace login", () => {
   it("rejects incorrect passwords and cross-site session changes", async () => {
     const bad = await login({ password: "incorrect" });
-    expect(bad.headers.get("location")).toContain("/login?error=1");
+    expect(bad.headers.get("location")).toContain("/login?as=operator&error=1");
     expect(bad.cookies.has("dalgeurak_session")).toBe(false);
     expect((await login({ password: "test-password" }, "https://other.example")).status).toBe(403);
     expect((await login({ intent: "logout" }, "https://other.example")).status).toBe(403);

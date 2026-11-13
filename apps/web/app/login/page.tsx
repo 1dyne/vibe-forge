@@ -20,11 +20,13 @@ const MESSAGES: Record<string, string> = {
   google_signup: "지금은 구글로 새로 가입할 수 없어요(정원 또는 초대 코드 확인)."
 };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; unlock?: string; next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; unlock?: string; next?: string; as?: string }> }) {
   const params = await searchParams;
   const next = params.next && /^\/(?!\/)/.test(params.next) ? params.next : "/";
   if (await viewerFromCookie((await cookies()).get("dalgeurak_session")?.value)) redirect(next);
-  const operatorReady = Boolean(process.env.APP_PASSWORD && process.env.SESSION_SECRET);
+  // 운영자 로그인은 일반 사용자 화면에 보이지 않는다. 운영자만 아는 주소(/login?as=operator)로 열고,
+  // 그 주소를 알아도 운영자 비밀번호가 있어야 들어간다.
+  const operatorReady = params.as === "operator" && Boolean(process.env.APP_PASSWORD && process.env.SESSION_SECRET);
   return (
     <main className="login-shell">
       <section className="login-card">
@@ -33,7 +35,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <h1>달그락 대장간</h1>
         {params.error && MESSAGES[params.error] && <p className="login-error" role="alert">{MESSAGES[params.error]}</p>}
         <ParticipantLogin next={next} google={googleConfigured()} unlock={params.unlock === "1"} canJoin={signupMode() !== "closed"} />
-        {operatorReady && <details className="operator-login">
+        {operatorReady && <details className="operator-login" open>
           <summary>운영자 로그인</summary>
           <form method="post" action="/api/session">
             <label htmlFor="password">운영자 비밀번호</label>
