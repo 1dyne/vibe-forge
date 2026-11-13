@@ -66,13 +66,15 @@ export function buildEras(c: EraCtx) {
 
   // 캔버스 간판: 빛을 받지 않는 재질이라 해 질 녘에도 또렷하다
   function sign(text: string, w: number, h: number, bg: string, fg: string, font = 64, border?: string) {
-    const cv = document.createElement("canvas"); cv.width = Math.round(w * 128); cv.height = Math.round(h * 128);
-    const x = cv.getContext("2d")!;
-    x.fillStyle = bg; x.fillRect(0, 0, cv.width, cv.height);
-    if (border) { x.strokeStyle = border; x.lineWidth = 8; x.strokeRect(6, 6, cv.width - 12, cv.height - 12); }
+    const R = 3; // 여러 배로 그려야 글씨가 안 깨진다
+    const cv = document.createElement("canvas"); cv.width = Math.round(w * 128 * R); cv.height = Math.round(h * 128 * R);
+    const W = cv.width / R, H = cv.height / R;
+    const x = cv.getContext("2d")!; x.scale(R, R);
+    x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    if (border) { x.strokeStyle = border; x.lineWidth = 8; x.strokeRect(6, 6, W - 12, H - 12); }
     x.fillStyle = fg; x.font = `${font}px Jua, sans-serif`; x.textAlign = "center"; x.textBaseline = "middle";
-    x.fillText(text, cv.width / 2, cv.height / 2 + 4);
-    const tex = new three.CanvasTexture(cv); tex.colorSpace = three.SRGBColorSpace;
+    x.fillText(text, W / 2, H / 2 + 4);
+    const tex = new three.CanvasTexture(cv); tex.colorSpace = three.SRGBColorSpace; tex.anisotropy = 8;
     return new three.Mesh(new three.PlaneGeometry(w, h), new three.MeshBasicMaterial({ map: tex, transparent: true, side: three.DoubleSide }));
   }
 
