@@ -715,6 +715,10 @@ describe("여러 주소와 다시 시작", () => {
     expect(hasValidOrigin(req("https://find.dalgrak.app", "find.dalgrak.app"))).toBe(true);
     expect(hasValidOrigin(req("https://web-production-f9d84b.up.railway.app", "web-production-f9d84b.up.railway.app"))).toBe(true);
     expect(hasValidOrigin(req("https://evil.example", "find.dalgrak.app"))).toBe(false);
+    const nullOrigin = (site?: string) => new NextRequest("http://internal:3000/api/session", { method: "POST", headers: { origin: "null", "x-forwarded-host": "dalgrak.app", ...(site ? { "sec-fetch-site": site } : {}) } });
+    expect(hasValidOrigin(nullOrigin("same-origin"))).toBe(true);
+    expect(hasValidOrigin(nullOrigin("cross-site"))).toBe(false);
+    expect(hasValidOrigin(nullOrigin())).toBe(false);
     if (prev === undefined) delete process.env.APP_BASE_URL; else process.env.APP_BASE_URL = prev;
   });
   it("이미 줄 선 메일로 새 대장간에서 다시 남기면 그 대장간의 마을 문이 열린다", async () => {

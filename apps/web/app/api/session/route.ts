@@ -20,11 +20,11 @@ export async function POST(request: NextRequest) {
   const secret = process.env.SESSION_SECRET;
   if (!password || !secret) return NextResponse.json({ error: "authentication is not configured" }, { status: 503 });
   // Failed and successful attempts both count, so guessing is slow either way.
-  if (!hit("login", clientIp(request)).ok) return NextResponse.redirect(publicUrl(request, "/login?error=slow"), 303);
+  if (!hit("login", clientIp(request)).ok) return NextResponse.redirect(publicUrl(request, "/login?as=operator&error=slow"), 303);
   const submitted = String(form.get("password") ?? "");
   if (!timingSafeEqualText(submitted, password)) {
     await audit("operator_login_failed");
-    return NextResponse.redirect(publicUrl(request, "/login?error=1"), 303);
+    return NextResponse.redirect(publicUrl(request, "/login?as=operator&error=1"), 303);
   }
   await audit("operator_login");
   const expiresAt = Date.now() + 1000 * 60 * 60 * (form.get("remember") === "on" ? 24 * 30 : 12);

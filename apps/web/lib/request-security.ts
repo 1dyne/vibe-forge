@@ -18,6 +18,9 @@ export function publicUrl(request: NextRequest, path: string): URL {
 export function hasValidOrigin(request: NextRequest): boolean {
   const origin = request.headers.get("origin");
   if (!origin || origin === publicOrigin(request) || origin === request.nextUrl.origin) return true;
+  // Referrer-Policy: no-referrer 때문에 브라우저는 같은 사이트의 폼 전송에도 Origin: null 을 보낸다.
+  // 이때는 브라우저가 붙이는 Sec-Fetch-Site(페이지 스크립트가 바꿀 수 없음)로 같은 출처인지 확인한다.
+  if (origin === "null") return request.headers.get("sec-fetch-site") === "same-origin";
   // 한 서비스가 여러 주소로 열린다(대표 도메인, www, 온보딩 서브도메인, Railway 주소).
   // 요청이 들어온 그 주소에서 보낸 것이면 같은 출처로 본다. 다른 사이트에서 보낸 요청은 그대로 막힌다.
   let host: string;
