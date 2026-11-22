@@ -232,3 +232,18 @@
 .agent-pill-sw{background:#e7e6f1;color:#686381}
 .agent-pill-me{background:#efdfc7;color:#886d42}
 .agent-pill-id{background:#eddde5;color:#9b5d7d}
+
+/* 새로 온 것. 숫자만 늘어나면 바뀐 줄을 모르고 지나가므로, 한 번 반짝이고
+   점으로 남는다. 계속 깜빡이면 그게 더 큰 소음이라 반짝임은 한 번만 준다. */
+.new-dot{display:inline-flex;align-items:center;justify-content:center;min-width:7px;height:7px;border-radius:999px;background:#d98b3a;vertical-align:middle;margin-right:5px}
+.workbench-toggle .new-dot{width:7px;min-width:7px;height:7px;margin:0 0 0 5px}
+.workbench-toggle.has-new{box-shadow:0 0 0 1px #e6c08a}
+.new-banner{display:flex;align-items:center;gap:2px;width:calc(100% - 44px);margin:0 22px 8px;padding:9px 12px;border:1px solid #ecd3a8;background:#fdf6e9;border-radius:10px;font-size:11px;color:#8a6a33;text-align:left;cursor:pointer}
+.new-banner:hover{background:#fbf0dc}
+.artifact-tabs button.is-new{box-shadow:inset 0 -2px 0 #d98b3a}
+tr.is-new>td{background:#fdf7ec}
+tr.is-new{animation:new-flash 1.6s ease-out 1}
+.new-banner{animation:new-flash 1.6s ease-out 1}
+@keyframes new-flash{0%{background:#f6e2bd}60%{background:#fdf6e9}100%{background:transparent}}
+tr.is-new{animation-name:new-flash-row}
+@keyframes new-flash-row{0%{box-shadow:inset 3px 0 0 #d98b3a}100%{box-shadow:inset 3px 0 0 #e8d6b4}}

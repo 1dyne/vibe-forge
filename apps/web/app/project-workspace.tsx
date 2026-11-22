@@ -41,7 +41,7 @@ export default function ProjectWorkspace() {
   const [makerHelp,setMakerHelp]=useState(false);
   const [showAccount,setShowAccount]=useState(false);
   const [deleting,setDeleting]=useState<LocalProject|null>(null);
-  const {preferences,setWorkbench,expand,toggleProjects,toggleFolder}=useWorkspacePreferences();
+  const {preferences,setWorkbench,expand,toggleProjects,toggleFolder,markSeen,ready:prefsReady}=useWorkspacePreferences();
   const end=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
   const project=projects.find(p=>p.id===selectedId)??null;
@@ -49,6 +49,18 @@ export default function ProjectWorkspace() {
   const workbenchPreference=project?preferences.workbenches[project.id]:undefined;
   const selectedItem=items.find(i=>i.id===workbenchPreference?.selected)??items[0];
   const showArtifacts=!!project&&items.length>0&&(workbenchPreference?.open??true);
+  // 지금 이 프로젝트에 있는 것들의 표식. 여기에 있는데 '본 것'에 없으면 새로 온 것이다.
+  const marks=project?[...items.map(i=>"item:"+i.id),...project.tasks.filter(t=>t.status==="ready").map(t=>"task:"+t.id)]:[];
+  const seenMarks=project?preferences.seen[project.id]??[]:[];
+  const newMarks=prefsReady?marks.filter(m=>!seenMarks.includes(m)):[];
+  // 작업대를 열어보면 읽은 것으로 친다. 다만 바로 지우면 강조가 눈에 들기도 전에
+  // 사라지므로 2.5초 뒤에 적는다. 그 사이에 새로 온 줄이 한 번 반짝인다.
+  useEffect(()=>{
+    if(!project||!showArtifacts||!prefsReady||!newMarks.length)return;
+    const id=project.id;const pending=[...newMarks];
+    const timer=setTimeout(()=>markSeen(id,pending),2500);
+    return ()=>clearTimeout(timer);
+  },[project?.id,showArtifacts,prefsReady,newMarks.join("|")]);// eslint-disable-line react-hooks/exhaustive-deps
   const layout=useWorkspaceLayout(showArtifacts);
   const workflow=project?workflowFor(project):null;
   const phase=workflow?.phase??"brainstorm";
@@ -160,8 +172,13 @@ export default function ProjectWorkspace() {
     </aside>
     <ResizeHandle className="sidebar-resizer" controls="project-sidebar" label="프로젝트 영역 크기 조절" axis={layout.mobile?"y":"x"} value={layout.mobile?layout.sizes.sidebarHeight:layout.sizes.sidebar} min={layout.mobile?120:160} max={480} onResize={v=>resize(layout.mobile?"sidebarHeight":"sidebar",v)} onReset={()=>resize(layout.mobile?"sidebarHeight":"sidebar",layout.mobile?210:240)}/>
     <section className="chat-panel" id="chat-panel" aria-label="대화">
-      <header className="chat-header"><div><h1 title={project?.name??"새로운 아이디어"}>{project?.name??"새로운 아이디어"}</h1><span className="breadcrumb">{workshop?(channel==="main"?"메인 대장간":AGENTS[channel].name+" 작업실"):phaseNames[phase]}</span></div>{items.length>0&&<button className="workbench-toggle" aria-expanded={showArtifacts} aria-controls="workbench-panel" onClick={()=>project&&setWorkbench(project.id,!showArtifacts,selectedItem.id)}>▥ 작업대 <span>{items.length}</span></button>}</header>
+      <header className="chat-header"><div><h1 title={project?.name??"새로운 아이디어"}>{project?.name??"새로운 아이디어"}</h1><span className="breadcrumb">{workshop?(channel==="main"?"메인 대장간":AGENTS[channel].name+" 작업실"):phaseNames[phase]}</span></div>{items.length>0&&<button className={"workbench-toggle"+(newMarks.length?" has-new":"")} aria-expanded={showArtifacts} aria-controls="workbench-panel" onClick={()=>project&&setWorkbench(project.id,!showArtifacts,selectedItem.id)}>▥ 작업대 <span>{items.length}</span>{newMarks.length>0&&<em className="new-dot" role="img" aria-label={`새로 온 것 ${newMarks.length}개`}/>}</button>}</header>
       {project&&<ProgressPanel project={project}/>}
+      {/* 새 작업물과 새 할 일이 조용히 늘어나기만 해서, 화면이 바뀐 줄도 모르고 지나갔다.
+          작업대가 닫혀 있을 때는 여기서 한 줄로 불러 세운다. */}
+      {project&&!showArtifacts&&newMarks.length>0&&<button className="new-banner" onClick={()=>setWorkbench(project.id,true,selectedItem?.id??"")}>
+        <span className="new-dot" aria-hidden="true"/>새로 온 것 {newMarks.length}개 · 작업대에서 보기 →
+      </button>}
       <div className="phase-strip" hidden={!!project}><span className={phase==="brainstorm"?"current":"done"}>01 아이디어</span><i/><span className={phase!=="brainstorm"&&!workshop?"current":workshop?"done":""}>02 계획</span><i/><span className={workshop?"current":""}>03 대장간</span></div>
       {workshop&&<div className="team-strip"><span>함께 일할 팀</span>{(["hw","sw","me","id"] as AgentId[]).map(a=><label key={a} className={workflow!.activeAgents.includes(a)?"on":""}><input type="checkbox" checked={workflow!.activeAgents.includes(a)} disabled={!!busy} onChange={()=>toggleAgent(a)}/>{a.toUpperCase()}</label>)}<select aria-label="에이전트 모드" value={mode} onChange={e=>setMode(e.target.value as "work"|"evaluate")}><option value="work">작업 모드</option><option value="evaluate">Evaluator 모드</option></select></div>}
       <div className="chat-scroll" role="log" aria-label="프로젝트 대화" aria-live="polite">
@@ -185,7 +202,7 @@ export default function ProjectWorkspace() {
     </section>
     {showArtifacts&&project&&<>
       <ResizeHandle className="workbench-resizer" controls="workbench-panel" label="작업대 크기 조절" axis={layout.stacked?"y":"x"} reverse value={layout.stacked?layout.sizes.workbenchHeight:layout.sizes.workbench} min={layout.stacked?180:280} max={layout.stacked?800:1000} onResize={v=>resize(layout.stacked?"workbenchHeight":"workbench",v)} onReset={()=>resize(layout.stacked?"workbenchHeight":"workbench",layout.stacked?360:460)}/>
-      <WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action} ownerName={viewer.kind==="user"?viewer.name:"나"} connectorOnly={connectorOnly}/>
+      <WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action} ownerName={viewer.kind==="user"?viewer.name:"나"} newMarks={newMarks} connectorOnly={connectorOnly}/>
     </>}
     {makerHelp&&<div className="modal-backdrop" onClick={()=>setMakerHelp(false)}><section className="profile-modal maker-help" role="dialog" aria-modal="true" aria-label="메이커스페이스 안내" onClick={e=>e.stopPropagation()}><header><h2>3D 프린터가 없어도 괜찮아요</h2><button aria-label="닫기" onClick={()=>setMakerHelp(false)}>×</button></header>
       {connectorOnly?<p>내 Claude에게 <b>“내 근처 메이커스페이스 찾아줘”</b>라고 말하면, 사는 곳과 이동할 수 있는 범위를 먼저 묻고 근처에서 쓸 수 있는 공간을 찾아 정리해줘요.</p>:<p className="notice">미안해요. 웹 대화에서 근처 메이커스페이스를 찾아주는 기능은 아직 설계 중이에요. 아래 방법으로 직접 찾아보실 수 있어요. Claude 커넥터로 쓰시면 Claude가 위치를 묻고 대신 찾아드려요.</p>}
