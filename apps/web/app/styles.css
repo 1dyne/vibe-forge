@@ -329,3 +329,14 @@ tr.is-new{animation-name:new-flash-row}
 .tour-how small{font-size:10.5px;color:var(--muted)}
 .tour-how-arrow{color:#9bb0a6}
 @media(max-width:600px){.tour-flow{grid-template-columns:1fr}.tour-flow li+li::before{display:none}}
+
+/* 시작하기 체크리스트. 남은 것이 보이게. 셋 다 끝나면 사라진다. */
+.start-checklist{margin:10px 12px 0;padding:10px 12px;border:1px solid #d9e6dd;border-radius:10px;background:#f4faf6}
+.start-checklist>strong{display:flex;justify-content:space-between;font-size:11px;color:#2f6a57}
+.start-checklist>strong span{color:#7b9b8d;font-weight:500}
+.start-checklist ul{list-style:none;margin:7px 0 0;padding:0}
+.start-checklist li{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:2px 0}
+.start-checklist li.done{color:#8b978f}
+.start-checklist li.done span:last-child{text-decoration:line-through}
+.start-mark{width:12px;text-align:center;color:#5d9a84}
+.start-checklist button{border:0;background:none;padding:2px 0;font-size:11.5px;color:#2f6a57;text-align:left;text-decoration:underline;text-underline-offset:2px}

@@ -15,6 +15,8 @@ export type Station = {
   before?: () => void;
   /** 가리킬 것이 없으면 건너뛴다(그 화면에 아직 없는 영역). */
   optional?: boolean;
+  /** 기본 이전/다음 대신 쓸 버튼. 첫 장에서 길을 가르는 데 쓴다. */
+  actions?: (go: { next: () => void; close: () => void }) => ReactNode;
 };
 
 type Box = { top: number; left: number; width: number; height: number };
@@ -101,10 +103,14 @@ export default function Tour({ stations, onClose }: { stations: Station[]; onClo
       {station.title && <strong>{station.title}</strong>}
       <div className="tour-body">{station.body}</div>
       <div className="tour-nav">
-        <button className="tour-skip" onClick={onClose}>그만 보기</button>
-        <span className="tour-spacer" />
-        {at > 0 && <button onClick={() => go(at - 1)}>이전</button>}
-        <button className="primary" onClick={() => go(at + 1)}>{last ? "다 봤어요" : "다음"}</button>
+        {station.actions
+          ? station.actions({ next: () => go(at + 1), close: onClose })
+          : <>
+            <button className="tour-skip" onClick={onClose}>그만 보기</button>
+            <span className="tour-spacer" />
+            {at > 0 && <button onClick={() => go(at - 1)}>이전</button>}
+            <button className="primary" onClick={() => go(at + 1)}>{last ? "다 봤어요" : "다음"}</button>
+          </>}
       </div>
     </div>
   </div>;
