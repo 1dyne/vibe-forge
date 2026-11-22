@@ -9,6 +9,23 @@ export const AGENTS: Record<AgentId, { name: string; title: string; description:
 };
 export const TOOL_OPTIONS = ["멀티미터", "자", "니퍼", "캡톤 테이프", "버니어 캘리퍼스", "납땜 도구", "브레드보드", "3D 프린터", "Arduino 보드"];
 export const emptyProfile = (): MakerProfile => ({ tools: [], toolsConfirmed: false, firmwareExperience: "unanswered", coreBehavior: "" });
+
+// 제작 프로필에는 성격이 다른 두 가지가 섞여 있다. 가진 장비와 쌓인 경험은 사람에게
+// 붙고 프로젝트가 바뀌어도 그대로다. 예산·기한·용도는 프로젝트마다 다르다.
+// 이걸 가르지 않으면 지난 프로젝트의 예산이 새 프로젝트로 따라 들어오고,
+// 반대로 장비는 프로젝트마다 다시 물어보게 된다.
+const PERSON_FIELDS = ["tools", "toolsConfirmed", "firmwareExperience", "solderingSkill", "printerAccess", "region", "travelRange", "makerspaces"] as const;
+
+export function personPart(profile: MakerProfile): Partial<MakerProfile> {
+  const out: Record<string, unknown> = {};
+  for (const field of PERSON_FIELDS) if (profile[field] !== undefined) out[field] = profile[field];
+  return out as Partial<MakerProfile>;
+}
+
+// 계정에 저장된 사람 쪽 값을 프로젝트 프로필 위에 덮는다. 프로젝트 쪽 값(핵심 동작,
+// 예산, 기한, 용도, 목표가)은 건드리지 않는다.
+export const withPersonPart = (project: MakerProfile, account: MakerProfile | null): MakerProfile =>
+  account ? { ...project, ...personPart(account) } : project;
 export function recommendAgents(idea: string): AgentId[] {
   const agents: AgentId[] = ["hw"];
   if (/웹|앱|서버|대시보드|통신|클라우드|web|app/i.test(idea)) agents.push("sw");

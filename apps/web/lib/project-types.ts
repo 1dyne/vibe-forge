@@ -127,8 +127,14 @@ export type LocalProject = {
 export type AgentId = "chief" | "hw" | "sw" | "me" | "id";
 export type ChatChannel = "main" | AgentId;
 export type ImageAttachment = { name: string; dataUrl: string };
+// 자주 가는 메이커스페이스. 예약 자체는 공간마다 제각각이라 여기서 걸지 않고,
+// 어디에 무엇이 있는지와 예약 페이지 링크를 들고 있는다. 출력 크기를 적어두면
+// ME 달그락이 그 장비로 낼 수 있는 크기 안에서 설계한다.
+export type MakerSpace = { id: string; name: string; where: string; printers: string; maxPrintMm: [number, number, number] | null; url: string; note: string };
+
 export type MakerProfile = {
   tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string;
+  makerspaces?: MakerSpace[];
   // Extended checklist; optional so older projects keep loading.
   solderingSkill?: "unanswered" | "none" | "tried" | "comfortable";
   printerAccess?: "unanswered" | "own" | "makerspace" | "service" | "none";

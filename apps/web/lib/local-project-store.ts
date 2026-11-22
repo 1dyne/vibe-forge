@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentPlan, BuildResult, DesignSlot, ImageAttachment, LocalProject, MakerProfile } from "./project-types";
-import { workflowFor } from "./workflow";
+import { emptyProfile, personPart, workflowFor } from "./workflow";
 import { forgetLegacyTokens, takeLegacyTokens } from "./users";
 import { currentVault, open, seal, vaultFor, withVault, type Vault } from "./vault";
 
@@ -166,8 +166,10 @@ export function createProject(idea: string, plan: AgentPlan, mode: LocalProject[
       updatedAt: now
     };
     project.workflow = workflowFor(project);
+    // 새 프로젝트는 '사람'에 붙은 것만 물려받는다. 지난 프로젝트의 예산·기한·용도가
+    // 따라 들어오면 안 된다.
     const savedProfile = profileFor(database, owner.ownerId ?? null);
-    if (savedProfile) project.workflow.profile = { ...savedProfile, coreBehavior: "" };
+    if (savedProfile) project.workflow.profile = { ...emptyProfile(), ...personPart(savedProfile) };
     database.projects.push(project);
     await writeDatabase(database);
     return structuredClone(project);
@@ -250,11 +252,24 @@ function profileFor(database: Database, ownerId: string | null): MakerProfile | 
   return ownerId ? database.profiles?.[ownerId] ?? null : database.profile ?? null;
 }
 export async function getMakerProfile(ownerId: string | null = null) { await queue; return profileFor(await readDatabase(), ownerId); }
+// 계정에는 사람 쪽 값만 담는다. 핵심 동작·예산·기한은 프로젝트의 것이라
+// 계정에 올려두면 다음 프로젝트로 새어 들어간다.
+// 저장하면 그 사람의 다른 프로젝트에도 사람 쪽 값을 함께 맞춘다. 장비를 한 번
+// 바꿨는데 어떤 프로젝트는 옛날 장비로 설계되는 일이 없도록.
 export function saveMakerProfile(profile: MakerProfile, ownerId: string | null = null) {
   return serialized(async () => {
     const database = await readDatabase();
-    if (ownerId) database.profiles = { ...database.profiles, [ownerId]: profile };
-    else database.profile = profile;
+    const person = personPart(profile);
+    if (ownerId) {
+      database.profiles = { ...database.profiles, [ownerId]: { ...emptyProfile(), ...person } };
+      for (const project of database.projects) {
+        if (project.ownerId !== ownerId || !project.workflow) continue;
+        project.workflow.profile = { ...project.workflow.profile, ...person };
+        project.updatedAt = new Date().toISOString();
+      }
+    } else {
+      database.profile = { ...emptyProfile(), ...person };
+    }
     await writeDatabase(database);
     return profile;
   });

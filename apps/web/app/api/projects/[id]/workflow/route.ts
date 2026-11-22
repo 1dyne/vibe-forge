@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { ProfileSchema } from "../../../../../lib/profile-schema";
 import { getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
@@ -12,11 +13,8 @@ import { unackedRisks } from "../../../../../lib/safety";
 import { validateLog } from "../../../../../lib/contract";
 import { snapshot, RESTORABLE, FIELD_LABEL } from "../../../../../lib/history";
 
-const ProfileSchema = z.object({ tools: z.array(z.string().max(80)).max(30), toolsConfirmed: z.boolean(), firmwareExperience: z.enum(["unanswered", "none", "guided", "independent"]), coreBehavior: z.string().max(1800),
-  solderingSkill: z.enum(["unanswered", "none", "tried", "comfortable"]).optional(), printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
-  region: z.string().max(60).optional(), budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
-  purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(), targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
-  travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(), timelineWeeks: z.number().min(0.5).max(104).nullable().optional() }).strict();
+// 스키마는 lib/profile-schema.ts 하나로 둔다. 계정 경로와 프로젝트 경로가 서로 다른
+// 모양을 받으면 사람 쪽 값이 한쪽에서만 저장되는 일이 생긴다.
 const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("profile"), profile: ProfileSchema }),
   z.object({ action: z.literal("agents"), agents: z.array(z.enum(["hw", "sw", "me", "id"])).min(1).max(4) }),
