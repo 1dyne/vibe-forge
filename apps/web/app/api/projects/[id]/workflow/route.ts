@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { budgetDenied, chargeTurn } from "../../../../../lib/usage";
 import { ProfileSchema } from "../../../../../lib/profile-schema";
 import { getMakerProfile, getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
@@ -44,6 +45,10 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
     if (!project || !canAccess(viewer, project)) return notFound();
     // Approvals and records stay open to everyone; only "plan" calls the in-app AI.
     if (input.action === "plan" && !canUseWebAi(viewer)) return webAiDenied();
+    // 무료 분량이 남았는지 보고, 모자라면 여기서 멈춘다. 실패한 호출도 토큰은 나가므로
+    // 보수적으로 먼저 적는다(운영자 계정은 자기 키를 쓰므로 세지 않는다).
+    { const denied = await budgetDenied(viewer, "build"); if (denied) return denied; }
+    if (process.env.APP_MODE === "live") await chargeTurn(viewer, "build");
     const current = workflowFor(project);
     // Electrical rules marked blocked hold back approvals and assembly progress.
     const blocked = blockingChecks(project.build);

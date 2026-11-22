@@ -11,7 +11,8 @@ import { endUserSessions } from "../../../../../lib/auth-store";
 export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   if ((await getViewer(request))?.kind !== "operator") return NextResponse.json({ error: "운영자만 사용할 수 있어요." }, { status: 403 });
-  const parsed = z.object({ webAi: z.boolean().optional(), revoke: z.literal(true).optional() }).strict().safeParse(await request.json().catch(() => null));
+  // dailyCreditUsd: 이 사람에게만 주는 하루 한도. null이면 공통 무료 한도로 되돌린다.
+  const parsed = z.object({ webAi: z.boolean().optional(), revoke: z.literal(true).optional(), dailyCreditUsd: z.number().min(0).max(1000).nullable().optional() }).strict().safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "입력값을 확인해주세요." }, { status: 400 });
   try {
     const { id } = await context.params;
@@ -22,6 +23,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       await audit("user_revoked", { userId: id });
     }
     if (parsed.data.webAi !== undefined) await audit("web_ai_changed", { userId: id, note: String(parsed.data.webAi) });
+    if (parsed.data.dailyCreditUsd !== undefined) await audit("credit_changed", { userId: id, note: String(parsed.data.dailyCreditUsd) });
     return NextResponse.json({ user });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "변경하지 못했습니다." }, { status: 404 });

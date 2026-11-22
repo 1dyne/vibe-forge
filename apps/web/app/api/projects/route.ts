@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { allowanceUsd, budgetDenied, chargeTurn, remainingUsd } from "../../../lib/usage";
+import { accountById } from "../../../lib/users";
 import { runDesignAgent } from "../../../lib/design-agent";
 import { QuotaError, createProject, getMakerProfile, limits, listProjects, reorderProjects } from "../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../lib/request-security";
@@ -12,7 +14,15 @@ const CreateProject = z.object({ idea: z.string().trim().min(3).max(4000), attac
 async function handleGET(request: NextRequest) {
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
-  return NextResponse.json({ projects: await listProjects(ownerIdOf(viewer)), viewer: viewer.kind === "operator" ? { kind: "operator" } : { kind: "user", name: viewer.user.name, webAi: viewer.user.webAi, projectLimit: limits.projectsPerUser() } });
+  const account = viewer.kind === "user" ? await accountById(viewer.user.id) : null;
+  return NextResponse.json({
+    projects: await listProjects(ownerIdOf(viewer)),
+    viewer: viewer.kind === "operator" ? { kind: "operator" } : {
+      kind: "user", name: viewer.user.name, webAi: viewer.user.webAi, projectLimit: limits.projectsPerUser(),
+      // 오늘 남은 무료 분량. 앱 안에서 대화할 때만 줄어든다(커넥터로 쓰면 줄지 않는다).
+      credit: account ? { remainingUsd: remainingUsd(account), allowanceUsd: allowanceUsd(account) } : null
+    }
+  });
 }
 
 async function handlePOST(request: NextRequest) {
@@ -20,6 +30,10 @@ async function handlePOST(request: NextRequest) {
   const viewer = await getViewer(request);
   if (!viewer) return unauthorized();
   if (!canUseWebAi(viewer)) return webAiDenied();
+    // 무료 분량이 남았는지 보고, 모자라면 여기서 멈춘다. 실패한 호출도 토큰은 나가므로
+    // 보수적으로 먼저 적는다(운영자 계정은 자기 키를 쓰므로 세지 않는다).
+    { const denied = await budgetDenied(viewer, "chat"); if (denied) return denied; }
+    if (process.env.APP_MODE === "live") await chargeTurn(viewer, "chat");
   try {
     const input = CreateProject.parse(await request.json());
     const attachments = input.attachments as ImageAttachment[];

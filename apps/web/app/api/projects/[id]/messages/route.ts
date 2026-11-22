@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { budgetDenied, chargeTurn } from "../../../../../lib/usage";
 import { runDesignAgent } from "../../../../../lib/design-agent";
 import { applyAgentPlan, getProject, mutateProject } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
@@ -21,6 +22,10 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
     const project = await getProject(id);
     if (!project || !canAccess(viewer, project)) return notFound();
     if (!canUseWebAi(viewer)) return webAiDenied();
+    // 무료 분량이 남았는지 보고, 모자라면 여기서 멈춘다. 실패한 호출도 토큰은 나가므로
+    // 보수적으로 먼저 적는다(운영자 계정은 자기 키를 쓰므로 세지 않는다).
+    { const denied = await budgetDenied(viewer, "chat"); if (denied) return denied; }
+    if (process.env.APP_MODE === "live") await chargeTurn(viewer, "chat");
     const input = Message.parse(await request.json());
     const attachments = input.attachments as ImageAttachment[];
     const workflow = workflowFor(project);

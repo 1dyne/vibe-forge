@@ -34,6 +34,11 @@ export type ForgeUser = {
   tokenSealed?: string;
   clients?: ConnectedClient[];
   webAi: boolean;
+  // 앱 안에서 대화할 때 쓴 모델 비용. 날짜가 바뀌면 usd와 turns를 0부터 다시 센다.
+  // totalUsd는 누적이라 초기화하지 않는다. dailyCreditUsd는 이 사람에게만 따로 준
+  // 하루 한도(없으면 모두에게 같은 무료 한도).
+  usage?: { day: string; usd: number; turns: number; totalUsd: number };
+  dailyCreditUsd?: number;
   createdAt: string;
   revokedAt: string | null;
   // How the account was made and what the person agreed to (self sign-up).
@@ -238,12 +243,14 @@ export function disableInvite(id: string): Promise<void> {
   });
 }
 
-export function updateUser(id: string, change: { webAi?: boolean; revoke?: boolean }): Promise<PublicUser> {
+export function updateUser(id: string, change: { webAi?: boolean; revoke?: boolean; dailyCreditUsd?: number | null }): Promise<PublicUser> {
   return serialized(async () => {
     const database = await readUsers();
     const user = database.users.find((item) => item.id === id);
     if (!user) throw new Error("사용자를 찾을 수 없습니다.");
     if (change.webAi !== undefined) user.webAi = change.webAi;
+    // 하루 한도를 이 사람에게만 따로 준다. null이면 모두와 같은 무료 한도로 되돌린다.
+    if (change.dailyCreditUsd !== undefined) { if (change.dailyCreditUsd === null) delete user.dailyCreditUsd; else user.dailyCreditUsd = change.dailyCreditUsd; }
     if (change.revoke) user.revokedAt ??= new Date().toISOString();
     await writeUsers(database);
     return toPublic(user);
