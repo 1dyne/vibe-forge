@@ -206,3 +206,6 @@
 .dev-summary button{font-size:10px;padding:4px 8px}
 .dev-summary small{flex-basis:100%;font-size:10px}
 .credit-line{display:block;width:100%;font-size:10px;color:#6f7d75;margin-top:3px}
+/* 하단에 성격이 다른 버튼 여덟 개가 평평하게 쌓여 있어 무엇이 무엇인지 읽히지 않았다.
+   계정에 속한 것과 연결에 속한 것을 작은 머리말로 갈라준다. */
+.nav-group{display:block;width:100%;font-size:9px;letter-spacing:.08em;color:#9aa49d;margin:8px 0 2px}
