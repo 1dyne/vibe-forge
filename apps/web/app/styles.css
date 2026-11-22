@@ -308,3 +308,24 @@ tr.is-new{animation-name:new-flash-row}
 .tour-nav button{font-size:11px;padding:7px 11px}
 .tour-skip{border:0;background:none;color:var(--muted);padding:6px 2px}
 .tour-spacer{flex:1}
+
+/* 투어 첫 장: 짚을 곳 없이 가운데 넓게. 설명이 길어 스크롤을 허용한다. */
+.tour-bubble-wide{max-height:min(560px,calc(100vh - 48px));overflow:auto;padding:20px 22px 16px}
+.tour-intro-head{display:flex;gap:14px;align-items:flex-start}
+.tour-intro-head img{flex-shrink:0;mix-blend-mode:multiply}
+.tour-intro-head strong{display:block;font-size:17px;margin-bottom:5px}
+.tour-intro-head p{margin:0;font-size:12.5px;line-height:1.8;color:#4a5852}
+.tour-intro h4{font-size:12px;margin:18px 0 8px;color:#2f4a40}
+.tour-flow{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0;padding:0;counter-reset:none}
+.tour-flow li{position:relative;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff}
+.tour-flow li+li::before{content:"→";position:absolute;left:-10px;top:12px;color:#9bb0a6;font-size:11px}
+.tour-flow-no{font-size:9px;letter-spacing:.1em;color:#7fa294;display:block}
+.tour-flow b{display:block;font-size:12.5px;margin:1px 0 3px}
+.tour-flow small{display:block;font-size:10.5px;line-height:1.65;color:var(--muted)}
+.tour-note{font-size:11.5px;line-height:1.75;color:#6d7a73;margin:8px 0 0}
+.tour-how{display:flex;align-items:center;gap:10px}
+.tour-how>div{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#f7faf7}
+.tour-how b{display:block;font-size:12px}
+.tour-how small{font-size:10.5px;color:var(--muted)}
+.tour-how-arrow{color:#9bb0a6}
+@media(max-width:600px){.tour-flow{grid-template-columns:1fr}.tour-flow li+li::before{display:none}}

@@ -9,6 +9,7 @@ import ConnectPanel from "./connect-panel";
 import AccountPanel from "./account-panel";
 import MakerspaceList from "./makerspace-list";
 import Tour, { type Station } from "./tour";
+import TourIntro from "./tour-intro";
 import DeleteProjectDialog from "./delete-project-dialog";
 import ProgressPanel, { ProgressRing } from "./progress-panel";
 import { projectProgress } from "../lib/progress";
@@ -68,21 +69,22 @@ export default function ProjectWorkspace() {
   // 슬라이드 아홉 장짜리 안내는 자동으로 띄우지 않는다. 화면을 가린 채 그림만 보여줘서,
   // 다 읽고 닫아도 실제 화면 어디에 뭐가 있는지는 알 수 없었다. 화면 투어로 교체 중.
   const tourStations: Station[] = [
+    { key: "intro", title: "", body: <TourIntro/> },
     { key: "projects", target: "projects", title: "여기에 프로젝트가 쌓여요",
       body: <><p>아이디어 하나가 프로젝트 하나입니다. 이름 왼쪽 고리가 <b>진행률</b>이에요.</p><p>이름을 두 번 누르면 바꾸고, 끌어서 순서를 바꿉니다.</p></> },
-    { key: "composer", target: "composer", title: "여기서 이야기해요",
-      body: <><p>만들고 싶은 것을 한 줄로 적으면 대장 달그락이 되물으며 같이 좁혀줍니다.</p><p>내 AI에 커넥터를 붙였다면, 거기서 나눈 이야기가 이 자리에 정리돼 쌓입니다.</p></> },
     { key: "progress", target: "progress", title: "지금 어느 단계인지",
-      body: <><p>체크리스트부터 조립까지 여덟 단계 중 어디인지 보여줍니다. 눌러 펼치면 남은 것과 <b>꼭 고칠 것</b>이 나와요.</p></> },
+      body: <><p>앞에서 본 세 묶음이 여기서는 여덟 단계로 나뉩니다. 눌러 펼치면 지금 할 일과 <b>꼭 고칠 것</b>이 나와요.</p></> },
     { key: "workbench-button", target: "workbench-button", title: "만들어진 것은 작업대로",
       body: <><p>설계도·회로·3D 목업·부품 목록·할 일이 전부 여기 쌓입니다. 새로 생기면 주황 점이 붙어요.</p></> },
     { key: "workbench", target: "workbench", title: "작업대", optional: true,
       before: () => { if (project && !showArtifacts) setWorkbench(project.id, true, selectedItem?.id ?? ""); },
-      body: <><p>탭을 바꿔가며 회로와 3D를 보고, <b>함께 할 다음 작업</b>에서 내가 할 일과 달그락이 할 일을 나눠 봅니다.</p></> },
+      body: <><p>탭을 바꿔가며 회로와 3D 목업을 봅니다. 회로에 <b>꼭 고칠 것</b>이 있으면 빨갛게 표시되고 넘어갈 수 없어요.</p><p>아래 <b>함께 할 다음 작업</b>에서 내가 할 일과 달그락이 할 일이 나뉩니다. 권하는 확인을 ✓ 확인만 하거나 ✗ 건너뛸 수 있고, 건너뛴 것은 남아요.</p></> },
     { key: "settings", target: "settings", title: "한 번만 정해두면 되는 것",
-      body: <><p>가진 장비와 경험, 자주 가는 메이커스페이스는 <b>계정에 저장</b>돼 모든 프로젝트가 같이 씁니다.</p></> },
+      body: <><p>가진 장비와 경험, 자주 가는 메이커스페이스는 <b>계정에 저장</b>돼 모든 프로젝트가 같이 씁니다. 프로젝트마다 다시 묻지 않아요.</p></> },
     { key: "ai-connect", target: "ai-connect", title: "내가 쓰는 AI에 붙이기",
-      body: <><p>Claude·ChatGPT·Replit·터미널 중 쓰는 것을 고르면 그 도구에 맞는 순서가 나옵니다.</p></> }
+      body: <><p>Claude·ChatGPT·Replit·터미널 중 쓰는 것을 고르면 그 도구에 맞는 순서가 나옵니다. 붙이면 거기서 나눈 이야기가 이 프로젝트에 쌓여요.</p></> },
+    { key: "composer", target: "composer", title: "이제 만들고 싶은 것을 적어보세요",
+      body: <><p>다 정해지지 않아도 괜찮아요. “책상이 어두우면 알려주는 것” 정도면 충분합니다.</p><p>적고 나면 대장 달그락이 되물으며 아까 본 순서대로 같이 내려갑니다.</p></> }
   ];
   const layout=useWorkspaceLayout(showArtifacts);
   const workflow=project?workflowFor(project):null;
