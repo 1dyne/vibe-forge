@@ -128,7 +128,36 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
 // ownerId null lists the operator's own projects; a user id lists only theirs.
 export async function listProjects(ownerId: string | null = null): Promise<LocalProject[]> {
   await queue;
-  return (await readDatabase()).projects.filter((project) => (ownerId === null ? !project.ownerId : project.ownerId === ownerId)).toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  // 직접 정한 순서가 있으면 그것이 먼저다. 아직 한 번도 끌어놓지 않았으면 예전처럼
+  // 최근 작업 순서를 쓴다(order가 모두 없어 비기므로 updatedAt으로 넘어간다).
+  return (await readDatabase()).projects
+    .filter((project) => (ownerId === null ? !project.ownerId : project.ownerId === ownerId))
+    .toSorted((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER) || b.updatedAt.localeCompare(a.updatedAt));
+}
+
+// 이름 바꾸기. 내용은 그대로 두고 이름만 바꾸므로 updatedAt도 올리지 않는다.
+export function renameProject(id: string, ownerId: string | null, name: string): Promise<LocalProject | null> {
+  return serialized(async () => {
+    const database = await readDatabase();
+    const project = database.projects.find((item) => item.id === id);
+    if (!project || (ownerId === null ? !!project.ownerId : project.ownerId !== ownerId)) return null;
+    project.name = name;
+    await writeDatabase(database);
+    return structuredClone(project);
+  });
+}
+
+// 끌어놓아 정한 순서를 받는다. 보낸 목록에 없는 내 프로젝트는 뒤로 붙여서,
+// 다른 탭에서 새 프로젝트가 생겨도 사라지지 않게 한다.
+export function reorderProjects(ownerId: string | null, ids: string[]): Promise<LocalProject[]> {
+  return serialized(async () => {
+    const database = await readDatabase();
+    const mine = database.projects.filter((project) => (ownerId === null ? !project.ownerId : project.ownerId === ownerId));
+    const ranked = [...ids.filter((id) => mine.some((project) => project.id === id)), ...mine.filter((project) => !ids.includes(project.id)).map((project) => project.id)];
+    for (const project of mine) project.order = ranked.indexOf(project.id);
+    await writeDatabase(database);
+    return structuredClone(mine.toSorted((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+  });
 }
 
 export async function getProject(id: string): Promise<LocalProject | null> {
@@ -264,8 +293,9 @@ export function saveMakerProfile(profile: MakerProfile, ownerId: string | null =
       database.profiles = { ...database.profiles, [ownerId]: { ...emptyProfile(), ...person } };
       for (const project of database.projects) {
         if (project.ownerId !== ownerId || !project.workflow) continue;
+        // updatedAt은 건드리지 않는다. 장비를 바꾼 것은 그 프로젝트를 작업한 게 아니라서,
+        // 여기서 시각을 올리면 목록 순서가 통째로 흔들린다.
         project.workflow.profile = { ...project.workflow.profile, ...person };
-        project.updatedAt = new Date().toISOString();
       }
     } else {
       database.profile = { ...emptyProfile(), ...person };

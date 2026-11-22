@@ -32,6 +32,8 @@ export default function ProjectWorkspace() {
   const [mode,setMode]=useState<"work"|"evaluate">("work");
   const [showProfile,setShowProfile]=useState(false);
   const [profileScope,setProfileScope]=useState<"project"|"account">("project");
+  const [renaming,setRenaming]=useState<string|null>(null);
+  const [dragId,setDragId]=useState<string|null>(null);
   const [profile,setProfile]=useState<MakerProfile>(emptyProfile());
   const [viewer,setViewer]=useState<ViewerInfo>({kind:"operator"});
   const [connectTab,setConnectTab]=useState<"claude"|"dev"|null>(null);
@@ -82,6 +84,30 @@ export default function ProjectWorkspace() {
   function toggleAgent(agent:AgentId) {if(!workflow)return;const next=workflow.activeAgents.includes(agent)?workflow.activeAgents.filter(a=>a!==agent):[...workflow.activeAgents,agent];if(!next.length){setError("함께 작업할 에이전트를 하나 이상 선택해주세요.");return;}if(channel===agent)setChannel("main");void action({action:"agents",agents:next});}
   const messages=project?.messages.filter(m=>!workshop||channel==="main"||(m.channel??"main")===channel)??[];
   const activeSpeaker=channel==="main"?"chief":channel;
+  // 이름은 목록에서 바로 고친다. 먼저 화면에 반영하고 서버가 거절하면 되돌린다.
+  async function renameTo(id:string,name:string) {
+    const trimmed=name.trim();setRenaming(null);
+    const before=projects.find(p=>p.id===id);
+    if(!before||!trimmed||trimmed===before.name)return;
+    setProjects(ps=>ps.map(p=>p.id===id?{...p,name:trimmed}:p));
+    try{
+      const r=await fetch("/api/projects/"+id,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({name:trimmed})});
+      if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error??"이름을 바꾸지 못했어요.");
+    }catch(e){setError(e instanceof Error?e.message:"이름을 바꾸지 못했어요.");setProjects(ps=>ps.map(p=>p.id===id?{...p,name:before.name}:p));}
+  }
+  // 끌어놓기와 Alt+방향키가 같은 길을 쓴다. 마우스를 못 쓰는 사람도 순서를 바꿀 수 있어야 한다.
+  async function moveProject(id:string,toIndex:number) {
+    const from=projects.findIndex(p=>p.id===id);
+    if(from<0)return;
+    const to=Math.max(0,Math.min(projects.length-1,toIndex));
+    if(from===to)return;
+    const next=[...projects];next.splice(to,0,...next.splice(from,1));
+    setProjects(next);
+    try{
+      const r=await fetch("/api/projects",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({order:next.map(p=>p.id)})});
+      if(!r.ok)throw new Error("순서를 저장하지 못했어요.");
+    }catch{setError("순서를 저장하지 못했어요. 새로고침하면 이전 순서로 돌아가요.");}
+  }
   // 프로젝트 없이도 열 수 있어야 한다. 프로젝트 안에서만 고칠 수 있으면 "장비는 한 번
   // 정해두고 계속 쓴다"가 성립하지 않는다. 프로젝트가 없으면 계정 프로필만 다룬다.
   const openProfile=async()=>{
@@ -107,10 +133,25 @@ export default function ProjectWorkspace() {
       <button className="brand" onClick={()=>switchProject(null)} disabled={!!busy} aria-label="달그락 대장간 · 새로운 아이디어로 이동"><img src="/characters/idle.png" alt=""/><span>달그락 대장간<small>생각을 손에 잡히게.</small></span></button>
       <button className="new-project" onClick={()=>switchProject(null)} disabled={!!busy}>＋ 새로운 아이디어</button>
       <button className="nav-caption projects-toggle" aria-expanded={preferences.projectsOpen} aria-controls="project-folders" onClick={toggleProjects}><span>{preferences.projectsOpen?"⌄":"›"} 프로젝트</span><span>{projects.length}{viewer.kind==="user"&&viewer.projectLimit?`/${viewer.projectLimit}`:""}</span></button>
-      {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" aria-label="프로젝트 목록">{projects.map(p=>{
+      {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" aria-label="프로젝트 목록">{projects.map((p,index)=>{
         const w=workflowFor(p);const progress=projectProgress(p);const expanded=preferences.expanded.includes(p.id);const active=p.id===selectedId;
         return <section className={"project-folder "+(active?"active-folder":"")} key={p.id}>
-          <div className="folder-heading"><button className="folder-toggle" aria-label={p.name+" 작업실 "+(expanded?"접기":"펼치기")} aria-expanded={expanded} aria-controls={"rooms-"+p.id} onClick={()=>toggleFolder(p.id)}>{expanded?"⌄":"›"}</button><button className="folder-name" aria-current={active?"page":undefined} disabled={!!busy} title={p.name} onClick={()=>switchProject(p.id)}><ProgressRing percent={progress.percent} blocked={progress.blocked}/><span>{p.name}<small>{progress.blocked?"꼭 고칠 것 · ":""}{phaseNames[w.phase]} · {progress.percent}%</small></span></button><button className="folder-delete" aria-label={p.name+" 삭제"} title="프로젝트 삭제" disabled={!!busy} onClick={()=>setDeleting(p)}>🗑</button></div>
+          <div className={"folder-heading"+(dragId===p.id?" dragging":"")} draggable={!renaming&&!busy}
+            onDragStart={e=>{setDragId(p.id);e.dataTransfer.effectAllowed="move";}}
+            onDragOver={e=>{if(dragId&&dragId!==p.id)e.preventDefault();}}
+            onDrop={e=>{e.preventDefault();if(dragId&&dragId!==p.id)void moveProject(dragId,index);setDragId(null);}}
+            onDragEnd={()=>setDragId(null)}>
+            <button className="folder-toggle" aria-label={p.name+" 작업실 "+(expanded?"접기":"펼치기")} aria-expanded={expanded} aria-controls={"rooms-"+p.id} onClick={()=>toggleFolder(p.id)}>{expanded?"⌄":"›"}</button>
+            {renaming===p.id
+              ? <input className="folder-rename" autoFocus defaultValue={p.name} maxLength={80} aria-label={p.name+" 이름 바꾸기"}
+                  onBlur={e=>void renameTo(p.id,e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();void renameTo(p.id,e.currentTarget.value);}if(e.key==="Escape"){e.preventDefault();setRenaming(null);}}}/>
+              : <button className="folder-name" aria-current={active?"page":undefined} disabled={!!busy} title={p.name+" · 두 번 누르면 이름 바꾸기, Alt+방향키로 순서 바꾸기"} onClick={()=>switchProject(p.id)}
+                  onDoubleClick={()=>setRenaming(p.id)}
+                  onKeyDown={e=>{if(e.key==="F2"){e.preventDefault();setRenaming(p.id);}if(e.altKey&&(e.key==="ArrowUp"||e.key==="ArrowDown")){e.preventDefault();void moveProject(p.id,index+(e.key==="ArrowUp"?-1:1));}}}>
+                  <ProgressRing percent={progress.percent} blocked={progress.blocked}/><span>{p.name}<small>{progress.blocked?"꼭 고칠 것 · ":""}{phaseNames[w.phase]} · {progress.percent}%</small></span></button>}
+            <button className="folder-rename-button" aria-label={p.name+" 이름 바꾸기"} title="이름 바꾸기" disabled={!!busy} onClick={()=>setRenaming(p.id)}>✏️</button>
+            <button className="folder-delete" aria-label={p.name+" 삭제"} title="프로젝트 삭제" disabled={!!busy} onClick={()=>setDeleting(p)}>🗑</button></div>
           {expanded&&<nav className="rooms project-rooms" id={"rooms-"+p.id} aria-label={p.name+" 작업실"}><button disabled={!!busy} className={active&&channel==="main"?"selected":""} aria-current={active&&channel==="main"?"page":undefined} onClick={()=>switchProject(p.id,"main")}>⌂ {w.phase==="workshop"?"메인 대장간":"대장과 아이디어 나누기"}</button>{w.phase==="workshop"&&Array.from(new Set<AgentId>(["chief",...w.activeAgents])).map(a=><button key={a} disabled={!!busy} className={active&&channel===a?"selected":""} aria-current={active&&channel===a?"page":undefined} onClick={()=>switchProject(p.id,a)}><span className={"agent-dot dot-"+a}/>{AGENTS[a].name}<small>작업실</small></button>)}</nav>}
         </section>;
       })}{!projects.length&&!loading&&<p className="muted empty-projects">첫 아이디어를 이야기하면 프로젝트 폴더가 생겨요.</p>}</nav>}

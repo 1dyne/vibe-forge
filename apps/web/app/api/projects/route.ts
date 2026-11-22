@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runDesignAgent } from "../../../lib/design-agent";
-import { QuotaError, createProject, getMakerProfile, limits, listProjects } from "../../../lib/local-project-store";
+import { QuotaError, createProject, getMakerProfile, limits, listProjects, reorderProjects } from "../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../lib/request-security";
 import { canUseWebAi, getViewer, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../lib/viewer";
 import { AttachmentsSchema } from "../../../lib/attachments";
@@ -37,5 +37,16 @@ async function handlePOST(request: NextRequest) {
   }
 }
 
+// 끌어놓아 정한 목록 순서를 저장한다. 보낸 순서대로 0..n-1을 매긴다.
+async function handlePATCH(request: NextRequest) {
+  if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
+  const viewer = await getViewer(request);
+  if (!viewer) return unauthorized();
+  const parsed = z.object({ order: z.array(z.string().max(60)).max(200) }).strict().safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "순서를 확인해주세요." }, { status: 400 });
+  return NextResponse.json({ projects: await reorderProjects(ownerIdOf(viewer), parsed.data.order) });
+}
+
 export const GET = withViewerVault(handleGET);
 export const POST = withViewerVault(handlePOST);
+export const PATCH = withViewerVault(handlePATCH);
