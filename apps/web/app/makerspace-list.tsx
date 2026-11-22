@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { MakerProfile, MakerSpace } from "../lib/project-types";
 import { emptyProfile, personPart } from "../lib/workflow";
+import { IconTrash } from "./icons";
 
 // 자주 가는 메이커스페이스를 계정에 등록해둔다. 예약을 여기서 대신 걸어주지는 않는다.
 // 국내 공간들은 예약 창구가 제각각이라(메이크올·지자체 사이트·전화) 공통으로 부를
@@ -55,7 +56,7 @@ export default function MakerspaceList() {
         {space.note && <small className="space-line">{space.note}</small>}
         {space.url && <a href={space.url} target="_blank" rel="noreferrer noopener">예약·안내 페이지 ↗</a>}
       </div>
-      <button disabled={busy} aria-label={`${space.name} 지우기`} onClick={() => void save(spaces.filter((s) => s.id !== space.id))}>🗑</button>
+      <button disabled={busy} aria-label={`${space.name} 지우기`} onClick={() => void save(spaces.filter((s) => s.id !== space.id))}><IconTrash/></button>
     </li>)}</ul>}
     <div className="space-form">
       <label>이름<input className="profile-input" maxLength={60} placeholder="예: 마포 무한상상실" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>

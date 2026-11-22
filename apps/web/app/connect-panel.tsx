@@ -4,6 +4,7 @@ import type { DevProfile, LocalProject } from "../lib/project-types";
 import { CODING_EXPERIENCE, DEV_INSTALL_OPTIONS, DEV_TOOLS, claudeProjectInstructions, devProfileMissing, devSetupSteps, emptyDevProfile } from "../lib/dev-handoff";
 import { workbenchDownloadUrl } from "../lib/workbench";
 import { workflowFor } from "../lib/workflow";
+import { IconLaptop, IconLink } from "./icons";
 
 type Me = { kind: "operator" | "user"; connectorUrl: string | null; clients: Array<{ name: string; version: string; lastSeenAt: string }> };
 
@@ -47,8 +48,8 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
     <section className="profile-modal connect-modal" role="dialog" aria-modal="true" aria-label="연결" onClick={(e) => e.stopPropagation()}>
       <header><h2>{project.name}</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
       <div className="connect-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "claude"} className={tab === "claude" ? "active" : ""} onClick={() => onTab("claude")}>🔗 Claude 연결</button>
-        <button role="tab" aria-selected={tab === "dev"} className={tab === "dev" ? "active" : ""} onClick={() => onTab("dev")}>💻 개발 연결</button>
+        <button role="tab" aria-selected={tab === "claude"} className={tab === "claude" ? "active" : ""} onClick={() => onTab("claude")}><IconLink/> Claude 연결</button>
+        <button role="tab" aria-selected={tab === "dev"} className={tab === "dev" ? "active" : ""} onClick={() => onTab("dev")}><IconLaptop/> 개발 연결</button>
       </div>
 
       {tab === "claude" && <>

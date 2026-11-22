@@ -247,3 +247,6 @@ tr.is-new{animation:new-flash 1.6s ease-out 1}
 @keyframes new-flash{0%{background:#f6e2bd}60%{background:#fdf6e9}100%{background:transparent}}
 tr.is-new{animation-name:new-flash-row}
 @keyframes new-flash-row{0%{box-shadow:inset 3px 0 0 #d98b3a}100%{box-shadow:inset 3px 0 0 #e8d6b4}}
+/* 손으로 그린 아이콘. 글자 옆에 설 때 글자와 같은 색·굵기로 보이도록 선을 글자색에 맡긴다. */
+.ink-icon{flex-shrink:0;vertical-align:-2px;margin-right:2px}
+.folder-rename-button .ink-icon,.folder-delete .ink-icon,.space-items button .ink-icon{margin:0}
