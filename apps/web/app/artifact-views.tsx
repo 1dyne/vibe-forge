@@ -187,10 +187,10 @@ export function downloadBom(project: LocalProject) {
   const url=URL.createObjectURL(new Blob([html],{type:"text/html;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="dalgeurak-bom.html";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-export function TaskView({project, onAction, busy}: {project:LocalProject;onAction:(input:Record<string,unknown>)=>void;busy:boolean}) {
+export function TaskView({project, onAction, busy, ownerName}: {project:LocalProject;onAction:(input:Record<string,unknown>)=>void;busy:boolean;ownerName:string}) {
   const [answers,setAnswers]=useState<Record<string,string>>({});
   return <><h3>함께 할 다음 작업</h3><table><thead><tr><th>담당</th><th>작업과 결과</th></tr></thead><tbody>
-    {project.tasks.map(t=><tr key={t.id}><td><span className={`pill ${t.status === "completed" ? "pass" : "unknown"}`}>{t.status==="completed"?"결과 제출됨":"사용자"}</span></td><td><strong>{t.title}</strong><p>{t.plain}</p>{t.status==="ready"&&<div className="evidence-input"><textarea aria-label={`${t.title} 결과`} value={answers[t.id]??""} placeholder="측정값, IDE 오류, 진행 결과를 알려주세요" onChange={e=>setAnswers({...answers,[t.id]:e.target.value})}/><button disabled={busy||!answers[t.id]?.trim()} onClick={()=>onAction({action:"evidence",taskId:t.id,text:answers[t.id]})}>팀에 결과 공유</button></div>}</td></tr>)}
+    {project.tasks.map(t=><tr key={t.id}><td><span className={`pill ${t.status === "completed" ? "pass" : "unknown"}`}>{t.status==="completed"?"결과 제출됨":ownerName}</span></td><td><strong>{t.title}</strong><p>{t.plain}</p>{t.status==="ready"&&<div className="evidence-input"><textarea aria-label={`${t.title} 결과`} value={answers[t.id]??""} placeholder="결과나 측정값" onChange={e=>setAnswers({...answers,[t.id]:e.target.value})}/><button disabled={busy||!answers[t.id]?.trim()} onClick={()=>onAction({action:"evidence",taskId:t.id,text:answers[t.id]})}>팀에 결과 공유</button></div>}</td></tr>)}
     {workflowFor(project).activeAgents.map(a=><tr key={a}><td><span className="pill">{AGENTS[a].name}</span></td><td>{a==="hw"?"회로·펌웨어 검토, 측정 결과로 원인 좁히기":a==="sw"?"웹·앱 코드 제안 및 완성된 결과 검사":a==="me"?"부품 실측 요청과 구조·배치 조정":"외형·착용감·안전성 충돌 검토"}</td></tr>)}
   </tbody></table><p className="muted">실행 결과는 모든 작업실에 공유됩니다. 측정값을 제출해도 검증 상태가 자동으로 합격 처리되지는 않습니다.</p></>;
 }
