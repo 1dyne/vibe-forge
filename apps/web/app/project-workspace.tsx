@@ -7,7 +7,8 @@ import WorkbenchPanel from "./workbench-panel";
 import ConnectPanel from "./connect-panel";
 import AccountPanel from "./account-panel";
 import DeleteProjectDialog from "./delete-project-dialog";
-import ProgressPanel from "./progress-panel";
+import ProgressPanel, { ProgressRing } from "./progress-panel";
+import { projectProgress } from "../lib/progress";
 import { CHECKLIST } from "../lib/checklist";
 import { ResizeHandle, useWorkspaceLayout, layoutLimits } from "./workspace-layout";
 import { useWorkspacePreferences } from "./workspace-preferences";
@@ -87,9 +88,9 @@ export default function ProjectWorkspace() {
       <button className="new-project" onClick={()=>switchProject(null)} disabled={!!busy}>＋ 새로운 아이디어</button>
       <button className="nav-caption projects-toggle" aria-expanded={preferences.projectsOpen} aria-controls="project-folders" onClick={toggleProjects}><span>{preferences.projectsOpen?"⌄":"›"} 프로젝트</span><span>{projects.length}{viewer.kind==="user"&&viewer.projectLimit?`/${viewer.projectLimit}`:""}</span></button>
       {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" aria-label="프로젝트 목록">{projects.map(p=>{
-        const w=workflowFor(p);const expanded=preferences.expanded.includes(p.id);const active=p.id===selectedId;
+        const w=workflowFor(p);const progress=projectProgress(p);const expanded=preferences.expanded.includes(p.id);const active=p.id===selectedId;
         return <section className={"project-folder "+(active?"active-folder":"")} key={p.id}>
-          <div className="folder-heading"><button className="folder-toggle" aria-label={p.name+" 작업실 "+(expanded?"접기":"펼치기")} aria-expanded={expanded} aria-controls={"rooms-"+p.id} onClick={()=>toggleFolder(p.id)}>{expanded?"⌄":"›"}</button><button className="folder-name" aria-current={active?"page":undefined} disabled={!!busy} title={p.name} onClick={()=>switchProject(p.id)}><span aria-hidden="true">▱</span><span>{p.name}<small>{phaseNames[w.phase]}</small></span></button><button className="folder-delete" aria-label={p.name+" 삭제"} title="프로젝트 삭제" disabled={!!busy} onClick={()=>setDeleting(p)}>🗑</button></div>
+          <div className="folder-heading"><button className="folder-toggle" aria-label={p.name+" 작업실 "+(expanded?"접기":"펼치기")} aria-expanded={expanded} aria-controls={"rooms-"+p.id} onClick={()=>toggleFolder(p.id)}>{expanded?"⌄":"›"}</button><button className="folder-name" aria-current={active?"page":undefined} disabled={!!busy} title={p.name} onClick={()=>switchProject(p.id)}><ProgressRing percent={progress.percent} blocked={progress.blocked}/><span>{p.name}<small>{progress.blocked?"꼭 고칠 것 · ":""}{phaseNames[w.phase]} · {progress.percent}%</small></span></button><button className="folder-delete" aria-label={p.name+" 삭제"} title="프로젝트 삭제" disabled={!!busy} onClick={()=>setDeleting(p)}>🗑</button></div>
           {expanded&&<nav className="rooms project-rooms" id={"rooms-"+p.id} aria-label={p.name+" 작업실"}><button disabled={!!busy} className={active&&channel==="main"?"selected":""} aria-current={active&&channel==="main"?"page":undefined} onClick={()=>switchProject(p.id,"main")}>⌂ {w.phase==="workshop"?"메인 대장간":"대장과 아이디어 나누기"}</button>{w.phase==="workshop"&&Array.from(new Set<AgentId>(["chief",...w.activeAgents])).map(a=><button key={a} disabled={!!busy} className={active&&channel===a?"selected":""} aria-current={active&&channel===a?"page":undefined} onClick={()=>switchProject(p.id,a)}><span className={"agent-dot dot-"+a}/>{AGENTS[a].name}<small>작업실</small></button>)}</nav>}
         </section>;
       })}{!projects.length&&!loading&&<p className="muted empty-projects">첫 아이디어를 이야기하면 프로젝트 폴더가 생겨요.</p>}</nav>}
