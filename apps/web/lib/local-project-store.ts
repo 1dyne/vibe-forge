@@ -198,7 +198,10 @@ export function createProject(idea: string, plan: AgentPlan, mode: LocalProject[
     // 새 프로젝트는 '사람'에 붙은 것만 물려받는다. 지난 프로젝트의 예산·기한·용도가
     // 따라 들어오면 안 된다.
     const savedProfile = profileFor(database, owner.ownerId ?? null);
-    if (savedProfile) project.workflow.profile = { ...emptyProfile(), ...personPart(savedProfile) };
+    if (savedProfile) {
+      project.workflow.profile = { ...emptyProfile(), ...personPart(savedProfile) };
+      if (savedProfile.devProfile) project.workflow.devProfile = savedProfile.devProfile;
+    }
     database.projects.push(project);
     await writeDatabase(database);
     return structuredClone(project);
@@ -296,6 +299,7 @@ export function saveMakerProfile(profile: MakerProfile, ownerId: string | null =
         // updatedAt은 건드리지 않는다. 장비를 바꾼 것은 그 프로젝트를 작업한 게 아니라서,
         // 여기서 시각을 올리면 목록 순서가 통째로 흔들린다.
         project.workflow.profile = { ...project.workflow.profile, ...person };
+        if (person.devProfile) project.workflow.devProfile = person.devProfile;
       }
     } else {
       database.profile = { ...emptyProfile(), ...person };

@@ -138,6 +138,9 @@ export type MakerSpace = { id: string; name: string; where: string; printers: st
 export type MakerProfile = {
   tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string;
   makerspaces?: MakerSpace[];
+  // 코딩 경험과 즐겨 쓰는 도구도 사람에게 붙는다. 프로젝트마다 다시 물을 이유가 없다.
+  // 영역별로 따로 둔다: 웹은 짜지만 펌웨어는 처음인 사람이 흔하다(firmwareExperience와 별개).
+  devProfile?: DevProfile;
   // Extended checklist; optional so older projects keep loading.
   solderingSkill?: "unanswered" | "none" | "tried" | "comfortable";
   printerAccess?: "unanswered" | "own" | "makerspace" | "service" | "none";

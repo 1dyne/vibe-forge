@@ -30,6 +30,7 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
   const [me, setMe] = useState<Me | null>(null);
   const workflow = workflowFor(project);
   const [dev, setDev] = useState<DevProfile>(workflow.devProfile ?? emptyDevProfile());
+  const [editing, setEditing] = useState(false);
   useEffect(() => {
     const load = () => fetch("/api/me", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((b) => b && setMe(b)).catch(() => {});
     void load();
@@ -66,13 +67,27 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
       </>}
 
       {tab === "dev" && <>
-        <p>소프트웨어가 필요하면 SW 달그락이 명세서를 만들고, 실제 코드는 Claude Code나 Codex에서 함께 만들어요. 처음이어도 괜찮아요. 아래 체크리스트로 설명 수준을 맞춰요.</p>
+        {/* 같은 화면으로 비개발자와 개발자를 모두 맞추려다 둘 다 얕아졌다. 들머리에서 갈라
+            설명의 깊이를 바꾼다. 기능을 숨기지는 않는다 — 실력이 늘면 계정에서 고치면 되고,
+            숨겨두면 늘어난 사람이 갇힌 느낌을 받는다. */}
+        <p>{saved.codingExperience === "independent"
+          ? "SW 달그락이 명세서(SPEC.md·CLAUDE.md·AGENTS.md)를 만들어 둡니다. 내려받아 Claude Code나 Codex에서 바로 시작하세요."
+          : saved.codingExperience === "guided"
+          ? "SW 달그락이 명세서를 만들고, 설치와 연결은 순서대로 짚어드려요. 막히는 곳은 그대로 알려주시면 됩니다."
+          : "소프트웨어가 필요하면 SW 달그락이 명세서를 만들고, 실제 코드는 Claude Code나 Codex에서 함께 만들어요. 처음이어도 괜찮아요. 설치부터 한 줄씩 같이 갑니다."}</p>
+        {saved.confirmed && !editing && <div className="dev-summary">
+          <span>{CODING_EXPERIENCE[saved.codingExperience]} · {DEV_TOOLS[saved.tool]} · {{ unanswered: "OS 미정", mac: "Mac", windows: "Windows", linux: "Linux" }[saved.os]}</span>
+          <button onClick={() => setEditing(true)}>바꾸기</button>
+          <small className="muted">계정에 저장돼 있어서 다음 프로젝트에서는 다시 묻지 않아요.</small>
+        </div>}
+        {(editing || !saved.confirmed) && <>
         <fieldset><legend>코딩 경험</legend>{(["none", "guided", "independent"] as const).map((v) => <label className="radio-option" key={v}><input type="radio" name="coding" checked={dev.codingExperience === v} onChange={() => setDev({ ...dev, codingExperience: v })} />{CODING_EXPERIENCE[v]}</label>)}</fieldset>
         <fieldset><legend>쓸 도구</legend><div className="choice-row">{(["claude_code", "codex", "undecided"] as const).map((v) => <label key={v} className={dev.tool === v ? "on" : ""}><input type="radio" name="tool" checked={dev.tool === v} onChange={() => setDev({ ...dev, tool: v })} />{DEV_TOOLS[v]}</label>)}</div><small className="muted">Claude Code는 Claude 구독, Codex는 ChatGPT 계정으로 써요. 모르겠으면 SW 달그락이 추천해요.</small></fieldset>
         <fieldset><legend>내 컴퓨터</legend><div className="choice-row">{(["mac", "windows", "linux"] as const).map((v) => <label key={v} className={dev.os === v ? "on" : ""}><input type="radio" name="os" checked={dev.os === v} onChange={() => setDev({ ...dev, os: v })} />{{ mac: "Mac", windows: "Windows", linux: "Linux" }[v]}</label>)}</div></fieldset>
         <fieldset><legend>이미 설치된 것</legend><div className="tool-checks">{DEV_INSTALL_OPTIONS.map((t) => <label key={t}><input type="checkbox" checked={dev.installed.includes(t)} onChange={(e) => setDev({ ...dev, confirmed: true, installed: e.target.checked ? [...dev.installed, t] : dev.installed.filter((x) => x !== t) })} />{t}</label>)}</div><label className="none-check"><input type="checkbox" checked={dev.confirmed && !dev.installed.length} onChange={(e) => setDev({ ...dev, installed: [], confirmed: e.target.checked })} />아무것도 설치하지 않았어요</label></fieldset>
-        <button className="primary" disabled={busy} onClick={() => onAction({ action: "dev_profile", devProfile: dev })}>체크리스트 저장</button>
+        <button className="primary" disabled={busy} onClick={() => { setEditing(false); onAction({ action: "dev_profile", devProfile: dev }); }}>체크리스트 저장</button>
         {missing.length > 0 && <p className="muted">저장하면 맞춤 설치 순서가 나와요. 아직 필요한 것: {missing.join(" · ")}</p>}
+        </>}
 
         <h3 className="connect-subtitle">명세서</h3>
         {specFiles.length ? <div className="spec-files">{specFiles.map((file) => <a key={file.id} href={workbenchDownloadUrl(project.id, `file:${file.id}`)} download={file.filename}>↓ {file.filename}</a>)}</div>

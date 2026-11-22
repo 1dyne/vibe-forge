@@ -66,6 +66,15 @@ describe("제작 프로필의 범위", () => {
     expect(after?.workflow?.profile.tools).toContain("3D 프린터");
   });
 
+  it("코딩 경험과 즐겨 쓰는 도구도 계정에 남아 다음 프로젝트가 물려받는다", async () => {
+    await saveMakerProfile({ ...filled(), devProfile: { codingExperience: "independent", tool: "claude_code", os: "mac", installed: ["Node.js"], confirmed: true } }, OWNER);
+    const saved = await getMakerProfile(OWNER);
+    expect(saved?.devProfile?.tool).toBe("claude_code");
+    const project = await createProject("개발 붙은 아이디어", plan, "mock", [], { ownerId: OWNER });
+    expect(project.workflow?.devProfile?.codingExperience).toBe("independent");
+    expect(project.workflow?.devProfile?.os).toBe("mac");
+  });
+
   it("남의 프로젝트는 건드리지 않는다", async () => {
     const other = await createProject("남의 프로젝트", plan, "mock", [], { ownerId: "owner-2" });
     await saveMakerProfile({ ...filled(), tools: ["니퍼"] }, OWNER);

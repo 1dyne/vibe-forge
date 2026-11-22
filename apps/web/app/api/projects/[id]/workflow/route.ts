@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ProfileSchema } from "../../../../../lib/profile-schema";
-import { getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
+import { getMakerProfile, getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
-import { transition, workflowFor } from "../../../../../lib/workflow";
+import { emptyProfile, transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
@@ -160,6 +160,13 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
       p.workflow = w;
     }, project.designRevision);
     if (input.action === "profile") await saveMakerProfile(input.profile as MakerProfile, ownerIdOf(viewer));
+    // 코딩 경험과 즐겨 쓰는 도구도 계정에 올린다. 프로젝트마다 같은 걸 다시 묻지 않도록.
+    // 이미 저장된 사람 쪽 값 위에 얹어야 장비·지역이 지워지지 않는다.
+    if (input.action === "dev_profile") {
+      const owner = ownerIdOf(viewer);
+      const account = (await getMakerProfile(owner)) ?? emptyProfile();
+      await saveMakerProfile({ ...account, devProfile: input.devProfile as DevProfile }, owner);
+    }
     return NextResponse.json({ project: updated });
   } catch (error) {
     const message = error instanceof Error ? error.message : "요청에 실패했습니다.";

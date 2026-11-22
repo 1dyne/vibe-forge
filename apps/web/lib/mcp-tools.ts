@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { buildFromSubmission } from "./build-pipeline";
 import { PlanSchema } from "./design-agent";
-import { applyAgentPlan, createProject, getProject, listProjects, mutateProject, saveMakerProfile } from "./local-project-store";
+import { applyAgentPlan, createProject, getMakerProfile, getProject, listProjects, mutateProject, saveMakerProfile } from "./local-project-store";
 import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile } from "./project-types";
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
@@ -16,7 +16,7 @@ import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
 import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
-import { TOOL_OPTIONS, intakeMissing, transition, workflowFor } from "./workflow";
+import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
 import { checkHousing, finalizeHousing, FAB_LABEL } from "./housing";
 import { checkPower, computePower, suggestedLoads, type PowerInput } from "./power";
@@ -1188,6 +1188,9 @@ TOOLS.push(
       const { projectId: id, ...profile } = DevProfileInput.parse(input) as DevProfile & { projectId: string };
       await ownedProject(id, context);
       const updated = await mutateProject(id, (p) => { const w = workflowFor(p); w.devProfile = profile; p.workflow = w; });
+      // 계정에도 올려 다음 프로젝트가 같은 것을 다시 묻지 않게 한다.
+      const account = (await getMakerProfile(context.user.id)) ?? emptyProfile();
+      await saveMakerProfile({ ...account, devProfile: profile }, context.user.id);
       const missing = devProfileMissing(profile);
       return stored(updated, context, missing.length ? `개발 체크리스트를 저장했어요. 아직 필요한 것: ${missing.join(" · ")}` : "개발 체크리스트를 저장했어요.");
     }

@@ -22,7 +22,14 @@ export const PersonProfileSchema = z.object({
   printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
   region: z.string().max(60).optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
-  makerspaces: z.array(MakerSpaceSchema).max(10).optional()
+  makerspaces: z.array(MakerSpaceSchema).max(10).optional(),
+  devProfile: z.object({
+    codingExperience: z.enum(["unanswered", "none", "guided", "independent"]),
+    tool: z.enum(["undecided", "claude_code", "codex"]),
+    os: z.enum(["unanswered", "mac", "windows", "linux"]),
+    installed: z.array(z.string().max(40)).max(12),
+    confirmed: z.boolean()
+  }).strict().optional()
 }).strict();
 
 // 프로젝트마다 달라지는 값까지 포함한 전체 프로필.
