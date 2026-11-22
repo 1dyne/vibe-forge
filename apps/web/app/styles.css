@@ -209,3 +209,26 @@
 /* 하단에 성격이 다른 버튼 여덟 개가 평평하게 쌓여 있어 무엇이 무엇인지 읽히지 않았다.
    계정에 속한 것과 연결에 속한 것을 작은 머리말로 갈라준다. */
 .nav-group{display:block;width:100%;font-size:9px;letter-spacing:.08em;color:#9aa49d;margin:8px 0 2px}
+
+/* 달그락은 다섯이 모두 같은 그림을 쓴다. 이름표 글자색만 달라서 어느 달그락인지
+   알아보려면 글자를 읽어야 했고, 대장과 HW는 그 색마저 같았다. 색만 바꿔 한눈에
+   구분되게 한다 — 어느 달그락이 말하고 있는지가 곧 지금 어느 일을 하는 중인지다.
+   민트(대장)를 기준으로 색상환을 돌린다. 윤곽선은 검정에 가까워 거의 영향이 없다. */
+.avatar-hw>img{filter:hue-rotate(-150deg) saturate(1.3)}
+.avatar-sw>img{filter:hue-rotate(85deg) saturate(.9)}
+.avatar-me>img{filter:hue-rotate(-105deg) saturate(.85)}
+.avatar-id>img{filter:hue-rotate(165deg) saturate(.9)}
+.avatar-hw b{background:#f3e0d1;color:#8a4e2c}
+.dot-chief{background:#548b7c}
+.dot-hw{background:#c07a4e}
+/* 말하는 사람 이름도 같은 색을 쓴다. 아바타와 이름이 따로 놀면 색이 기억에 안 남는다. */
+.chat-message.agent-chief .message-meta strong{color:#356c58}
+.chat-message.agent-hw .message-meta strong{color:#8a4e2c}
+.chat-message.agent-sw .message-meta strong{color:#686381}
+.chat-message.agent-me .message-meta strong{color:#886d42}
+.chat-message.agent-id .message-meta strong{color:#9b5d7d}
+.agent-pill-chief{background:#d5e7dd;color:#356c58}
+.agent-pill-hw{background:#f3e0d1;color:#8a4e2c}
+.agent-pill-sw{background:#e7e6f1;color:#686381}
+.agent-pill-me{background:#efdfc7;color:#886d42}
+.agent-pill-id{background:#eddde5;color:#9b5d7d}

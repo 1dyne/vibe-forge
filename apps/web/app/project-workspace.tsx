@@ -151,7 +151,7 @@ export default function ProjectWorkspace() {
                   onDoubleClick={()=>setRenaming(p.id)}
                   onKeyDown={e=>{if(e.key==="F2"){e.preventDefault();setRenaming(p.id);}if(e.altKey&&(e.key==="ArrowUp"||e.key==="ArrowDown")){e.preventDefault();void moveProject(p.id,index+(e.key==="ArrowUp"?-1:1));}}}>
                   <ProgressRing percent={progress.percent} blocked={progress.blocked}/><span>{p.name}<small>{progress.blocked?"꼭 고칠 것 · ":""}{phaseNames[w.phase]} · {progress.percent}%</small></span></button>}
-            <button className="folder-rename-button" aria-label={p.name+" 이름 바꾸기"} title="이름 바꾸기" disabled={!!busy} onClick={()=>setRenaming(p.id)}>✏️</button>
+            <button className="folder-rename-button" aria-label={p.name+" 이름 바꾸기"} title="이름 바꾸기" disabled={!!busy} onClick={()=>setRenaming(p.id)}>✎</button>
             <button className="folder-delete" aria-label={p.name+" 삭제"} title="프로젝트 삭제" disabled={!!busy} onClick={()=>setDeleting(p)}>🗑</button></div>
           {expanded&&<nav className="rooms project-rooms" id={"rooms-"+p.id} aria-label={p.name+" 작업실"}><button disabled={!!busy} className={active&&channel==="main"?"selected":""} aria-current={active&&channel==="main"?"page":undefined} onClick={()=>switchProject(p.id,"main")}>⌂ {w.phase==="workshop"?"메인 대장간":"대장과 아이디어 나누기"}</button>{w.phase==="workshop"&&Array.from(new Set<AgentId>(["chief",...w.activeAgents])).map(a=><button key={a} disabled={!!busy} className={active&&channel===a?"selected":""} aria-current={active&&channel===a?"page":undefined} onClick={()=>switchProject(p.id,a)}><span className={"agent-dot dot-"+a}/>{AGENTS[a].name}<small>작업실</small></button>)}</nav>}
         </section>;
@@ -167,7 +167,7 @@ export default function ProjectWorkspace() {
       <div className="chat-scroll" role="log" aria-label="프로젝트 대화" aria-live="polite">
         {!project&&<div className="welcome"><Avatar large/><p className="eyebrow">YOUR IDEA, OUR NEXT PROJECT</p><h2>무엇을 만들어볼까요?</h2>{connectorOnly?<p>대화는 내 Claude에서 이어가요.<br/>Claude에게 아이디어를 말하고 “달그락 대장간에 프로젝트로 만들어줘”라고 하면 여기에 폴더가 생겨요.</p>:<p>아직 다 정해지지 않아도 괜찮아요.<br/>대장 달그락과 이야기하며 첫 설계를 시작해보세요.</p>}{!connectorOnly&&<div className="idea-prompts">{["내 팔에 앉는 부엉이 반려 로봇","식물의 상태를 알려주는 화분","책상 위 작은 집중 타이머"].map(s=><button key={s} onClick={()=>setText(s)}>{s} ↗</button>)}</div>}</div>}
         {project&&<div className="project-intro"><span className="pill">{phaseNames[phase]}</span><p>{project.oneLiner}</p></div>}
-        {messages.map(m=><article key={m.id} className={"chat-message "+m.role}>
+        {messages.map(m=><article key={m.id} className={"chat-message "+m.role+(m.role==="assistant"?" agent-"+(m.agent??"chief"):"")}>
           {m.role==="assistant"?<Avatar agent={m.agent??"chief"}/>:<span className="user-avatar">나</span>}
           <div className="message-body"><div className="message-meta"><strong>{m.role==="user"?"나":AGENTS[m.agent??"chief"].name}</strong>{m.mode==="evaluate"&&<span className="pill unknown">Evaluator</span>}{workshop&&channel==="main"&&m.channel&&m.channel!=="main"&&<small>{AGENTS[m.channel].name} 작업실에서 공유</small>}<time>{new Date(m.createdAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</time></div><div className="message-text">{m.text}</div>{m.attachments?.length?<div className="message-images">{m.attachments.map((a,i)=><a href={a.dataUrl} download={a.name} key={i}><img src={a.dataUrl} alt={a.name}/><span>{a.name}</span></a>)}</div>:null}{m.shared&&workshop&&<span className="shared-tag">↗ 팀 공통 기록에 공유됨</span>}</div>
         </article>)}
