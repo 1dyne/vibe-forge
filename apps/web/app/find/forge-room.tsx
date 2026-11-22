@@ -70,7 +70,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       el.appendChild(renderer.domElement);
       const scene = new three.Scene();
       const st = STYLE[village] ?? STYLE.kkomul;
-      const stage = fires.reduce((m, f) => Math.max(m, f.stage), 1) as 1 | 2 | 3;
+      const stage = fires.reduce<1 | 2 | 3>((m, f) => (f.stage > m ? f.stage : m), 1);
       const W = [6, 7.4, 9][stage - 1], D = [5, 6, 7][stage - 1], H = 3.4;
       const latest = fires[0]?.color ?? "#FF8F3F";
       const anim: Array<(t: number) => void> = [];
