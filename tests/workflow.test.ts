@@ -64,6 +64,17 @@ describe("persisted approval and team workflow",()=>{
     const task=p.tasks.find(t=>t.kind==="measure")!;
     p=(await act(p,{action:"evidence",taskId:task.id,text:"4.9 V 측정"})).project;
     expect(teamContext(p).evidence[0].text).toBe("4.9 V 측정");
+    // 권장하는 일을 사람이 안 할 수 있다. 건너뛰면 지우지 않고 '확인 안 한 자리'로 남긴다.
+    const left=p.tasks.find(t=>t.status==="ready")!;
+    p=(await act(p,{action:"task_mark",taskId:left.id,mark:"skipped",note:"장비가 없어요"})).project;
+    expect(p.tasks.find(t=>t.id===left.id)?.status).toBe("skipped");
+    expect(p.tasks.find(t=>t.id===left.id)?.skipNote).toBe("장비가 없어요");
+    // 마음이 바뀌면 다시 할 일로 되돌릴 수 있고, 되돌리면 건너뛴 기록도 함께 지워진다.
+    p=(await act(p,{action:"task_mark",taskId:left.id,mark:"ready"})).project;
+    expect(p.tasks.find(t=>t.id===left.id)?.status).toBe("ready");
+    expect(p.tasks.find(t=>t.id===left.id)?.skipNote).toBeUndefined();
+    p=(await act(p,{action:"task_mark",taskId:left.id,mark:"checked"})).project;
+    expect(p.tasks.find(t=>t.id===left.id)?.status).toBe("checked");
     expect(p.build?.evaluator.hw.verdict).toBe("unknown");
     p=(await act(p,{action:"reopen"})).project;
     expect(p.workflow?.circuitApprovedAt).toBeNull();

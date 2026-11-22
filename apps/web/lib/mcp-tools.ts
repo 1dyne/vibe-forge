@@ -350,6 +350,8 @@ function summarize(project: LocalProject, context: ToolContext) {
     team: workflow.activeAgents,
     slots: project.slots.map(({ key, label, status, valueText, assumption, acknowledged }) => ({ key, label, status, valueText, assumption, acknowledged })),
     openTasks: project.tasks.filter((task) => task.status === "ready").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
+    // 권장했지만 사람이 하지 않고 넘어간 일. 설계를 다시 볼 때와 문제가 생겼을 때 여기부터 의심한다.
+    skippedTasks: project.tasks.filter((task) => task.status === "skipped").map(({ id, kind, title, plain, skipNote }) => ({ id, kind, title, plain, note: skipNote ?? "" })),
     circuit: project.build ? {
       status: project.build.status, board: project.build.blueprint.board, supplyVoltage: project.build.blueprint.supplyVoltage,
       components: project.build.blueprint.components.map(({ ref, valueOrModel }) => ({ ref, valueOrModel, purchase: workflow.purchases[ref] ?? "needed" })),
@@ -642,7 +644,10 @@ export const TOOLS: ToolDefinition[] = [
         p.build = build;
         p.stage = "spec";
         p.lastAgentMode = "live";
-        p.tasks = p.tasks.filter((task) => task.status === "completed" || !["measure", "run_firmware"].includes(task.kind));
+        // 새 회로가 오면 손대지 않은(ready) 계측·펌웨어 작업은 새 목록으로 갈음된다.
+        // 사람이 내린 판단(결과 제출·확인·건너뜀)은 지우지 않는다. 특히 '건너뜀'을 지우면
+        // 확인하지 않고 지나간 자리가 흔적 없이 사라져, 문제가 생겨도 되짚을 수 없다.
+        p.tasks = p.tasks.filter((task) => task.status !== "ready" || !["measure", "run_firmware"].includes(task.kind));
         const evaluatorTasks = [
           ...build.evaluator.hw.requiredMeasurements.map((plain, index) => ({ kind: "measure" as const, title: `회로 계측 ${index + 1}`, plain })),
           ...build.evaluator.sw.requiredRuns.map((plain, index) => ({ kind: "run_firmware" as const, title: `펌웨어 확인 ${index + 1}`, plain }))

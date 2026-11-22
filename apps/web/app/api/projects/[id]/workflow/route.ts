@@ -24,6 +24,7 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve_mockup") }), z.object({ action: z.literal("enter_workshop") }),
   z.object({ action: z.literal("reopen") }),
   z.object({ action: z.literal("evidence"), taskId: z.string(), text: z.string().trim().min(1).max(3000) }),
+  z.object({ action: z.literal("task_mark"), taskId: z.string(), mark: z.enum(["checked", "skipped", "ready"]), note: z.string().trim().max(500).optional() }),
   z.object({ action: z.literal("dev_profile"), devProfile: z.object({ codingExperience: z.enum(["unanswered", "none", "guided", "independent"]), tool: z.enum(["undecided", "claude_code", "codex"]), os: z.enum(["unanswered", "mac", "windows", "linux"]), installed: z.array(z.string().max(40)).max(12), confirmed: z.boolean() }).strict() }),
   z.object({ action: z.literal("assembly_report"), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^(s\d+-c\d+|lib:[a-z0-9-]+)$/).optional(), text: z.string().trim().min(1).max(1000), value: z.number().finite().nullable().optional(), yes: z.boolean().nullable().optional() }),
   z.object({ action: z.literal("detail_request"), step: z.number().int().min(1).max(20), level: z.enum(["beginner", "micro"]) }),
@@ -114,6 +115,19 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         w.evidence.push({ taskId: task.id, text: input.text, createdAt: now });
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task.title}] 결과: ${input.text}`, shared: true, createdAt: now });
         announce(`실행 결과를 팀 전체에 공유했어요: ${input.text}\n결과 제출은 검증 합격을 뜻하지 않아요. 해당 에이전트의 평가 모드에서 검토할 수 있습니다.`);
+      } else if (input.action === "task_mark") {
+        const task = p.tasks.find((t) => t.id === input.taskId);
+        if (!task) throw new Error("작업을 찾을 수 없습니다.");
+        task.status = input.mark;
+        if (input.mark === "ready") { delete task.closedAt; delete task.skipNote; }
+        else { task.closedAt = now; if (input.mark === "skipped") task.skipNote = input.note || ""; else delete task.skipNote; }
+        const said = { checked: "확인했어요", skipped: "이번에는 건너뛸게요", ready: "다시 할 일로 되돌릴게요" }[input.mark];
+        p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task.title}] ${said}${input.note ? ` · ${input.note}` : ""}`, shared: true, createdAt: now });
+        announce(input.mark === "skipped"
+          // 건너뛴 일은 지우지 않고 '확인하지 않은 부분'으로 남는다. 문제가 생기면 여기부터 본다.
+          ? `'${task.title}'을(를) 건너뛴 것으로 남겼어요. 확인하지 않은 부분으로 설계에 표시해두고, 나중에 문제가 생기면 여기부터 되짚을게요.`
+          : input.mark === "checked" ? `'${task.title}'을(를) 확인한 것으로 기록했어요. 측정값이 필요해지면 다시 열 수 있어요.`
+          : `'${task.title}'을(를) 다시 할 일로 되돌렸어요.`);
       } else if (input.action === "purchase") {
         if (!p.build?.blueprint.components.some((c) => c.ref === input.ref)) throw new Error("부품을 찾을 수 없습니다.");
         w.purchases[input.ref] = input.status;

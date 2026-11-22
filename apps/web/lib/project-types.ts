@@ -15,8 +15,17 @@ export type ProjectTask = {
   kind: "confirm_spec" | "confirm_availability" | "measure" | "run_firmware" | "provide_info";
   title: string;
   plain: string;
-  status: "ready" | "completed";
+  // completed = 결과를 적어서 냈다. checked = 확인만 하고 넘겼다(결과 없음).
+  // skipped = 안 하고 넘겼다. 권장했지만 하지 않은 일이라 지우지 않고 남긴다.
+  // 나중에 문제가 생겼을 때 "여기는 확인 안 하고 지나갔다"를 되짚을 수 있어야 한다.
+  status: "ready" | "completed" | "checked" | "skipped";
+  closedAt?: string;
+  skipNote?: string;
 };
+
+// 권장했지만 사람이 하지 않고 넘어간 일. 문제가 생기면 여기부터 의심한다.
+export const skippedTasks = (tasks: ProjectTask[]) => tasks.filter((t) => t.status === "skipped");
+export const openTasks = (tasks: ProjectTask[]) => tasks.filter((t) => t.status === "ready");
 
 export type ChatMessage = {
   id: string;
