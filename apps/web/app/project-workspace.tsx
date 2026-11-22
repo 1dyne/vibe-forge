@@ -80,7 +80,7 @@ export default function ProjectWorkspace() {
       body: <p>아이디어 하나가 프로젝트 하나. 왼쪽 고리가 진행률이에요.</p> },
     { key: "progress", target: "progress", title: "진행 단계",
       body: <p>여덟 단계 중 지금 여기. 눌러서 펼쳐보세요.</p> },
-    { key: "workbench-button", target: "workbench-button", title: "작업대",
+    { key: "workbench-button", target: "workbench-button", title: "작업대", optional: true,
       body: <p>설계·회로·3D·부품이 여기 쌓여요. 새로 생기면 주황 점.</p> },
     { key: "composer", target: "composer", title: "시작하기",
       body: <p>만들고 싶은 것을 한 줄로 적어보세요.</p> }

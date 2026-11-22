@@ -30,7 +30,7 @@ export default function Tour({ stations, onClose }: { stations: Station[]; onClo
   const [at, setAt] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
   const bubble = useRef<HTMLDivElement>(null);
-  const station = stations[at];
+  const station = stations[Math.min(at, stations.length - 1)];
   const last = at === stations.length - 1;
 
   // 대상이 아직 그려지지 않았을 수 있어 몇 프레임 기다렸다 잰다.
@@ -50,7 +50,11 @@ export default function Tour({ stations, onClose }: { stations: Station[]; onClo
     let tries = 0;
     let raf = 0;
     const tick = () => {
-      if (measure() || tries++ > 40) return;
+      if (measure()) return;
+      // 아직 그려지지 않았을 수 있어 잠깐 기다린다. 그래도 없으면, 그 화면에 아직
+      // 없는 영역이라는 뜻이다(프로젝트가 없으면 작업대도 없다). 가리킬 것이 없는데
+      // 말풍선만 띄우면 더 헷갈리므로, 건너뛰어도 되는 정거장은 조용히 넘긴다.
+      if (tries++ > 40) { if (station.optional) setAt(index => (index === at ? at + 1 : index)); return; }
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -58,7 +62,7 @@ export default function Tour({ stations, onClose }: { stations: Station[]; onClo
     window.addEventListener("resize", again);
     window.addEventListener("scroll", again, true);
     return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", again); window.removeEventListener("scroll", again, true); };
-  }, [measure]);
+  }, [measure, station.optional, at]);
 
   const go = useCallback((next: number) => {
     if (next < 0) return;
@@ -76,6 +80,7 @@ export default function Tour({ stations, onClose }: { stations: Station[]; onClo
     return () => window.removeEventListener("keydown", onKey);
   }, [at, go, onClose]);
 
+  useEffect(() => { if (at >= stations.length) onClose(); }, [at, stations.length, onClose]);
   useEffect(() => { bubble.current?.focus(); }, [at]);
 
   // 아래 → 위 → 옆 순으로 자리를 찾는다. 사이드바나 작업대처럼 화면만큼 긴 것을
