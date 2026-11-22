@@ -65,7 +65,8 @@ export default function ProjectWorkspace() {
     const timer=setTimeout(()=>markSeen(id,pending),2500);
     return ()=>clearTimeout(timer);
   },[project?.id,showArtifacts,prefsReady,newMarks.join("|")]);// eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(()=>{if(prefsReady&&!preferences.tutorialSeen)setShowTutorial(true);},[prefsReady,preferences.tutorialSeen]);
+  // 슬라이드 아홉 장짜리 안내는 자동으로 띄우지 않는다. 화면을 가린 채 그림만 보여줘서,
+  // 다 읽고 닫아도 실제 화면 어디에 뭐가 있는지는 알 수 없었다. 화면 투어로 교체 중.
   const layout=useWorkspaceLayout(showArtifacts);
   const workflow=project?workflowFor(project):null;
   const phase=workflow?.phase??"brainstorm";
