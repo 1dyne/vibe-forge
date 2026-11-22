@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LocalProject } from "../lib/project-types";
 import type { WorkbenchItem } from "../lib/workbench";
 import { workbenchDownloadUrl } from "../lib/workbench";
-import { AGENTS, workflowFor } from "../lib/workflow";
+import { AGENTS, agentName, workflowFor } from "../lib/workflow";
 import { CircuitView, MockupView, TaskView } from "./artifact-views";
 import { AssemblyView } from "./assembly-view";
 import { HousingView } from "./housing-view";
@@ -12,8 +12,8 @@ import { HistoryList, PowerView, SafetyView, TestView } from "./plan-views";
 import { ContractView } from "./contract-view";
 import { provisionalReasons } from "../lib/provisional";
 
-export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction, ownerName, newMarks = [], connectorOnly = false }: {
-  project: LocalProject; items: WorkbenchItem[]; selected: string; busy: boolean; connectorOnly?: boolean; ownerName: string; newMarks?: string[];
+export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction, ownerName, newMarks = [], shortNames = false, connectorOnly = false }: {
+  project: LocalProject; items: WorkbenchItem[]; selected: string; busy: boolean; connectorOnly?: boolean; ownerName: string; newMarks?: string[]; shortNames?: boolean;
   onSelect: (id: string) => void; onClose: () => void; onAction: (input: Record<string, unknown>) => void;
 }) {
   const item = items.find(i => i.id === selected) ?? items[0];
@@ -55,8 +55,8 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
         {item.kind === "assembly" && project.assembly && <AssemblyView project={project} busy={busy} onAction={onAction} connectorOnly={connectorOnly} />}
         {item.kind === "cad" && project.build && <><div className="artifact-title"><span className="pill">치수 기반 3D</span><h3>{item.filename}</h3></div><MockupView blueprint={project.build.blueprint} /></>}
         {item.kind === "bom" && project.build && <><h3>{project.name} · 부품목록</h3><p className="notice">구매 전 정확한 모델·수량·가격·판매처 재고를 확인해주세요. 출처의 가격은 확인한 날짜 기준이에요.</p><table className="bom-table"><thead><tr><th>부품 / 용도</th><th>진행 상태</th></tr></thead><tbody>{project.build.blueprint.components.map(c => <tr key={c.ref}><td><small>{c.ref} · 수량 확인 필요</small><strong>{c.valueOrModel}</strong><p>{c.reason}</p>{(workflow.partSources?.[c.ref] ?? []).map(s => <p className="part-source" key={s.url}><a href={s.url} target="_blank" rel="noreferrer noopener">↗ {s.title}</a>{s.price && <> · {s.price}</>} <small>{s.checkedAt.slice(0, 10)} 확인</small></p>)}</td><td><select aria-label={`${c.ref} 구매 상태`} value={workflow.purchases[c.ref] ?? "needed"} disabled={busy} onChange={e => onAction({ action: "purchase", ref: c.ref, status: e.target.value })}><option value="needed">구매 예정</option><option value="ordered">주문 완료</option><option value="received">수령 완료</option><option value="problem">문제 발생</option></select></td></tr>)}</tbody></table></>}
-        {item.kind === "tasks" && <TaskView project={project} onAction={onAction} busy={busy} ownerName={ownerName} newMarks={newMarks} />}
-        {item.kind === "record" && <><h3>팀 공통 기록</h3>{workflow.sharedUpdates.map(u => <article className="shared-record" key={u.id}><span className="pill">{AGENTS[u.agent].name}</span><p>{u.text}</p><small>{new Date(u.createdAt).toLocaleString("ko-KR")}</small></article>)}<HistoryList project={project} onAction={onAction} busy={busy} /></>}
+        {item.kind === "tasks" && <TaskView project={project} onAction={onAction} busy={busy} ownerName={ownerName} newMarks={newMarks} shortNames={shortNames} />}
+        {item.kind === "record" && <><h3>팀 공통 기록</h3>{workflow.sharedUpdates.map(u => <article className="shared-record" key={u.id}><span className="pill">{agentName(u.agent,shortNames)}</span><p>{u.text}</p><small>{new Date(u.createdAt).toLocaleString("ko-KR")}</small></article>)}<HistoryList project={project} onAction={onAction} busy={busy} /></>}
         {(item.kind === "file" || item.kind === "plan") && item.mimeType.startsWith("text/html") && <iframe title={item.filename} className="file-preview" sandbox="" referrerPolicy="no-referrer" srcDoc={`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">${item.content}`} />}
       </>}
     </div>

@@ -73,7 +73,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
       if (input.action === "profile") {
         w.profile = input.profile as MakerProfile;
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `제작 프로필을 알려드릴게요.\n핵심 동작: ${w.profile.coreBehavior || "아직 논의 중"}\n보유 도구: ${w.profile.tools.join(", ") || "없음"}\n펌웨어 경험: ${{ unanswered: "아직 답변 안 함", none: "처음이에요", guided: "안내를 보며 해봤어요", independent: "직접 할 수 있어요" }[w.profile.firmwareExperience]}`, createdAt: now });
-        announce("제작 프로필을 저장했어요. 목표는 유지하면서 경험에 맞춰 설명할게요. 아이디어를 더 논의하거나, 준비되었다면 계획 시작을 눌러주세요.");
+        announce("제작 프로필을 저장했어요.\n\n목표는 유지하면서 경험에 맞춰 설명할게요.\n\n아이디어를 더 논의하거나, 준비되었다면 계획 시작을 눌러주세요.");
       } else if (input.action === "assembly_report") {
         recordAssembly(p, input.step, input.cardId ?? null, input.text, { value: input.value ?? null, yes: input.yes ?? null });
       } else if (input.action === "detail_request") {
@@ -117,7 +117,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         task.status = "completed";
         w.evidence.push({ taskId: task.id, text: input.text, createdAt: now });
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task.title}] 결과: ${input.text}`, shared: true, createdAt: now });
-        announce(`실행 결과를 팀 전체에 공유했어요: ${input.text}\n결과 제출은 검증 합격을 뜻하지 않아요. 해당 에이전트의 평가 모드에서 검토할 수 있습니다.`);
+        announce(`실행 결과를 팀 전체에 공유했어요: ${input.text}\n\n결과 제출은 검증 합격을 뜻하지 않아요. 해당 에이전트의 평가 모드에서 검토할 수 있습니다.`);
       } else if (input.action === "task_mark") {
         const task = p.tasks.find((t) => t.id === input.taskId);
         if (!task) throw new Error("작업을 찾을 수 없습니다.");
@@ -128,7 +128,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `[${task.title}] ${said}${input.note ? ` · ${input.note}` : ""}`, shared: true, createdAt: now });
         announce(input.mark === "skipped"
           // 건너뛴 일은 지우지 않고 '확인하지 않은 부분'으로 남는다. 문제가 생기면 여기부터 본다.
-          ? `'${task.title}'을(를) 건너뛴 것으로 남겼어요. 확인하지 않은 부분으로 설계에 표시해두고, 나중에 문제가 생기면 여기부터 되짚을게요.`
+          ? `'${task.title}'을(를) 건너뛴 것으로 남겼어요.\n\n확인하지 않은 부분으로 설계에 표시해두고, 나중에 문제가 생기면 여기부터 되짚을게요.`
           : input.mark === "checked" ? `'${task.title}'을(를) 확인한 것으로 기록했어요. 측정값이 필요해지면 다시 열 수 있어요.`
           : `'${task.title}'을(를) 다시 할 일로 되돌렸어요.`);
       } else if (input.action === "purchase") {
@@ -149,10 +149,10 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         if (input.action === "plan") {
           p.stage = "spec"; p.build = newBuild; p.lastAgentMode = "live";
           p.tasks = p.tasks.map((task) => task.kind === "confirm_spec" ? { ...task, status: "completed" } : task);
-          announce("브레인스토밍을 마치고 회로 초안을 준비했어요. 오른쪽 회로 탭에서 연결과 미확정 사항을 확인해주세요. 회로 방향을 승인하면 3D 목업을 만듭니다.");
+          announce("브레인스토밍을 마치고 회로 초안을 준비했어요.\n\n오른쪽 회로 탭에서 연결과 미확정 사항을 확인해주세요.\n\n회로 방향을 승인하면 3D 목업을 만듭니다.");
         } else if (input.action === "approve_circuit") {
           p.build = approvedCad(p.build!, p.productForm);
-          announce("회로 방향을 승인했어요. 승인된 부품과 치수로 3D 목업을 만들었어요. 드래그해서 돌려보고 형태를 검토해주세요. 이 승인은 실물 전기 검증의 합격과는 별개예요.");
+          announce("회로 방향을 승인했어요. 승인된 부품과 치수로 3D 목업을 만들었어요.\n\n드래그해서 돌려보고 형태를 검토해주세요.\n\n이 승인은 실물 전기 검증의 합격과는 별개예요.");
         } else if (input.action === "approve_mockup") {
           announce("3D 목업 방향을 승인했어요. 다음 할 일 탭에서 사람과 AI의 작업을 나누고 BOM의 구매 상태를 확인해주세요.");
           p.tasks = p.tasks.filter((t) => !["measure", "run_firmware"].includes(t.kind));
@@ -160,7 +160,7 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
           for (const [kind, texts] of [["measure", build.evaluator.hw.requiredMeasurements], ["run_firmware", build.evaluator.sw.requiredRuns]] as const) {
             texts.forEach((plain, index) => p.tasks.push({ id: randomUUID(), kind, title: `${kind === "measure" ? "회로 계측" : "펌웨어 확인"} ${index + 1}`, plain, status: "ready" }));
           }
-        } else { p.stage = "workshop"; announce("대장간에 오신 것을 환영해요. 팀 전체 또는 개별 작업실에서 대화하세요. 모든 방의 변경·관측·제안은 공통 기록에 공유됩니다. 제가 담당과 다음 순서를 조율할게요."); }
+        } else { p.stage = "workshop"; announce("대장간에 오신 것을 환영해요.\n\n팀 전체 또는 개별 작업실에서 대화하세요. 모든 방의 변경·관측·제안은 공통 기록에 공유됩니다.\n\n제가 담당과 다음 순서를 조율할게요."); }
       }
       p.workflow = w;
     }, project.designRevision);
