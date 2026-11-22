@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { DevProfile, LocalProject } from "../lib/project-types";
-import { CODING_EXPERIENCE, DEV_INSTALL_OPTIONS, DEV_TOOLS, claudeProjectInstructions, devProfileMissing, devSetupSteps, emptyDevProfile } from "../lib/dev-handoff";
+import { CODING_EXPERIENCE, DEV_INSTALL_OPTIONS, DEV_TOOLS, projectInstructions, devProfileMissing, devSetupSteps, emptyDevProfile } from "../lib/dev-handoff";
 import { workbenchDownloadUrl } from "../lib/workbench";
 import { workflowFor } from "../lib/workflow";
+import { AI_CLIENTS, aiClient, type AiClientId } from "../lib/ai-clients";
 import { IconLaptop, IconLink } from "./icons";
 
 type Me = { kind: "operator" | "user"; connectorUrl: string | null; clients: Array<{ name: string; version: string; lastSeenAt: string }> };
@@ -25,13 +26,15 @@ function Copy({ value, label = "복사" }: { value: string; label?: string }) {
 }
 
 export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAction }: {
-  project: LocalProject; tab: "claude" | "dev"; busy: boolean;
-  onTab: (tab: "claude" | "dev") => void; onClose: () => void; onAction: (input: Record<string, unknown>) => void;
+  project: LocalProject; tab: "ai" | "dev"; busy: boolean;
+  onTab: (tab: "ai" | "dev") => void; onClose: () => void; onAction: (input: Record<string, unknown>) => void;
 }) {
   const [me, setMe] = useState<Me | null>(null);
   const workflow = workflowFor(project);
   const [dev, setDev] = useState<DevProfile>(workflow.devProfile ?? emptyDevProfile());
   const [editing, setEditing] = useState(false);
+  const [client, setClient] = useState<AiClientId>("claude");
+  const picked = aiClient(client);
   useEffect(() => {
     const load = () => fetch("/api/me", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((b) => b && setMe(b)).catch(() => {});
     void load();
@@ -42,29 +45,34 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
   const missing = devProfileMissing(saved);
   const specFiles = (project.workspaceFiles ?? []).filter((file) => file.agent === "sw" && ["SPEC.md", "CLAUDE.md", "AGENTS.md"].includes(file.filename));
   const codingClients = (me?.clients ?? []).filter((client) => /codex|claude[-_ ]?code/i.test(client.name));
-  const instructions = claudeProjectInstructions(project);
+  const instructions = projectInstructions(project);
   const steps = devSetupSteps(saved, project, me?.connectorUrl ?? null);
   return <div className="modal-backdrop" onClick={onClose}>
     <section className="profile-modal connect-modal" role="dialog" aria-modal="true" aria-label="연결" onClick={(e) => e.stopPropagation()}>
       <header><h2>{project.name}</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
       <div className="connect-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "claude"} className={tab === "claude" ? "active" : ""} onClick={() => onTab("claude")}><IconLink/> Claude 연결</button>
+        <button role="tab" aria-selected={tab === "ai"} className={tab === "ai" ? "active" : ""} onClick={() => onTab("ai")}><IconLink/> AI 연결</button>
         <button role="tab" aria-selected={tab === "dev"} className={tab === "dev" ? "active" : ""} onClick={() => onTab("dev")}><IconLaptop/> 개발 연결</button>
       </div>
 
-      {tab === "claude" && <>
-        <p>Claude 채팅에서 대화하고, 정리된 내용은 이 프로젝트에 쌓여요. Claude는 웹 검색으로 부품과 데이터시트를 찾고 출처를 함께 남겨요.</p>
-        <ol className="connect-steps">
-          <li><strong>커넥터 추가 (처음 한 번)</strong>
-            {me?.connectorUrl ? <><p>claude.ai → 설정 → 커넥터 → 커스텀 커넥터 추가에 붙여넣고 <b>연결</b>을 눌러요. 뜨는 창에서 <b>허용</b>하면 끝이에요. 이 주소는 모두 같아서 남에게 보여도 괜찮아요.</p><div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div></>
-              : <p>{me?.kind === "operator" ? "운영자 계정에는 커넥터 주소가 없어요. 참여자 관리에서 본인 이름으로 링크를 만들어 쓰세요." : "커넥터 주소를 불러오지 못했어요. 운영자에게 받은 주소를 사용해주세요."}</p>}
-          </li>
-          <li><strong>Claude 프로젝트 만들고 지침에 붙여넣기</strong>
-            <p>claude.ai에서 이 아이디어용 프로젝트를 만들고, 프로젝트 지침(instructions)에 아래 문구를 붙여넣어요. 그 프로젝트의 모든 대화가 이 달그락 프로젝트에만 이어서 쌓여요.</p>
-            <pre className="instructions-box">{instructions}</pre><Copy value={instructions} label="지침 복사" />
-          </li>
-          <li><strong>대화 시작</strong><p>그 Claude 프로젝트에서 새 대화를 열고 + 메뉴에서 달그락 대장간 커넥터를 켠 뒤 “이어서 하자”라고 말해요. 이 화면은 자동으로 새로고침돼요.</p></li>
-        </ol>
+      {tab === "ai" && <>
+        <p>달그락과의 대화는 내가 쓰는 AI에서 해요. 정리된 내용만 이 프로젝트에 쌓입니다.</p>
+        <fieldset><legend>어떤 AI를 쓰시나요?</legend><div className="choice-row">{AI_CLIENTS.map(c =>
+          <label key={c.id} className={client === c.id ? "on" : ""}><input type="radio" name="aiclient" checked={client === c.id} onChange={() => setClient(c.id)} />{c.label}</label>)}</div></fieldset>
+        <p>{picked.intro}</p>
+        {!picked.verified && <p className="notice">아직 저희가 직접 붙여보고 확인한 도구는 아니에요. 안 되면 알려주시면 고칠게요.</p>}
+        {picked.caution && <p className="notice">{picked.caution}</p>}
+        {me?.connectorUrl ? <>
+          <ol className="connect-steps">{picked.steps.map((step, index) => <li key={index}><strong>{step.title}</strong><p>{step.detail}</p>
+            {step.command && <div className="copy-row"><code>{step.command.replace("{URL}", me.connectorUrl!)}</code><Copy value={step.command.replace("{URL}", me.connectorUrl!)} /></div>}
+          </li>)}</ol>
+          <h3 className="connect-subtitle">커넥터 주소</h3>
+          <div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div>
+          <small className="muted">이 주소는 모두 같아서 남에게 보여도 괜찮아요. 내 기록은 허용 창을 거친 뒤에만 열려요.</small>
+          <h3 className="connect-subtitle">지침 문구</h3>
+          <p className="muted">이 프로젝트에만 기록이 쌓이도록 AI에게 먼저 주는 문구예요.</p>
+          <pre className="instructions-box">{instructions}</pre><Copy value={instructions} label="지침 복사" />
+        </> : <p>{me?.kind === "operator" ? "운영자 계정에는 커넥터 주소가 없어요. 참여자 관리에서 본인 이름으로 링크를 만들어 쓰세요." : "커넥터 주소를 불러오지 못했어요. 운영자에게 받은 주소를 사용해주세요."}</p>}
       </>}
 
       {tab === "dev" && <>

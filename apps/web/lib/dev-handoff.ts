@@ -19,12 +19,12 @@ export function devProfileMissing(profile: DevProfile | undefined): string[] {
 
 // Text the person pastes into a Claude Project's instructions so every chat in
 // that Claude Project keeps writing to this one 달그락 project.
-export function claudeProjectInstructions(project: Pick<LocalProject, "id" | "name">): string {
+export function projectInstructions(project: Pick<LocalProject, "id" | "name">): string {
   return [
-    `이 Claude 프로젝트는 달그락 대장간 프로젝트 「${project.name}」와 연결되어 있어요.`,
+    `이 대화 공간은 달그락 대장간 프로젝트 「${project.name}」와 연결되어 있어요.`,
     `- 달그락 프로젝트 ID: ${project.id}`,
     "- 대화를 시작하면 달그락 대장간 커넥터의 get_project를 이 ID로 호출해 현재 단계와 다음 할 일을 확인해줘.",
-    "- 이 Claude 프로젝트의 모든 기록은 이 ID에만 남겨줘. 내가 직접 요청하지 않으면 새 달그락 프로젝트를 만들지 마.",
+    "- 여기서 나눈 모든 기록은 이 ID에만 남겨줘. 내가 직접 요청하지 않으면 새 달그락 프로젝트를 만들지 마.",
     "- 부품·가격·데이터시트를 웹에서 찾았다면 record_part_source로 출처 링크와 확인 날짜를 남겨줘."
   ].join("\n");
 }

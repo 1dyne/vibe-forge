@@ -61,4 +61,4 @@ export function canUseWebAi(viewer: Viewer): boolean {
 
 export const unauthorized = () => NextResponse.json({ error: "다시 로그인해주세요." }, { status: 401 });
 export const notFound = () => NextResponse.json({ error: "프로젝트를 찾을 수 없습니다." }, { status: 404 });
-export const webAiDenied = () => NextResponse.json({ error: "이 계정은 Claude 커넥터로 대화하는 계정이에요. 대화와 설계는 내 Claude에서 이어가고, 여기서는 확인과 승인만 해주세요." }, { status: 403 });
+export const webAiDenied = () => NextResponse.json({ error: "이 계정은 커넥터로 연결한 AI에서 대화하는 계정이에요. 대화와 설계는 연결한 AI에서 이어가고, 여기서는 확인과 승인만 해주세요." }, { status: 403 });

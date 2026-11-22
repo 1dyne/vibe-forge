@@ -45,7 +45,7 @@ export async function budgetDenied(viewer: Viewer, kind: TurnKind): Promise<Next
   const left = remainingUsd(account);
   if (left >= TURN_USD[kind]) return null;
   return NextResponse.json({
-    error: `오늘 쓸 수 있는 무료 분량을 다 썼어요. 내일 다시 채워져요. 그동안에는 내 Claude에 커넥터를 연결해 쓰시면 대화 비용이 들지 않아요.`,
+    error: `오늘 쓸 수 있는 무료 분량을 다 썼어요. 내일 다시 채워져요. 그동안에는 내가 쓰는 AI에 커넥터를 연결해 쓰시면 대화 비용이 들지 않아요.`,
     code: "credit_exhausted",
     remainingUsd: left
   }, { status: 402 });

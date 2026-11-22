@@ -494,7 +494,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
           {terms.length > 0 && <div className="quick terms" aria-label="말 뜻 묻기">{terms.map((e) => <button key={e.term} type="button" onClick={() => ask(`‘${e.term}’ 뜻이 뭐예요?`, e.short)}>ⓘ {e.term} 뜻?</button>)}</div>}
           {mode === "project" && connectorOnly ? <>
             <div className="quick">{kit.faq.map((f) => <button key={f.q} type="button" onClick={() => copyAsk(f.q)}>{f.q}</button>)}</div>
-            <p className="note">대화는 내 Claude에서 해요. 위 문구를 누르면 지금 단계가 담긴 질문이 복사돼요. 내 Claude에 붙여 넣고 사진도 같이 보내 주세요.{copied ? " ✓ 복사했어요" : ""}</p>
+            <p className="note">대화는 연결한 AI에서 해요. 위 문구를 누르면 지금 단계가 담긴 질문이 복사돼요. 내 Claude에 붙여 넣고 사진도 같이 보내 주세요.{copied ? " ✓ 복사했어요" : ""}</p>
           </> : mode === "project" && onAsk ? <>
             <div className="quick">{kit.faq.map((f) => <button key={f.q} type="button" disabled={asking} onClick={() => askReal(f.q)}>{f.q}</button>)}</div>
             {photos.length > 0 && <div className="photos">{photos.map((p, i) => <img key={i} src={p.dataUrl} alt={p.name} />)}<button type="button" onClick={() => setPhotos([])}>지우기</button></div>}

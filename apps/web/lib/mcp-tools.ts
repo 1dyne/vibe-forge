@@ -14,7 +14,7 @@ import { resolvePin } from "./parts/rules";
 import { judgeReading, libraryCardsForStep, parseOhms } from "./parts/trouble-cards";
 import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
-import { buildDevHandoff, claudeProjectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
+import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
@@ -40,7 +40,7 @@ type ToolResult = { text: string; data?: unknown };
 type ToolDefinition = { name: string; title: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, boolean>; run: (input: unknown, context: ToolContext) => Promise<ToolResult> };
 
 export const SERVER_INSTRUCTIONS = [
-  "대화는 사용자의 Claude에서만 한다. 대화 원문을 달그락에 기록하지 않는다. 설계에 필요한 사실만 저장하고, 이름·연락처·회사명·고객 정보는 도구 입력에서 뺀다.",
+  "대화는 사용자가 쓰는 AI 쪽에서만 한다. 대화 원문을 달그락에 기록하지 않는다. 설계에 필요한 사실만 저장하고, 이름·연락처·회사명·고객 정보는 도구 입력에서 뺀다.",
   "달그락 대장간: 하드웨어 경험이 없는 사람도 저전력 장치를 만들 수 있게, 아이디어를 설계도로 바꾸고 하나씩 구현하도록 돕는 제작 프로젝트 도구다. 대화와 설계는 너(사용자의 Claude)가 하고, 결과는 이 도구로 달그락 대장간에 누적 기록한다. 사용자는 웹 대시보드에서 설계도·회로·3D 목업·부품목록·할 일을 보고 승인한다.",
   "처음 쓰거나 규칙이 헷갈리면 dalgeurak_guide를 먼저 호출한다. 기존 프로젝트를 이어갈 때는 get_project로 현재 단계와 다음에 할 일을 읽고 시작한다.",
   "작업 중인 프로젝트를 고정한다: Claude 프로젝트 지침이나 대화에 '달그락 프로젝트 ID'가 있으면 그 ID에만 기록한다. ID를 모르면 추측하지 말고 list_projects를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 새 프로젝트를 만들지 않는다.",
@@ -61,7 +61,7 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 ## 작업 중인 프로젝트 고정
 - Claude 프로젝트 지침이나 대화에 "달그락 프로젝트 ID"가 있으면 모든 도구 호출에 그 ID만 쓴다. 대화를 시작하면 그 ID로 get_project를 호출한다.
 - ID를 모르면 추측하지 말고 list_projects 결과를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 create_project를 호출하지 않는다.
-- create_project의 idea에는 인사말이 아니라 사용자가 설명한 아이디어를 넣는다. 만든 뒤에는 claudeProjectInstructions를 보여주고 Claude 프로젝트 지침에 붙여넣으라고 안내한다.
+- create_project의 idea에는 인사말이 아니라 사용자가 설명한 아이디어를 넣는다. 만든 뒤에는 projectInstructions를 보여주고 Claude 프로젝트 지침에 붙여넣으라고 안내한다.
 
 ## 체크리스트는 선택지로 묻는다
 - get_checklist로 질문과 선택지를 받아 그대로 묻는다. 열린 질문("경험이 어떠세요?")으로 바꾸지 않는다.
@@ -363,7 +363,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     files: workbenchItems(project).map(({ filename, kind }) => ({ filename, kind })),
     partSources: workflow.partSources ?? {},
     devProfile: workflow.devProfile ?? emptyDevProfile(), devProfileMissing: devProfileMissing(workflow.devProfile),
-    claudeProjectInstructions: claudeProjectInstructions(project),
+    projectInstructions: projectInstructions(project),
     evidence: workflow.evidence.slice(-10),
     sharedUpdates: workflow.sharedUpdates.slice(-10).map(({ agent, text, createdAt }) => ({ agent, text, createdAt })),
     recentMessages: project.messages.slice(-8).map(({ role, agent, channel, text }) => ({ role, agent, channel, text })),
@@ -513,7 +513,7 @@ export const TOOLS: ToolDefinition[] = [
     run: async (input, context) => {
       const { idea, plan } = z.object({ idea: z.string().trim().min(3).max(4000), plan: PlanSchema }).strict().parse(input);
       const project = await createProject(idea, plan as AgentPlan, "live", [], { ownerId: context.user.id, origin: "connector" });
-      return stored(project, context, `'${project.name}' 프로젝트를 만들었어요. 같은 Claude 프로젝트에서 계속 이어가려면 아래 문구를 Claude 프로젝트 지침에 붙여넣으라고 사용자에게 안내하세요.\n\n${claudeProjectInstructions(project)}\n`);
+      return stored(project, context, `'${project.name}' 프로젝트를 만들었어요. 같은 대화 공간에서 계속 이어가려면 아래 문구를 Claude 프로젝트 지침에 붙여넣으라고 사용자에게 안내하세요.\n\n${projectInstructions(project)}\n`);
     }
   },
   {

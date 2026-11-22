@@ -162,7 +162,7 @@ describe("Claude connector", () => {
     const created = await tool(token, "create_project", { idea: "버튼을 누르면 켜지는 탁상 램프", plan });
     const id = created.structuredContent!.id as string;
     expect(created.content[0].text).toContain(`달그락 프로젝트 ID: ${id}`);
-    expect(created.structuredContent!.claudeProjectInstructions).toContain("새 달그락 프로젝트를 만들지 마");
+    expect(created.structuredContent!.projectInstructions).toContain("새 달그락 프로젝트를 만들지 마");
     const guide = await tool(token, "dalgeurak_guide", {});
     expect(guide.content[0].text).toContain("추측하지 말고");
     expect(guide.content[0].text).toContain("record_part_source");
