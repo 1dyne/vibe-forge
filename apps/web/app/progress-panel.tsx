@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { LocalProject } from "../lib/project-types";
 import { projectProgress, projectStages, type Status } from "../lib/progress";
+import { IconUndo } from "./icons";
 
 // 사이드바 프로젝트 줄에 들어가는 작은 고리. 숫자는 옆의 글자가 말하므로 여기서는 숨긴다.
 export function ProgressRing({ percent, blocked = false }: { percent: number; blocked?: boolean }) {
@@ -15,7 +16,7 @@ export function ProgressRing({ percent, blocked = false }: { percent: number; bl
 
 const icon: Record<Status, string> = { done: "✓", current: "●", blocked: "!", todo: "○" };
 
-export default function ProgressPanel({ project }: { project: LocalProject }) {
+export default function ProgressPanel({ project, onAction, busy }: { project: LocalProject; onAction: (input: Record<string, unknown>) => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const [showThinking, setShowThinking] = useState(true);
   const stages = projectStages(project);
@@ -40,6 +41,12 @@ export default function ProgressPanel({ project }: { project: LocalProject }) {
         {stage.sub && (stage.status === "current" || stage.status === "done") && <ul className="stage-sub">{stage.sub.map((sub) => <li key={sub.label} className={sub.status}>{icon[sub.status]} {sub.label}{sub.note ? <small> · {sub.note}</small> : null}</li>)}</ul>}
       </div>
     </li>)}</ol>}
+    {/* 되돌리기는 사이드바에 상시 노출돼 있었다. 되돌릴 수 없는 동작이라 늘 보일 자리가
+        아니고, 무엇을 되돌리는지도 '진행 단계' 옆에서 봐야 뜻이 통한다. */}
+    {open && <details className="reset-menu"><summary><IconUndo /> 이 단계부터 다시 하기</summary>
+      <button disabled={busy} onClick={() => { if (confirm("체크리스트와 설계도는 두고 완성품 형태·회로·3D·조립 가이드와 승인을 지울까요? 되돌릴 수 없어요.")) onAction({ action: "reset_stage", stage: "product_form" }); }}>완성품 형태부터 다시</button>
+      <button disabled={busy} onClick={() => { if (confirm("체크리스트만 두고 설계도·완성품 형태·회로·3D·조립 가이드와 승인을 지울까요? 되돌릴 수 없어요.")) onAction({ action: "reset_stage", stage: "plan" }); }}>설계도부터 다시</button>
+    </details>}
     {open && activity.length > 0 && <details className="activity-log"><summary>최근 활동 {activity.length}</summary><ul>{activity.map((a) => <li key={a.id}><time>{new Date(a.at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</time> <b>{a.source === "person" ? "나" : a.source === "claude" ? "대장" : "기록"}</b> {a.title}{a.detail ? ` — ${a.detail}` : ""}</li>)}</ul></details>}
   </section>;
 }

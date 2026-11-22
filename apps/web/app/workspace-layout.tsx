@@ -44,7 +44,9 @@ export function useWorkspaceLayout(workbenchVisible: boolean) {
     "--sidebar-height": `${Math.min(sizes.sidebarHeight, viewport.height * .4)}px`,
     "--workbench-height": `${Math.min(sizes.workbenchHeight, viewport.height * .55)}px`
   } as CSSProperties;
-  return { sizes, style, mobile, stacked, resize, reset: () => setSizes(defaults) };
+  // 한 번도 끌어서 바꾸지 않았으면 되돌릴 것도 없다. 그때는 버튼을 아예 보이지 않는다.
+  const isDefault = (Object.keys(defaults) as Array<keyof LayoutSizes>).every(key => sizes[key] === defaults[key]);
+  return { sizes, style, mobile, stacked, resize, isDefault, reset: () => setSizes(defaults) };
 }
 
 export function ResizeHandle({ label, axis, value, min, max, reverse = false, onResize, onReset, className = "", controls }: {

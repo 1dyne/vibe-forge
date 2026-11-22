@@ -11,10 +11,11 @@ function Ink({ children, size = 15, ...rest }: SVGProps<SVGSVGElement> & { size?
 
 export const IconPlus = (p: SVGProps<SVGSVGElement>) => <Ink {...p}><path d="M10 4.4v11.2M4.4 10h11.2" /></Ink>;
 
-// 모루 — 작업대
-export const IconAnvil = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
-  <path d="M3 7.4h9.3c1.9 0 3.1 1.3 4.4 1.3-.5 1.9-2.3 3-4.5 3H8.6" />
-  <path d="M8.6 11.7 7.4 15M5 15.6h6.4" /><path d="M3 7.4 4.6 5h3.2" />
+// 작업 책상 — 작업대. 처음엔 모루로 그렸는데 "작업대"로 읽히지 않았다.
+// 상판 위에 만들던 것이 놓여 있어야 '작업 중인 책상'으로 보인다.
+export const IconDesk = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
+  <path d="M2.4 8.6h15.2" /><path d="M4.6 8.6v7.6M15.4 8.6v7.6" /><path d="M4.6 13.2h10.8" />
+  <path d="M7.8 4.8h4.4v3.8H7.8z" />
 </Ink>;
 
 // 망치 — 제작 프로필(가진 장비와 경험)
@@ -23,10 +24,13 @@ export const IconHammer = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
   <path d="M11.4 3.6 9.3 5.6l5.2 5.2 2-2c.6-.6.6-1.6 0-2.2l-3-3a1.6 1.6 0 0 0-2.1 0Z" />
 </Ink>;
 
-// 3D 프린터 — 메이커스페이스
+// 3D 프린터 — 메이커스페이스. 처음엔 네모 상자로 그렸더니 바로 옆 '개발 연결'(노트북)과
+// 구분이 안 됐다. 열린 문틀 모양 뼈대에 가로 레일, 매달린 노즐, 바닥판 위에 출력 중인
+// 덩어리를 두어 프린터로 읽히게 했다.
 export const IconPrinter = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
-  <path d="M3.6 3.8h12.8v8.4H3.6z" /><path d="M6.4 12.2v2.1h7.2v-2.1" />
-  <path d="M8.3 7h3.4l-.7 2.6H9z" /><path d="M5 16.4h10" />
+  <path d="M3.6 16.4V3.6h12.8v12.8" /><path d="M3.6 7.2h12.8" />
+  <path d="M10 7.2v1.5" /><path d="M8.9 8.7h2.2l-1.1 1.6z" />
+  <path d="M8.2 11.8h3.6v2.9H8.2z" /><path d="M5.6 14.7h8.8" />
 </Ink>;
 
 export const IconTrash = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
