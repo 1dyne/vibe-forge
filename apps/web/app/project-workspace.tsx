@@ -8,7 +8,7 @@ import WorkbenchPanel from "./workbench-panel";
 import ConnectPanel from "./connect-panel";
 import AccountPanel from "./account-panel";
 import MakerspaceList from "./makerspace-list";
-import Tutorial from "./tutorial";
+import Tour, { type Station } from "./tour";
 import DeleteProjectDialog from "./delete-project-dialog";
 import ProgressPanel, { ProgressRing } from "./progress-panel";
 import { projectProgress } from "../lib/progress";
@@ -67,6 +67,23 @@ export default function ProjectWorkspace() {
   },[project?.id,showArtifacts,prefsReady,newMarks.join("|")]);// eslint-disable-line react-hooks/exhaustive-deps
   // 슬라이드 아홉 장짜리 안내는 자동으로 띄우지 않는다. 화면을 가린 채 그림만 보여줘서,
   // 다 읽고 닫아도 실제 화면 어디에 뭐가 있는지는 알 수 없었다. 화면 투어로 교체 중.
+  const tourStations: Station[] = [
+    { key: "projects", target: "projects", title: "여기에 프로젝트가 쌓여요",
+      body: <><p>아이디어 하나가 프로젝트 하나입니다. 이름 왼쪽 고리가 <b>진행률</b>이에요.</p><p>이름을 두 번 누르면 바꾸고, 끌어서 순서를 바꿉니다.</p></> },
+    { key: "composer", target: "composer", title: "여기서 이야기해요",
+      body: <><p>만들고 싶은 것을 한 줄로 적으면 대장 달그락이 되물으며 같이 좁혀줍니다.</p><p>내 AI에 커넥터를 붙였다면, 거기서 나눈 이야기가 이 자리에 정리돼 쌓입니다.</p></> },
+    { key: "progress", target: "progress", title: "지금 어느 단계인지",
+      body: <><p>체크리스트부터 조립까지 여덟 단계 중 어디인지 보여줍니다. 눌러 펼치면 남은 것과 <b>꼭 고칠 것</b>이 나와요.</p></> },
+    { key: "workbench-button", target: "workbench-button", title: "만들어진 것은 작업대로",
+      body: <><p>설계도·회로·3D 목업·부품 목록·할 일이 전부 여기 쌓입니다. 새로 생기면 주황 점이 붙어요.</p></> },
+    { key: "workbench", target: "workbench", title: "작업대", optional: true,
+      before: () => { if (project && !showArtifacts) setWorkbench(project.id, true, selectedItem?.id ?? ""); },
+      body: <><p>탭을 바꿔가며 회로와 3D를 보고, <b>함께 할 다음 작업</b>에서 내가 할 일과 달그락이 할 일을 나눠 봅니다.</p></> },
+    { key: "settings", target: "settings", title: "한 번만 정해두면 되는 것",
+      body: <><p>가진 장비와 경험, 자주 가는 메이커스페이스는 <b>계정에 저장</b>돼 모든 프로젝트가 같이 씁니다.</p></> },
+    { key: "ai-connect", target: "ai-connect", title: "내가 쓰는 AI에 붙이기",
+      body: <><p>Claude·ChatGPT·Replit·터미널 중 쓰는 것을 고르면 그 도구에 맞는 순서가 나옵니다.</p></> }
+  ];
   const layout=useWorkspaceLayout(showArtifacts);
   const workflow=project?workflowFor(project):null;
   const phase=workflow?.phase??"brainstorm";
@@ -152,7 +169,7 @@ export default function ProjectWorkspace() {
       <button className="brand" onClick={()=>switchProject(null)} disabled={!!busy} aria-label="달그락 대장간 · 새로운 아이디어로 이동"><img src="/characters/idle.png" alt=""/><span>달그락 대장간<small>생각을 손에 잡히게.</small></span></button>
       <button className="new-project" onClick={()=>switchProject(null)} disabled={!!busy}>＋ 새로운 아이디어</button>
       <button className="nav-caption projects-toggle" aria-expanded={preferences.projectsOpen} aria-controls="project-folders" onClick={toggleProjects}><span>{preferences.projectsOpen?"⌄":"›"} 프로젝트</span><span>{projects.length}{viewer.kind==="user"&&viewer.projectLimit?`/${viewer.projectLimit}`:""}</span></button>
-      {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" aria-label="프로젝트 목록">{projects.map((p,index)=>{
+      {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" data-tour="projects" aria-label="프로젝트 목록">{projects.map((p,index)=>{
         const w=workflowFor(p);const progress=projectProgress(p);const expanded=preferences.expanded.includes(p.id);const active=p.id===selectedId;
         return <section className={"project-folder "+(active?"active-folder":"")} key={p.id}>
           <div className={"folder-heading"+(dragId===p.id?" dragging":"")} draggable={!renaming&&!busy}
@@ -174,11 +191,11 @@ export default function ProjectWorkspace() {
           {expanded&&<nav className="rooms project-rooms" id={"rooms-"+p.id} aria-label={p.name+" 작업실"}><button disabled={!!busy} className={active&&channel==="main"?"selected":""} aria-current={active&&channel==="main"?"page":undefined} onClick={()=>switchProject(p.id,"main")}>⌂ {w.phase==="workshop"?"메인 대장간":"대장과 아이디어 나누기"}</button>{w.phase==="workshop"&&Array.from(new Set<AgentId>(["chief",...w.activeAgents])).map(a=><button key={a} disabled={!!busy} className={active&&channel===a?"selected":""} aria-current={active&&channel===a?"page":undefined} onClick={()=>switchProject(p.id,a)}><span className={"agent-dot dot-"+a}/>{agentName(a,preferences.shortNames)}<small>작업실</small></button>)}</nav>}
         </section>;
       })}{!projects.length&&!loading&&<p className="muted empty-projects">첫 아이디어를 이야기하면 프로젝트 폴더가 생겨요.</p>}</nav>}
-      <div className="sidebar-bottom"><span className="online-dot"/> {viewer.kind==="user"?viewer.name+"의 작업 공간":"내 작업 공간"}{viewer.kind==="user"&&viewer.webAi&&viewer.credit&&viewer.credit.allowanceUsd>0&&<span className="credit-line" title="앱 안에서 대장 달그락과 대화할 때만 줄어요. 내 Claude에 커넥터를 연결해 쓰면 줄지 않아요.">오늘 남은 대화 {Math.round((viewer.credit.remainingUsd/viewer.credit.allowanceUsd)*100)}%</span>}{viewer.kind==="operator"&&<a className="admin-link" href="/admin"><IconPeople/> 참여자 관리</a>}{viewer.kind==="user"&&<button onClick={()=>setShowAccount(true)}><IconPerson/> 내 계정</button>}<span className="nav-group">내 설정</span><button onClick={()=>setShowTutorial(true)}><IconBook/> 사용법 다시 보기</button><button disabled={!!busy} onClick={()=>void openProfile()}><IconHammer/> 제작 프로필</button><button onClick={()=>setMakerHelp(true)}><IconPrinter/> 메이커스페이스·3D 프린터</button><span className="nav-group">연결</span><button disabled={!project} onClick={()=>setConnectTab("ai")}><IconLink/> AI 연결</button><button disabled={!project} onClick={()=>setConnectTab("dev")}><IconLaptop/> 개발 연결</button><div className="workspace-settings"><button onClick={toggleShortNames} aria-pressed={preferences.shortNames} title="달그락 이름을 하드웨어 달그락 ↔ HW처럼 바꿔 보여줍니다">{preferences.shortNames?"이름 길게 보기":"이름 짧게 보기"}</button>{!layout.isDefault&&<button onClick={layout.reset} title="끌어서 바꾼 칸 너비를 처음 크기로 돌립니다">칸 너비 원래대로</button>}<form method="post" action="/api/session"><input type="hidden" name="intent" value="logout"/><button disabled={!!busy}>로그아웃</button></form></div></div>
+      <div className="sidebar-bottom" data-tour="settings"><span className="online-dot"/> {viewer.kind==="user"?viewer.name+"의 작업 공간":"내 작업 공간"}{viewer.kind==="user"&&viewer.webAi&&viewer.credit&&viewer.credit.allowanceUsd>0&&<span className="credit-line" title="앱 안에서 대장 달그락과 대화할 때만 줄어요. 내 Claude에 커넥터를 연결해 쓰면 줄지 않아요.">오늘 남은 대화 {Math.round((viewer.credit.remainingUsd/viewer.credit.allowanceUsd)*100)}%</span>}{viewer.kind==="operator"&&<a className="admin-link" href="/admin"><IconPeople/> 참여자 관리</a>}{viewer.kind==="user"&&<button onClick={()=>setShowAccount(true)}><IconPerson/> 내 계정</button>}<span className="nav-group">내 설정</span><button onClick={()=>setShowTutorial(true)}><IconBook/> 사용법 다시 보기</button><button disabled={!!busy} onClick={()=>void openProfile()}><IconHammer/> 제작 프로필</button><button onClick={()=>setMakerHelp(true)}><IconPrinter/> 메이커스페이스·3D 프린터</button><span className="nav-group">연결</span><button data-tour="ai-connect" disabled={!project} onClick={()=>setConnectTab("ai")}><IconLink/> AI 연결</button><button disabled={!project} onClick={()=>setConnectTab("dev")}><IconLaptop/> 개발 연결</button><div className="workspace-settings"><button onClick={toggleShortNames} aria-pressed={preferences.shortNames} title="달그락 이름을 하드웨어 달그락 ↔ HW처럼 바꿔 보여줍니다">{preferences.shortNames?"이름 길게 보기":"이름 짧게 보기"}</button>{!layout.isDefault&&<button onClick={layout.reset} title="끌어서 바꾼 칸 너비를 처음 크기로 돌립니다">칸 너비 원래대로</button>}<form method="post" action="/api/session"><input type="hidden" name="intent" value="logout"/><button disabled={!!busy}>로그아웃</button></form></div></div>
     </aside>
     <ResizeHandle className="sidebar-resizer" controls="project-sidebar" label="프로젝트 영역 크기 조절" axis={layout.mobile?"y":"x"} value={layout.mobile?layout.sizes.sidebarHeight:layout.sizes.sidebar} min={layout.mobile?120:160} max={480} onResize={v=>resize(layout.mobile?"sidebarHeight":"sidebar",v)} onReset={()=>resize(layout.mobile?"sidebarHeight":"sidebar",layout.mobile?210:240)}/>
     <section className="chat-panel" id="chat-panel" aria-label="대화">
-      <header className="chat-header"><div><h1 title={project?.name??"새로운 아이디어"}>{project?.name??"새로운 아이디어"}</h1><span className="breadcrumb">{workshop?(channel==="main"?"메인 대장간":agentName(channel,preferences.shortNames)+" 작업실"):phaseNames[phase]}</span></div>{items.length>0&&<button className={"workbench-toggle"+(newMarks.length?" has-new":"")} aria-expanded={showArtifacts} aria-controls="workbench-panel" onClick={()=>project&&setWorkbench(project.id,!showArtifacts,selectedItem.id)}><IconDesk/> 작업대 <span>{items.length}</span>{newMarks.length>0&&<em className="new-dot" role="img" aria-label={`새로 온 것 ${newMarks.length}개`}/>}</button>}</header>
+      <header className="chat-header"><div><h1 title={project?.name??"새로운 아이디어"}>{project?.name??"새로운 아이디어"}</h1><span className="breadcrumb">{workshop?(channel==="main"?"메인 대장간":agentName(channel,preferences.shortNames)+" 작업실"):phaseNames[phase]}</span></div>{items.length>0&&<button data-tour="workbench-button" className={"workbench-toggle"+(newMarks.length?" has-new":"")} aria-expanded={showArtifacts} aria-controls="workbench-panel" onClick={()=>project&&setWorkbench(project.id,!showArtifacts,selectedItem.id)}><IconDesk/> 작업대 <span>{items.length}</span>{newMarks.length>0&&<em className="new-dot" role="img" aria-label={`새로 온 것 ${newMarks.length}개`}/>}</button>}</header>
       {project&&<ProgressPanel project={project} onAction={action} busy={!!busy}/>}
       {/* 새 작업물과 새 할 일이 조용히 늘어나기만 해서, 화면이 바뀐 줄도 모르고 지나갔다.
           작업대가 닫혀 있을 때는 여기서 한 줄로 불러 세운다. */}
@@ -202,7 +219,7 @@ export default function ProjectWorkspace() {
         {loading&&<p className="loading-text">저장한 프로젝트를 불러오고 있어요…</p>}<div ref={end}/>
       </div>
       <ResizeHandle className="composer-resizer" controls="composer-area" label="대화 입력 영역 높이 조절" axis="y" reverse value={layout.sizes.composer} min={layoutLimits.composer[0]} max={layoutLimits.composer[1]} onResize={v=>resize("composer",v)} onReset={()=>resize("composer",160)}/>
-      <footer className="composer-area" id="composer-area">{error&&<div role="alert" className="error-banner">{error}<button onClick={()=>setError("")}>닫기</button></div>}{attachments.length>0&&<div className="attachment-previews">{attachments.map((a,i)=><div key={i}><img src={a.dataUrl} alt={a.name}/><button type="button" aria-label={a.name+" 첨부 제거"} onClick={()=>setAttachments(attachments.filter((_,j)=>j!==i))}>×</button></div>)}</div>}
+      <footer className="composer-area" data-tour="composer" id="composer-area">{error&&<div role="alert" className="error-banner">{error}<button onClick={()=>setError("")}>닫기</button></div>}{attachments.length>0&&<div className="attachment-previews">{attachments.map((a,i)=><div key={i}><img src={a.dataUrl} alt={a.name}/><button type="button" aria-label={a.name+" 첨부 제거"} onClick={()=>setAttachments(attachments.filter((_,j)=>j!==i))}>×</button></div>)}</div>}
         {connectorOnly?<div className="connector-composer"><strong>대화는 연결한 AI에서 이어가요</strong><p>연결한 AI가 나눈 이야기와 설계를 이곳에 기록해요. 이 화면은 자동으로 새로고침되고, 회로·3D 승인과 구매·측정 기록은 여기서 직접 해요.</p></div>:<form className="composer" onSubmit={submit}><textarea value={text} aria-label={project?"채팅 메시지":"아이디어 입력"} placeholder={workshop?(channel==="main"?"달그락 팀":agentName(channel,preferences.shortNames))+"에게 이야기해주세요…":"머릿속 아이디어를 들려주세요. 이미지도 좋아요."} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!busy)void submit(e);}}} disabled={!!busy||loading}/><div className="composer-tools"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={e=>attach(e.target.files)}/><button type="button" aria-label="이미지 첨부" disabled={!!busy} onClick={()=>fileInput.current?.click()}>＋ <span>이미지 첨부</span></button><span className="composer-hint">{workshop?(mode==="evaluate"?"평가":"작업")+" · 팀 전체 기록 공유":"대장 달그락과 함께"}</span><button type="submit" className="send" aria-label="메시지 보내기" disabled={!!busy||loading||(!text.trim()&&!attachments.length)}>↑</button></div></form>}<p className="composer-footnote">{project?.origin==="connector"?"이 프로젝트의 대화와 설계는 Claude에서 만들어졌어요. 중요한 제작 결정은 직접 검토해주세요.":project?.lastAgentMode==="mock"?"Mock · 실제 AI 분석 없이 기록만 저장됩니다.":"AI 제안은 확인이 필요해요. 중요한 제작 결정은 함께 검토합니다."}</p>
       </footer>
     </section>
@@ -216,7 +233,7 @@ export default function ProjectWorkspace() {
       <h3>이렇게 찾아보세요</h3><ul className="maker-tips"><li><b>메이크올(makeall.com)</b>에서 지역으로 메이커스페이스와 보유 장비를 검색해요.</li><li>검색어: “[내 지역] 메이커스페이스 3D 프린터 예약”, “[내 지역] 팹랩”, “[내 지역] 무한상상실”.</li><li>공간 소개에서 보유 프린터를 확인해요. 흔한 예: 뱀부랩(Bambu Lab), 큐비콘(Cubicon), 신도리코(Sindoh), 크리얼리티(Creality), 프루사(Prusa). 같은 이름으로 “[프린터 이름] 사용법”을 검색하면 출력 준비에 도움이 돼요.</li><li>이용 조건(기본 교육 이수, 예약 방법, 재료비)과 운영 시간은 방문 전에 공식 페이지에서 꼭 확인하세요.</li></ul>
       <MakerspaceList/>
       <button className="primary" onClick={()=>setMakerHelp(false)}>확인</button></section></div>}
-    {showTutorial&&<Tutorial shortNames={preferences.shortNames} onToggleShortNames={setShortNames} onClose={()=>{setShowTutorial(false);setTutorialSeen(true);}}/>}
+    {showTutorial&&<Tour stations={tourStations} onClose={()=>{setShowTutorial(false);setTutorialSeen(true);}}/>}
     {showAccount&&<AccountPanel onClose={()=>setShowAccount(false)}/>}
     {deleting&&<DeleteProjectDialog project={deleting} used={projects.length} limit={viewer.kind==="user"?viewer.projectLimit??null:null} onClose={()=>setDeleting(null)} onDeleted={id=>{setDeleting(null);setProjects(ps=>ps.filter(x=>x.id!==id));if(selectedId===id)switchProject(null);}}/>}
     {connectTab&&project&&<ConnectPanel key={project.id} project={project} tab={connectTab} busy={!!busy} onTab={setConnectTab} onClose={()=>setConnectTab(null)} onAction={action}/>}

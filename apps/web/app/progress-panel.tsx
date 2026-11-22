@@ -25,7 +25,7 @@ export default function ProgressPanel({ project, onAction, busy }: { project: Lo
   const live = project.liveStatus && Date.now() - new Date(project.liveStatus.updatedAt).getTime() < 15 * 60_000 ? project.liveStatus : null;
   const working = live?.plan.some((item) => item.status !== "done");
   const activity = (project.activity ?? []).slice(-6).reverse();
-  return <section className="progress-panel" aria-label="진행 단계">
+  return <section className="progress-panel" data-tour="progress" aria-label="진행 단계">
     <button className="progress-head" aria-expanded={open} onClick={() => setOpen(!open)}>
       <span>{open ? "⌄" : "›"} 진행 단계</span>
       <span className={"progress-now" + (progress.blocked ? " blocked" : "")}>{current ? `${progress.blocked ? "꼭 고칠 것 · " : ""}${progress.percent}% · ${current.label}` : "다 끝냈어요 · 100%"}</span>

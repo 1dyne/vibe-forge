@@ -291,3 +291,20 @@ tr.is-new{animation-name:new-flash-row}
 @keyframes art-pop{0%{transform:scale(.7)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
 .art-alert{transform-origin:center;transform-box:fill-box;animation:art-pop .55s .5s ease-out both;stroke:var(--danger)}
 .tutorial-body{animation:art-in .35s ease-out both}
+
+/* 화면 투어. 짚는 자리만 남기고 나머지를 덮는다. 덮개는 링의 거대한 box-shadow 하나로
+   만든다 — 마스크를 쓰면 브라우저마다 가장자리가 달라진다. */
+.tour-layer{position:fixed;inset:0;z-index:60;pointer-events:none}
+.tour-dim{position:fixed;inset:0;background:rgba(24,34,30,.55)}
+.tour-ring{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(24,34,30,.55),0 0 0 2px #7fc3b1 inset;transition:top .28s ease,left .28s ease,width .28s ease,height .28s ease;animation:tour-pop .32s ease-out}
+@keyframes tour-pop{from{box-shadow:0 0 0 9999px rgba(24,34,30,.55),0 0 0 7px rgba(127,195,177,.5) inset}}
+.tour-bubble{position:fixed;background:var(--paper);border-radius:13px;padding:14px 16px 12px;box-shadow:0 10px 30px rgba(20,30,26,.3);pointer-events:auto;outline:none;transition:top .28s ease,left .28s ease}
+.tour-count{font-size:9px;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+.tour-bubble>strong{display:block;font-size:14px;margin-bottom:6px}
+.tour-body{font-size:12.5px;line-height:1.75;color:#3c4a44}
+.tour-body p{margin:0 0 7px}
+.tour-body p:last-child{margin:0}
+.tour-nav{display:flex;align-items:center;gap:7px;margin-top:12px}
+.tour-nav button{font-size:11px;padding:7px 11px}
+.tour-skip{border:0;background:none;color:var(--muted);padding:6px 2px}
+.tour-spacer{flex:1}
