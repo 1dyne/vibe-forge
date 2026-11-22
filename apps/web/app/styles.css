@@ -255,3 +255,39 @@ tr.is-new{animation-name:new-flash-row}
 .message-text>p:last-child,.message-text>ul:last-child,.message-text>ol:last-child{margin-bottom:0}
 .message-text>ul,.message-text>ol{margin:0 0 10px;padding-left:19px}
 .message-text>ul li,.message-text>ol li{padding:2px 0}
+
+/* 사용법 안내. 읽는 화면이라 본문을 넓게 잡고 글자도 키웠다. */
+.tutorial-backdrop{align-items:center}
+.tutorial{background:var(--paper);border-radius:16px;width:min(640px,94vw);max-height:92vh;overflow:auto;padding:20px 26px 18px;outline:none}
+.tutorial header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.tutorial-skip{border:0;background:none;font-size:11px;color:var(--muted);padding:4px}
+.tutorial h2{font-size:21px;margin:12px 0 10px;letter-spacing:-.5px}
+.tutorial-body p{font-size:13.5px;line-height:1.85;margin:0 0 10px;color:#3c4a44}
+.tutorial-stage{display:flex;align-items:center;justify-content:center;min-height:150px;background:#f2f5f1;border-radius:12px;color:#44584f;padding:14px}
+.tutorial-art{width:100%;max-width:330px;height:auto}
+.tutorial-team{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;text-align:center}
+.tutorial-team>div{width:92px}
+.tutorial-team strong{display:block;font-size:11px;margin-top:5px;line-height:1.35}
+.tutorial-team small{display:block;font-size:9px;color:var(--muted)}
+.tutorial-choice{display:flex;flex-wrap:wrap;gap:7px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;font-size:12px}
+.tutorial-choice button{font-size:11px;padding:6px 10px}
+.tutorial-choice button.on{background:var(--mint);border-color:var(--mint);font-weight:650}
+.tutorial-choice small{flex-basis:100%;font-size:10px;color:var(--muted);line-height:1.6}
+.tutorial footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}
+.tutorial-dots{display:flex;gap:6px;list-style:none;margin:0;padding:0}
+.tutorial-dots button{width:8px;height:8px;padding:0;border-radius:50%;border:1px solid #c6d2cb;background:#fff}
+.tutorial-dots button.done{background:#b7d4c8;border-color:#b7d4c8}
+.tutorial-dots button.on{background:#4d8f7e;border-color:#4d8f7e;transform:scale(1.25)}
+.tutorial-nav{display:flex;gap:8px}
+
+/* 그림의 움직임: 순서대로 나타나고, 흐름은 그려지고, 조심할 것은 한 번 뛴다. */
+@keyframes art-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.art-in{opacity:0;animation:art-in .42s ease-out forwards}
+@keyframes art-draw{to{stroke-dashoffset:0}}
+.art-flow,.art-dim,.art-check,.art-cross{stroke-dasharray:160;stroke-dashoffset:160;animation:art-draw .9s .35s ease-out forwards}
+.art-check{stroke:#3f8d6f}
+.art-cross{stroke:var(--warn)}
+.art-dim{stroke:#93a39a}
+@keyframes art-pop{0%{transform:scale(.7)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.art-alert{transform-origin:center;transform-box:fill-box;animation:art-pop .55s .5s ease-out both;stroke:var(--danger)}
+.tutorial-body{animation:art-in .35s ease-out both}

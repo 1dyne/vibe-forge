@@ -8,13 +8,14 @@ import WorkbenchPanel from "./workbench-panel";
 import ConnectPanel from "./connect-panel";
 import AccountPanel from "./account-panel";
 import MakerspaceList from "./makerspace-list";
+import Tutorial from "./tutorial";
 import DeleteProjectDialog from "./delete-project-dialog";
 import ProgressPanel, { ProgressRing } from "./progress-panel";
 import { projectProgress } from "../lib/progress";
 import { CHECKLIST } from "../lib/checklist";
 import { ResizeHandle, useWorkspaceLayout, layoutLimits } from "./workspace-layout";
 import { useWorkspacePreferences } from "./workspace-preferences";
-import { IconDesk, IconHammer, IconLaptop, IconLink, IconPencil, IconPeople, IconPerson, IconPrinter, IconTrash, IconUndo } from "./icons";
+import { IconBook, IconDesk, IconHammer, IconLaptop, IconLink, IconPencil, IconPeople, IconPerson, IconPrinter, IconTrash, IconUndo } from "./icons";
 import MessageText from "./message-text";
 
 type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean; projectLimit?: number; credit?: { remainingUsd: number; allowanceUsd: number } | null };
@@ -35,6 +36,7 @@ export default function ProjectWorkspace() {
   const [mode,setMode]=useState<"work"|"evaluate">("work");
   const [showProfile,setShowProfile]=useState(false);
   const [profileScope,setProfileScope]=useState<"project"|"account">("project");
+  const [showTutorial,setShowTutorial]=useState(false);
   const [renaming,setRenaming]=useState<string|null>(null);
   const [dragId,setDragId]=useState<string|null>(null);
   const [profile,setProfile]=useState<MakerProfile>(emptyProfile());
@@ -43,7 +45,7 @@ export default function ProjectWorkspace() {
   const [makerHelp,setMakerHelp]=useState(false);
   const [showAccount,setShowAccount]=useState(false);
   const [deleting,setDeleting]=useState<LocalProject|null>(null);
-  const {preferences,setWorkbench,expand,toggleProjects,toggleFolder,toggleShortNames,markSeen,ready:prefsReady}=useWorkspacePreferences();
+  const {preferences,setWorkbench,expand,toggleProjects,toggleFolder,toggleShortNames,setShortNames,setTutorialSeen,markSeen,ready:prefsReady}=useWorkspacePreferences();
   const end=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
   const project=projects.find(p=>p.id===selectedId)??null;
@@ -63,6 +65,7 @@ export default function ProjectWorkspace() {
     const timer=setTimeout(()=>markSeen(id,pending),2500);
     return ()=>clearTimeout(timer);
   },[project?.id,showArtifacts,prefsReady,newMarks.join("|")]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(prefsReady&&!preferences.tutorialSeen)setShowTutorial(true);},[prefsReady,preferences.tutorialSeen]);
   const layout=useWorkspaceLayout(showArtifacts);
   const workflow=project?workflowFor(project):null;
   const phase=workflow?.phase??"brainstorm";
@@ -170,7 +173,7 @@ export default function ProjectWorkspace() {
           {expanded&&<nav className="rooms project-rooms" id={"rooms-"+p.id} aria-label={p.name+" 작업실"}><button disabled={!!busy} className={active&&channel==="main"?"selected":""} aria-current={active&&channel==="main"?"page":undefined} onClick={()=>switchProject(p.id,"main")}>⌂ {w.phase==="workshop"?"메인 대장간":"대장과 아이디어 나누기"}</button>{w.phase==="workshop"&&Array.from(new Set<AgentId>(["chief",...w.activeAgents])).map(a=><button key={a} disabled={!!busy} className={active&&channel===a?"selected":""} aria-current={active&&channel===a?"page":undefined} onClick={()=>switchProject(p.id,a)}><span className={"agent-dot dot-"+a}/>{agentName(a,preferences.shortNames)}<small>작업실</small></button>)}</nav>}
         </section>;
       })}{!projects.length&&!loading&&<p className="muted empty-projects">첫 아이디어를 이야기하면 프로젝트 폴더가 생겨요.</p>}</nav>}
-      <div className="sidebar-bottom"><span className="online-dot"/> {viewer.kind==="user"?viewer.name+"의 작업 공간":"내 작업 공간"}{viewer.kind==="user"&&viewer.webAi&&viewer.credit&&viewer.credit.allowanceUsd>0&&<span className="credit-line" title="앱 안에서 대장 달그락과 대화할 때만 줄어요. 내 Claude에 커넥터를 연결해 쓰면 줄지 않아요.">오늘 남은 대화 {Math.round((viewer.credit.remainingUsd/viewer.credit.allowanceUsd)*100)}%</span>}{viewer.kind==="operator"&&<a className="admin-link" href="/admin"><IconPeople/> 참여자 관리</a>}{viewer.kind==="user"&&<button onClick={()=>setShowAccount(true)}><IconPerson/> 내 계정</button>}<span className="nav-group">내 설정</span><button disabled={!!busy} onClick={()=>void openProfile()}><IconHammer/> 제작 프로필</button><button onClick={()=>setMakerHelp(true)}><IconPrinter/> 메이커스페이스·3D 프린터</button><span className="nav-group">연결</span><button disabled={!project} onClick={()=>setConnectTab("ai")}><IconLink/> AI 연결</button><button disabled={!project} onClick={()=>setConnectTab("dev")}><IconLaptop/> 개발 연결</button><div className="workspace-settings"><button onClick={toggleShortNames} aria-pressed={preferences.shortNames} title="달그락 이름을 하드웨어 달그락 ↔ HW처럼 바꿔 보여줍니다">{preferences.shortNames?"이름 길게 보기":"이름 짧게 보기"}</button>{!layout.isDefault&&<button onClick={layout.reset} title="끌어서 바꾼 칸 너비를 처음 크기로 돌립니다">칸 너비 원래대로</button>}<form method="post" action="/api/session"><input type="hidden" name="intent" value="logout"/><button disabled={!!busy}>로그아웃</button></form></div></div>
+      <div className="sidebar-bottom"><span className="online-dot"/> {viewer.kind==="user"?viewer.name+"의 작업 공간":"내 작업 공간"}{viewer.kind==="user"&&viewer.webAi&&viewer.credit&&viewer.credit.allowanceUsd>0&&<span className="credit-line" title="앱 안에서 대장 달그락과 대화할 때만 줄어요. 내 Claude에 커넥터를 연결해 쓰면 줄지 않아요.">오늘 남은 대화 {Math.round((viewer.credit.remainingUsd/viewer.credit.allowanceUsd)*100)}%</span>}{viewer.kind==="operator"&&<a className="admin-link" href="/admin"><IconPeople/> 참여자 관리</a>}{viewer.kind==="user"&&<button onClick={()=>setShowAccount(true)}><IconPerson/> 내 계정</button>}<span className="nav-group">내 설정</span><button onClick={()=>setShowTutorial(true)}><IconBook/> 사용법 다시 보기</button><button disabled={!!busy} onClick={()=>void openProfile()}><IconHammer/> 제작 프로필</button><button onClick={()=>setMakerHelp(true)}><IconPrinter/> 메이커스페이스·3D 프린터</button><span className="nav-group">연결</span><button disabled={!project} onClick={()=>setConnectTab("ai")}><IconLink/> AI 연결</button><button disabled={!project} onClick={()=>setConnectTab("dev")}><IconLaptop/> 개발 연결</button><div className="workspace-settings"><button onClick={toggleShortNames} aria-pressed={preferences.shortNames} title="달그락 이름을 하드웨어 달그락 ↔ HW처럼 바꿔 보여줍니다">{preferences.shortNames?"이름 길게 보기":"이름 짧게 보기"}</button>{!layout.isDefault&&<button onClick={layout.reset} title="끌어서 바꾼 칸 너비를 처음 크기로 돌립니다">칸 너비 원래대로</button>}<form method="post" action="/api/session"><input type="hidden" name="intent" value="logout"/><button disabled={!!busy}>로그아웃</button></form></div></div>
     </aside>
     <ResizeHandle className="sidebar-resizer" controls="project-sidebar" label="프로젝트 영역 크기 조절" axis={layout.mobile?"y":"x"} value={layout.mobile?layout.sizes.sidebarHeight:layout.sizes.sidebar} min={layout.mobile?120:160} max={480} onResize={v=>resize(layout.mobile?"sidebarHeight":"sidebar",v)} onReset={()=>resize(layout.mobile?"sidebarHeight":"sidebar",layout.mobile?210:240)}/>
     <section className="chat-panel" id="chat-panel" aria-label="대화">
@@ -212,6 +215,7 @@ export default function ProjectWorkspace() {
       <h3>이렇게 찾아보세요</h3><ul className="maker-tips"><li><b>메이크올(makeall.com)</b>에서 지역으로 메이커스페이스와 보유 장비를 검색해요.</li><li>검색어: “[내 지역] 메이커스페이스 3D 프린터 예약”, “[내 지역] 팹랩”, “[내 지역] 무한상상실”.</li><li>공간 소개에서 보유 프린터를 확인해요. 흔한 예: 뱀부랩(Bambu Lab), 큐비콘(Cubicon), 신도리코(Sindoh), 크리얼리티(Creality), 프루사(Prusa). 같은 이름으로 “[프린터 이름] 사용법”을 검색하면 출력 준비에 도움이 돼요.</li><li>이용 조건(기본 교육 이수, 예약 방법, 재료비)과 운영 시간은 방문 전에 공식 페이지에서 꼭 확인하세요.</li></ul>
       <MakerspaceList/>
       <button className="primary" onClick={()=>setMakerHelp(false)}>확인</button></section></div>}
+    {showTutorial&&<Tutorial shortNames={preferences.shortNames} onToggleShortNames={setShortNames} onClose={()=>{setShowTutorial(false);setTutorialSeen(true);}}/>}
     {showAccount&&<AccountPanel onClose={()=>setShowAccount(false)}/>}
     {deleting&&<DeleteProjectDialog project={deleting} used={projects.length} limit={viewer.kind==="user"?viewer.projectLimit??null:null} onClose={()=>setDeleting(null)} onDeleted={id=>{setDeleting(null);setProjects(ps=>ps.filter(x=>x.id!==id));if(selectedId===id)switchProject(null);}}/>}
     {connectTab&&project&&<ConnectPanel key={project.id} project={project} tab={connectTab} busy={!!busy} onTab={setConnectTab} onClose={()=>setConnectTab(null)} onAction={action}/>}

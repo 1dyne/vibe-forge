@@ -66,3 +66,9 @@ export const IconPerson = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
   <path d="M10 9.6a2.8 2.8 0 1 0 0-5.6 2.8 2.8 0 0 0 0 5.6Z" />
   <path d="M4.4 16.4c0-2.9 2.4-4.9 5.6-4.9s5.6 2 5.6 4.9" />
 </Ink>;
+
+// 펼친 책 — 사용법 다시 보기
+export const IconBook = (p: SVGProps<SVGSVGElement>) => <Ink {...p}>
+  <path d="M10 5.6v10.2" /><path d="M10 5.6C8.4 4.3 6.4 3.8 3.6 3.8v10.2c2.8 0 4.8.5 6.4 1.8" />
+  <path d="M10 5.6c1.6-1.3 3.6-1.8 6.4-1.8v10.2c-2.8 0-4.8.5-6.4 1.8" />
+</Ink>;
