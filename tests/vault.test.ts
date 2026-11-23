@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { activeStore } from "./at-rest";
+import { usingPostgres } from "../apps/web/lib/row-store";
 import { createCipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -36,14 +38,14 @@ describe("sealed participant records", () => {
     const id = made.structuredContent.id as string;
     await call("set_maker_profile", { projectId: id, coreBehavior: "흙이 마르면 깜빡임", tools: ["멀티미터"], toolsConfirmed: true, firmwareExperience: "none" });
 
-    const raw = await readFile(dataFile(), "utf8");
+    const raw = await activeStore([dataFile(), usersFile()]);
     expect(raw).not.toContain("비밀 화분");
     expect(raw).not.toContain("흙이 마르면");
     expect(raw).toContain(user.id);
-    expect((await stat(dataFile())).mode & 0o077).toBe(0);
-    const users = await readFile(usersFile(), "utf8");
-    expect(users).not.toContain(token);
-    expect(users).not.toContain("tokenSealed");
+    expect(raw).not.toContain(token);
+    expect(raw).not.toContain("tokenSealed");
+    // 파일로 저장할 때만 뜻이 있는 확인.
+    if (!usingPostgres()) expect((await stat(dataFile())).mode & 0o077).toBe(0);
 
     const list = async (cookie: string) => listRoute(new NextRequest("http://localhost/api/projects", { headers: { cookie: `dalgeurak_session=${cookie}` } }));
     const own = await (await list(userSessionValue(token))).json();
@@ -79,9 +81,9 @@ describe("sealed participant records", () => {
     const store = await import("../apps/web/lib/local-project-store");
     const { vaultFor, withVault } = await import("../apps/web/lib/vault");
     expect(await store.getProject(legacyProject.id)).toBeNull();
-    const raw = await readFile(path.join(legacyFolder, "projects.json"), "utf8");
+    const raw = await activeStore([path.join(legacyFolder, "projects.json"), path.join(legacyFolder, "users.json")]);
     expect(raw).not.toContain("평문");
-    expect(await readFile(path.join(legacyFolder, "users.json"), "utf8")).not.toContain("tokenSealed");
+    expect(raw).not.toContain("tokenSealed");
     const opened = await withVault(vaultFor(token, userId), () => store.getProject(legacyProject.id));
     expect(opened?.idea).toBe("평문으로 남아 있던 아이디어");
     expect((await withVault(vaultFor(token, userId), () => store.getMakerProfile(userId)))?.coreBehavior).toBe("평문 프로필");

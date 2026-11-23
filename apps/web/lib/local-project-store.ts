@@ -5,6 +5,7 @@ import type { AgentPlan, BuildResult, DesignSlot, ImageAttachment, LocalProject,
 import { emptyProfile, personPart, workflowFor } from "./workflow";
 import { forgetLegacyTokens, takeLegacyTokens } from "./users";
 import { currentVault, open, seal, vaultFor, withVault, type Vault } from "./vault";
+import { importOnce, readRows, snapshotOf, usingPostgres, writeRows, type Row } from "./row-store";
 
 const labels: Array<[DesignSlot["key"], string]> = [
   ["power", "전원"],
@@ -19,10 +20,18 @@ const labels: Array<[DesignSlot["key"], string]> = [
 
 type SealedProject = { id: string; ownerId: string; updatedAt: string; sealed: string };
 type SealedProfile = { sealed: string };
-type StoredDatabase = { version: 1; projects: Array<LocalProject | SealedProject>; profile?: MakerProfile; profiles?: Record<string, MakerProfile | SealedProfile> };
+// 읽을 때 본 모습. 쓸 때 이것과 달라진 행만 쓴다 (row-store.ts의 설명 참고).
+// Database로 풀었다가 StoredDatabase로 다시 묶는 동안 함께 따라다녀야 해서
+// 심볼 키로 붙인다 — 전개 연산자({...x})가 심볼 키를 그대로 옮겨준다.
+const SNAPSHOT = Symbol("rows-as-read");
+type Snapshot = { projects: Map<string, string>; profiles: Map<string, string> };
+// 운영자의 옛 전역 프로필에는 ownerId가 없다. 행으로 옮기면서 이 이름을 준다.
+// 참여자 ownerId는 UUID라서 겹치지 않는다.
+const OPERATOR_PROFILE = "(operator)";
+type StoredDatabase = { version: 1; projects: Array<LocalProject | SealedProject>; profile?: MakerProfile; profiles?: Record<string, MakerProfile | SealedProfile>; [SNAPSHOT]?: Snapshot };
 // In memory: the operator's projects and the current participant's opened
 // records are plain; every other participant's records stay sealed in hidden.
-type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile>; hidden: { projects: SealedProject[]; profiles: Record<string, SealedProfile> } };
+type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile>; hidden: { projects: SealedProject[]; profiles: Record<string, SealedProfile> }; [SNAPSHOT]?: Snapshot };
 let queue: Promise<unknown> = Promise.resolve();
 let migration: Promise<void> | null = null;
 
@@ -37,7 +46,7 @@ const isSealed = (value: unknown): value is { sealed: string } => typeof (value 
 const projectLabel = (id: string, ownerId: string) => `project:${id}:${ownerId}`;
 const profileLabel = (ownerId: string) => `profile:${ownerId}`;
 
-async function readStored(): Promise<StoredDatabase> {
+async function readFileStored(): Promise<StoredDatabase> {
   try {
     const parsed = JSON.parse(await readFile(/* turbopackIgnore: true */ dataFile(), "utf8")) as StoredDatabase;
     if (parsed.version !== 1 || !Array.isArray(parsed.projects)) throw new Error("저장된 프로젝트 형식을 읽을 수 없습니다.");
@@ -48,7 +57,45 @@ async function readStored(): Promise<StoredDatabase> {
   }
 }
 
+// 볼륨에 있던 local-projects.json을 처음 한 번만 옮긴다. 봉인된 기록은 봉인된
+// 채로 옮긴다 — 서버는 열쇠가 없어서 열 수도 없고, 열 이유도 없다.
+let imported: Promise<void> | null = null;
+function importProjectsOnce(): Promise<void> {
+  imported ??= importOnce(`projects:${dataFile()}`, async () => {
+    const file = await readFileStored();
+    const profiles: Row[] = Object.entries(file.profiles ?? {}).map(([ownerId, profile]) => ({ id: ownerId, data: profile }));
+    if (file.profile) profiles.push({ id: OPERATOR_PROFILE, data: file.profile });
+    return [
+      { table: "forge_projects" as const, rows: file.projects.map((project): Row => ({ id: project.id, data: project })) },
+      { table: "forge_profiles" as const, rows: profiles }
+    ];
+  }).then(() => undefined).catch((error) => { imported = null; throw error; });
+  return imported;
+}
+
+async function readStored(): Promise<StoredDatabase> {
+  if (!usingPostgres()) return readFileStored();
+  await importProjectsOnce();
+  const [projects, profiles] = await Promise.all([readRows("forge_projects"), readRows("forge_profiles")]);
+  const operator = profiles.find((row) => row.id === OPERATOR_PROFILE);
+  return {
+    version: 1,
+    projects: projects.map((row) => row.data as LocalProject | SealedProject),
+    ...(operator ? { profile: operator.data as MakerProfile } : {}),
+    profiles: Object.fromEntries(profiles.filter((row) => row.id !== OPERATOR_PROFILE).map((row) => [row.id, row.data as MakerProfile | SealedProfile])),
+    [SNAPSHOT]: { projects: snapshotOf(projects), profiles: snapshotOf(profiles) }
+  };
+}
+
 async function writeStored(database: StoredDatabase) {
+  if (usingPostgres()) {
+    const before = database[SNAPSHOT] ?? { projects: new Map(), profiles: new Map() };
+    const profiles: Row[] = Object.entries(database.profiles ?? {}).map(([ownerId, profile]) => ({ id: ownerId, data: profile }));
+    if (database.profile) profiles.push({ id: OPERATOR_PROFILE, data: database.profile });
+    await writeRows("forge_projects", database.projects.map((project): Row => ({ id: project.id, data: project })), before.projects);
+    await writeRows("forge_profiles", profiles, before.profiles);
+    return;
+  }
   const file = dataFile();
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;
@@ -85,7 +132,7 @@ async function readDatabase(): Promise<Database> {
   await migrateLegacy();
   const stored = await readStored();
   const vault = currentVault();
-  const database: Database = { version: 1, projects: [], ...(stored.profile ? { profile: stored.profile } : {}), hidden: { projects: [], profiles: {} } };
+  const database: Database = { version: 1, projects: [], ...(stored.profile ? { profile: stored.profile } : {}), hidden: { projects: [], profiles: {} }, ...(stored[SNAPSHOT] ? { [SNAPSHOT]: stored[SNAPSHOT] } : {}) };
   for (const item of stored.projects) {
     if (!isSealed(item)) { database.projects.push(item); continue; }
     const opened = vault && item.ownerId === vault.ownerId ? open<LocalProject>(item.sealed, vault.key, projectLabel(item.id, item.ownerId)) : null;

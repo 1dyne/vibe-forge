@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { activeStore } from "./at-rest";
 import { NextRequest } from "next/server";
 import { GET as resourceMetadata } from "../apps/web/app/.well-known/oauth-protected-resource/[[...path]]/route";
 import { GET as serverMetadata } from "../apps/web/app/.well-known/oauth-authorization-server/[[...path]]/route";
@@ -107,7 +108,7 @@ describe("MCP OAuth", () => {
     const stored = await readFile(path.join(folder, "oauth.json"), "utf8");
     expect(stored).not.toContain(issued.access_token);
     expect(stored).not.toContain(issued.refresh_token);
-    expect(await readFile(path.join(folder, "projects.json"), "utf8")).not.toContain("비밀 램프");
+    expect(await activeStore([path.join(folder, "projects.json")])).not.toContain("비밀 램프");
 
     const refreshed = await (await token(form({ grant_type: "refresh_token", refresh_token: issued.refresh_token, client_id: again.client.client_id }))).json();
     expect(refreshed.access_token).not.toBe(issued.access_token);

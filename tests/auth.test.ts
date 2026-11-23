@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { allAtRest } from "./at-rest";
 import { NextRequest } from "next/server";
 import { POST as signup } from "../apps/web/app/api/auth/signup/route";
 import { POST as verify } from "../apps/web/app/api/auth/verify/route";
@@ -102,7 +103,7 @@ describe("email accounts", () => {
     expect(made.isError).toBeFalsy();
     expect((await projectsOf(cookie))!.map((p) => p.idea)).toEqual(["비밀번호로 잠긴 아이디어"]);
 
-    const raw = [await readFile(path.join(folder, "projects.json"), "utf8"), await readFile(path.join(folder, "users.json"), "utf8"), await readFile(path.join(folder, "auth.json"), "utf8")].join("\n");
+    const raw = await allAtRest([path.join(folder, "projects.json"), path.join(folder, "users.json"), path.join(folder, "auth.json")]);
     expect(raw).not.toContain("비밀번호로 잠긴");
     expect(raw).not.toContain("correct horse battery");
     expect(raw).not.toContain(recoveryCode);
@@ -202,7 +203,7 @@ describe("Google accounts", () => {
     const account = await (await me(new NextRequest(`${ORIGIN}/api/me`, { headers: { cookie } }))).json();
     expect(account).toMatchObject({ auth: "google", email: "googler@example.com", lock: "server", passwordSet: false, googleConsent: { version: expect.any(String) } });
     await tool(await connectorToken(cookie), "create_project", { idea: "구글 계정 아이디어", plan });
-    expect(await readFile(path.join(folder, "projects.json"), "utf8")).not.toContain("구글 계정 아이디어");
+    expect(await allAtRest([path.join(folder, "projects.json")])).not.toContain("구글 계정 아이디어");
 
     // A later Google login opens the same records without any password.
     const second = await googleRound("intent=login");
@@ -217,9 +218,10 @@ describe("Google accounts", () => {
     const set = await meAction(json(`${ORIGIN}/api/me`, { action: "set_password", password: "google upgrade pass" }, { cookie }));
     expect(set.status).toBe(200);
     expect((await set.json()).recoveryCode).toMatch(/-/);
-    const users = await readFile(path.join(folder, "users.json"), "utf8");
-    const record = JSON.parse(users).users.find((u: { email?: string }) => u.email === "upgrade@example.com");
-    expect(record.keys.server).toBeUndefined();
+    const { accountByEmail } = await import("../apps/web/lib/users");
+    const record = await accountByEmail("upgrade@example.com");
+    expect(record?.keys?.server).toBeUndefined();
+    expect(record?.keys?.password).toBeDefined();
 
     const next = await googleRound("intent=login");
     expect(next.callback!.headers.get("location")).toContain("/login?unlock=1");

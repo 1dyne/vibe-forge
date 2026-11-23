@@ -2,6 +2,7 @@ import { createDecipheriv, createHash, randomBytes, randomUUID } from "node:cryp
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { timingSafeEqualText } from "./session";
+import { importOnce, readRows, snapshotOf, usingPostgres, writeRows, type Row } from "./row-store";
 
 // People the operator invites. Each gets one secret token that works both as
 // their Claude connector URL and as their dashboard sign-in link. Only the
@@ -52,7 +53,12 @@ export type PublicUser = Omit<ForgeUser, "tokenHash" | "tokenSealed" | "password
 export type Invite = { id: string; label: string; codeHash: string; maxUses: number; used: number; expiresAt: string | null; createdAt: string; disabledAt: string | null };
 export type PublicInvite = Omit<Invite, "codeHash">;
 
-type UserDatabase = { version: 1; users: ForgeUser[]; invites?: Invite[] };
+// 읽을 때 본 모습을 이 객체에 달아 보낸다. 쓸 때 그것과 달라진 행만 쓴다.
+// 모듈 변수로 두지 않는 이유: 읽기는 쓰기 대기열 밖에서도 일어나서, 한 군데
+// 모아두면 쓰기가 자기 것이 아닌 스냅숏으로 비교하게 된다.
+const SNAPSHOT = Symbol("rows-as-read");
+type Snapshot = { users: Map<string, string>; invites: Map<string, string> };
+type UserDatabase = { version: 1; users: ForgeUser[]; invites?: Invite[]; [SNAPSHOT]?: Snapshot };
 let queue: Promise<unknown> = Promise.resolve();
 
 function dataFile() {
@@ -62,7 +68,7 @@ function dataFile() {
   return path.join(workspace, ".data", "users.json");
 }
 
-async function readUsers(): Promise<UserDatabase> {
+async function readFileUsers(): Promise<UserDatabase> {
   try {
     const parsed = JSON.parse(await readFile(/* turbopackIgnore: true */ dataFile(), "utf8")) as UserDatabase;
     if (parsed.version !== 1 || !Array.isArray(parsed.users)) throw new Error("저장된 사용자 형식을 읽을 수 없습니다.");
@@ -73,11 +79,42 @@ async function readUsers(): Promise<UserDatabase> {
   }
 }
 
+// 볼륨에 있던 users.json을 Postgres로 처음 한 번만 옮긴다. 파일은 그대로 둔다.
+let imported: Promise<void> | null = null;
+function importUsersOnce(): Promise<void> {
+  imported ??= importOnce(`users:${dataFile()}`, async () => {
+    const file = await readFileUsers();
+    return [
+      { table: "forge_users" as const, rows: file.users.map((user): Row => ({ id: user.id, data: user })) },
+      { table: "forge_invites" as const, rows: (file.invites ?? []).map((invite): Row => ({ id: invite.id, data: invite })) }
+    ];
+  }).then(() => undefined).catch((error) => { imported = null; throw error; });
+  return imported;
+}
+
+async function readUsers(): Promise<UserDatabase> {
+  if (!usingPostgres()) return readFileUsers();
+  await importUsersOnce();
+  const [users, invites] = await Promise.all([readRows("forge_users"), readRows("forge_invites")]);
+  return {
+    version: 1,
+    users: users.map((row) => row.data as ForgeUser),
+    invites: invites.map((row) => row.data as Invite),
+    [SNAPSHOT]: { users: snapshotOf(users), invites: snapshotOf(invites) }
+  };
+}
+
 async function writeUsers(database: UserDatabase) {
+  if (usingPostgres()) {
+    const before = database[SNAPSHOT] ?? { users: new Map(), invites: new Map() };
+    await writeRows("forge_users", database.users.map((user): Row => ({ id: user.id, data: user })), before.users);
+    await writeRows("forge_invites", (database.invites ?? []).map((invite): Row => ({ id: invite.id, data: invite })), before.invites);
+    return;
+  }
   const file = dataFile();
   await mkdir(path.dirname(file), { recursive: true });
   const temporary = `${file}.${process.pid}.tmp`;
-  await writeFile(temporary, JSON.stringify(database, null, 2), { encoding: "utf8", mode: 0o600 });
+  await writeFile(temporary, JSON.stringify({ version: database.version, users: database.users, ...(database.invites ? { invites: database.invites } : {}) }, null, 2), { encoding: "utf8", mode: 0o600 });
   await rename(temporary, file);
 }
 
