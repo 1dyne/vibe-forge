@@ -19,7 +19,7 @@ export const emptyProfile = (): MakerProfile => ({ tools: [], toolsConfirmed: fa
 // 붙고 프로젝트가 바뀌어도 그대로다. 예산·기한·용도는 프로젝트마다 다르다.
 // 이걸 가르지 않으면 지난 프로젝트의 예산이 새 프로젝트로 따라 들어오고,
 // 반대로 장비는 프로젝트마다 다시 물어보게 된다.
-const PERSON_FIELDS = ["tools", "toolsConfirmed", "firmwareExperience", "solderingSkill", "printerAccess", "region", "travelRange", "makerspaces", "devProfile"] as const;
+const PERSON_FIELDS = ["tools", "toolsConfirmed", "firmwareExperience", "solderingSkill", "printerAccess", "region", "travelRange", "makerspaces", "ownedParts", "devProfile"] as const;
 
 export function personPart(profile: MakerProfile): Partial<MakerProfile> {
   const out: Record<string, unknown> = {};

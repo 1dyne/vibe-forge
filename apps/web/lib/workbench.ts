@@ -7,6 +7,9 @@ import { workflowFor } from "./workflow";
 export type WorkbenchItem = {
   id: string;
   filename: string;
+  /** 탭에 보일 짧은 이름. 파일명은 내려받을 때 프로젝트를 알아볼 수 있게 길지만,
+      화면의 탭 줄에서는 프로젝트 이름이 탭마다 되풀이돼 정작 무슨 파일인지가 잘린다. */
+  label: string;
   kind: "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
@@ -47,7 +50,9 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
   if (!project) return [];
   const workflow = workflowFor(project);
   const stem = project.name.replace(/[\\/:*?"<>|\r\n]/g, "-").slice(0, 80) || "project";
-  const items: WorkbenchItem[] = [];
+  // label은 마지막에 한 번에 붙인다(파일명에서 깎아낸다).
+  type Draft = Omit<WorkbenchItem, "label">;
+  const items: Draft[] = [];
   if (project.productForm) items.push({ id: "document:product", filename: `${stem}-완성품.json`, kind: "product", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.productForm, null, 2) });
   if (project.assembly) {
     const g = project.assembly;
@@ -64,7 +69,7 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
   }
   if (project.testPlan) items.push({ id: "document:tests", filename: `${stem}-테스트.md`, kind: "tests", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 테스트 계획\n\n${project.testPlan.cases.map((c) => `## ${c.stage}단계 · ${c.title}\n\n- 준비: ${c.setup}\n- 할 일: ${c.do}\n- 기대: ${[c.expect.serial?.join(" / "), c.expect.observe, c.expect.measure ? `${c.expect.measure.what} ${c.expect.measure.min}~${c.expect.measure.max}${c.expect.measure.unit}` : ""].filter(Boolean).join(" · ")}${c.result ? `\n- 결과: ${c.result.status} — ${c.result.evidence}` : ""}`).join("\n\n")}\n` });
   if (project.safety) items.push({ id: "document:safety", filename: `${stem}-안전.md`, kind: "safety", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 안전 검토\n\n${project.safety.items.map((i) => `- [${i.status === "ok" || i.ackAt ? "x" : " "}] (${i.status}) ${i.topic}: ${i.text}${i.required ? " · 필수" : ""}`).join("\n")}\n` });
-  if (project.buildPlan) items.push(...[{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan, stickerHtml(provisionalReasons(project))) }] as WorkbenchItem[]);
+  if (project.buildPlan) items.push(...[{ id: "document:plan", filename: `${stem}-설계도.html`, kind: "plan", mimeType: "text/html; charset=utf-8", content: planDocument(project.name, project.buildPlan, stickerHtml(provisionalReasons(project))) }] as Draft[]);
   items.push(...(project.build?.artifacts ?? [])
     .filter(a => a.kind !== "cad" || Boolean(workflow.circuitApprovedAt))
     .map(a => ({ id: `artifact:${a.id}`, filename: a.filename, kind: a.kind, mimeType: a.mimeType, content: a.content })));
@@ -82,7 +87,9 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
   if (workflow.sharedUpdates.length) {
     items.push({ id: "document:record", filename: `${stem}-팀기록.md`, kind: "record", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 팀 기록\n\n${workflow.sharedUpdates.map(u => `## ${u.agent} · ${u.createdAt}\n\n${u.text}`).join("\n\n")}\n` });
   }
-  return items;
+  // 파일명 앞의 프로젝트 이름과 확장자를 떼면 "부품목록"만 남는다.
+  const shortLabel = (filename: string) => filename.startsWith(`${stem}-`) ? filename.slice(stem.length + 1).replace(/\.[a-z0-9]+$/i, "") : filename;
+  return items.map((item) => ({ ...item, label: shortLabel(item.filename) }));
 }
 
 export function workbenchDownloadUrl(projectId: string, itemId: string) {

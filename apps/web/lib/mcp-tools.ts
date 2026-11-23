@@ -46,6 +46,7 @@ export const SERVER_INSTRUCTIONS = [
   "작업 중인 프로젝트를 고정한다: Claude 프로젝트 지침이나 대화에 '달그락 프로젝트 ID'가 있으면 그 ID에만 기록한다. ID를 모르면 추측하지 말고 list_projects를 보여주며 사용자에게 고르게 한다. 사용자가 요청하지 않으면 새 프로젝트를 만들지 않는다.",
   "체크리스트는 get_checklist의 선택지 그대로 묻는다(가능하면 선택형 아티팩트). 회로 전에 형태 질문을 하고 완성품 미리보기(set_product_form)를 보여준 뒤, 대장이 전체 구조·연결 단계·먼저 익힐 연습을 set_build_plan으로 정의한다. 회로 뒤에는 실제 기판 배치와 문제 카드가 있는 조립 가이드(set_assembly_guide)를 만든다.",
   "비용은 항상 원 단위 숫자로 말하고 예산과 비교한다. 넘으면 예산 상향·단계 개발·대체 부품을 숫자로 제안한다. 부품은 보드에 연결할 수 있는 모듈로 제안하고 완제품 기기는 기본 제안으로 쓰지 않는다.",
+  "사용자가 이미 가진 부품은 사라고 하지 않는다. get_project의 profile.ownedParts를 먼저 보고, 거기 있는 부품은 비용에서 빼고 '가지고 계신 걸 씁니다'라고 말한다. 대화 중에 \"이건 집에 있어요\"라는 말이 나오면 set_maker_profile의 ownedParts에 더한다(기존 목록을 함께 보낸다). 가진 부품의 값이 설계에 맞는지는 사람이 확인해야 하므로, 값이 중요한 부품(저항·전지·레귤레이터)은 몇 Ω·몇 mAh인지 되묻는다.",
   "회로 승인, 3D 목업 승인, 대장간 입장은 사람만 대시보드에서 한다. 너는 승인했다고 말하거나 승인된 것처럼 진행하지 않는다.",
   "확인·측정·실행하지 않은 것은 unknown으로 둔다. 웹 검색을 쓸 수 있으면 부품·데이터시트·가격·메이커스페이스를 찾아도 되지만, 출처 링크와 확인 날짜를 record_part_source로 남기고 가격·재고는 '검색 시점 기준, 구매 전 확인'으로 안내한다. 찾지 못한 값은 꾸며내지 않는다.",
   "달그락 화면에 남는 글은 사람이 눈으로 훑는다. 한 덩어리로 길게 쓰지 말고, 생각이 바뀔 때마다 빈 줄을 넣어 문단을 나눈다. 나열할 것은 '- '로 줄을 바꿔 적고 순서가 있으면 '1. '을 쓴다. 한 문단은 세 문장을 넘기지 않는다. 줄글로 길게 쓰면 화면에서 읽히지 않는다."
@@ -391,7 +392,15 @@ const ProfileInput = z.object({
   purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(),
   targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
-  timelineWeeks: z.number().min(0.5).max(104).nullable().optional()
+  timelineWeeks: z.number().min(0.5).max(104).nullable().optional(),
+  // 사용자가 "이거 이미 있어요"라고 말한 부품. id는 서버가 붙인다 — 모델이 지어낸
+  // id를 그대로 쓰면 같은 부품이 두 줄로 쌓인다.
+  ownedParts: z.array(z.object({
+    name: z.string().trim().min(1).max(80),
+    qty: z.number().int().min(1).max(999).optional(),
+    catalogId: z.string().trim().max(60).nullable().optional(),
+    note: z.string().trim().max(120).optional()
+  }).strict()).max(120).optional()
 }).strict();
 
 const TeamTurnInput = z.object({
@@ -537,11 +546,22 @@ export const TOOLS: ToolDefinition[] = [
       solderingSkill: { type: "string", enum: ["unanswered", "none", "tried", "comfortable"] }, printerAccess: { type: "string", enum: ["unanswered", "own", "makerspace", "service", "none"] },
       region: { type: "string", description: "시·구 (메이커스페이스 안내용)" }, budgetKRW: { type: ["integer", "null"], description: "부품 총 예산 상한(원)" },
       purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" },
-      travelRange: { type: "string", enum: ["unanswered", "walk", "transit30", "transit60", "car"], description: "메이커스페이스까지 이동 가능 범위" }, timelineWeeks: { type: ["number", "null"], description: "원하는 완성 기간(주). 선택" }
+      travelRange: { type: "string", enum: ["unanswered", "walk", "transit30", "transit60", "car"], description: "메이커스페이스까지 이동 가능 범위" }, timelineWeeks: { type: ["number", "null"], description: "원하는 완성 기간(주). 선택" },
+      ownedParts: { type: "array", description: "사용자가 이미 가지고 있다고 말한 부품. 보내면 이 목록으로 전체가 바뀐다(한 줄만 추가하려면 기존 목록을 함께 보낸다). 부품목록에서 이미 가진 것을 빼는 데 쓰인다. find_part_cards로 카드가 있으면 catalogId를 넣으면 사양까지 함께 본다.", items: { type: "object", additionalProperties: false, required: ["name"], properties: {
+        name: { type: "string", description: "부품 이름. 사용자가 말한 대로" }, qty: { type: "integer", description: "수량. 모르면 생략(1로 둔다)" },
+        catalogId: { type: ["string", "null"], description: "부품 카드 id. 모르면 생략" }, note: { type: "string", description: "값이 섞여 있다거나 어디 있다는 메모. 선택" }
+      } } }
     } },
     run: async (input, context) => {
-      const { projectId: id, ...parsed } = ProfileInput.parse(input) as MakerProfile & { projectId: string };
+      const { projectId: id, ownedParts: incoming, ...parsed } = ProfileInput.parse(input);
       const project = await ownedProject(id, context);
+      if (incoming) {
+        const previous = workflowFor(project).profile.ownedParts ?? [];
+        (parsed as Partial<MakerProfile>).ownedParts = incoming.map((part) => ({
+          id: previous.find((old) => old.name === part.name)?.id ?? randomUUID().slice(0, 8),
+          name: part.name, qty: part.qty ?? 1, catalogId: part.catalogId ?? null, note: part.note ?? ""
+        }));
+      }
       const profile: MakerProfile = { ...workflowFor(project).profile, ...Object.fromEntries(Object.entries(parsed).filter(([, value]) => value !== undefined)) } as MakerProfile;
       const updated = await mutateProject(project.id, (p) => {
         const w = workflowFor(p);

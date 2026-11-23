@@ -11,6 +11,7 @@ import { ChangeSticker } from "./change-sticker";
 import { HistoryList, PowerView, SafetyView, TestView } from "./plan-views";
 import { ContractView } from "./contract-view";
 import { provisionalReasons } from "../lib/provisional";
+import { ownedHit } from "../lib/owned-parts";
 
 export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction, ownerName, newMarks = [], shortNames = false, connectorOnly = false }: {
   project: LocalProject; items: WorkbenchItem[]; selected: string; busy: boolean; connectorOnly?: boolean; ownerName: string; newMarks?: string[]; shortNames?: boolean;
@@ -39,9 +40,9 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
       else return;
       e.preventDefault(); select(items[next].id);
       (e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")[next])?.focus();
-    }}>{items.map(i => <button key={i.id} id={`workbench-tab-${i.id}`} role="tab" aria-controls="workbench-content" tabIndex={item.id === i.id ? 0 : -1} aria-selected={item.id === i.id} className={(item.id === i.id ? "active" : "") + (newMarks.includes("item:" + i.id) ? " is-new" : "")} title={i.filename} onClick={() => select(i.id)}>{i.filename}</button>)}</div>}
+    }}>{items.map(i => <button key={i.id} id={`workbench-tab-${i.id}`} role="tab" aria-controls="workbench-content" tabIndex={item.id === i.id ? 0 : -1} aria-selected={item.id === i.id} className={(item.id === i.id ? "active" : "") + (newMarks.includes("item:" + i.id) ? " is-new" : "")} title={i.filename} onClick={() => select(i.id)}>{i.label}</button>)}</div>}
     {/* 탭이 보일 때는 그 탭이 곧 파일명이라 여기서는 비운다(자리는 지켜 버튼 정렬을 유지). */}
-    <div className="file-toolbar"><span title={item.filename}>{items.length > 1 ? "" : item.filename}</span>{hasPreview && <button aria-pressed={source} onClick={() => setSourceItem(source ? null : item.id)}>{source ? "미리보기" : "파일 원문"}</button>}<a href={downloadUrl} download={item.filename}>다운로드 ↓</a></div>
+    <div className="file-toolbar"><span title={item.filename}>{items.length > 1 ? "" : item.label}</span>{hasPreview && <button aria-pressed={source} onClick={() => setSourceItem(source ? null : item.id)}>{source ? "미리보기" : "파일 원문"}</button>}<a href={downloadUrl} download={item.filename}>다운로드 ↓</a></div>
     <div className="artifact-content" id="workbench-content" role="tabpanel" tabIndex={0} aria-labelledby={`workbench-tab-${item.id}`}>
       {["product", "plan", "circuit", "cad", "assembly", "bom"].includes(item.kind) && <ChangeSticker reasons={provisionalReasons(project)} />}
       {source || !hasPreview ? <pre className="file-source">{item.content}</pre> : <>
@@ -54,7 +55,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
         {item.kind === "housing" && project.housing && project.productForm && <HousingView project={project} />}
         {item.kind === "assembly" && project.assembly && <AssemblyView project={project} busy={busy} onAction={onAction} connectorOnly={connectorOnly} />}
         {item.kind === "cad" && project.build && <><div className="artifact-title"><span className="pill">치수 기반 3D</span><h3>{item.filename}</h3></div><MockupView blueprint={project.build.blueprint} /></>}
-        {item.kind === "bom" && project.build && <><h3>{project.name} · 부품목록</h3><p className="notice">구매 전 정확한 모델·수량·가격·판매처 재고를 확인해주세요. 출처의 가격은 확인한 날짜 기준이에요.</p><table className="bom-table"><thead><tr><th>부품 / 용도</th><th>진행 상태</th></tr></thead><tbody>{project.build.blueprint.components.map(c => <tr key={c.ref}><td><small>{c.ref} · 수량 확인 필요</small><strong>{c.valueOrModel}</strong><p>{c.reason}</p>{(workflow.partSources?.[c.ref] ?? []).map(s => <p className="part-source" key={s.url}><a href={s.url} target="_blank" rel="noreferrer noopener">↗ {s.title}</a>{s.price && <> · {s.price}</>} <small>{s.checkedAt.slice(0, 10)} 확인</small></p>)}</td><td><select aria-label={`${c.ref} 구매 상태`} value={workflow.purchases[c.ref] ?? "needed"} disabled={busy} onChange={e => onAction({ action: "purchase", ref: c.ref, status: e.target.value })}><option value="needed">구매 예정</option><option value="ordered">주문 완료</option><option value="received">수령 완료</option><option value="problem">문제 발생</option></select></td></tr>)}</tbody></table></>}
+        {item.kind === "bom" && project.build && <BomView project={project} workflow={workflow} busy={busy} onAction={onAction} />}
         {item.kind === "tasks" && <TaskView project={project} onAction={onAction} busy={busy} ownerName={ownerName} newMarks={newMarks} shortNames={shortNames} />}
         {item.kind === "record" && <><h3>팀 공통 기록</h3>{workflow.sharedUpdates.map(u => <article className="shared-record" key={u.id}><span className="pill">{agentName(u.agent,shortNames)}</span><p>{u.text}</p><small>{new Date(u.createdAt).toLocaleString("ko-KR")}</small></article>)}<HistoryList project={project} onAction={onAction} busy={busy} /></>}
         {(item.kind === "file" || item.kind === "plan") && item.mimeType.startsWith("text/html") && <iframe title={item.filename} className="file-preview" sandbox="" referrerPolicy="no-referrer" srcDoc={`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:">${item.content}`} />}
@@ -62,4 +63,47 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
     </div>
     <footer className="artifact-footer"><span>● 저장됨 · {item.filename}</span><button disabled={busy} onClick={() => onAction({ action: "reopen" })}>설계 다시 논의</button></footer>
   </aside>;
+}
+
+// 사러 가기 전에 보는 화면. 서랍에 있는 것을 또 사게 하지 않는 것이 여기서 할 일이다.
+// '가지고 있어요'와 '가진 것 같아요'를 구분해 적는다. 부품 카드가 같으면 같은
+// 부품이지만, 이름만 겹치는 것은 값이 다를 수 있어서(저항 220Ω / 10kΩ) 사람이 봐야 한다.
+function BomView({ project, workflow, busy, onAction }: {
+  project: LocalProject; workflow: ReturnType<typeof workflowFor>; busy: boolean; onAction: (input: Record<string, unknown>) => void;
+}) {
+  const components = project.build!.blueprint.components;
+  const hits = components.map(c => ownedHit(workflow.profile, c));
+  // 확실한 것과 확인이 필요한 것을 따로 센다. 섞어서 세면 "3개는 있어요"를 믿고
+  // 안 샀다가 값이 안 맞아 멈추게 된다.
+  const sure = hits.filter(h => h?.certainty === "card").length;
+  const maybe = hits.filter(h => h?.certainty === "name").length;
+  return <>
+    <h3>부품목록</h3>
+    <p className="notice">
+      {sure > 0 && `${components.length}개 중 ${sure}개는 이미 가지고 있어요.`}
+      {maybe > 0 && `${sure > 0 ? " " : ""}${maybe}개는 가진 것과 값이 맞는지 확인해주세요.`}
+      {sure === 0 && maybe === 0 && "사기 전에 모델·수량·재고를 한 번 더 확인해주세요."}
+    </p>
+    <table className="bom-table"><thead><tr><th>부품 / 용도</th><th>진행 상태</th></tr></thead><tbody>
+      {components.map((c, index) => {
+        const hit = hits[index];
+        return <tr key={c.ref} className={hit?.certainty === "card" ? "bom-owned" : ""}>
+          <td>
+            <small>{c.ref}</small>
+            <strong>{c.valueOrModel}</strong>
+            {hit && (hit.certainty === "card"
+              ? <small className="owned-yes">가지고 있어요 · {hit.part.name} {hit.part.qty}개</small>
+              : <small className="owned-maybe">가진 것 같아요 · ‘{hit.part.name}’이 맞는 값인지 확인</small>)}
+            <p>{c.reason}</p>
+            {(workflow.partSources?.[c.ref] ?? []).map(s => <p className="part-source" key={s.url}>
+              <a href={s.url} target="_blank" rel="noreferrer noopener">↗ {s.title}</a>{s.price && <> · {s.price}</>} <small>{s.checkedAt.slice(0, 10)} 확인</small>
+            </p>)}
+          </td>
+          <td><select aria-label={`${c.ref} 구매 상태`} value={workflow.purchases[c.ref] ?? "needed"} disabled={busy} onChange={e => onAction({ action: "purchase", ref: c.ref, status: e.target.value })}>
+            <option value="needed">구매 예정</option><option value="ordered">주문 완료</option><option value="received">수령 완료</option><option value="problem">문제 발생</option>
+          </select></td>
+        </tr>;
+      })}
+    </tbody></table>
+  </>;
 }

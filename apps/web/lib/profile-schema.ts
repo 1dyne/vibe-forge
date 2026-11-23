@@ -13,6 +13,15 @@ export const MakerSpaceSchema = z.object({
   note: z.string().trim().max(300)
 }).strict();
 
+// 가진 부품 한 줄. 이름만 있으면 되고, 부품 카드와 연결되면 catalogId가 붙는다.
+export const OwnedPartSchema = z.object({
+  id: z.string().max(40),
+  name: z.string().trim().min(1).max(80),
+  qty: z.number().int().min(1).max(999),
+  catalogId: z.string().trim().max(60).nullable(),
+  note: z.string().trim().max(120)
+}).strict();
+
 // 사람에게 붙는 값. 계정에 저장되고 모든 프로젝트가 함께 쓴다.
 export const PersonProfileSchema = z.object({
   tools: z.array(z.string().max(80)).max(30),
@@ -23,6 +32,7 @@ export const PersonProfileSchema = z.object({
   region: z.string().max(60).optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
   makerspaces: z.array(MakerSpaceSchema).max(10).optional(),
+  ownedParts: z.array(OwnedPartSchema).max(120).optional(),
   devProfile: z.object({
     codingExperience: z.enum(["unanswered", "none", "guided", "independent"]),
     tool: z.enum(["undecided", "claude_code", "codex"]),

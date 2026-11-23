@@ -40,8 +40,8 @@ function NetDiagram({ blueprint }: { blueprint: BuildBlueprint }) {
         </g>;
       })}
     </svg></div>
-    <p className="notice">이 회로는 부품 카드 없이 제출돼서 실제 부품 모양으로 그릴 수 없어요. Claude에게 “부품 카드(find_part_cards)로 회로를 다시 제출해줘”라고 하면 실제 부품 배치도로 바뀌어요.</p>
-    <p className="muted">같은 선의 단자는 전기적으로 연결됩니다. 선을 누르면 해당 net을 강조합니다. 실제 부품의 단자명·정격을 확인할 회로 초안입니다.</p>
+    <p className="notice">부품 카드 없이 제출된 회로라 실제 부품 모양으로 그릴 수 없어요. 연결한 AI에게 “부품 카드로 회로를 다시 제출해줘”라고 해주세요.</p>
+    <p className="muted">같은 선에 붙은 단자끼리 연결돼요. 선을 누르면 그 선만 밝아져요.</p>
     <details><summary>부품별 연결표</summary><table><thead><tr><th>NET</th><th>연결 단자</th></tr></thead><tbody>{blueprint.nets.map((n) => <tr key={n.name}><td>{n.name}</td><td>{n.members.join(" · ")}</td></tr>)}</tbody></table></details>
   </div>;
 }
@@ -86,13 +86,13 @@ export function MockupView({ blueprint, form }: { blueprint: BuildBlueprint; for
   const { widthMm: w, depthMm: d, heightMm: h, wallMm: wall } = blueprint.enclosure;
   if (!webgl) return <MockupSvg blueprint={blueprint} form={form} />;
   return <div className="mockup-view">
-    <div className="view-toolbar"><span>{form ? "완성품 미리보기" : `${w} × ${d} × ${h} mm`}</span><button aria-pressed={inside} onClick={() => setInside(!inside)}>{inside ? "겉모습 보기" : "속 보기"}</button><button onClick={() => { setZoom(1); setResetKey((k) => k + 1); }}>시점 초기화</button></div>
+    <div className="view-toolbar"><span>{form ? "완성품 미리보기" : `${w} × ${d} × ${h} mm`} · 벽 {wall}mm</span><button aria-pressed={inside} onClick={() => setInside(!inside)}>{inside ? "겉모습 보기" : "속 보기"}</button><button onClick={() => { setZoom(1); setResetKey((k) => k + 1); }}>시점 초기화</button></div>
     <Mockup3D solids={solids} inside={inside} zoom={zoom} resetKey={resetKey} onFail={() => setWebgl(false)} />
-    <div className="mockup3d-hint">드래그로 돌려보고, 부품을 누르면 이름이 나와요 · 치수 기반 기구 목업</div>
+    <div className="mockup3d-hint">드래그로 돌려보기 · 부품을 누르면 이름이 나와요</div>
     <label className="zoom-slider">확대 <input aria-label="3D 확대" type="range" min=".5" max="1.8" step=".05" value={zoom} onChange={(e)=>setZoom(Number(e.target.value))}/></label>
     {form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
-    {!form && !blueprint.shape?.length && <p className="notice">아직 완성품 형태가 정해지지 않아 기본 상자로 보여주고 있어요. Claude에게 “완성품 모양부터 정하자”라고 말하면 형태 질문을 하고 완성품 미리보기를 만들어요.</p>}
-    <p className="muted">{form ? "실제 부품 치수로 안에 들어갈 자리를 표시했어요. 출력 전 실측과 간섭 확인이 필요해요." : blueprint.shape?.length ? `설명한 형태를 ${blueprint.shape.length}개의 기본 도형으로 만든 외형 목업이에요. 내부 전자부품 공간은 ${w}×${d}×${h}mm 기준이에요. ` : ""}벽 두께 {wall} mm. 보드와 부품은 자리표시자이며, 실제 부품 치수를 받으면 기구 설계를 조정합니다. 출력 전 CAD 렌더와 간섭 확인이 필요합니다.</p>
+    {!form && !blueprint.shape?.length && <p className="notice">아직 형태를 안 정해서 기본 상자로 보여줘요. 연결한 AI에게 “완성품 모양부터 정하자”라고 말해주세요.</p>}
+    <p className="muted">보드와 부품은 자리표시자예요. 출력 전에 실측하고 간섭을 확인해주세요.</p>
   </div>;
 }
 
@@ -163,7 +163,7 @@ function MockupSvg({ blueprint, form }: { blueprint: BuildBlueprint; form?: Prod
     return output.sort((a,b) => a.z-b.z);
   }, [w,d,h,wall,rotation,blueprint.board,shapeParts,form,inside]);
   return <div className="mockup-view">
-    <div className="view-toolbar"><span>{form ? "완성품 미리보기" : `${w} × ${d} × ${h} mm`}</span>{form && <button aria-pressed={inside} onClick={() => setInside(!inside)}>{inside ? "겉모습 보기" : "속 보기"}</button>}<button onClick={() => setRotation({yaw:-.6,pitch:.55,zoom:1})}>시점 초기화</button></div>
+    <div className="view-toolbar"><span>{form ? "완성품 미리보기" : `${w} × ${d} × ${h} mm`} · 벽 {wall}mm</span>{form && <button aria-pressed={inside} onClick={() => setInside(!inside)}>{inside ? "겉모습 보기" : "속 보기"}</button>}<button onClick={() => setRotation({yaw:-.6,pitch:.55,zoom:1})}>시점 초기화</button></div>
     <svg className="orbit-canvas" viewBox="0 0 560 360" role="img" aria-label="드래그로 회전 가능한 3D 하우징 목업" tabIndex={0}
       onPointerDown={(e) => { drag.current={x:e.clientX,y:e.clientY}; e.currentTarget.setPointerCapture(e.pointerId); }}
       onPointerMove={(e) => { if (!drag.current) return; const dx=e.clientX-drag.current.x,dy=e.clientY-drag.current.y; drag.current={x:e.clientX,y:e.clientY}; setRotation((r)=>({...r,yaw:r.yaw+dx*.012,pitch:Math.max(-1.3,Math.min(1.3,r.pitch+dy*.009))})); }}
@@ -171,12 +171,12 @@ function MockupSvg({ blueprint, form }: { blueprint: BuildBlueprint; form?: Prod
       onKeyDown={(e) => { if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) {e.preventDefault();setRotation((r)=>({...r,yaw:r.yaw+(e.key==="ArrowLeft"?-.15:e.key==="ArrowRight"?.15:0),pitch:Math.max(-1.3,Math.min(1.3,r.pitch+(e.key==="ArrowUp"?.1:e.key==="ArrowDown"?-.1:0)))}));} }}>
       <ellipse cx="280" cy="297" rx="185" ry="30" fill="#1f1f1f" opacity=".05"/>
       {faces.map((f,i)=><polygon key={i} points={f.points} fill={f.fill} stroke="#506f66" strokeWidth=".65" strokeOpacity={f.opacity !== undefined ? .35 : 1} fillOpacity={f.opacity ?? .86}><title>{f.label}</title></polygon>)}
-      <text x="22" y="335" fill="#64736e" fontSize="11">드래그 / 방향키로 회전 · 치수 기반 기구 목업</text>
+      <text x="22" y="335" fill="#64736e" fontSize="11">드래그 · 방향키로 회전</text>
     </svg>
     <label className="zoom-slider">확대 <input aria-label="3D 확대" type="range" min=".5" max="1.8" step=".05" value={rotation.zoom} onChange={(e)=>setRotation({...rotation,zoom:Number(e.target.value)})}/></label>
     {form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
-    {!form && !blueprint.shape?.length && <p className="notice">아직 완성품 형태가 정해지지 않아 기본 상자로 보여주고 있어요. Claude에게 “완성품 모양부터 정하자”라고 말하면 형태 질문을 하고 완성품 미리보기를 만들어요.</p>}
-    <p className="muted">{form ? "실제 부품 치수로 안에 들어갈 자리를 표시했어요. 출력 전 실측과 간섭 확인이 필요해요." : blueprint.shape?.length ? `설명한 형태를 ${blueprint.shape.length}개의 기본 도형으로 만든 외형 목업이에요. 내부 전자부품 공간은 ${w}×${d}×${h}mm 기준이에요. ` : ""}벽 두께 {wall} mm. 보드와 부품은 자리표시자이며, 실제 부품 치수를 받으면 기구 설계를 조정합니다. 출력 전 CAD 렌더와 간섭 확인이 필요합니다.</p>
+    {!form && !blueprint.shape?.length && <p className="notice">아직 형태를 안 정해서 기본 상자로 보여줘요. 연결한 AI에게 “완성품 모양부터 정하자”라고 말해주세요.</p>}
+    <p className="muted">보드와 부품은 자리표시자예요. 출력 전에 실측하고 간섭을 확인해주세요.</p>
   </div>;
 }
 
@@ -198,6 +198,6 @@ export function TaskView({project, onAction, busy, ownerName, newMarks=[], short
     {project.tasks.map(t=>{const closed=CLOSED[t.status];const fresh=newMarks.includes("task:"+t.id);return <tr key={t.id} className={fresh?"is-new":""}><td><span className={`pill ${closed?.pill??""}`}>{closed?.label??ownerName}</span></td><td><strong>{fresh&&<span className="new-dot" aria-label="새로 온 할 일"/>}{t.title}</strong><p>{t.plain}</p>{t.skipNote&&<p className="skip-note">남긴 말: {t.skipNote}</p>}{t.status==="ready"?<div className="evidence-input"><textarea aria-label={`${t.title} 결과`} value={answers[t.id]??""} placeholder="결과나 측정값" onChange={e=>setAnswers({...answers,[t.id]:e.target.value})}/><div className="task-actions"><button disabled={busy||!answers[t.id]?.trim()} onClick={()=>onAction({action:"evidence",taskId:t.id,text:answers[t.id]})}>팀에 결과 공유</button><button className="task-mark" disabled={busy} title="적을 결과는 없지만 확인은 했어요" onClick={()=>onAction({action:"task_mark",taskId:t.id,mark:"checked"})}>✓ 확인만</button><button className="task-mark skip" disabled={busy} title="하지 않고 넘어가요. 확인하지 않은 부분으로 남습니다" onClick={()=>onAction({action:"task_mark",taskId:t.id,mark:"skipped",note:answers[t.id]?.trim()||undefined})}>✗ 건너뛰기</button></div></div>:<button className="task-undo" disabled={busy} onClick={()=>onAction({action:"task_mark",taskId:t.id,mark:"ready"})}><IconUndo/> 다시 할 일로</button>}</td></tr>;})}
     {workflowFor(project).activeAgents.map(a=><tr key={a}><td><span className={"pill agent-pill-"+a}>{agentName(a,shortNames)}</span></td><td>{a==="hw"?"회로·펌웨어 검토, 측정 결과로 원인 좁히기":a==="sw"?"웹·앱 코드 제안 및 완성된 결과 검사":a==="me"?"부품 실측 요청과 구조·배치 조정":"외형·착용감·안전성 충돌 검토"}</td></tr>)}
   </tbody></table>
-  {skipped.length>0&&<div className="skipped-box"><strong>확인하지 않고 넘어간 것 {skipped.length}개</strong><p>그냥 넘어가도 괜찮지만, 나중에 안 맞거나 고장 나면 여기부터 되짚어요. 지금 하려면 위에서 ‘다시 할 일로’를 누르세요.</p><ul>{skipped.map(t=><li key={t.id}>{t.title}{t.skipNote?` · ${t.skipNote}`:""}</li>)}</ul></div>}
-  <p className="muted">실행 결과는 모든 작업실에 공유됩니다. 측정값을 제출해도 검증 상태가 자동으로 합격 처리되지는 않습니다.</p></>;
+  {skipped.length>0&&<div className="skipped-box"><strong>확인하지 않고 넘어간 것 {skipped.length}개</strong><p>넘어가도 괜찮아요. 나중에 안 맞거나 고장 나면 여기부터 되짚어요.</p><ul>{skipped.map(t=><li key={t.id}>{t.title}{t.skipNote?` · ${t.skipNote}`:""}</li>)}</ul></div>}
+  <p className="muted">결과는 팀 전체가 봐요 · 측정값을 올려도 합격 처리는 자동으로 되지 않아요.</p></>;
 }

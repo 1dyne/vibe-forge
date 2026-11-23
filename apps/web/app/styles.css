@@ -340,3 +340,26 @@ tr.is-new{animation-name:new-flash-row}
 .start-checklist li.done span:last-child{text-decoration:line-through}
 .start-mark{width:12px;text-align:center;color:#5d9a84}
 .start-checklist button{border:0;background:none;padding:2px 0;font-size:11.5px;color:#2f6a57;text-align:left;text-decoration:underline;text-underline-offset:2px}
+
+/* 가지고 있는 부품. 장비 선택지 아래에 붙어 같은 무게로 보여야 한다. */
+.owned-parts>small.muted{display:block;margin:-6px 0 10px;font-size:11px;line-height:1.6}
+.owned-items{list-style:none;padding:0;margin:0 0 10px}
+.owned-items li{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px;background:#fafbf9;font-size:12px}
+.owned-items li>span{flex:1;min-width:0}
+.owned-items button{border:0;background:none;padding:2px 4px}
+.owned-linked{margin-left:6px;padding:1px 6px;border-radius:999px;background:#e7efdf;color:#5c7046;font-size:10px}
+.owned-note{display:block;color:#8d9c83;margin-top:2px}
+.owned-form{display:grid;grid-template-columns:1fr 72px;gap:8px 10px;align-items:end}
+.owned-form label{font-size:12px;display:grid;gap:3px;margin:0}
+.owned-form .profile-input{margin:0}
+.owned-form>.owned-memo,.owned-form>button,.owned-form>.owned-hint{grid-column:1/-1}
+.owned-form>.owned-hint{margin:-2px 0 2px}
+.owned-form>button{padding:9px;border:1px solid var(--line);border-radius:8px;background:white;font-size:12px}
+.owned-hint{display:block;font-size:11px;color:#95a489}
+.owned-hint.on{color:#5c7046}
+@media(max-width:600px){.owned-form{grid-template-columns:1fr}}
+
+/* 부품목록에서 이미 가진 것. '있다'와 '있는 것 같다'를 색으로도 가른다. */
+.bom-owned td strong{color:#5c7046}
+.bom-table td small.owned-yes{display:block;margin:3px 0;color:#5c7046;font-weight:600}
+.bom-table td small.owned-maybe{display:block;margin:3px 0;color:#977537}

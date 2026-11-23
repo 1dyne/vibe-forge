@@ -135,9 +135,16 @@ export type ImageAttachment = { name: string; dataUrl: string };
 // ME 달그락이 그 장비로 낼 수 있는 크기 안에서 설계한다.
 export type MakerSpace = { id: string; name: string; where: string; printers: string; maxPrintMm: [number, number, number] | null; url: string; note: string };
 
+// 이미 가지고 있는 부품. 서랍에 있는 것을 또 사게 하지 않으려고 적어둔다.
+// catalogId가 붙으면 부품 카드의 전압·로직레벨·전류를 호환성 검사에 함께 넣는다.
+// 붙지 않아도(카드에 없는 부품) 목록에는 남아서 "이건 있으니 빼세요"로 쓰인다.
+export type OwnedPart = { id: string; name: string; qty: number; catalogId: string | null; note: string };
+
 export type MakerProfile = {
   tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string;
   makerspaces?: MakerSpace[];
+  // 가진 부품. 장비(tools)는 고정된 선택지지만 부품은 사람마다 제각각이라 직접 적는다.
+  ownedParts?: OwnedPart[];
   // 코딩 경험과 즐겨 쓰는 도구도 사람에게 붙는다. 프로젝트마다 다시 물을 이유가 없다.
   // 영역별로 따로 둔다: 웹은 짜지만 펌웨어는 처음인 사람이 흔하다(firmwareExperience와 별개).
   devProfile?: DevProfile;
