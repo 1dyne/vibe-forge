@@ -12,6 +12,7 @@ import { HistoryList, PowerView, SafetyView, TestView } from "./plan-views";
 import { ContractView } from "./contract-view";
 import { provisionalReasons } from "../lib/provisional";
 import { ownedHit } from "../lib/owned-parts";
+import { SOURCING_LABEL, sourcingLines, sourcingSummary } from "../lib/sourcing";
 
 export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction, ownerName, newMarks = [], shortNames = false, connectorOnly = false }: {
   project: LocalProject; items: WorkbenchItem[]; selected: string; busy: boolean; connectorOnly?: boolean; ownerName: string; newMarks?: string[]; shortNames?: boolean;
@@ -73,20 +74,22 @@ function BomView({ project, workflow, busy, onAction }: {
 }) {
   const components = project.build!.blueprint.components;
   const hits = components.map(c => ownedHit(workflow.profile, c));
-  // 확실한 것과 확인이 필요한 것을 따로 센다. 섞어서 세면 "3개는 있어요"를 믿고
-  // 안 샀다가 값이 안 맞아 멈추게 된다.
-  const sure = hits.filter(h => h?.certainty === "card").length;
-  const maybe = hits.filter(h => h?.certainty === "name").length;
+  // 언제 사야 하는지는 따로 센다(sourcing.ts). 여기서는 받아 적기만 한다.
+  const lines = sourcingLines(project);
+  const sum = sourcingSummary(lines);
+  const headline = [
+    sum.ready && `지금 사도 되는 것 ${sum.ready}개`,
+    sum.waiting && `기다릴 것 ${sum.waiting}개`,
+    sum.verify && `확인할 것 ${sum.verify}개`,
+    sum.owned && `이미 가진 것 ${sum.owned}개`
+  ].filter(Boolean).join(" · ");
   return <>
     <h3>부품목록</h3>
-    <p className="notice">
-      {sure > 0 && `${components.length}개 중 ${sure}개는 이미 가지고 있어요.`}
-      {maybe > 0 && `${sure > 0 ? " " : ""}${maybe}개는 가진 것과 값이 맞는지 확인해주세요.`}
-      {sure === 0 && maybe === 0 && "사기 전에 모델·수량·재고를 한 번 더 확인해주세요."}
-    </p>
+    <p className="notice">{headline || "사기 전에 모델·수량·재고를 한 번 더 확인해주세요."}</p>
     <table className="bom-table"><thead><tr><th>부품 / 용도</th><th>진행 상태</th></tr></thead><tbody>
       {components.map((c, index) => {
         const hit = hits[index];
+        const line = lines[index];
         return <tr key={c.ref} className={hit?.certainty === "card" ? "bom-owned" : ""}>
           <td>
             <small>{c.ref}</small>
@@ -99,9 +102,12 @@ function BomView({ project, workflow, busy, onAction }: {
               <a href={s.url} target="_blank" rel="noreferrer noopener">↗ {s.title}</a>{s.price && <> · {s.price}</>} <small>{s.checkedAt.slice(0, 10)} 확인</small>
             </p>)}
           </td>
-          <td><select aria-label={`${c.ref} 구매 상태`} value={workflow.purchases[c.ref] ?? "needed"} disabled={busy} onChange={e => onAction({ action: "purchase", ref: c.ref, status: e.target.value })}>
+          <td>
+            {line.verdict !== "owned" && <span className={`buy-when buy-${line.verdict}`} title={line.reason}>{SOURCING_LABEL[line.verdict]}</span>}
+            <select aria-label={`${c.ref} 구매 상태`} value={workflow.purchases[c.ref] ?? "needed"} disabled={busy} onChange={e => onAction({ action: "purchase", ref: c.ref, status: e.target.value })}>
             <option value="needed">구매 예정</option><option value="ordered">주문 완료</option><option value="received">수령 완료</option><option value="problem">문제 발생</option>
-          </select></td>
+          </select>
+          </td>
         </tr>;
       })}
     </tbody></table>

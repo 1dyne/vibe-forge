@@ -363,3 +363,10 @@ tr.is-new{animation-name:new-flash-row}
 .bom-owned td strong{color:#5c7046}
 .bom-table td small.owned-yes{display:block;margin:3px 0;color:#5c7046;font-weight:600}
 .bom-table td small.owned-maybe{display:block;margin:3px 0;color:#977537}
+
+/* 언제 사야 하는지. 이유는 말풍선(title)으로만 둔다 — 줄로 적으면 목록이 글밭이 된다. */
+.buy-when{display:block;margin-bottom:5px;padding:2px 7px;border-radius:999px;font-size:10px;width:fit-content;border:1px solid transparent}
+.buy-ready{background:#e7efdf;color:#4e6639}
+.buy-wait_design{background:#eef1ec;color:#7b8a74}
+.buy-verify{background:#fbf2da;color:#8d6d2c}
+.buy-blocked{background:#fbe6e2;color:#a2493f}

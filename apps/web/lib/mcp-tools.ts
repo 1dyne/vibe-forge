@@ -23,6 +23,7 @@ import { checkPower, computePower, suggestedLoads, type PowerInput } from "./pow
 import { mergeSafety, requiredSafety, unackedRisks } from "./safety";
 import { snapshot, FIELD_LABEL } from "./history";
 import { provisionalReasons } from "./provisional";
+import { sourcingLines } from "./sourcing";
 import { uploadGuideFor } from "./firmware-guide";
 import { contractMarkdown, contractTs, crossCheck, selfCheck, validateLog } from "./contract";
 import type { ContractMessage, DataContract } from "./project-types";
@@ -47,6 +48,7 @@ export const SERVER_INSTRUCTIONS = [
   "체크리스트는 get_checklist의 선택지 그대로 묻는다(가능하면 선택형 아티팩트). 회로 전에 형태 질문을 하고 완성품 미리보기(set_product_form)를 보여준 뒤, 대장이 전체 구조·연결 단계·먼저 익힐 연습을 set_build_plan으로 정의한다. 회로 뒤에는 실제 기판 배치와 문제 카드가 있는 조립 가이드(set_assembly_guide)를 만든다.",
   "비용은 항상 원 단위 숫자로 말하고 예산과 비교한다. 넘으면 예산 상향·단계 개발·대체 부품을 숫자로 제안한다. 부품은 보드에 연결할 수 있는 모듈로 제안하고 완제품 기기는 기본 제안으로 쓰지 않는다.",
   "사용자가 이미 가진 부품은 사라고 하지 않는다. get_project의 profile.ownedParts를 먼저 보고, 거기 있는 부품은 비용에서 빼고 '가지고 계신 걸 씁니다'라고 말한다. 대화 중에 \"이건 집에 있어요\"라는 말이 나오면 set_maker_profile의 ownedParts에 더한다(기존 목록을 함께 보낸다). 가진 부품의 값이 설계에 맞는지는 사람이 확인해야 하므로, 값이 중요한 부품(저항·전지·레귤레이터)은 몇 Ω·몇 mAh인지 되묻는다.",
+  "언제 사라고 할지는 get_project의 sourcing을 보고 말한다. when=ready만 \"지금 주문하세요\"라고 하고, wait_design은 회로 승인 전이라 바뀔 수 있으니 기다리게, blocked는 꼭 고칠 것을 먼저 고치게, verify는 why에 적힌 것을 확인하고 사게 안내한다. 승인 전에 전체 주문을 권하지 않는다 — 설계가 바뀌면 그 돈이 버려진다.",
   "회로 승인, 3D 목업 승인, 대장간 입장은 사람만 대시보드에서 한다. 너는 승인했다고 말하거나 승인된 것처럼 진행하지 않는다.",
   "확인·측정·실행하지 않은 것은 unknown으로 둔다. 웹 검색을 쓸 수 있으면 부품·데이터시트·가격·메이커스페이스를 찾아도 되지만, 출처 링크와 확인 날짜를 record_part_source로 남기고 가격·재고는 '검색 시점 기준, 구매 전 확인'으로 안내한다. 찾지 못한 값은 꾸며내지 않는다.",
   "달그락 화면에 남는 글은 사람이 눈으로 훑는다. 한 덩어리로 길게 쓰지 말고, 생각이 바뀔 때마다 빈 줄을 넣어 문단을 나눈다. 나열할 것은 '- '로 줄을 바꿔 적고 순서가 있으면 '1. '을 쓴다. 한 문단은 세 문장을 넘기지 않는다. 줄글로 길게 쓰면 화면에서 읽히지 않는다."
@@ -332,6 +334,8 @@ function summarize(project: LocalProject, context: ToolContext) {
     productForm: project.productForm ?? null,
     housing: project.housing ?? null,
     provisional: provisionalReasons(project),
+    // 언제 사야 하는지. 구매를 권하는 쪽은 모델이라, 모델이 이걸 봐야 한다.
+    sourcing: project.build ? sourcingLines(project).map((line) => ({ ref: line.ref, name: line.name, when: line.verdict, why: line.reason })) : [],
     power: project.power ?? null,
     powerSuggestedLoads: suggestedLoads(project),
     testPlan: project.testPlan ?? null,
