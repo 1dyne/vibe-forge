@@ -25,13 +25,20 @@ type SealedProfile = { sealed: string };
 // 심볼 키로 붙인다 — 전개 연산자({...x})가 심볼 키를 그대로 옮겨준다.
 const SNAPSHOT = Symbol("rows-as-read");
 type Snapshot = { projects: Map<string, string>; profiles: Map<string, string> };
+// 열어본 기록의 "연 그대로"를 기억한다. 봉인은 열 때마다 IV가 달라서 같은 내용을
+// 다시 봉인해도 글자가 달라진다. 그대로 두면 저장할 때마다 그 사람의 모든 기록이
+// 바뀐 것으로 보여 행 단위로 쓰는 뜻이 없어진다. 내용이 그대로면 원래 봉인문을 쓴다.
+const OPENED = Symbol("sealed-as-opened");
+// key까지 들고 있어야 한다. 링크를 바꾸면 같은 내용을 새 열쇠로 다시 봉인해야 하는데,
+// 열쇠가 바뀐 걸 모르고 옛 봉인문을 재사용하면 새 링크로는 기록이 열리지 않는다.
+type Opened = { key: Buffer; projects: Map<string, { sealed: string; json: string }>; profile: { sealed: string; json: string } | null };
 // 운영자의 옛 전역 프로필에는 ownerId가 없다. 행으로 옮기면서 이 이름을 준다.
 // 참여자 ownerId는 UUID라서 겹치지 않는다.
 const OPERATOR_PROFILE = "(operator)";
-type StoredDatabase = { version: 1; projects: Array<LocalProject | SealedProject>; profile?: MakerProfile; profiles?: Record<string, MakerProfile | SealedProfile>; [SNAPSHOT]?: Snapshot };
+type StoredDatabase = { version: 1; projects: Array<LocalProject | SealedProject>; profile?: MakerProfile; profiles?: Record<string, MakerProfile | SealedProfile>; [SNAPSHOT]?: Snapshot; [OPENED]?: Opened };
 // In memory: the operator's projects and the current participant's opened
 // records are plain; every other participant's records stay sealed in hidden.
-type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile>; hidden: { projects: SealedProject[]; profiles: Record<string, SealedProfile> }; [SNAPSHOT]?: Snapshot };
+type Database = { version: 1; projects: LocalProject[]; profile?: MakerProfile; profiles?: Record<string, MakerProfile>; hidden: { projects: SealedProject[]; profiles: Record<string, SealedProfile> }; [SNAPSHOT]?: Snapshot; [OPENED]?: Opened };
 let queue: Promise<unknown> = Promise.resolve();
 let migration: Promise<void> | null = null;
 
@@ -103,13 +110,18 @@ async function writeStored(database: StoredDatabase) {
   await rename(temporary, file);
 }
 
-function sealOwned(database: StoredDatabase, vault: Vault): StoredDatabase {
+function sealOwned(database: StoredDatabase, vault: Vault, opened?: Opened): StoredDatabase {
+  // 연 그대로면 그때의 봉인문을 다시 쓴다. 새로 봉인하면 글자가 달라져서, 고치지
+  // 않은 기록까지 매번 다시 저장된다.
+  const sameKey = opened?.key.equals(vault.key) ?? false;
+  const reseal = (value: unknown, label: string, was: { sealed: string; json: string } | undefined) =>
+    sameKey && was && was.json === JSON.stringify(value) ? was.sealed : seal(value, vault.key, label);
   const projects = database.projects.map((project) => !isSealed(project) && project.ownerId === vault.ownerId
-    ? { id: project.id, ownerId: vault.ownerId, updatedAt: project.updatedAt, sealed: seal(project, vault.key, projectLabel(project.id, vault.ownerId)) }
+    ? { id: project.id, ownerId: vault.ownerId, updatedAt: project.updatedAt, sealed: reseal(project, projectLabel(project.id, vault.ownerId), opened?.projects.get(project.id)) }
     : project);
   const profiles = { ...database.profiles };
   const profile = profiles[vault.ownerId];
-  if (profile && !isSealed(profile)) profiles[vault.ownerId] = { sealed: seal(profile, vault.key, profileLabel(vault.ownerId)) };
+  if (profile && !isSealed(profile)) profiles[vault.ownerId] = { sealed: reseal(profile, profileLabel(vault.ownerId), opened?.profile ?? undefined) };
   return { ...database, projects, ...(database.profiles ? { profiles } : {}) };
 }
 
@@ -133,18 +145,29 @@ async function readDatabase(): Promise<Database> {
   const stored = await readStored();
   const vault = currentVault();
   const database: Database = { version: 1, projects: [], ...(stored.profile ? { profile: stored.profile } : {}), hidden: { projects: [], profiles: {} }, ...(stored[SNAPSHOT] ? { [SNAPSHOT]: stored[SNAPSHOT] } : {}) };
+  const was: Opened = { key: vault?.key ?? Buffer.alloc(0), projects: new Map(), profile: null };
+  const sealedOf = new Map<string, string>();
   for (const item of stored.projects) {
     if (!isSealed(item)) { database.projects.push(item); continue; }
     const opened = vault && item.ownerId === vault.ownerId ? open<LocalProject>(item.sealed, vault.key, projectLabel(item.id, item.ownerId)) : null;
-    if (opened) database.projects.push(opened);
+    if (opened) { database.projects.push(opened); sealedOf.set(opened.id, item.sealed); }
     else database.hidden.projects.push(item);
   }
+  // workflow를 채운 뒤에 기억해야 한다. 그 전에 찍으면 아무것도 안 고쳐도 달라 보인다.
   for (const project of database.projects) project.workflow = workflowFor(project);
+  for (const project of database.projects) {
+    const sealed = sealedOf.get(project.id);
+    if (sealed) was.projects.set(project.id, { sealed, json: JSON.stringify(project) });
+  }
   for (const [ownerId, profile] of Object.entries(stored.profiles ?? {})) {
     const opened = isSealed(profile) ? (vault?.ownerId === ownerId ? open<MakerProfile>(profile.sealed, vault.key, profileLabel(ownerId)) : null) : profile;
-    if (opened) (database.profiles ??= {})[ownerId] = opened;
+    if (opened) {
+      (database.profiles ??= {})[ownerId] = opened;
+      if (isSealed(profile)) was.profile = { sealed: profile.sealed, json: JSON.stringify(opened) };
+    }
     else if (isSealed(profile)) database.hidden.profiles[ownerId] = profile;
   }
+  database[OPENED] = was;
   return database;
 }
 
@@ -162,7 +185,7 @@ async function writeDatabase(database: Database) {
   }
   let stored: StoredDatabase = { ...visible, projects: [...visible.projects, ...hidden.projects], profiles: { ...visible.profiles, ...hidden.profiles } };
   const vault = currentVault();
-  if (vault) stored = sealOwned(stored, vault);
+  if (vault) stored = sealOwned(stored, vault, database[OPENED]);
   await writeStored(stored);
 }
 

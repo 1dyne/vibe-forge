@@ -70,18 +70,37 @@ export function ownedHit(profile: Pick<MakerProfile, "ownedParts"> | null | unde
   return byName ? { part: byName, certainty: "name" } : null;
 }
 
-// 사러 가기 전에 한 번 보는 줄. 이미 가진 것은 빼고, 몇 개를 더 사야 하는지만 남긴다.
-export type ShoppingLine = { ref: string; name: string; needQty: number; owned: OwnedHit | null; buyQty: number };
-
-export function shoppingList(profile: Pick<MakerProfile, "ownedParts"> | null | undefined, needed: Array<{ ref: string; valueOrModel: string; catalogId?: string | null; qty?: number }>): ShoppingLine[] {
-  // 같은 부품을 여러 ref가 쓰면(LED 세 개) 가진 수량을 나눠 써야 한다.
+// 부품목록 한 장을 통째로 맞춰본다. 한 줄씩 따로 보면 안 되는 이유가 있다:
+// LED 한 개를 가진 사람의 설계에 LED 자리가 둘이면, 줄마다 따로 물었을 때 둘 다
+// "가지고 있어요"가 된다. 가진 수량을 앞 줄부터 써 나가야 두 번째 줄이 사라고 한다.
+// (설계의 부품 한 줄은 한 개다 — CircuitComponent에는 수량이 없다.)
+export function ownedHits(profile: Pick<MakerProfile, "ownedParts"> | null | undefined, needed: Array<{ catalogId?: string | null; valueOrModel?: string; model?: string }>): Array<OwnedHit | null> {
   const left = new Map(ownedParts(profile).map((part) => [part.id, part.qty]));
   return needed.map((item) => {
-    const needQty = Math.max(1, item.qty ?? 1);
-    const owned = ownedHit(profile, item);
-    const available = owned ? left.get(owned.part.id) ?? 0 : 0;
-    const used = Math.min(available, needQty);
-    if (owned) left.set(owned.part.id, available - used);
-    return { ref: item.ref, name: item.valueOrModel, needQty, owned: owned && used > 0 ? owned : null, buyQty: needQty - used };
+    const hit = ownedHit(profile, item);
+    if (!hit) return null;
+    const remaining = left.get(hit.part.id) ?? 0;
+    if (remaining <= 0) return null;
+    left.set(hit.part.id, remaining - 1);
+    return hit;
+  });
+}
+
+// 커넥터가 보낸 목록을 저장할 모양으로 맞춘다. id는 서버가 쥔다 — 모델이 지어낸
+// id를 그대로 쓰면 같은 부품이 두 줄로 쌓인다.
+//
+// 전에 쓰던 id는 이름이 같은 줄에 물려주되, 한 번 물려준 id는 다시 쓰지 않는다.
+// 그러지 않으면 "저항"을 두 줄 보냈을 때 둘 다 같은 id를 받아서, 화면에서는 키가
+// 겹치고 수량 계산에서는 두 줄이 한 줄로 취급된다.
+export function reconcileOwnedParts(
+  previous: OwnedPart[],
+  incoming: Array<{ name: string; qty?: number; catalogId?: string | null; note?: string }>,
+  newId: () => string
+): OwnedPart[] {
+  const spare = [...previous];
+  return incoming.map((part) => {
+    const at = spare.findIndex((old) => old.name === part.name);
+    const id = at >= 0 ? spare.splice(at, 1)[0].id : newId();
+    return { id, name: part.name, qty: part.qty ?? 1, catalogId: part.catalogId ?? null, note: part.note ?? "" };
   });
 }

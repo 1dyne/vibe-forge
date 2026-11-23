@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { OwnedPart } from "../lib/project-types";
 import { PART_CARDS } from "../lib/parts/catalog";
-import { normalizePartName, samePartName } from "../lib/owned-parts";
+import { normalizePartName } from "../lib/owned-parts";
 import { IconTrash } from "./icons";
 
 // 장비(tools)는 고정된 선택지로 물을 수 있다. 멀티미터·니퍼·3D 프린터는 종류가
@@ -14,17 +14,18 @@ import { IconTrash } from "./icons";
 // 카드와 연결돼야 되므로, 아는 이름을 적으면 조용히 연결한다.
 
 // 적은 이름이 아는 부품인지 찾는다. 모델명과 다른 이름(별칭)까지 본다.
-// 정확히 같은 이름을 먼저 보고, 없을 때만 비슷한 이름을 찾는다. 그러지 않으면
-// 먼저 나온 카드가 비슷하다는 이유로 정확히 맞는 카드를 가로챈다.
+// 이름이 정확히 같을 때만 카드를 붙인다(모델명·별칭·id, 띄어쓰기와 대소문자는 무시).
+//
+// 처음에는 비슷한 이름도 받았는데, 실제 입력으로 재보니 느슨하게 걸린 세 번 중 두 번이
+// 틀렸다. "WS2812B LED 링"이 별칭 "LED" 때문에 LED 5mm 카드에 붙고, "전지"가 18650
+// 홀더에 붙었다. 틀린 카드가 붙으면 부품목록이 "가지고 있어요"라고 단정해서, 정작
+// 없는 부품을 안 사고 넘어가게 된다. 못 붙이는 쪽이 틀리게 붙이는 쪽보다 낫다.
+// 정확히 맞춘 열한 번은 전부 옳았고, 화면에는 고를 수 있는 목록(datalist)이 있다.
 export function matchCatalog(name: string): string | null {
   const typed = normalizePartName(name);
   if (typed.length < 2) return null;
   const namesOf = (card: (typeof PART_CARDS)[number]) => [card.model, ...card.aliases, card.id];
-  const exact = PART_CARDS.find((card) => namesOf(card).some((candidate) => normalizePartName(candidate) === typed));
-  if (exact) return exact.id;
-  // samePartName의 모호함 기준을 그대로 쓴다. "led"처럼 짧은 별칭이 "LED 링 12구"를
-  // 가로채지 않게 막는 것이 여기서도 필요하다.
-  return PART_CARDS.find((card) => namesOf(card).some((candidate) => samePartName(candidate, name)))?.id ?? null;
+  return PART_CARDS.find((card) => namesOf(card).some((candidate) => normalizePartName(candidate) === typed))?.id ?? null;
 }
 
 const blank = () => ({ name: "", qty: 1, note: "" });
@@ -67,7 +68,7 @@ export default function OwnedPartsField({ parts, onChange, max = 120 }: { parts:
       </label>
       {/* 방금 친 이름에 대한 반응이라 입력칸 바로 밑에 둔다. 버튼 아래로 내리면
           스크롤 밖으로 밀려 읽히지 않는다. */}
-      {draft.name.trim() && <small className={linked ? "owned-hint on" : "owned-hint"}>{linked ? "아는 부품이에요 · 사양까지 함께 봐요" : "목록에만 남아요 · 사양은 모르는 부품이에요"}</small>}
+      {draft.name.trim() && <small className={linked ? "owned-hint on" : "owned-hint"}>{linked ? "아는 부품이에요 · 사양까지 함께 봐요" : "목록에만 남아요 · 아는 부품이면 목록에서 골라주세요"}</small>}
       <label className="owned-memo"><span>메모 <small>(선택)</small></span>
         <input className="profile-input" maxLength={120} placeholder="예: 서랍 둘째 칸, 값 섞여 있음" value={draft.note}
           onChange={(e) => setDraft({ ...draft, note: e.target.value })} />

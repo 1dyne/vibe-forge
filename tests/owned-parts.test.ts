@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { normalizePartName, ownedHit, samePartName, shoppingList, valueTokens, valuesCovered } from "../apps/web/lib/owned-parts";
+import { beforeEach, describe, expect, it } from "vitest";
+import { normalizePartName, ownedHit, ownedHits, reconcileOwnedParts, samePartName, valueTokens, valuesCovered } from "../apps/web/lib/owned-parts";
 import type { MakerProfile, OwnedPart } from "../apps/web/lib/project-types";
 import { emptyProfile } from "../apps/web/lib/workflow";
 
@@ -76,30 +76,48 @@ describe("가진 부품인지 가리기", () => {
   });
 });
 
-describe("살 것만 남기기", () => {
-  it("가진 수량만큼 빼고 부족한 만큼만 사게 한다", () => {
-    const list = shoppingList(withParts([part({ id: "led", name: "LED 5mm", qty: 2 })]), [
-      { ref: "D1", valueOrModel: "LED 5mm", qty: 5 }
+describe("부품목록 한 장을 통째로 맞추기", () => {
+  // LED 한 개를 가진 사람의 설계에 LED 자리가 둘이면, 줄마다 따로 물었을 때는
+  // 둘 다 "가지고 있어요"가 된다. 그러면 하나를 안 사고 넘어간다.
+  it("가진 수량을 앞 줄부터 나눠 쓴다", () => {
+    const hits = ownedHits(withParts([part({ id: "led", name: "LED 5mm", qty: 2 })]), [
+      { valueOrModel: "LED 5mm" }, { valueOrModel: "LED 5mm" }, { valueOrModel: "LED 5mm" }
     ]);
-    expect(list[0].buyQty).toBe(3);
-    expect(list[0].owned?.part.id).toBe("led");
+    expect(hits.map((hit) => hit?.part.id ?? null)).toEqual(["led", "led", null]);
   });
 
-  // 같은 부품을 여러 자리에서 쓰면 가진 수량을 나눠 써야 한다. 그러지 않으면
-  // LED 두 개로 다섯 자리를 모두 채운 것처럼 보인다.
-  it("여러 자리가 같은 부품을 쓰면 수량을 나눠 쓴다", () => {
-    const list = shoppingList(withParts([part({ id: "led", name: "LED 5mm", qty: 2 })]), [
-      { ref: "D1", valueOrModel: "LED 5mm", qty: 1 },
-      { ref: "D2", valueOrModel: "LED 5mm", qty: 1 },
-      { ref: "D3", valueOrModel: "LED 5mm", qty: 1 }
-    ]);
-    expect(list.map((line) => line.buyQty)).toEqual([0, 0, 1]);
-    expect(list[2].owned).toBeNull();
+  it("서로 다른 부품은 각자 센다", () => {
+    const hits = ownedHits(withParts([
+      part({ id: "led", name: "LED 5mm", qty: 1 }),
+      part({ id: "r", name: "저항", qty: 50, catalogId: "resistor" })
+    ]), [{ valueOrModel: "LED 5mm" }, { valueOrModel: "저항 220Ω", catalogId: "resistor" }, { valueOrModel: "ESP32 DevKit V1" }]);
+    expect(hits.map((hit) => hit?.part.id ?? null)).toEqual(["led", "r", null]);
   });
 
-  it("가진 게 없으면 전부 사야 한다", () => {
-    const list = shoppingList(emptyProfile(), [{ ref: "U1", valueOrModel: "ESP32 DevKit V1", qty: 1 }]);
-    expect(list[0].buyQty).toBe(1);
-    expect(list[0].owned).toBeNull();
+  it("가진 게 없으면 전부 null", () => {
+    expect(ownedHits(emptyProfile(), [{ valueOrModel: "ESP32 DevKit V1" }])).toEqual([null]);
+  });
+});
+
+describe("커넥터가 보낸 목록 맞추기", () => {
+  let n = 0;
+  const newId = () => `new${++n}`;
+  beforeEach(() => { n = 0; });
+
+  it("전에 쓰던 id를 이름이 같은 줄에 물려준다", () => {
+    const out = reconcileOwnedParts([part({ id: "keep", name: "저항", qty: 10 })], [{ name: "저항", qty: 50 }], newId);
+    expect(out).toEqual([{ id: "keep", name: "저항", qty: 50, catalogId: null, note: "" }]);
+  });
+
+  // 한 번 물려준 id를 또 물려주면 두 줄이 같은 id를 갖는다. 화면에서는 키가 겹치고,
+  // 수량을 나눠 쓰는 계산에서는 두 줄이 한 줄로 취급된다.
+  it("같은 이름이 두 줄 와도 id가 겹치지 않는다", () => {
+    const out = reconcileOwnedParts([part({ id: "keep", name: "저항", qty: 10 })], [{ name: "저항", qty: 1 }, { name: "저항", qty: 2 }], newId);
+    expect(out.map((p) => p.id)).toEqual(["keep", "new1"]);
+    expect(new Set(out.map((p) => p.id)).size).toBe(2);
+  });
+
+  it("빠진 값은 기본값으로 채운다", () => {
+    expect(reconcileOwnedParts([], [{ name: "새 부품" }], newId)).toEqual([{ id: "new1", name: "새 부품", qty: 1, catalogId: null, note: "" }]);
   });
 });

@@ -1,5 +1,5 @@
 import type { LocalProject } from "./project-types";
-import { ownedHit, type OwnedHit } from "./owned-parts";
+import { ownedHits, type OwnedHit } from "./owned-parts";
 import { workflowFor } from "./workflow";
 
 // 언제 사야 하는가. 부품목록은 지금까지 "구매 예정 / 주문 완료 / 수령 완료"만
@@ -36,8 +36,11 @@ export function sourcingLines(project: LocalProject): SourcingLine[] {
   const checks = project.build?.checks ?? [];
   const approved = Boolean(workflow.circuitApprovedAt);
 
-  return components.map((component) => {
-    const owned = ownedHit(workflow.profile, component);
+  // 가진 수량을 앞 줄부터 나눠 쓴다. LED 하나로 LED 자리 둘을 채울 수 없다.
+  const hits = ownedHits(workflow.profile, components);
+
+  return components.map((component, index) => {
+    const owned = hits[index];
     const mine = checks.filter((check) => (check.affectedRefs ?? []).includes(component.ref));
     const blocked = mine.find((check) => check.severity === "blocked" || check.verdict === "fail");
     const warned = mine.find((check) => check.severity === "warning" || check.verdict === "unknown");

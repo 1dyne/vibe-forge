@@ -68,8 +68,22 @@ export async function readRows(table: Table): Promise<Row[]> {
   return rows.map((row) => ({ id: row.id as string, data: row.data }));
 }
 
+// 비교는 키 순서를 가리지 않아야 한다. Postgres는 jsonb를 넣을 때 키 순서를 제 식대로
+// 정규화하는데(짧은 키부터), 우리가 저장할 객체는 코드에 적은 순서를 그대로 따른다.
+// 그냥 JSON.stringify로 견주면 내용이 같아도 글자가 달라서, 객체를 다시 만들어 넣는
+// 행(봉인된 프로젝트의 {id, ownerId, updatedAt, sealed})은 늘 "바뀐 것"으로 보인다.
+// 그러면 행 단위로 쓰는 뜻이 없어진다.
+export function canonical(value: unknown): string {
+  if (value === undefined) return "null";
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).filter((key) => record[key] !== undefined).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(record[key])}`).join(",")}}`;
+}
+
 /** 읽을 때 본 모습. 이것과 다른 행만 쓴다. */
-export const snapshotOf = (rows: Row[]): Map<string, string> => new Map(rows.map((row) => [row.id, JSON.stringify(row.data)]));
+export const snapshotOf = (rows: Row[]): Map<string, string> => new Map(rows.map((row) => [row.id, canonical(row.data)]));
 
 // 바뀐 행만 쓰고, 사라진 행만 지운다. 한 트랜잭션으로 묶어 중간에 끊겨도
 // 반만 반영되는 일이 없게 한다.
@@ -121,9 +135,13 @@ export async function importOnce(key: string, load: () => Promise<Array<{ table:
         await client.query(`INSERT INTO ${group.table} (id, data) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`, [row.id, JSON.stringify(row.data)]);
       }
     }
+    const counts = Object.fromEntries(groups.map((group) => [group.table, group.rows.length]));
     await client.query("INSERT INTO forge_meta (id, data) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
-      [`import:${key}`, JSON.stringify({ at: new Date().toISOString(), counts: Object.fromEntries(groups.map((g) => [g.table, g.rows.length])) })]);
+      [`import:${key}`, JSON.stringify({ at: new Date().toISOString(), counts })]);
     await client.query("COMMIT");
+    // 운영에서 이사가 무엇을 옮겼는지 눈으로 확인할 수 있어야 한다. 0건이면 파일을
+    // 못 찾았다는 뜻이고, 그건 조용히 지나가면 안 되는 일이다.
+    console.log(`[forge-store] ${key} 이사 완료:`, JSON.stringify(counts));
     return "imported";
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});

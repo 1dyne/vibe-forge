@@ -38,6 +38,30 @@ async function reset() {
 
 const plan = { projectName: "테스트", oneLiner: "", reply: "", slotUpdates: [], tasks: [] };
 
+// Postgres 없이도 돈다. 행 단위로 쓸지 말지를 가르는 함수라 늘 확인한다.
+describe("바뀐 행 가리기", () => {
+  it("키 순서가 달라도 같은 내용으로 본다", async () => {
+    const { canonical } = await import("../apps/web/lib/row-store");
+    // Postgres는 jsonb 키 순서를 제 식대로 정규화한다. 글자 그대로 견주면
+    // 내용이 같아도 늘 "바뀐 것"이 되어 행 단위로 쓰는 뜻이 없어진다.
+    expect(canonical({ id: "p1", ownerId: "o", updatedAt: "t", sealed: "x" }))
+      .toBe(canonical({ sealed: "x", id: "p1", updatedAt: "t", ownerId: "o" }));
+  });
+
+  it("안쪽 객체와 배열까지 내려가며 본다", async () => {
+    const { canonical } = await import("../apps/web/lib/row-store");
+    expect(canonical({ a: [{ x: 1, y: 2 }] })).toBe(canonical({ a: [{ y: 2, x: 1 }] }));
+    // 배열 순서는 뜻이 있으므로 가린다.
+    expect(canonical({ a: [1, 2] })).not.toBe(canonical({ a: [2, 1] }));
+  });
+
+  it("내용이 다르면 다르게 본다", async () => {
+    const { canonical } = await import("../apps/web/lib/row-store");
+    expect(canonical({ name: "가" })).not.toBe(canonical({ name: "나" }));
+    expect(canonical({ a: 1 })).not.toBe(canonical({ a: 1, b: 2 }));
+  });
+});
+
 when("Postgres 저장소", () => {
   beforeEach(async () => { await reset(); });
 
@@ -86,6 +110,37 @@ when("Postgres 저장소", () => {
     const list = await store.listProjects(null);
     expect(list.find((p) => p.id === first.id)?.name).toBe("이름 바꾼 프로젝트");
     expect(list).toHaveLength(2);
+  });
+
+  // 봉인은 열 때마다 IV가 달라서, 같은 내용을 다시 봉인하면 글자가 달라진다.
+  // 그대로 두면 참여자가 저장할 때마다 그 사람의 모든 기록이 바뀐 것으로 보여
+  // 행 단위로 쓰는 뜻이 없어진다.
+  it("봉인된 기록도 고친 것만 다시 쓴다", async () => {
+    const { createUser } = await import("../apps/web/lib/users");
+    const { vaultFor, withVault } = await import("../apps/web/lib/vault");
+    const { user, token } = await createUser("봉인 참여자", true);
+    const vault = vaultFor(token, user.id);
+
+    const [a, b] = await withVault(vault, async () => [
+      await store.createProject("첫째", plan, "mock", [], { ownerId: user.id }),
+      await store.createProject("둘째", plan, "mock", [], { ownerId: user.id })
+    ]);
+
+    const pool = await rowStore.db();
+    const stamp = async (id: string) => (await pool.query("SELECT updated_at FROM forge_projects WHERE id = $1", [id])).rows[0].updated_at.toISOString();
+    const sealed = async (id: string) => (await pool.query("SELECT data FROM forge_projects WHERE id = $1", [id])).rows[0].data.sealed as string;
+    const beforeStamp = await stamp(b.id);
+    const beforeSealed = await sealed(b.id);
+
+    await withVault(vault, () => store.renameProject(a.id, user.id, "이름 바꾼 첫째"));
+
+    // 안 고친 쪽은 봉인문도 저장 시각도 그대로여야 한다.
+    expect(await sealed(b.id)).toBe(beforeSealed);
+    expect(await stamp(b.id)).toBe(beforeStamp);
+    // 고친 쪽은 실제로 바뀌고, 그래도 열린다.
+    expect(await sealed(a.id)).not.toBe(beforeSealed);
+    const opened = await withVault(vault, () => store.getProject(a.id));
+    expect(opened?.name).toBe("이름 바꾼 첫째");
   });
 
   it("계정 프로필이 남고 다시 읽힌다", async () => {

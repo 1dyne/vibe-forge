@@ -11,7 +11,7 @@ import { ChangeSticker } from "./change-sticker";
 import { HistoryList, PowerView, SafetyView, TestView } from "./plan-views";
 import { ContractView } from "./contract-view";
 import { provisionalReasons } from "../lib/provisional";
-import { ownedHit } from "../lib/owned-parts";
+import { ownedHits } from "../lib/owned-parts";
 import { SOURCING_LABEL, sourcingLines, sourcingSummary } from "../lib/sourcing";
 
 export default function WorkbenchPanel({ project, items, selected, busy, onSelect, onClose, onAction, ownerName, newMarks = [], shortNames = false, connectorOnly = false }: {
@@ -73,7 +73,7 @@ function BomView({ project, workflow, busy, onAction }: {
   project: LocalProject; workflow: ReturnType<typeof workflowFor>; busy: boolean; onAction: (input: Record<string, unknown>) => void;
 }) {
   const components = project.build!.blueprint.components;
-  const hits = components.map(c => ownedHit(workflow.profile, c));
+  const hits = ownedHits(workflow.profile, components);
   // 언제 사야 하는지는 따로 센다(sourcing.ts). 여기서는 받아 적기만 한다.
   const lines = sourcingLines(project);
   const sum = sourcingSummary(lines);

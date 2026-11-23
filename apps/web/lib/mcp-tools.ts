@@ -24,6 +24,7 @@ import { mergeSafety, requiredSafety, unackedRisks } from "./safety";
 import { snapshot, FIELD_LABEL } from "./history";
 import { provisionalReasons } from "./provisional";
 import { sourcingLines } from "./sourcing";
+import { reconcileOwnedParts } from "./owned-parts";
 import { uploadGuideFor } from "./firmware-guide";
 import { contractMarkdown, contractTs, crossCheck, selfCheck, validateLog } from "./contract";
 import type { ContractMessage, DataContract } from "./project-types";
@@ -561,10 +562,10 @@ export const TOOLS: ToolDefinition[] = [
       const project = await ownedProject(id, context);
       if (incoming) {
         const previous = workflowFor(project).profile.ownedParts ?? [];
-        (parsed as Partial<MakerProfile>).ownedParts = incoming.map((part) => ({
-          id: previous.find((old) => old.name === part.name)?.id ?? randomUUID().slice(0, 8),
-          name: part.name, qty: part.qty ?? 1, catalogId: part.catalogId ?? null, note: part.note ?? ""
-        }));
+        // apps/web의 tsconfig는 strict: false라 zod가 추론한 name이 선택값으로 보인다.
+        // 런타임에는 스키마가 min(1)로 막고 있으니 여기서 좁혀 쓴다.
+        const sent = incoming as Array<{ name: string; qty?: number; catalogId?: string | null; note?: string }>;
+        (parsed as Partial<MakerProfile>).ownedParts = reconcileOwnedParts(previous, sent, () => randomUUID().slice(0, 8));
       }
       const profile: MakerProfile = { ...workflowFor(project).profile, ...Object.fromEntries(Object.entries(parsed).filter(([, value]) => value !== undefined)) } as MakerProfile;
       const updated = await mutateProject(project.id, (p) => {
