@@ -11,7 +11,7 @@ OpenAI의 ChatGPT 요금제 사용(Sign in with ChatGPT · plan usage)은 지금
 | 오픈소스이면서 사용자 컴퓨터에서 도는 앱 | 누구나 가능. 로그인 결과를 `127.0.0.1`로 받아야 하고 토큰은 로컬에 둔다 |
 | 유료·원격 호스팅 앱 (dalgrak.app 자체) | 관심 양식으로 신청해 승인받아야 한다 |
 
-그래서 로그인과 AI 호출은 사용자 컴퓨터의 오픈소스 앱(`helper/`)이 맡고, dalgrak.app은 대화 화면과 기록을 맡습니다. 호스팅 승인이 나면 도우미 없이 쓰는 방식을 추가합니다.
+그래서 로그인과 AI 호출은 사용자 컴퓨터의 오픈소스 앱(달그락 도우미)이 맡고, dalgrak.app은 대화 화면과 기록을 맡습니다. 호스팅 승인이 나면 도우미 없이 쓰는 방식을 추가합니다.
 
 ## 흐름
 
@@ -44,4 +44,6 @@ OpenAI의 ChatGPT 요금제 사용(Sign in with ChatGPT · plan usage)은 지금
 
 ## 공개 저장소
 
-`helper/`는 자체 `package.json`과 MIT 라이선스를 가진 독립 패키지입니다. 공개 저장소(`1dyne/dalgrak-helper`)로 옮겨 배포합니다. 화면의 설치 안내 링크(`apps/web/app/helper-composer.tsx`의 `HELPER_REPO_URL`)가 그 주소를 가리킵니다.
+도우미 코드는 공개 저장소 [`1dyne/dalgrak-helper`](https://github.com/1dyne/dalgrak-helper)에 있습니다(MIT). 이 저장소에는 서버와 화면 쪽만 있습니다. 화면의 설치 안내 링크(`apps/web/app/helper-composer.tsx`의 `HELPER_REPO_URL`)가 그 주소를 가리킵니다.
+
+사용자가 실행하는 명령은 `npx github:1dyne/dalgrak-helper` 하나입니다.
