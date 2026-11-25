@@ -29,7 +29,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
   const downloadUrl = workbenchDownloadUrl(project.id, item.id);
   function select(id: string) { setSourceItem(null); onSelect(id); }
   return <aside className="artifact-panel" id="workbench-panel" data-tour="workbench" aria-label="작업대">
-    <header className="artifact-header"><div><h2>작업대 <span className="artifact-count">{items.length}</span></h2></div><div className="workbench-header-actions"><span className="revision">r{project.designRevision}</span><button className="icon-button" onClick={onClose} aria-label="작업대 닫기">×</button></div></header>
+    <header className="artifact-header"><div><button className="back-to-status" onClick={onClose}>← 현황판</button><h2 className="viewer-title">{item.label}</h2></div><div className="workbench-header-actions"><span className="revision">r{project.designRevision}</span></div></header>
     {/* 파일이 하나뿐이면 탭 줄은 파일명을 한 번 더 보여줄 뿐이라, 아래 도구줄에만 이름을 둔다. */}
     {items.length > 1 && <div ref={tabs} className="artifact-tabs" role="tablist" aria-label="작업물 파일" onKeyDown={e => {
       const index = items.findIndex(i => i.id === item.id);
