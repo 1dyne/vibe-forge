@@ -13,6 +13,7 @@ import { POST as poll } from "../apps/web/app/api/helper/poll/route";
 import { GET as readJob, POST as reportJob } from "../apps/web/app/api/helper/jobs/[id]/route";
 import { GET as statusRoute } from "../apps/web/app/api/helper/status/route";
 import { GET as listRoute } from "../apps/web/app/api/projects/route";
+import { GET as boardGet, POST as boardPost } from "../apps/web/app/api/projects/[id]/board/route";
 import { resetHelperRelay } from "../apps/web/lib/helper-relay";
 import { userSessionValue } from "../apps/web/lib/session";
 import { resetRateLimits } from "../apps/web/lib/rate-limit";
@@ -100,6 +101,30 @@ describe("도우미 대화 경로", () => {
     expect((await readJob(new NextRequest(`${ORIGIN}/api/helper/jobs/${sent.jobId}?from=0`, { headers: cookie(b.linkToken) }), jobParams(sent.jobId))).status).toBe(404);
     // 남의 프로젝트로는 보낼 수 없다.
     expect((await chat(post("/api/helper/chat", { projectId: a.projectId, text: "남의 것" }, cookie(b.linkToken)))).status).toBe(404);
+  });
+
+  it("달그락이 도구로 넘긴 차례가 사람 화면의 '지금 할 일'이 되고, 사람이 답하면 달그락 차례로 돌아간다", async () => {
+    const a = await person("마");
+    const call = async (name: string, args: Record<string, unknown>) => (await (await mcp(post("/api/mcp", { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { projectId: a.projectId, ...args } } }, bearer(a.access)))).json()).result;
+    // 설계도 없이는 일을 나눌 수 없다
+    const early = await call("set_work_board", { cards: [{ id: "c1", title: "회로", detail: "d", owner: "chief" }] });
+    expect(early.isError).toBe(true);
+    expect(early.content[0].text).toContain("set_build_plan");
+    // 현실 기록은 회로가 없어도 된다
+    const real = await call("record_real_world", { delivery: { label: "5kg 로드셀", status: "ordered", expectedAt: "2026-11-27" }, now: "책상 정리 중" });
+    expect(real.isError).toBeFalsy();
+    expect(real.content[0].text).toContain("[현황판]");
+    expect(real.content[0].text).toContain("배송: 5kg 로드셀 주문함 · 도착 예정 2026-11-27");
+    expect(real.structuredContent.board.real.now.text).toBe("책상 정리 중");
+    // 사람이 화면에서 배송이 밀렸다고 고친다
+    const params = { params: Promise.resolve({ id: a.projectId }) };
+    const moved = await (await boardPost(post(`/api/projects/${a.projectId}/board`, { action: "delivery", label: "5kg 로드셀", status: "delayed", expectedAt: "2026-12-01" }, cookie(a.linkToken)), params)).json();
+    expect(moved.board.real.deliveries[0]).toMatchObject({ status: "delayed", expectedAt: "2026-12-01" });
+    const seen = await (await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(a.linkToken) }), params)).json();
+    expect(seen.board.real.events.at(-1).text).toContain("2026-11-27 → 2026-12-01");
+    // 남의 현황판은 볼 수 없다
+    const b = await person("바");
+    expect((await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(b.linkToken) }), params)).status).toBe(404);
   });
 
   it("로그인 없이는 도우미 자리에도 화면 자리에도 설 수 없다", async () => {

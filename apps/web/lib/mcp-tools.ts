@@ -15,6 +15,7 @@ import { judgeReading, libraryCardsForStep, parseOhms } from "./parts/trouble-ca
 import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
 import { checkProductForm, footprint, placementReadback } from "./form-check";
+import { BoardError, boardOf, moveCard, recordReal, upsertCards, viewBoard } from "./board";
 import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
@@ -233,6 +234,16 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 3. write_dev_spec으로 SPEC.md·CLAUDE.md·AGENTS.md를 만들고, 대시보드 "💻 개발 연결"의 설치·연결 순서를 따라가게 한다.
 4. 구현은 Claude Code나 Codex에서 하고, 그쪽 Claude는 log_dev_progress로 진행을 남긴다.
 
+## 현황판: 누구 차례인지와 현실의 상태 (set_work_board · update_work_card · record_real_world)
+달그락들은 방마다 따로 대화하지만 현황판은 하나다. 모든 방의 달그락이 get_project의 board를 읽고 답한다. 사람은 '지금 할 일' 하나와 방마다의 알림을 따라간다.
+- 대장은 설계도(set_build_plan)와 팀(set_team)이 정해지면 set_work_board로 일을 작업 카드로 나눠 담당 달그락에게 맡긴다. 카드는 사람이 알아볼 이름으로, 먼저 끝나야 하는 카드는 dependsOn으로 잇는다.
+- 일을 사람에게 넘길 때는 반드시 update_work_card로 turn=person과 ask를 적는다. ask에는 도구·위치·단위까지 구체적으로 쓴다. 이걸 하지 않으면 사람에게 알림이 가지 않아 자기 차례인지 모른다.
+- 사람이 답하면 그 카드를 turn=agent로 되돌리고 이어서 작업한다. 사람의 확인을 기다리는 카드는 달그락이 혼자 done으로 바꿀 수 없다.
+- 배송·출력·예약·굳는 시간처럼 현실을 기다려야 하면 turn=waiting과 예정일을 적는다. 기다리는 동안 재촉하지 않고, board.canDoMeanwhile에 있는 일을 먼저 하자고 제안한다.
+- 사용자가 "주문했어", "금요일에 온대", "배송이 밀렸어", "지금 납땜하는 중이야", "이번 주는 수요일만 돼"라고 말하면 record_real_world로 남긴다. 말하지 않은 날짜를 지어내지 않는다.
+- board.overdue에 예정일이 지난 것이 있으면 다음 대화에서 먼저 묻는다("로드셀 도착했나요?"). 일정이 밀려 기한(timelineWeeks)이 위험해지면 숫자로 알리고 순서를 다시 제안한다.
+- 다른 방의 카드는 그 담당 달그락의 일이다. 내 방의 카드만 바꾸고, 다른 방에 영향이 있으면 대장에게 알린다(log_team_turn의 sharedSummary).
+
 ## 사람이 하는 일과 기본 원칙
 - 승인 세 가지, 부품 구매, 납땜, 측정, 업로드는 사람이 한다. 사용자가 말해준 결과는 record_task_result, set_purchase_status로 기록한다. 결과 제출은 합격이 아니다.
 - 결정은 사람이 한다. 확인 안 한 건 unknown. 사용자 기술 수준은 설명 방식과 연습 단계에 반영하고, 목표 자체를 임의로 낮추지 않는다.
@@ -337,6 +348,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     profile: workflow.profile, profileMissing: intakeMissing(workflow.profile), checklistMissing: checklistMissing(workflow.profile),
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
+    board: viewBoard(boardOf(project)),
     productForm: project.productForm ?? null,
     productFormFindings: project.productForm ? checkProductForm(project.productForm) : [],
     housing: project.housing ?? null,
@@ -386,7 +398,7 @@ function summarize(project: LocalProject, context: ToolContext) {
 const checklistUrl = (project: LocalProject, context: ToolContext) => withLinkParams(context.dashboardUrl, { p: project.id, open: "profile" });
 
 const stored = (project: LocalProject, context: ToolContext, message: string): ToolResult => ({
-  text: `${message}\n다음: ${PHASE_NEXT[workflowFor(project).phase]}\n대시보드: ${context.dashboardUrl}`,
+  text: `${message}\n다음: ${PHASE_NEXT[workflowFor(project).phase]}${boardOf(project).cards.length || boardOf(project).real.deliveries.length ? `\n\n[현황판]\n${viewBoard(boardOf(project)).brief}` : ""}\n대시보드: ${context.dashboardUrl}`,
   data: summarize(project, context)
 });
 
@@ -782,6 +794,68 @@ export const TOOLS: ToolDefinition[] = [
         p.workflow = w;
       });
       return stored(updated, context, "구매 상태를 기록했어요.");
+    }
+  }
+  ,{
+    name: "set_work_board", title: "현황판에 작업 카드 정하기",
+    description: "대장이 설계와 팀 배치를 마친 뒤, 해야 할 일을 작업 카드로 나눠 담당 달그락에게 맡긴다. 카드마다 담당(owner: chief·hw·sw·me·id), 먼저 끝나야 하는 카드(dependsOn)를 정한다. 이미 있는 id를 다시 보내면 내용만 고치고 진행 상태는 지킨다. 사람은 대시보드에서 방마다 알림을 보고 '지금 할 일'을 따라간다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "cards"], properties: { projectId, cards: { type: "array", minItems: 1, maxItems: 30, items: { type: "object", additionalProperties: false, required: ["id", "title", "detail", "owner"], properties: {
+      id: { type: "string", description: "짧은 영문 id (예: circuit-1, housing-lid). 다시 보낼 때 같은 id를 쓴다" },
+      title: { type: "string", description: "사람이 알아볼 이름 (예: 하우징 뚜껑)" },
+      detail: { type: "string", description: "무엇을 만들거나 정하는 카드인지 한두 문장" },
+      owner: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "담당 달그락. 이 카드의 대화는 그 방에서 한다" },
+      dependsOn: { type: "array", items: { type: "string" }, description: "먼저 끝나야 하는 카드 id" },
+      turn: { type: "string", enum: ["agent", "person"], description: "새 카드의 첫 차례. 기본은 agent(달그락이 먼저 작업)" },
+      ask: { type: "string", description: "첫 차례가 person일 때, 사람에게 무엇을 해 달라는지" }
+    } } } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), cards: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/), title: z.string().min(1).max(60), detail: z.string().min(1).max(400), owner: z.enum(["chief", "hw", "sw", "me", "id"]), dependsOn: z.array(z.string().max(40)).max(8).optional(), turn: z.enum(["agent", "person"]).optional(), ask: z.string().max(400).optional() }).strict()).min(1).max(30) }).strict().parse(input);
+      const project = await ownedProject(parsed.projectId, context);
+      if (!project.buildPlan) throw new ToolError("먼저 대장의 전체 설계도(set_build_plan)를 저장하세요. 설계가 있어야 일을 나눌 수 있어요.");
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        const w = workflowFor(p);
+        p.board = upsertCards(boardOf(p), parsed.cards as Parameters<typeof upsertCards>[1], w.activeAgents, "chief");
+        const rooms = [...new Set(parsed.cards.map((c) => c.owner))].map((a) => a.toUpperCase()).join(" · ");
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `현황판: 작업 카드 ${parsed.cards.length}개를 ${rooms} 방에 나눴어요.`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+        pushActivity(p, { source: "claude", title: "작업 카드 배치" });
+      });
+      return stored(updated, context, "작업 카드를 현황판에 올렸어요. 사람에게는 '지금 할 일' 하나와 방마다의 알림으로 보여요.");
+    }
+  },
+  {
+    name: "update_work_card", title: "작업 카드의 차례 바꾸기",
+    description: "작업 카드가 지금 누구 차례인지 바꾼다. agent=달그락이 작업 중, person=사람의 확인·결정·측정·조립이 필요(ask에 구체적으로 무엇을 해 달라는지), waiting=현실 대기(waiting에 무엇을 언제까지 기다리는지: 배송·출력·예약·굳는 시간), blocked=막힘(note에 이유), done=완료. 사람의 확인을 기다리는 카드는 달그락이 혼자 done으로 바꿀 수 없다. 일을 사람에게 넘길 때마다 호출한다 — 호출하지 않으면 사람은 자기 차례인지 모른다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "cardId", "turn", "by"], properties: { projectId, cardId: { type: "string" }, by: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "지금 이 카드를 바꾸는 달그락" }, turn: { type: "string", enum: ["agent", "person", "waiting", "blocked", "done"] },
+      ask: { type: "string", description: "turn=person: 사람에게 해 달라는 것. 도구·위치·단위까지 (예: 멀티미터 DC 20V로 3V3 핀과 GND 사이 전압을 재서 알려주세요)" },
+      waiting: { type: "object", additionalProperties: false, required: ["what"], properties: { what: { type: "string", description: "무엇을 기다리는지 (예: 로드셀 배송)" }, kind: { type: "string", enum: ["delivery", "print", "booking", "curing", "other"] }, expectedAt: { type: ["string", "null"], description: "예정일 YYYY-MM-DD. 모르면 null" } } },
+      note: { type: "string", description: "막힌 이유나 참고 메모" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), cardId: z.string().max(40), by: z.enum(["chief", "hw", "sw", "me", "id"]), turn: z.enum(["agent", "person", "waiting", "blocked", "done"]), ask: z.string().max(400).optional(), waiting: z.object({ what: z.string().min(1).max(200), kind: z.enum(["delivery", "print", "booking", "curing", "other"]).default("other"), expectedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null) }).strict().optional(), note: z.string().max(400).optional() }).strict().parse(input);
+      await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(parsed.projectId, (p) => { p.board = moveCard(boardOf(p), parsed.cardId, parsed as Parameters<typeof moveCard>[2], parsed.by); });
+      return stored(updated, context, "작업 카드의 차례를 바꿨어요.");
+    }
+  },
+  {
+    name: "record_real_world", title: "현실에서 벌어진 일 기록",
+    description: "화면 밖 현실의 상태를 현황판에 남긴다. 사용자가 말해준 것만 기록한다: 부품 주문·도착 예정일·지연·도착(delivery), 지금 손으로 하고 있는 일(now, 예: 납땜 3단계 하는 중), 쓸 수 있는 시간 같은 여건(availability), 그 밖의 사건(event, 예: 프린터 노즐 막힘). 모든 방의 달그락이 이것을 보고 순서를 다시 잡는다. 회로가 아직 없어도 부품 이름으로 배송을 기록할 수 있다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId"], properties: { projectId,
+      delivery: { type: "object", additionalProperties: false, required: ["label", "status"], properties: { label: { type: "string", description: "부품 이름 (예: 5kg 로드셀)" }, ref: { type: "string", description: "회로 부품 ref가 있으면 (예: U2)" }, status: { type: "string", enum: ["ordered", "delayed", "arrived", "problem"] }, expectedAt: { type: ["string", "null"], description: "도착 예정일 YYYY-MM-DD. 모르면 null" }, note: { type: "string" } } },
+      now: { type: ["string", "null"], description: "사람이 지금 하고 있는 일. 끝났으면 null" },
+      availability: { type: ["string", "null"], description: "여건 (예: 이번 주는 수요일 저녁만 가능)" },
+      event: { type: "string", description: "현실에서 일어난 일 한 줄" } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), delivery: z.object({ label: z.string().min(1).max(80), ref: z.string().max(16).optional(), status: z.enum(["ordered", "delayed", "arrived", "problem"]), expectedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), note: z.string().max(200).optional() }).strict().optional(), now: z.string().max(200).nullable().optional(), availability: z.string().max(200).nullable().optional(), event: z.string().max(300).optional() }).strict().parse(input);
+      if (!parsed.delivery && parsed.now === undefined && parsed.availability === undefined && !parsed.event) throw new ToolError("기록할 것을 하나 이상 넣어주세요 (delivery, now, availability, event).");
+      await ownedProject(parsed.projectId, context);
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        p.board = recordReal(boardOf(p), parsed as Parameters<typeof recordReal>[1]);
+        // 회로 부품이면 기존 구매 상태도 함께 맞춘다. 부품목록과 현황판이 서로 다른 말을 하지 않게.
+        const d = parsed.delivery;
+        if (d?.ref && p.build?.blueprint.components.some((c) => c.ref === d.ref)) { const w = workflowFor(p); w.purchases[d.ref] = d.status === "arrived" ? "received" : d.status === "problem" ? "problem" : "ordered"; p.workflow = w; }
+      });
+      return stored(updated, context, "현실의 상태를 현황판에 남겼어요.");
     }
   }
 ];
@@ -1351,7 +1425,7 @@ export async function callTool(name: string, input: unknown, context: ToolContex
     return { content: [{ type: "text", text }], ...(result.data && typeof result.data === "object" ? { structuredContent: result.data as Record<string, unknown> } : {}) };
   } catch (error) {
     if (error instanceof z.ZodError) return { content: [{ type: "text", text: `입력 형식이 맞지 않아요: ${error.issues.slice(0, 5).map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`).join("; ")}` }], isError: true };
-    if (error instanceof ToolError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error instanceof ToolError || error instanceof BoardError || error instanceof QuotaError || error instanceof Error && /먼저|승인|단계/.test(error.message)) return { content: [{ type: "text", text: error.message }], isError: true };
     console.error("mcp tool failed", name, error instanceof Error ? error.message : "unknown error");
     return { content: [{ type: "text", text: "도구 실행 중 오류가 났어요. 잠시 후 다시 시도해주세요." }], isError: true };
   }
