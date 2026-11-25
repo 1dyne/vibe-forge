@@ -10,7 +10,7 @@ import { IconLaptop, IconLink } from "./icons";
 type Me = { kind: "operator" | "user"; connectorUrl: string | null; clients: Array<{ name: string; version: string; lastSeenAt: string }> };
 
 function clientLabel(name: string) {
-  if (/dalgrak-helper/i.test(name)) return "달그락 도우미";
+  if (/dalgrak-helper/i.test(name)) return "달그락 연결 앱";
   if (/codex/i.test(name)) return "Codex";
   if (/claude[-_ ]?code/i.test(name)) return "Claude Code";
   if (/claude/i.test(name)) return "Claude 앱";

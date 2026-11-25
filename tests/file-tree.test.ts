@@ -99,7 +99,10 @@ describe("파일 트리", () => {
     const names = index.map((e) => e.name);
     expect(names).toContain("housing_lid_v2.stl");
     expect(names).toContain("셈-sam-v1_ME_housing-lid_초안2.stl");
-    expect(index.find((e) => e.name === "SPEC.md")).toMatchObject({ itemId: "file:e", url: "/api/projects/p1/workbench/file%3Ae" });
+    const spec = index.find((e) => e.name === "SPEC.md")!;
+    expect(spec.itemId).toBe("file:e");
+    // 내려받을 때는 통일된 이름으로 저장되게 ?name= 이 붙는다
+    expect(spec.url.startsWith("/api/projects/p1/workbench/file%3Ae?name=")).toBe(true);
     expect(fileNameIndex(null)).toEqual([]);
   });
 });

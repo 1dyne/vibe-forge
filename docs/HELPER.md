@@ -1,8 +1,8 @@
-# 달그락 도우미: 달그락 안에서 대화하기 (내 ChatGPT 요금제)
+# 달그락 연결 앱: 달그락 안에서 대화하기 (내 ChatGPT 요금제)
 
 "대화는 Claude에서, 화면은 달그락에서"가 비개발자에게 너무 어렵다는 피드백에서 나온 구조입니다. 대화를 달그락 화면 안으로 가져오되, AI 비용은 사용자가 이미 구독 중인 요금제에서 나갑니다.
 
-## 왜 '도우미 앱'인가
+## 왜 '연결 앱 앱'인가
 
 OpenAI의 ChatGPT 요금제 사용(Sign in with ChatGPT · plan usage)은 지금 두 갈래입니다(2026-11-25 확인, `developers.openai.com/siwc`).
 
@@ -11,22 +11,22 @@ OpenAI의 ChatGPT 요금제 사용(Sign in with ChatGPT · plan usage)은 지금
 | 오픈소스이면서 사용자 컴퓨터에서 도는 앱 | 누구나 가능. 로그인 결과를 `127.0.0.1`로 받아야 하고 토큰은 로컬에 둔다 |
 | 유료·원격 호스팅 앱 (dalgrak.app 자체) | 관심 양식으로 신청해 승인받아야 한다 |
 
-그래서 로그인과 AI 호출은 사용자 컴퓨터의 오픈소스 앱(달그락 도우미)이 맡고, dalgrak.app은 대화 화면과 기록을 맡습니다. 호스팅 승인이 나면 도우미 없이 쓰는 방식을 추가합니다.
+그래서 로그인과 AI 호출은 사용자 컴퓨터의 오픈소스 앱(달그락 연결 앱)이 맡고, dalgrak.app은 대화 화면과 기록을 맡습니다. 호스팅 승인이 나면 연결 앱 없이 쓰는 방식을 추가합니다.
 
 ## 흐름
 
 ```
 화면  POST /api/helper/chat            말을 기록하고 우체통에 넣는다 → jobId
-도우미 POST /api/helper/poll            (25초 붙들기) 할 일과 최근 대화를 받는다
-도우미 → api.openai.com/v1/responses    사용자 요금제로 답을 만든다 (store:false, stream:true)
-도우미 → POST /api/mcp                  모델이 부른 달그락 도구를 그대로 호출한다
-도우미 POST /api/helper/jobs/<id>       답 조각·진행 표시·끝을 올린다 (끝나면 서버가 기록에 남긴다)
+연결 앱 POST /api/helper/poll            (25초 붙들기) 할 일과 최근 대화를 받는다
+연결 앱 → api.openai.com/v1/responses    사용자 요금제로 답을 만든다 (store:false, stream:true)
+연결 앱 → POST /api/mcp                  모델이 부른 달그락 도구를 그대로 호출한다
+연결 앱 POST /api/helper/jobs/<id>       답 조각·진행 표시·끝을 올린다 (끝나면 서버가 기록에 남긴다)
 화면  GET  /api/helper/jobs/<id>?from=n 답을 흘려 받는다
-화면  GET  /api/helper/status           도우미가 켜져 있는지(45초 안에 신호가 있었는지)
+화면  GET  /api/helper/status           연결 앱이 켜져 있는지(45초 안에 신호가 있었는지)
 ```
 
-- 도우미는 커넥터와 같은 OAuth 토큰(`/api/mcp`)으로 인증합니다. 화면 쪽은 로그인 세션입니다. `/api/helper/*`는 쿠키 관문(`proxy.ts`)을 거치지 않고 각 라우트가 직접 확인합니다.
-- 설계 규칙과 검사는 바뀌지 않았습니다. 도우미의 모델은 Claude 커넥터와 똑같은 31개 도구를 쓰고, 거절도 똑같이 받습니다. 달라진 것은 사용 규칙(`dalgeurak_guide`)을 모델이 "읽으러 가는" 대신 매 턴 지침에 넣는다는 점입니다.
+- 연결 앱은 커넥터와 같은 OAuth 토큰(`/api/mcp`)으로 인증합니다. 화면 쪽은 로그인 세션입니다. `/api/helper/*`는 쿠키 관문(`proxy.ts`)을 거치지 않고 각 라우트가 직접 확인합니다.
+- 설계 규칙과 검사는 바뀌지 않았습니다. 연결 앱의 모델은 Claude 커넥터와 똑같은 31개 도구를 쓰고, 거절도 똑같이 받습니다. 달라진 것은 사용 규칙(`dalgeurak_guide`)을 모델이 "읽으러 가는" 대신 매 턴 지침에 넣는다는 점입니다.
 - 우체통(`apps/web/lib/helper-relay.ts`)은 메모리에 있습니다. **서버가 한 대일 때만 맞습니다.** 여러 대로 늘리면 Postgres나 Redis로 옮겨야 합니다. 재시작하면 진행 중이던 한 턴만 끊기고 기록은 남습니다.
 
 ## 저장되는 것
@@ -37,13 +37,13 @@ OpenAI의 ChatGPT 요금제 사용(Sign in with ChatGPT · plan usage)은 지금
 
 ## 한계
 
-- 사용자 컴퓨터에서 도우미가 켜져 있어야 새 답을 받습니다. 꺼져 있으면 보기·승인·기록만 됩니다.
-- 이미지 첨부는 아직 도우미 경로로 가지 않습니다.
+- 사용자 컴퓨터에서 연결 앱이 켜져 있어야 새 답을 받습니다. 꺼져 있으면 보기·승인·기록만 됩니다.
+- 이미지 첨부는 아직 연결 앱 경로로 가지 않습니다.
 - 프로젝트 없이 시작한 첫 턴의 답은 새로 만든 프로젝트의 첫 응답으로만 남습니다.
-- 실제 ChatGPT 계정으로의 로그인과 요청은 이 저장소의 자동 테스트로 확인할 수 없습니다. 테스트는 OpenAI 자리를 가짜로 세우고 나머지 전부(서버 라우트, 도우미의 로그인 검증·대화 루프·중계)를 돌립니다.
+- 실제 ChatGPT 계정으로의 로그인과 요청은 이 저장소의 자동 테스트로 확인할 수 없습니다. 테스트는 OpenAI 자리를 가짜로 세우고 나머지 전부(서버 라우트, 연결 앱의 로그인 검증·대화 루프·중계)를 돌립니다.
 
 ## 공개 저장소
 
-도우미 코드는 공개 저장소 [`1dyne/dalgrak-helper`](https://github.com/1dyne/dalgrak-helper)에 있습니다(MIT). 이 저장소에는 서버와 화면 쪽만 있습니다. 화면의 설치 안내 링크(`apps/web/app/helper-composer.tsx`의 `HELPER_REPO_URL`)가 그 주소를 가리킵니다.
+연결 앱 코드는 공개 저장소 [`1dyne/dalgrak-helper`](https://github.com/1dyne/dalgrak-helper)에 있습니다(MIT). 이 저장소에는 서버와 화면 쪽만 있습니다. 화면의 설치 안내 링크(`apps/web/app/helper-composer.tsx`의 `HELPER_REPO_URL`)가 그 주소를 가리킵니다.
 
 사용자가 실행하는 명령은 `npx github:1dyne/dalgrak-helper` 하나입니다.

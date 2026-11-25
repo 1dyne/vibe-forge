@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-// 달그락 도우미(사용자 컴퓨터에서 도는 오픈소스 앱)와 이 서버 사이의 우체통.
+// 달그락 연결 앱(사용자 컴퓨터에서 도는 오픈소스 앱)와 이 서버 사이의 우체통.
 //
-// AI 호출과 ChatGPT 로그인은 도우미가 맡는다. 서버는 로그인 토큰을 받지도, 보지도
-// 않는다. 서버가 하는 일은 두 가지뿐이다: 화면(어느 기기든)에서 온 말을 도우미에게
-// 건네고, 도우미가 돌려주는 답을 화면으로 흘려보낸다.
+// AI 호출과 ChatGPT 로그인은 연결 앱이 맡는다. 서버는 로그인 토큰을 받지도, 보지도
+// 않는다. 서버가 하는 일은 두 가지뿐이다: 화면(어느 기기든)에서 온 말을 연결 앱에게
+// 건네고, 연결 앱이 돌려주는 답을 화면으로 흘려보낸다.
 //
 // 지금은 메모리에만 둔다. 서버가 한 대일 때만 맞는 구조이고, 재시작하면 진행 중이던
 // 한 턴이 끊긴다(대화 기록은 프로젝트에 저장되므로 남는다). 서버를 여러 대로 늘리면
@@ -22,7 +22,7 @@ export type HelperJob = {
   projectId: string | null;
   channel: string;
   text: string;
-  /** 사용자가 화면에서 고른 모델. 도우미가 쓸 수 있는 것일 때만 따른다 */
+  /** 사용자가 화면에서 고른 모델. 연결 앱이 쓸 수 있는 것일 때만 따른다 */
   model: string | null;
   createdAt: number;
   claimedAt: number | null;
@@ -79,7 +79,7 @@ export class RelayError extends Error {
 
 export function enqueueJob(input: { userId: string; projectId: string | null; channel: string; text: string; model?: string | null }): HelperJob {
   sweep();
-  if (!helperStatus(input.userId).online) throw new RelayError("offline", "컴퓨터의 달그락 도우미가 꺼져 있어요. 도우미를 켜면 여기서 바로 대화할 수 있어요.");
+  if (!helperStatus(input.userId).online) throw new RelayError("offline", "컴퓨터의 달그락 연결 앱이 꺼져 있어요. 연결 앱을 켜면 여기서 바로 대화할 수 있어요.");
   const queue = state.queues.get(input.userId) ?? [];
   const active = [...state.jobs.values()].filter((job) => job.userId === input.userId && !job.finished).length;
   if (active >= MAX_QUEUED) throw new RelayError("busy", "앞서 보낸 말에 답하는 중이에요. 답이 끝나면 다시 보내주세요.");
@@ -91,7 +91,7 @@ export function enqueueJob(input: { userId: string; projectId: string | null; ch
   return job;
 }
 
-/** 도우미가 일을 가져간다. 없으면 waitMs까지 기다렸다가 null. */
+/** 연결 앱이 일을 가져간다. 없으면 waitMs까지 기다렸다가 null. */
 export async function claimJob(userId: string, waitMs = POLL_WAIT_MS): Promise<HelperJob | null> {
   const take = () => {
     const queue = state.queues.get(userId) ?? [];
@@ -136,8 +136,8 @@ export function pushJobEvent(jobId: string, userId: string, event: HelperEvent):
 export async function readJobEvents(jobId: string, userId: string, from: number, waitMs = 20_000): Promise<{ events: HelperEvent[]; next: number; finished: boolean }> {
   const job = jobFor(jobId, userId);
   const snapshot = () => ({ events: job.events.slice(from), next: job.events.length, finished: job.finished });
-  // 도우미가 가져가지 않은 채 오래 남았으면, 도우미가 꺼진 것이다.
-  if (!job.finished && !job.claimedAt && Date.now() - job.createdAt > CLAIM_TIMEOUT_MS) finish(job, { type: "error", code: "offline", message: "컴퓨터의 달그락 도우미가 응답하지 않아요. 도우미가 켜져 있는지 확인해주세요." });
+  // 연결 앱이 가져가지 않은 채 오래 남았으면, 연결 앱이 꺼진 것이다.
+  if (!job.finished && !job.claimedAt && Date.now() - job.createdAt > CLAIM_TIMEOUT_MS) finish(job, { type: "error", code: "offline", message: "컴퓨터의 달그락 연결 앱이 응답하지 않아요. 연결 앱이 켜져 있는지 확인해주세요." });
   if (job.events.length > from || job.finished || waitMs <= 0) return snapshot();
   return new Promise((resolve) => {
     const done = () => { clearTimeout(timer); job.watchers.delete(done); resolve(snapshot()); };

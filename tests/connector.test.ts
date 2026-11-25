@@ -118,7 +118,7 @@ describe("Claude connector", () => {
     expect(after.structuredContent!.files.some((f: { kind: string }) => f.kind === "cad")).toBe(true);
     const locked = await tool(token, "submit_circuit", { projectId: id, blueprint, review });
     expect(locked.isError).toBe(true);
-    expect(locked.content[0].text).toContain("설계 다시 논의");
+    expect(locked.content[0].text).toContain("propose_design_change");
   });
 
   it("keeps each person's projects private and gates in-app AI per account", async () => {

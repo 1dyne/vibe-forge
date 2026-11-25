@@ -3,6 +3,7 @@ import type { MakerProfile } from "../lib/project-types";
 import { CHECKLIST } from "../lib/checklist";
 import { intakeMissing } from "../lib/workflow";
 import type { HubTab } from "./account-hub";
+import ProjectExtras from "./project-extras";
 
 // 이 프로젝트에만 해당하는 것: 무엇을 만드는지, 왜, 언제까지, 얼마로.
 // 장비와 경험은 사람의 것이라 내 계정에 있다. 여기서는 요약만 보여주고 그쪽으로 보낸다.
@@ -28,6 +29,7 @@ export default function ProjectSettings({ projectName, profile, busy, onChange, 
       <fieldset><legend>언제까지 만들고 싶나요? <small>(선택)</small></legend><div className="choice-row">{timeline.options!.map((o) => { const on = o.value === "" ? profile.timelineWeeks == null : profile.timelineWeeks === Number(o.value); return <label key={o.value || "none"} className={on ? "on" : ""}><input type="radio" name="timeline" checked={on} onChange={() => onChange({ ...profile, timelineWeeks: o.value === "" ? null : Number(o.value) })} />{o.label}</label>; })}</div><small className="muted">실력에 비해 짧으면 목표는 유지하고, 왜 어려운지와 어떤 순서로 가야 하는지 알려드려요.</small></fieldset>
       <fieldset><legend>이 프로젝트에 투자하고 싶은 예산은요? <small>(선택)</small></legend><small className="muted">정확하지 않아도 돼요. 쓰고 싶은 만큼을 적어주세요.</small><div className="choice-row">{budget.options!.filter((o) => o.value !== "custom").map((o) => <label key={o.value} className={profile.budgetKRW === Number(o.value) ? "on" : ""}><input type="radio" name="budget" checked={profile.budgetKRW === Number(o.value)} onChange={() => onChange({ ...profile, budgetKRW: Number(o.value) })} />{o.label}</label>)}</div><label className="custom-budget">직접 입력 (원)<input className="profile-input" type="number" min={0} step={1000} value={profile.budgetKRW ?? ""} onChange={(e) => onChange({ ...profile, budgetKRW: e.target.value === "" ? null : Number(e.target.value) })} /></label></fieldset>
 
+      <ProjectExtras profile={profile} onChange={onChange} />
       <div className={`person-summary ${personMissing.length ? "missing" : ""}`}>
         <strong>내 장비와 경험 <small>(내 계정 · 모든 프로젝트가 같이 써요)</small></strong>
         <p>{gear ? `도구: ${gear}` : "도구: 아직 안 적었어요"}<br />{skill ? `경험: ${skill}` : "경험: 아직 안 적었어요"}</p>

@@ -155,6 +155,8 @@ export type MakerProfile = {
   learningMode?: boolean;
   // 체크리스트의 추가 질문 답(측정 도구, 작업 여건, 사용 환경 등). 키는 checklist.ts의 EXTRA_QUESTIONS
   extras?: Record<string, string | string[]>;
+  // 추가 질문 가운데 이 프로젝트에만 해당하는 답(사용 환경, 완성도 기대)
+  projectExtras?: Record<string, string | string[]>;
   tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string;
   makerspaces?: MakerSpace[];
   // 가진 부품. 장비(tools)는 고정된 선택지지만 부품은 사람마다 제각각이라 직접 적는다.

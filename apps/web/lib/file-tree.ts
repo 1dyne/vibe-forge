@@ -167,10 +167,11 @@ export function buildFileTree(project: LocalProject | null): FileTree {
         if (afterFinal) { state = "revised"; revision = topRevision + 1; label = `개정 ${revision} 초안`; nameState = `개정${revision}-초안`; }
         else { state = "draft"; draftNo += 1; revision = 0; label = `초안 ${draftNo}`; nameState = `초안${draftNo}`; }
       }
+      const displayName = `${stem}_${AGENTS[agent].short}_${token(subject)}_${nameState}${ext ? `.${ext}` : ""}`;
       return {
-        itemId: item.id, filename: item.filename, ext, agent, state, label, revision,
-        displayName: `${stem}_${AGENTS[agent].short}_${token(subject)}_${nameState}${ext ? `.${ext}` : ""}`,
-        printable: PRINTABLE.has(ext), createdAt, fromChannel, url: workbenchDownloadUrl(project.id, item.id), changedSinceFinal: changed
+        itemId: item.id, filename: item.filename, ext, agent, state, label, revision, displayName,
+        // 내려받을 때도 화면에 보이는 통일된 이름으로 저장되게 한다.
+        printable: PRINTABLE.has(ext), createdAt, fromChannel, url: `${workbenchDownloadUrl(project.id, item.id)}?name=${encodeURIComponent(displayName)}`, changedSinceFinal: changed
       };
     }).reverse();
     subjects.push({ key, name: subject, agent, versions, current: versions.find((v) => v.state === "final") ?? null });

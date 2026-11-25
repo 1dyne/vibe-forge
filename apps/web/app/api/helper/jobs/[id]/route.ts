@@ -20,7 +20,7 @@ const Event = z.discriminatedUnion("type", [
 ]);
 const Body = z.object({ events: z.array(Event).min(1).max(50) }).strict();
 
-// 도우미가 답을 조금씩 올려보내는 자리. 다 됐다고 하면(done) 그 답을 프로젝트의
+// 연결 앱이 답을 조금씩 올려보내는 자리. 다 됐다고 하면(done) 그 답을 프로젝트의
 // 대화 기록에 남긴다. 그래야 다른 기기에서 열어도 같은 대화가 보인다.
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const session = await helperSession(request);

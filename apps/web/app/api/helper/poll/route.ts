@@ -11,8 +11,8 @@ export const maxDuration = 60;
 const Hello = z.object({ model: z.string().max(80).nullish(), version: z.string().max(40).nullish(), account: z.string().max(120).nullish(), models: z.array(z.object({ slug: z.string().min(1).max(80), name: z.string().max(80) }).strict()).max(40).optional(), wait: z.boolean().default(true) }).strict();
 const HISTORY = 24;
 
-// 도우미가 "나 켜져 있어요, 할 일 있나요?" 하고 묻는 자리. 할 일이 없으면 25초쯤
-// 붙들고 있다가 빈손으로 돌려보내고, 도우미는 바로 다시 묻는다.
+// 연결 앱이 "나 켜져 있어요, 할 일 있나요?" 하고 묻는 자리. 할 일이 없으면 25초쯤
+// 붙들고 있다가 빈손으로 돌려보내고, 연결 앱은 바로 다시 묻는다.
 export async function POST(request: NextRequest) {
   const session = await helperSession(request);
   if (!session) return helperUnauthorized();

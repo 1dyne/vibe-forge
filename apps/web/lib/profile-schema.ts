@@ -50,5 +50,6 @@ export const ProfileSchema = PersonProfileSchema.extend({
   budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(),
   targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
-  timelineWeeks: z.number().min(0.5).max(104).nullable().optional()
+  timelineWeeks: z.number().min(0.5).max(104).nullable().optional(),
+  projectExtras: z.record(z.string().max(40), z.union([z.string().max(200), z.array(z.string().max(80)).max(20)])).optional()
 }).strict();

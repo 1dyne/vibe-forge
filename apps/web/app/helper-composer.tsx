@@ -2,8 +2,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { LocalProject } from "../lib/project-types";
 
-// 달그락 도우미(내 컴퓨터에서 도는 앱)가 켜져 있으면 여기서 바로 대화한다.
-// 답은 도우미가 내 ChatGPT 요금제로 만들고, 이 화면은 그 답을 흘려 받는다.
+// 달그락 연결 앱(내 컴퓨터에서 도는 앱)가 켜져 있으면 여기서 바로 대화한다.
+// 답은 연결 앱이 내 ChatGPT 요금제로 만들고, 이 화면은 그 답을 흘려 받는다.
 // 흘러오는 답은 입력창이 아니라 대화 목록에 그린다(onLive). 입력창은 입력만 맡는다.
 
 type Model = { slug: string; name: string };
@@ -109,10 +109,10 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
 
   if (!status) return <div className="connector-composer"><p>연결 상태를 확인하고 있어요…</p></div>;
   if (!status.online) return <div className="connector-composer">
-    <strong>달그락 도우미가 꺼져 있어요 · 켜면 여기서 바로 대화할 수 있어요</strong>
+    <strong>달그락 연결 앱이 꺼져 있어요 · 켜면 여기서 바로 대화할 수 있어요</strong>
     <p>내 컴퓨터의 터미널(윈도우는 PowerShell)에 아래를 붙여넣고 Enter를 누르세요. 전에 로그인했다면 다시 묻지 않고 바로 켜져요. “준비됐어요”가 뜨면 이 화면이 몇 초 안에 입력창으로 바뀌어요.</p>
     <div className="copy-row"><code>{HELPER_COMMAND}</code><button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(HELPER_COMMAND).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "복사됨" : "복사"}</button></div>
-    <p>터미널 창을 닫으면 도우미도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법</a></p>
+    <p>터미널 창을 닫으면 연결 앱도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법 · 더블클릭으로 켜는 파일 받기</a></p>
   </div>;
   return <>
     {error && <p role="alert" className="helper-live-error">{error.message} {error.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>} <button type="button" onClick={() => setError(null)}>닫기</button></p>}

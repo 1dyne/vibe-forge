@@ -7,6 +7,7 @@ import { AGENTS, agentName, workflowFor } from "../lib/workflow";
 import { CircuitView, MockupView, TaskView } from "./artifact-views";
 import { AssemblyView } from "./assembly-view";
 import PreciseMockup from "./precise-mockup";
+import CircuitReading from "./circuit-reading";
 import { HousingView } from "./housing-view";
 import { ChangeSticker } from "./change-sticker";
 import { HistoryList, PowerView, SafetyView, TestView } from "./plan-views";
@@ -49,6 +50,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
       {["product", "plan", "circuit", "cad", "assembly", "bom"].includes(item.kind) && <ChangeSticker reasons={provisionalReasons(project)} />}
       {source || !hasPreview ? <pre className="file-source">{item.content}</pre> : <>
         {item.kind === "circuit" && project.build && <><div className="artifact-title"><span className="pill">회로 초안</span><h3>{project.build.blueprint.title}</h3></div><CircuitView blueprint={project.build.blueprint} /><div className="check-list">{project.build.checks.map(c => <div key={c.id} className={c.verdict}><span>{c.verdict === "pass" ? "✓" : c.verdict === "unknown" ? "?" : "!"}</span><p><b>{c.id}</b>{c.message}</p></div>)}</div><details><summary>HW / SW 검토 결과</summary><p>{project.build.evaluator.summary}</p>{[project.build.evaluator.hw, project.build.evaluator.sw].map((v, i) => <p key={i}><span className={`pill ${v.verdict}`}>{i ? "SW" : "HW"} · {v.verdict}</span> {v.findings.join(" ")}</p>)}</details></>}
+        {item.kind === "circuit" && project.build && <CircuitReading blueprint={project.build.blueprint} />}
         {item.kind === "mockup" && project.preciseMockup && <><div className="artifact-title"><span className="pill">정밀 목업</span><h3>{project.preciseMockup.title}</h3></div><p className="pm-summary">{project.preciseMockup.summary}</p><PreciseMockup spec={project.preciseMockup} /></>}
         {item.kind === "product" && project.productForm && <><div className="artifact-title"><span className="pill">완성품 미리보기</span><h3>{project.name}</h3></div><MockupView blueprint={project.build?.blueprint ?? { title: project.name, board: "", supplyVoltage: 5, components: [], nets: [], enclosure: { widthMm: 40, depthMm: 40, heightMm: 40, wallMm: 2 }, firmware: { platform: "arduino", behavior: "", pinAssignments: [], loopSteps: [] }, assumptions: [], humanChecks: [] }} form={project.productForm} /></>}
         {item.kind === "contract" && project.dataContract && <ContractView project={project} onAction={onAction} busy={busy} />}

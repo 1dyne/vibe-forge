@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useMemo, FormEvent, useEffect, useRef, useState } from "react";
 import type { AgentId, ChatChannel, ImageAttachment, LocalProject, MakerProfile } from "../lib/project-types";
 import { AGENTS, agentName, emptyProfile, intakeMissing, personPart, TOOL_OPTIONS, workflowFor } from "../lib/workflow";
 import { CODING_EXPERIENCE, DEV_TOOLS, emptyDevProfile } from "../lib/dev-handoff";
@@ -10,6 +10,11 @@ import AccountHub, { type HubTab } from "./account-hub";
 import ProjectSettings from "./project-settings";
 import StatusPanel from "./status-panel";
 import { boardOf, viewBoard } from "../lib/board";
+import { fileNameIndex } from "../lib/file-tree";
+import { pendingProposals } from "../lib/revision";
+import { stageCardFor } from "../lib/project-kind";
+import { LearnModeContext } from "./info-dot";
+import ForgeScene from "./forge-scene";
 import MakerspaceList from "./makerspace-list";
 import OwnedPartsField from "./owned-parts-field";
 import Tour, { type Station } from "./tour";
@@ -51,7 +56,7 @@ export default function ProjectWorkspace() {
   const [connectTab,setConnectTab]=useState<"ai"|"dev"|null>(null);
   const [makerHelp,setMakerHelp]=useState(false);
   const [hub,setHub]=useState<HubTab|null>(null);
-  // 도우미가 답을 흘려보내는 동안의 말풍선과, 아직 프로젝트가 없는 대화(저장할 곳이 없어 화면에만 둔다).
+  // 연결 앱이 답을 흘려보내는 동안의 말풍선과, 아직 프로젝트가 없는 대화(저장할 곳이 없어 화면에만 둔다).
   const [helperLive,setHelperLive]=useState<HelperLive|null>(null);
   const [loose,setLoose]=useState<Array<{role:"user"|"assistant";text:string}>>([]);
   const [deleting,setDeleting]=useState<LocalProject|null>(null);
@@ -70,9 +75,12 @@ export default function ProjectWorkspace() {
   // 내 공방: 내가 확인해 줘야 하는 것만, 프로젝트를 가리지 않고 한곳에.
   const [showWorkshop,setShowWorkshop]=useState(false);
   const myTurns=projects.flatMap(p=>viewBoard(boardOf(p)).cards.filter(c=>c.active&&c.turn==="person").map(c=>({project:p,card:c})));
+  const myProposals=projects.flatMap(p=>pendingProposals(p).map(x=>({project:p,proposal:x})));
+  const myCount=myTurns.length+myProposals.length;
   const showArtifacts=!!project&&!panelHidden;
   const viewing=showArtifacts&&items.length>0&&!!selectedItem&&(workbenchPreference?.open??false);
   const board=viewBoard(boardOf(project??{}));
+  const fileLinks=useMemo(()=>fileNameIndex(project),[project]);
   // 지금 이 프로젝트에 있는 것들의 표식. 여기에 있는데 '본 것'에 없으면 새로 온 것이다.
   const marks=project?[...items.map(i=>"item:"+i.id),...project.tasks.filter(t=>t.status==="ready").map(t=>"task:"+t.id)]:[];
   const seenMarks=project?preferences.seen[project.id]??[]:[];
@@ -113,6 +121,7 @@ export default function ProjectWorkspace() {
   const roomsOn=workshop||board.rooms.some(r=>r.room!=="chief");
   const room:ChatChannel=roomsOn?channel:"main";
   async function boardAction(body:Record<string,unknown>) {if(!project)return;try{const r=await fetch("/api/projects/"+project.id+"/board",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const b=await r.json();if(!r.ok)throw new Error(b.error??"반영하지 못했어요.");if(b.project)setProjects(ps=>ps.map(x=>x.id===b.project.id?b.project:x));}catch(e){setError(e instanceof Error?e.message:"반영하지 못했어요.");}}
+  async function personPost(path:string,body:Record<string,unknown>) {if(!project)return null;try{const r=await fetch("/api/projects/"+project.id+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const b=await r.json();if(!r.ok)throw new Error(b.error??"반영하지 못했어요.");if(b.project)setProjects(ps=>ps.map(x=>x.id===b.project.id?b.project:x));return b;}catch(e){setError(e instanceof Error?e.message:"반영하지 못했어요.");return null;}}
   // Connector accounts talk to their own Claude; this page shows and approves.
   const connectorOnly=viewer.kind==="user"&&!viewer.webAi;
   const busyRef=useRef("");busyRef.current=busy;
@@ -132,7 +141,7 @@ export default function ProjectWorkspace() {
     if(added){setWorkbench(p.id,true,added.id);setPanelHidden(false);}
     setProjects(ps=>[p,...ps.filter(x=>x.id!==p.id)]);setSelectedId(p.id);expand(p.id);
   }
-  // 도우미가 답을 끝내면 목록을 다시 읽는다. 프로젝트 없이 시작했다면 도우미가 방금 만든 것을 연다.
+  // 연결 앱이 답을 끝내면 목록을 다시 읽는다. 프로젝트 없이 시작했다면 연결 앱이 방금 만든 것을 연다.
   // 프로젝트가 생기지 않은 대화(인사, 질문)는 저장할 곳이 없으므로 화면에 남겨 둔다.
   async function helperTurnEnd(turn:HelperTurn) {
     const b=await fetch("/api/projects",{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);
@@ -200,10 +209,10 @@ export default function ProjectWorkspace() {
     finally{setBusy("");}
   }
   const resize=(key:keyof typeof layout.sizes,value:number)=>layout.resize(key,value,showArtifacts);
-  return <main style={layout.style} className={"forge-app resizable-workspace "+(showArtifacts?"":"artifacts-hidden")+(navOpen?" nav-open":"")}>
+  return <LearnModeContext.Provider value={workflow?.profile.learningMode===true}><main style={layout.style} className={"forge-app resizable-workspace "+(showArtifacts?"":"artifacts-hidden")+(navOpen?" nav-open":"")}>
     <aside className="sidebar" id="project-sidebar" aria-label="프로젝트 탐색">
       <button className="nav-close" aria-label="프로젝트 목록 닫기" onClick={()=>setNavOpen(false)}>×</button><button className="brand" onClick={()=>switchProject(null)} disabled={!!busy} aria-label="달그락 대장간 · 새로운 아이디어로 이동"><img src="/characters/idle.png" alt=""/><span>달그락 대장간<small>생각을 손에 잡히게.</small></span></button>
-      <button className="new-project" onClick={()=>switchProject(null)} disabled={!!busy}>＋ 새로운 아이디어</button><button className={"my-workshop"+(myTurns.length?" has-turn":"")} onClick={()=>{setShowWorkshop(true);setNavOpen(false);}}><IconHammer/> 내 공방{myTurns.length>0&&<em className="turn-badge" aria-label={`내가 확인할 것 ${myTurns.length}개`}>{myTurns.length}</em>}</button>
+      <button className="new-project" onClick={()=>switchProject(null)} disabled={!!busy}>＋ 새로운 아이디어</button><button className={"my-workshop"+(myCount?" has-turn":"")} onClick={()=>{setShowWorkshop(true);setNavOpen(false);}}><IconHammer/> 내 공방{myCount>0&&<em className="turn-badge" aria-label={`내가 확인할 것 ${myCount}개`}>{myCount}</em>}</button>
       <button className="nav-caption projects-toggle" aria-expanded={preferences.projectsOpen} aria-controls="project-folders" onClick={toggleProjects}><span>{preferences.projectsOpen?"⌄":"›"} 프로젝트</span><span>{projects.length}{viewer.kind==="user"&&viewer.projectLimit?`/${viewer.projectLimit}`:""}</span></button>
       {preferences.projectsOpen&&<nav className="project-tree" id="project-folders" data-tour="projects" aria-label="프로젝트 목록">{projects.map((p,index)=>{
         const w=workflowFor(p);const progress=projectProgress(p);const expanded=preferences.expanded.includes(p.id);const active=p.id===selectedId;
@@ -240,15 +249,17 @@ export default function ProjectWorkspace() {
         {project&&roomsOn&&board.cards.filter(c=>c.turn!=="done"&&(room==="main"?c.owner==="chief":c.owner===room)).map(c=><div key={c.id} className={"room-card turn-"+c.turn+(c.active?"":" held")}><div><small>{c.heldBy.length?"앞 작업을 기다리는 중":c.turn==="person"?"내 차례":c.turn==="waiting"?"기다리는 중":c.turn==="blocked"?"막힘":"달그락 작업 중"}</small><strong>{c.title}</strong><p>{c.turn==="person"?c.ask:c.turn==="waiting"?(c.waiting?.what??"")+(c.waiting?.expectedAt?" · "+c.waiting.expectedAt+" 예정":""):c.turn==="blocked"?c.note:c.detail}</p></div>{c.turn==="person"&&c.active&&<button disabled={!!busy} onClick={()=>void boardAction({action:"respond",cardId:c.id})}>했어요 · 달그락에게 넘기기</button>}</div>)}
         {messages.map(m=><article key={m.id} className={"chat-message "+m.role+(m.role==="assistant"?" agent-"+(m.agent??"chief"):"")}>
           {m.role==="assistant"?<Avatar agent={m.agent??"chief"}/>:<span className="user-avatar">나</span>}
-          <div className="message-body"><div className="message-meta"><strong>{m.role==="user"?"나":agentName(m.agent??"chief",preferences.shortNames)}</strong>{m.mode==="evaluate"&&<span className="pill unknown">Evaluator</span>}{workshop&&channel==="main"&&m.channel&&m.channel!=="main"&&<small>{agentName(m.channel,preferences.shortNames)} 작업실에서 공유</small>}<time>{new Date(m.createdAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</time></div><MessageText text={m.text}/>{m.attachments?.length?<div className="message-images">{m.attachments.map((a,i)=><a href={a.dataUrl} download={a.name} key={i}><img src={a.dataUrl} alt={a.name}/><span>{a.name}</span></a>)}</div>:null}{m.shared&&workshop&&<span className="shared-tag">↗ 팀 공통 기록에 공유됨</span>}</div>
+          <div className="message-body"><div className="message-meta"><strong>{m.role==="user"?"나":agentName(m.agent??"chief",preferences.shortNames)}</strong>{m.mode==="evaluate"&&<span className="pill unknown">Evaluator</span>}{workshop&&channel==="main"&&m.channel&&m.channel!=="main"&&<small>{agentName(m.channel,preferences.shortNames)} 작업실에서 공유</small>}<time>{new Date(m.createdAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</time></div><MessageText files={fileLinks} text={m.text}/>{m.attachments?.length?<div className="message-images">{m.attachments.map((a,i)=><a href={a.dataUrl} download={a.name} key={i}><img src={a.dataUrl} alt={a.name}/><span>{a.name}</span></a>)}</div>:null}{m.shared&&workshop&&<span className="shared-tag">↗ 팀 공통 기록에 공유됨</span>}</div>
         </article>)}
-        {project&&room==="main"&&phase==="brainstorm"&&<div className="intake-card"><strong>설계 전, 함께 확인할 것</strong><p>핵심 동작과 보유 도구, 펌웨어 경험을 알려주세요. 경험은 설명을 맞추는 데만 사용합니다.</p><div className="intake-status">{["핵심 동작","보유 도구","펌웨어 경험"].map(s=><span key={s} className={intakeMissing(workflow!.profile).includes(s)?"":"complete"}>{intakeMissing(workflow!.profile).includes(s)?"○":"✓"} {s}</span>)}</div><button onClick={openProfile} disabled={!!busy}>체크리스트 작성하기</button>{connectorOnly?<p className="connector-hint">준비가 되면 연결한 AI에게 “회로 계획 시작해줘”라고 말해주세요.</p>:<button className="primary" disabled={!!busy||intakeMissing(workflow!.profile).length>0} onClick={()=>action({action:"plan"})}>브레인스토밍 마치고 계획 시작 →</button>}</div>}
+        {project&&room==="main"&&phase==="brainstorm"&&(()=>{const card=stageCardFor(project);const pf=workflow!.profile;const hard=card.kind==="hardware"||card.kind==="both";
+          const done=(k:string)=>k==="coreBehavior"?!!pf.coreBehavior.trim():k==="tools"?pf.toolsConfirmed:k==="firmwareExperience"?pf.firmwareExperience!=="unanswered":k==="codingExperience"?(pf.devProfile?.codingExperience??"unanswered")!=="unanswered":k==="whatToMake"?!!project.idea.trim():false;
+          return <div className="intake-card"><strong>{card.title}</strong><p>{card.description}</p><div className="intake-status">{card.checklist.map(c=><span key={c.key} className={done(c.key)?"complete":""}>{done(c.key)?"✓":"○"} {c.label}</span>)}</div><button onClick={()=>hard?void openProfile():setHub("skill")} disabled={!!busy}>{card.action}</button>{connectorOnly?<p className="connector-hint">{card.readyHint}</p>:hard&&<button className="primary" disabled={!!busy||intakeMissing(pf).length>0} onClick={()=>action({action:"plan"})}>브레인스토밍 마치고 계획 시작 →</button>}</div>;})()}
         {project&&room==="main"&&phase==="circuit"&&<div className="stage-card"><span className="pill">먼저, 회로</span><strong>회로 방향을 확인해주세요.</strong><p>오른쪽 회로도에서 연결과 미확정 항목을 검토하고 변경할 부분은 채팅으로 논의해요.</p><button className="primary" disabled={!!busy||!project.build} onClick={()=>action({action:"approve_circuit"})}>회로 방향 승인 · 3D 목업 만들기 →</button><button disabled={!!busy} onClick={()=>action({action:"reopen"})}>아이디어·회로 다시 논의</button></div>}
         {project&&room==="main"&&phase==="mockup"&&<div className="stage-card"><strong>돌려보고, 형태를 확인해주세요.</strong><p>회로에 맞춘 치수 목업입니다. 실제 부품 크기와 착용감은 제작 단계에서 확인해요.</p><button className="primary" disabled={!!busy} onClick={()=>action({action:"approve_mockup"})}>3D 방향 승인 · 작업 나누기 →</button><button disabled={!!busy} onClick={()=>action({action:"reopen"})}>설계 변경 논의</button></div>}
         {project&&room==="main"&&phase==="handoff"&&<div className="handoff-card"><h3>함께 만들 달그락 팀이에요.</h3><p>아이디어 범위에 맞춰 제안했어요. 사용할 에이전트를 직접 고를 수 있습니다.</p><div className="agent-cards">{(["hw","sw","me","id"] as AgentId[]).map(a=><label key={a}><Avatar agent={a}/><strong>{agentName(a,preferences.shortNames)}</strong><small>{AGENTS[a].title}</small><input type="checkbox" aria-label={agentName(a,preferences.shortNames)+" 선택"} checked={workflow!.activeAgents.includes(a)} disabled={!!busy} onChange={()=>toggleAgent(a)}/></label>)}</div><p>다음 할 일과 BOM을 확인했으면 준비된 작업부터 시작해요. 부품이 없어도 코드·설계 논의를 진행할 수 있어요.</p><button className="primary" disabled={!!busy} onClick={()=>action({action:"enter_workshop"})}>대장간 입장 →</button></div>}
-        {!project&&loose.map((m,i)=><article key={"loose"+i} className={"chat-message "+m.role+(m.role==="assistant"?" agent-chief":"")}>{m.role==="assistant"?<Avatar agent="chief"/>:<span className="user-avatar">나</span>}<div className="message-body"><div className="message-meta"><strong>{m.role==="user"?"나":agentName("chief",preferences.shortNames)}</strong></div><MessageText text={m.text}/></div></article>)}
-        {helperLive&&!project&&<article className="chat-message user"><span className="user-avatar">나</span><div className="message-body"><div className="message-meta"><strong>나</strong></div><MessageText text={helperLive.user}/></div></article>}
-        {helperLive&&<article className={"chat-message assistant agent-"+(room!=="main"?room:"chief")} aria-live="polite"><Avatar agent={room!=="main"?room as AgentId:"chief"} busy/><div className="message-body"><div className="message-meta"><strong>{agentName(room!=="main"?room as AgentId:"chief",preferences.shortNames)}</strong></div>{helperLive.text&&<MessageText text={helperLive.text}/>}<p className="helper-live-step">{helperLive.step||(helperLive.text?"이어서 쓰는 중":"생각하고 있어요")}<span className="loading-dots">…</span></p></div></article>}
+        {!project&&loose.map((m,i)=><article key={"loose"+i} className={"chat-message "+m.role+(m.role==="assistant"?" agent-chief":"")}>{m.role==="assistant"?<Avatar agent="chief"/>:<span className="user-avatar">나</span>}<div className="message-body"><div className="message-meta"><strong>{m.role==="user"?"나":agentName("chief",preferences.shortNames)}</strong></div><MessageText files={fileLinks} text={m.text}/></div></article>)}
+        {helperLive&&!project&&<article className="chat-message user"><span className="user-avatar">나</span><div className="message-body"><div className="message-meta"><strong>나</strong></div><MessageText files={fileLinks} text={helperLive.user}/></div></article>}
+        {helperLive&&<article className={"chat-message assistant agent-"+(room!=="main"?room:"chief")} aria-live="polite"><Avatar agent={room!=="main"?room as AgentId:"chief"} busy/><div className="message-body"><div className="message-meta"><strong>{agentName(room!=="main"?room as AgentId:"chief",preferences.shortNames)}</strong></div>{helperLive.text&&<MessageText files={fileLinks} text={helperLive.text}/>}<p className="helper-live-step">{helperLive.step||(helperLive.text?"이어서 쓰는 중":"생각하고 있어요")}<span className="loading-dots">…</span></p></div></article>}
         {busy&&<div className="thinking-message" role="status"><Avatar agent={activeSpeaker} busy/><div><strong>{busy}</strong><p>필요한 정보를 살펴보고 있어요<span className="loading-dots">…</span></p></div></div>}
         {loading&&<p className="loading-text">저장한 프로젝트를 불러오고 있어요…</p>}<div ref={end}/>
       </div>
@@ -259,16 +270,18 @@ export default function ProjectWorkspace() {
     </section>
     {showArtifacts&&project&&<>
       <ResizeHandle className="workbench-resizer" controls="workbench-panel" label="작업대 크기 조절" axis={layout.stacked?"y":"x"} reverse value={layout.stacked?layout.sizes.workbenchHeight:layout.sizes.workbench} min={layout.stacked?180:280} max={layout.stacked?800:1000} onResize={v=>resize(layout.stacked?"workbenchHeight":"workbench",v)} onReset={()=>resize(layout.stacked?"workbenchHeight":"workbench",layout.stacked?360:460)}/>
-      {viewing?<WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action} ownerName={viewer.kind==="user"?viewer.name:"나"} newMarks={newMarks} shortNames={preferences.shortNames} connectorOnly={connectorOnly}/>:<StatusPanel key={project.id+"-status"} mode={panelMode} project={project} board={board} items={items} newMarks={newMarks} shortNames={preferences.shortNames} busy={!!busy} onRoom={r=>switchProject(project.id,r==="chief"?"main":r)} onOpenItem={id=>setWorkbench(project.id,true,id)} onAction={action} onBoard={boardAction} onProjectSettings={()=>void openProfile()} onDevConnect={()=>setConnectTab("dev")} onClose={()=>setPanelHidden(true)}/>}
+      {viewing?<WorkbenchPanel key={project.id} project={project} items={items} selected={selectedItem.id} busy={!!busy} onSelect={id=>setWorkbench(project.id,true,id)} onClose={()=>setWorkbench(project.id,false,selectedItem.id)} onAction={action} ownerName={viewer.kind==="user"?viewer.name:"나"} newMarks={newMarks} shortNames={preferences.shortNames} connectorOnly={connectorOnly}/>:<StatusPanel key={project.id+"-status"} mode={panelMode} project={project} board={board} items={items} newMarks={newMarks} shortNames={preferences.shortNames} busy={!!busy} onRoom={r=>switchProject(project.id,r==="chief"?"main":r)} onOpenItem={id=>setWorkbench(project.id,true,id)} onAction={action} onBoard={boardAction} onProjectSettings={()=>void openProfile()} onDevConnect={()=>setConnectTab("dev")} activeRoom={room==="main"?"chief":room as AgentId} liveRoom={helperLive?(room==="main"?"chief":room as AgentId):null} onMarkFile={(itemId,action)=>void personPost("/files/mark",{itemId,action})} onDecide={(proposalId,decision)=>void personPost("/revision",{action:decision,proposalId})} onVerify={body=>personPost("/verify",body)} onClose={()=>setPanelHidden(true)}/>}
     </>}
     
     {showTutorial&&<Tour stations={tourStations} onClose={()=>{setShowTutorial(false);setTutorialSeen(true);}}/>}
     {showWorkshop&&<div className="modal-backdrop" onClick={()=>setShowWorkshop(false)}><section className="profile-modal workshop-modal" role="dialog" aria-modal="true" aria-label="내 공방" onClick={e=>e.stopPropagation()}><header><h2>내 공방</h2><button aria-label="닫기" onClick={()=>setShowWorkshop(false)}>×</button></header>
-      {myTurns.length===0?<p className="muted">지금 확인할 것이 없어요.</p>:projects.filter(p=>myTurns.some(t=>t.project.id===p.id)).map(p=><div key={p.id} className="workshop-group"><h3>{p.name}</h3><ul>{myTurns.filter(t=>t.project.id===p.id).map(t=><li key={t.card.id}><button onClick={()=>{setShowWorkshop(false);switchProject(p.id,t.card.owner==="chief"?"main":t.card.owner);}}><span className={"agent-dot dot-"+t.card.owner}/><span><b>{t.card.title}</b><small>{t.card.ask}</small></span><em>{agentName(t.card.owner,preferences.shortNames)} →</em></button></li>)}</ul></div>)}
+      {project&&<ForgeScene board={board} shortNames={preferences.shortNames} activeRoom={room==="main"?"chief":room as AgentId} liveRoom={helperLive?(room==="main"?"chief":room as AgentId):null} onRoom={r=>{setShowWorkshop(false);switchProject(project.id,r==="chief"?"main":r);}}/>}
+      {myProposals.length>0&&<div className="workshop-group"><h3>승인을 기다리는 수정안</h3><ul>{myProposals.map(t=><li key={t.proposal.id}><button onClick={()=>{setShowWorkshop(false);switchProject(t.project.id,"main");setPanelMode("status");setPanelHidden(false);}}><span className={"agent-dot dot-"+t.proposal.by}/><span><b>{t.proposal.title}</b><small>{t.project.name} · {t.proposal.reason}</small></span><em>작업대 →</em></button></li>)}</ul></div>}
+      {myCount===0?<p className="muted">지금 확인할 것이 없어요.</p>:projects.filter(p=>myTurns.some(t=>t.project.id===p.id)).map(p=><div key={p.id} className="workshop-group"><h3>{p.name}</h3><ul>{myTurns.filter(t=>t.project.id===p.id).map(t=><li key={t.card.id}><button onClick={()=>{setShowWorkshop(false);switchProject(p.id,t.card.owner==="chief"?"main":t.card.owner);}}><span className={"agent-dot dot-"+t.card.owner}/><span><b>{t.card.title}</b><small>{t.card.ask}</small></span><em>{agentName(t.card.owner,preferences.shortNames)} →</em></button></li>)}</ul></div>)}
     </section></div>}
     {hub&&<AccountHub key={hub} initialTab={hub} project={project} hasAccount={viewer.kind==="user"} settings={{shortNames:preferences.shortNames,onToggleShortNames:toggleShortNames,onTutorial:()=>{setHub(null);setShowTutorial(true);},onProjectSettings:null,onDevConnect:null,projectName:null}} onClose={()=>setHub(null)} onSaved={()=>{void fetch("/api/projects",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(b)setProjects(b.projects);}).catch(()=>{});}}/>}
     {deleting&&<DeleteProjectDialog project={deleting} used={projects.length} limit={viewer.kind==="user"?viewer.projectLimit??null:null} onClose={()=>setDeleting(null)} onDeleted={id=>{setDeleting(null);setProjects(ps=>ps.filter(x=>x.id!==id));if(selectedId===id)switchProject(null);}}/>}
     {connectTab&&project&&<ConnectPanel key={project.id} project={project} tab={connectTab} busy={!!busy} onTab={setConnectTab} onClose={()=>setConnectTab(null)} onAction={action} onAccount={()=>{setConnectTab(null);setHub("skill");}}/>}
     {showProfile&&project&&<ProjectSettings projectName={project.name} profile={profile} busy={!!busy} onChange={setProfile} onSave={()=>void saveProfile()} onClose={()=>setShowProfile(false)} onAccount={tab=>{setShowProfile(false);setHub(tab);}}/>}
-  </main>;
+  </main></LearnModeContext.Provider>;
 }

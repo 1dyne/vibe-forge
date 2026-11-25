@@ -40,6 +40,13 @@ import type { HousingPlan } from "./project-types";
 // absent: the person approves the circuit, the mockup and the workshop entry
 // on the dashboard.
 
+import { tools as fileTools, GUIDE_SECTION as FILE_GUIDE } from "./tools/file-tools";
+import { tools as learnTools, GUIDE_SECTION as LEARN_GUIDE } from "./tools/learn-tools";
+import { tools as revisionTools, GUIDE_SECTION as REVISION_GUIDE } from "./tools/revision-tools";
+import { tools as verifyTools, GUIDE_SECTION as VERIFY_GUIDE } from "./tools/verify-tools";
+import { pendingProposals, proposalSummary, revisionOf } from "./revision";
+import { buildLadder, ladderBrief, verifyOf } from "./verify-ladder";
+import { cleanExtras, extrasText } from "./checklist";
 import { kit, ToolError, type ToolContext, type ToolDefinition, type ToolResult } from "./tool-kit";
 export { ToolError };
 export type { ToolContext };
@@ -361,6 +368,8 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     board: viewBoard(boardOf(project)),
+    designChanges: revisionOf(project).proposals.map(proposalSummary),
+    verification: project.build ? ladderBrief(buildLadder(project), verifyOf(project)) : null,
     preciseMockup: project.preciseMockup ? { spec: project.preciseMockup, report: (({ checks, ...rest }) => ({ ...rest, checks: checks.filter((c) => !c.pass) }))(checkMockup(project.preciseMockup)) } : null,
     productForm: project.productForm ?? null,
     productFormFindings: project.productForm ? checkProductForm(project.productForm) : [],
@@ -429,6 +438,9 @@ const ProfileInput = z.object({
   targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
   timelineWeeks: z.number().min(0.5).max(104).nullable().optional(),
+  learningMode: z.boolean().optional(),
+  extras: z.record(z.string().max(40), z.union([z.string().max(200), z.array(z.string().max(80)).max(20)])).optional(),
+  projectExtras: z.record(z.string().max(40), z.union([z.string().max(200), z.array(z.string().max(80)).max(20)])).optional(),
   // 사용자가 "이거 이미 있어요"라고 말한 부품. id는 서버가 붙인다 — 모델이 지어낸
   // id를 그대로 쓰면 같은 부품이 두 줄로 쌓인다.
   ownedParts: z.array(z.object({
@@ -527,7 +539,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "달그락 대장간의 단계, 역할, 기록 규칙을 읽는다. 처음 쓸 때나 규칙이 헷갈릴 때 먼저 호출한다.",
     inputSchema: { type: "object", additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
-    run: async (_input, context) => ({ text: `${GUIDE}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
+    run: async (_input, context) => ({ text: `${GUIDE}\n\n${[REVISION_GUIDE, VERIFY_GUIDE, FILE_GUIDE, LEARN_GUIDE].join("\n\n")}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
   },
   {
     name: "list_projects", title: "내 프로젝트 목록",
@@ -583,14 +595,21 @@ export const TOOLS: ToolDefinition[] = [
       region: { type: "string", description: "시·구 (메이커스페이스 안내용)" }, budgetKRW: { type: ["integer", "null"], description: "부품 총 예산 상한(원)" },
       purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" },
       travelRange: { type: "string", enum: ["unanswered", "walk", "transit30", "transit60", "car"], description: "메이커스페이스까지 이동 가능 범위" }, timelineWeeks: { type: ["number", "null"], description: "원하는 완성 기간(주). 선택" },
+      learningMode: { type: "boolean", description: "학습 모드. 사용자가 더 자세한 설명을 원하면 true" },
+      extras: { type: "object", description: "추가 질문의 답 가운데 사람에게 붙는 것 (get_checklist의 extraQuestions의 id → 선택지 value 또는 value 배열). 기존 답은 보낸 키만 바뀐다", additionalProperties: true },
+      projectExtras: { type: "object", description: "추가 질문의 답 가운데 이 프로젝트에만 해당하는 것 (사용 환경, 완성도 기대 등)", additionalProperties: true },
       ownedParts: { type: "array", description: "사용자가 이미 가지고 있다고 말한 부품. 보내면 이 목록으로 전체가 바뀐다(한 줄만 추가하려면 기존 목록을 함께 보낸다). 부품목록에서 이미 가진 것을 빼는 데 쓰인다. find_part_cards로 카드가 있으면 catalogId를 넣으면 사양까지 함께 본다.", items: { type: "object", additionalProperties: false, required: ["name"], properties: {
         name: { type: "string", description: "부품 이름. 사용자가 말한 대로" }, qty: { type: "integer", description: "수량. 모르면 생략(1로 둔다)" },
         catalogId: { type: ["string", "null"], description: "부품 카드 id. 모르면 생략" }, note: { type: "string", description: "값이 섞여 있다거나 어디 있다는 메모. 선택" }
       } } }
     } },
     run: async (input, context) => {
-      const { projectId: id, ownedParts: incoming, ...parsed } = ProfileInput.parse(input);
+      const { projectId: id, ownedParts: incoming, extras: sentExtras, projectExtras: sentProjectExtras, ...parsed } = ProfileInput.parse(input);
       const project = await ownedProject(id, context);
+      // 추가 질문의 답은 보낸 키만 바꾸고, 선택지에 없는 값은 버린다.
+      const before = workflowFor(project).profile;
+      if (sentExtras) (parsed as Partial<MakerProfile>).extras = { ...(before.extras ?? {}), ...cleanExtras(sentExtras as Record<string, string | string[]>, "person") };
+      if (sentProjectExtras) (parsed as Partial<MakerProfile>).projectExtras = { ...(before.projectExtras ?? {}), ...cleanExtras(sentProjectExtras as Record<string, string | string[]>, "project") };
       if (incoming) {
         const previous = workflowFor(project).profile.ownedParts ?? [];
         // apps/web의 tsconfig는 strict: false라 zod가 추론한 name이 선택값으로 보인다.
@@ -635,7 +654,7 @@ export const TOOLS: ToolDefinition[] = [
       const missing = checklistMissing(profile);
       return {
         text: `아래 질문을 선택지 그대로 물어보세요. 아티팩트를 만들 수 있으면 선택형 체크리스트로 보여주고, 답은 채팅으로 받거나 대시보드 링크에서 바로 저장하게 하세요.\n대시보드에서 고르기: ${checklistUrl(project, context)}\n\n${checklistText()}\n\n아직 없는 항목 — 필수: ${missing.required.join(", ") || "없음"} / 권장: ${missing.recommended.join(", ") || "없음"}`,
-        data: { questions: CHECKLIST, current: profile, missing, checklistUrl: checklistUrl(project, context) }
+        data: { questions: CHECKLIST, current: profile, missing, checklistUrl: checklistUrl(project, context), extraQuestions: extrasText() }
       };
     }
   },
@@ -682,7 +701,7 @@ export const TOOLS: ToolDefinition[] = [
       const { projectId: id, blueprint, review } = z.object({ projectId: z.string().uuid(), blueprint: z.unknown(), review: z.unknown() }).strict().parse(input);
       const project = await ownedProject(id, context);
       const phase = workflowFor(project).phase;
-      if (phase !== "brainstorm" && phase !== "circuit") throw new ToolError("이미 승인된 설계는 대화만으로 바꾸지 않아요. 사용자가 대시보드에서 '설계 다시 논의'를 누른 뒤 다시 제출하세요.");
+      if (phase !== "brainstorm" && phase !== "circuit") throw new ToolError("이미 승인된 회로예요. 고쳐야 하면 propose_design_change로 수정안을 내주세요. 서버가 바뀌는 것과 사람이 다시 할 일을 계산하고, 사용자가 작업대에서 승인하면 적용돼요.");
       if (!project.productForm) throw new ToolError("먼저 완성품 형태를 set_product_form으로 정하세요. 사용자가 완성 모양을 3D로 보고 동의한 뒤 회로를 그려요. 형태 질문(크기·쥐는 방식·화면/카메라/버튼 위치·재질·색)을 먼저 하세요.");
       if (!project.buildPlan) throw new ToolError("먼저 대장으로서 전체 설계도를 set_build_plan으로 저장하세요. 보드·연결 방식·모듈·단계·먼저 익힐 것·예산을 정한 뒤 1단계 회로를 제출해요.");
       if (phase === "brainstorm") transition(workflowFor(project), "plan", false);
@@ -1514,3 +1533,4 @@ export async function callTool(name: string, input: unknown, context: ToolContex
 // lib/tools/ 아래의 도구 묶음이 쓰는 공용 함수를 채운다.
 kit.ownedProject = ownedProject;
 kit.stored = stored;
+TOOLS.push(...revisionTools, ...verifyTools, ...fileTools, ...learnTools);

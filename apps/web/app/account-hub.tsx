@@ -49,14 +49,14 @@ function AiTab({ project }: { project: LocalProject | null }) {
   const command = HELPER_COMMAND;
   return <>
     <h3 className="connect-subtitle">이 화면에서 바로 대화하기 · 내 ChatGPT 요금제</h3>
-    <p className={`helper-state ${helper?.online ? "on" : ""}`}>{helper == null ? "확인하는 중…" : helper.online ? `달그락 도우미가 켜져 있어요${helper.account ? ` · ${helper.account}` : ""}${helper.model ? ` · ${helper.model}` : ""}` : "달그락 도우미가 꺼져 있어요"}</p>
-    <p>내 컴퓨터에서 달그락 도우미를 켜 두면, 이 화면에서(휴대폰에서도) 바로 대화할 수 있어요. AI 사용량은 내 ChatGPT 요금제에서 나가고, 로그인 정보는 내 컴퓨터에만 남아요.</p>
+    <p className={`helper-state ${helper?.online ? "on" : ""}`}>{helper == null ? "확인하는 중…" : helper.online ? `달그락 연결 앱이 켜져 있어요${helper.account ? ` · ${helper.account}` : ""}${helper.model ? ` · ${helper.model}` : ""}` : "달그락 연결 앱이 꺼져 있어요"}</p>
+    <p>내 컴퓨터에서 달그락 연결 앱을 켜 두면, 이 화면에서(휴대폰에서도) 바로 대화할 수 있어요. AI 사용량은 내 ChatGPT 요금제에서 나가고, 로그인 정보는 내 컴퓨터에만 남아요.</p>
     <ol className="connect-steps">
       <li><strong>Node.js 설치 (처음 한 번)</strong><p>nodejs.org에서 LTS 버전을 받아 설치해요.</p></li>
-      <li><strong>터미널에서 도우미 켜기</strong><p>맥은 “터미널”, 윈도우는 “PowerShell”을 열고 아래를 붙여넣어요. 브라우저가 열리면 달그락과 ChatGPT에 차례로 로그인해요.</p><div className="copy-row"><code>{command}</code><Copy value={command} /></div></li>
+      <li><strong>터미널에서 연결 앱 켜기</strong><p>맥은 “터미널”, 윈도우는 “PowerShell”을 열고 아래를 붙여넣어요. 브라우저가 열리면 달그락과 ChatGPT에 차례로 로그인해요.</p><div className="copy-row"><code>{command}</code><Copy value={command} /></div></li>
       <li><strong>창을 켜 둔 채 대화하기</strong><p>“준비됐어요”가 뜨면 끝이에요. 창을 닫으면 대화가 멈추고, 다시 켜면 이어져요.</p></li>
     </ol>
-    <p className="muted"><a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">도우미가 무엇을 어디로 보내는지 보기 (공개 코드)</a></p>
+    <p className="muted"><a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">연결 앱이 무엇을 어디로 보내는지 보기 (공개 코드)</a></p>
 
     <details className="hub-more"><summary>다른 AI 앱에서 대화하고 싶어요 (Claude 등, 커넥터)</summary>
       <p>Claude 같은 AI 앱에 달그락 대장간을 커넥터로 붙여 그 앱에서 대화할 수도 있어요. 그 앱의 설정 → 커넥터 → 커스텀 커넥터 추가에 아래 주소를 넣고 연결해요.</p>

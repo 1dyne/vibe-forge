@@ -5,6 +5,11 @@ import type { AgentId, LocalProject } from "../lib/project-types";
 import type { WorkbenchItem } from "../lib/workbench";
 import { agentName } from "../lib/workflow";
 import ProgressPanel from "./progress-panel";
+import ForgeScene from "./forge-scene";
+import FilesView from "./files-view";
+import RevisionView from "./revision-view";
+import VerifyView from "./verify-view";
+import { revisionOf } from "../lib/revision";
 
 // 오른쪽 패널: 이 프로젝트가 지금 어디에 있는지. Claude Code의 오른쪽 패널(환경·결과물)
 // 자리다. 대화는 방마다 따로지만 여기는 하나라서, 어느 방에 있든 같은 것을 본다.
@@ -14,7 +19,7 @@ const TURN: Record<CardTurn, string> = { agent: "달그락 작업 중", person: 
 const DELIVERY = { ordered: "주문함", delayed: "지연", arrived: "도착", problem: "문제" } as const;
 const day = (iso: string) => iso.slice(5, 10).replace("-", "/");
 
-export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onProjectSettings, onDevConnect, onClose }: {
+export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onProjectSettings, onDevConnect, activeRoom, liveRoom, onMarkFile, onDecide, onVerify, onClose }: {
   /** status = 작업대, files = 파일 모아보기 */
   mode: "status" | "files";
   project: LocalProject; board: BoardView; items: WorkbenchItem[]; newMarks: string[]; shortNames: boolean; busy: boolean;
@@ -25,6 +30,12 @@ export default function StatusPanel({ mode, project, board, items, newMarks, sho
   onBoard: (body: Record<string, unknown>) => Promise<void>;
   onProjectSettings: () => void;
   onDevConnect: () => void;
+  /** 지금 대화 중인 대장간과, 지금 답하고 있는 달그락 */
+  activeRoom: AgentId | null;
+  liveRoom: AgentId | null;
+  onMarkFile: (itemId: string, action: "final" | "unfinal") => void;
+  onDecide: (proposalId: string, decision: "approve" | "reject") => void;
+  onVerify: (body: Record<string, unknown>) => Promise<unknown> | void;
   onClose: () => void;
 }) {
   const [now, setNow] = useState(board.real.now?.text ?? "");
@@ -36,13 +47,15 @@ export default function StatusPanel({ mode, project, board, items, newMarks, sho
 
   if (mode === "files") return <aside className="artifact-panel status-panel" id="workbench-panel" aria-label="파일">
     <header className="artifact-header"><div><h2>파일 <span className="artifact-count">{items.length}</span></h2></div><div className="workbench-header-actions"><button className="icon-button" onClick={onClose} aria-label="닫기">×</button></div></header>
-    <div className="status-scroll">{items.length ? files : <p className="status-empty">아직 만들어진 파일이 없어요.</p>}</div>
+    <div className="status-scroll"><FilesView project={project} newMarks={newMarks} shortNames={shortNames} busy={busy} onOpen={onOpenItem} onMark={onMarkFile} /></div>
   </aside>;
 
   // 글을 줄인다: 비어 있는 칸은 아예 보이지 않고, 자세한 목록은 접어 둔다.
   return <aside className="artifact-panel status-panel" id="workbench-panel" data-tour="workbench" aria-label="작업대">
     <header className="artifact-header"><div><h2>작업대</h2></div><div className="workbench-header-actions"><details className="gear-menu"><summary aria-label="이 프로젝트의 설정" title="이 프로젝트의 설정">⚙</summary><div><button onClick={onProjectSettings}>프로젝트 설정<small>목적 · 기한 · 예산</small></button><button onClick={onDevConnect}>앱·코드 만들기 연결<small>쓰는 도구와 명세서</small></button></div></details><button className="icon-button" onClick={onClose} aria-label="작업대 접기">×</button></div></header>
     <div className="status-scroll">
+      <ForgeScene compact board={board} shortNames={shortNames} activeRoom={activeRoom} liveRoom={liveRoom} onRoom={onRoom} />
+      {revisionOf(project).proposals.length > 0 && <section className="status-block"><details className="status-details" open={revisionOf(project).proposals.some((p) => p.status === "proposed")}><summary>수정안 {revisionOf(project).proposals.filter((p) => p.status === "proposed").length || ""}</summary><RevisionView project={project} busy={busy} shortNames={shortNames} onDecide={onDecide} /></details></section>}
       {board.nextForPerson && <section className="status-block">
         <h3>지금 할 일</h3>
         <button className="next-card" onClick={() => onRoom(board.nextForPerson!.room)}><small>{agentName(board.nextForPerson.room, shortNames)}</small><strong>{board.nextForPerson.title}</strong><span>{board.nextForPerson.ask}</span></button>
@@ -71,6 +84,7 @@ export default function StatusPanel({ mode, project, board, items, newMarks, sho
           : <button className="now-line" onClick={() => { setNow(board.real.now?.text ?? ""); setEditingNow(true); }}>{board.real.now ? <>지금 <b>{board.real.now.text}</b></> : "지금 하는 일 적기"}</button>}
       </section>}
 
+      {project.build && <section className="status-block"><details className="status-details"><summary>회로 확인 사다리</summary><VerifyView project={project} busy={busy} onSubmit={onVerify as never} /></details></section>}
       <section className="status-block"><details className="status-details" open={!board.cards.length}><summary>진행 단계</summary><div className="status-progress"><ProgressPanel project={project} onAction={onAction} busy={busy} /></div></details></section>
 
       {items.length > 0 && <section className="status-block"><h3>파일 <small>{items.length}</small></h3>{files}</section>}
