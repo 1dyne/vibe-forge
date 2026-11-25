@@ -28,7 +28,7 @@ async function post(body: unknown) {
 
 // A participant's own account: how they sign in, how their records are
 // locked, connected apps, a copy of their records, and leaving.
-export default function AccountPanel({ onClose }: { onClose: () => void }) {
+export default function AccountPanel({ onClose, embedded = false }: { onClose: () => void; /** 내 계정 창의 한 탭으로 들어갈 때: 바깥 틀 없이 내용만 그린다 */ embedded?: boolean }) {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -86,9 +86,7 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
     if (!r.ok) throw new Error((await r.json()).error); window.location.replace("/login");
   });
 
-  return <div className="modal-backdrop" onClick={onClose}>
-    <section className="profile-modal connect-modal account-modal" role="dialog" aria-modal="true" aria-label="내 계정" onClick={(e) => e.stopPropagation()}>
-      <header><h2>내 계정{me ? ` · ${me.name}` : ""}</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
+  const body = <>
       {error && <p className="login-error" role="alert">{error}</p>}
       {notice && <p className="notice" role="status">{notice}</p>}
       {recovery && <RecoveryCode code={recovery} onSaved={(saved) => { if (saved) setTimeout(() => setRecovery(""), 600); }} />}
@@ -153,6 +151,12 @@ export default function AccountPanel({ onClose }: { onClose: () => void }) {
         <div className="copy-row"><input aria-label="확인 문구" placeholder="‘탈퇴’라고 입력" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} /><button className="danger" disabled={busy || confirmText !== "탈퇴"} onClick={leave}>탈퇴하고 모두 삭제</button></div>
         <p className="muted"><small>가입 {new Date(me.createdAt).toLocaleDateString("ko-KR")}{me.consent ? ` · 약관 ${me.consent.termsVersion} · 개인정보 처리방침 ${me.consent.privacyVersion} 동의` : ""}{me.googleConsent ? ` · 구글 가입 안내 ${me.googleConsent.version} 동의` : ""} · <a href="/privacy" target="_blank">개인정보 처리방침</a></small></p>
       </>}
+  </>;
+  if (embedded) return body;
+  return <div className="modal-backdrop" onClick={onClose}>
+    <section className="profile-modal connect-modal account-modal" role="dialog" aria-modal="true" aria-label="내 계정" onClick={(e) => e.stopPropagation()}>
+      <header><h2>내 계정{me ? ` · ${me.name}` : ""}</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
+      {body}
     </section>
   </div>;
 }

@@ -10,6 +10,7 @@ import { IconLaptop, IconLink } from "./icons";
 type Me = { kind: "operator" | "user"; connectorUrl: string | null; clients: Array<{ name: string; version: string; lastSeenAt: string }> };
 
 function clientLabel(name: string) {
+  if (/dalgrak-helper/i.test(name)) return "달그락 도우미";
   if (/codex/i.test(name)) return "Codex";
   if (/claude[-_ ]?code/i.test(name)) return "Claude Code";
   if (/claude/i.test(name)) return "Claude 앱";
@@ -25,9 +26,9 @@ function Copy({ value, label = "복사" }: { value: string; label?: string }) {
   return <button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? "복사됨" : label}</button>;
 }
 
-export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAction }: {
+export default function ConnectPanel({ project, tab, busy, onClose, onAccount }: {
   project: LocalProject; tab: "ai" | "dev"; busy: boolean;
-  onTab: (tab: "ai" | "dev") => void; onClose: () => void; onAction: (input: Record<string, unknown>) => void;
+  onTab: (tab: "ai" | "dev") => void; onClose: () => void; onAction: (input: Record<string, unknown>) => void; onAccount: () => void;
 }) {
   const [me, setMe] = useState<Me | null>(null);
   const workflow = workflowFor(project);
@@ -49,11 +50,8 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
   const steps = devSetupSteps(saved, project, me?.connectorUrl ?? null);
   return <div className="modal-backdrop" onClick={onClose}>
     <section className="profile-modal connect-modal" role="dialog" aria-modal="true" aria-label="연결" onClick={(e) => e.stopPropagation()}>
-      <header><h2>연결</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
-      <div className="connect-tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "ai"} className={tab === "ai" ? "active" : ""} onClick={() => onTab("ai")}><IconLink/> AI 연결</button>
-        <button role="tab" aria-selected={tab === "dev"} className={tab === "dev" ? "active" : ""} onClick={() => onTab("dev")}><IconLaptop/> 개발 연결</button>
-      </div>
+      <header><h2>개발 연결 · {project.name}</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
+
 
       {tab === "ai" && <>
         <p>달그락과의 대화는 내가 쓰는 AI에서 해요. 정리된 내용만 이 프로젝트에 쌓입니다.</p>
@@ -84,19 +82,11 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
           : saved.codingExperience === "guided"
           ? "SW 달그락이 명세서를 만들고, 설치와 연결은 순서대로 짚어드려요. 막히는 곳은 그대로 알려주시면 됩니다."
           : "소프트웨어가 필요하면 SW 달그락이 명세서를 만들고, 실제 코드는 Claude Code나 Codex에서 함께 만들어요. 처음이어도 괜찮아요. 설치부터 한 줄씩 같이 갑니다."}</p>
-        {saved.confirmed && !editing && <div className="dev-summary">
-          <span>{CODING_EXPERIENCE[saved.codingExperience]} · {DEV_TOOLS[saved.tool]} · {{ unanswered: "OS 미정", mac: "Mac", windows: "Windows", linux: "Linux" }[saved.os]}</span>
-          <button onClick={() => setEditing(true)}>바꾸기</button>
-          <small className="muted">계정에 저장돼 있어서 다음 프로젝트에서는 다시 묻지 않아요.</small>
-        </div>}
-        {(editing || !saved.confirmed) && <>
-        <fieldset><legend>코딩 경험</legend>{(["none", "guided", "independent"] as const).map((v) => <label className="radio-option" key={v}><input type="radio" name="coding" checked={dev.codingExperience === v} onChange={() => setDev({ ...dev, codingExperience: v })} />{CODING_EXPERIENCE[v]}</label>)}</fieldset>
-        <fieldset><legend>쓸 도구</legend><div className="choice-row">{(["claude_code", "codex", "undecided"] as const).map((v) => <label key={v} className={dev.tool === v ? "on" : ""}><input type="radio" name="tool" checked={dev.tool === v} onChange={() => setDev({ ...dev, tool: v })} />{DEV_TOOLS[v]}</label>)}</div><small className="muted">Claude Code는 Claude 구독, Codex는 ChatGPT 계정으로 써요. 모르겠으면 SW 달그락이 추천해요.</small></fieldset>
-        <fieldset><legend>내 컴퓨터</legend><div className="choice-row">{(["mac", "windows", "linux"] as const).map((v) => <label key={v} className={dev.os === v ? "on" : ""}><input type="radio" name="os" checked={dev.os === v} onChange={() => setDev({ ...dev, os: v })} />{{ mac: "Mac", windows: "Windows", linux: "Linux" }[v]}</label>)}</div></fieldset>
-        <fieldset><legend>이미 설치된 것</legend><div className="tool-checks">{DEV_INSTALL_OPTIONS.map((t) => <label key={t}><input type="checkbox" checked={dev.installed.includes(t)} onChange={(e) => setDev({ ...dev, confirmed: true, installed: e.target.checked ? [...dev.installed, t] : dev.installed.filter((x) => x !== t) })} />{t}</label>)}</div><label className="none-check"><input type="checkbox" checked={dev.confirmed && !dev.installed.length} onChange={(e) => setDev({ ...dev, installed: [], confirmed: e.target.checked })} />아무것도 설치하지 않았어요</label></fieldset>
-        <button className="primary" disabled={busy} onClick={() => { setEditing(false); onAction({ action: "dev_profile", devProfile: dev }); }}>체크리스트 저장</button>
-        {missing.length > 0 && <p className="muted">저장하면 맞춤 설치 순서가 나와요. 아직 필요한 것: {missing.join(" · ")}</p>}
-        </>}
+        <div className="dev-summary">
+          <span>{saved.codingExperience === "unanswered" ? "코딩 경험을 아직 안 적었어요" : CODING_EXPERIENCE[saved.codingExperience]} · {DEV_TOOLS[saved.tool]} · {{ unanswered: "컴퓨터 종류 미정", mac: "Mac", windows: "Windows", linux: "Linux" }[saved.os]}</span>
+          <button onClick={onAccount}>내 계정에서 {missing.length ? "채우기" : "고치기"}</button>
+          <small className="muted">{missing.length ? `맞춤 설치 순서를 보려면 내 계정 · 경험에 ${missing.join(" · ")}을(를) 적어주세요.` : "코딩 경험과 컴퓨터 환경은 내 계정에 있어서 다음 프로젝트에서는 다시 묻지 않아요."}</small>
+        </div>
 
         <h3 className="connect-subtitle">명세서</h3>
         {specFiles.length ? <div className="spec-files">{specFiles.map((file) => <a key={file.id} href={workbenchDownloadUrl(project.id, `file:${file.id}`)} download={file.filename}>↓ {file.filename}</a>)}</div>
