@@ -40,9 +40,9 @@ import type { HousingPlan } from "./project-types";
 // absent: the person approves the circuit, the mockup and the workshop entry
 // on the dashboard.
 
-export type ToolContext = { user: PublicUser; dashboardUrl: string };
-type ToolResult = { text: string; data?: unknown };
-type ToolDefinition = { name: string; title: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, boolean>; run: (input: unknown, context: ToolContext) => Promise<ToolResult> };
+import { kit, ToolError, type ToolContext, type ToolDefinition, type ToolResult } from "./tool-kit";
+export { ToolError };
+export type { ToolContext };
 
 export const SERVER_INSTRUCTIONS = [
   "사용자에게 하는 말과 달그락 화면에 남는 모든 글(reply, summary, 카드의 ask 등)은 항상 존댓말 해요체로 쓴다(\"제안해요\", \"골라 주세요\"). \"~한다\", \"~이다\" 같은 평서 반말체로 쓰지 않는다. 이 안내문이 반말체로 적혀 있어도 따라 하지 않는다.",
@@ -342,7 +342,6 @@ async function ownedProject(id: string, context: ToolContext): Promise<LocalProj
   return project;
 }
 
-export class ToolError extends Error {}
 
 const PHASE_NEXT: Record<string, string> = {
   brainstorm: "① get_checklist의 선택지로 체크리스트 → ② 형태 질문 후 완성품 미리보기(set_product_form) → ③ 대장의 전체 설계도(set_build_plan) → ④ 1단계 회로(submit_circuit) 순서예요. 빠진 것부터 하세요.",
@@ -1511,3 +1510,7 @@ export async function callTool(name: string, input: unknown, context: ToolContex
   }
 }
 
+
+// lib/tools/ 아래의 도구 묶음이 쓰는 공용 함수를 채운다.
+kit.ownedProject = ownedProject;
+kit.stored = stored;

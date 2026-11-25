@@ -33,6 +33,8 @@ export const PersonProfileSchema = z.object({
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
   makerspaces: z.array(MakerSpaceSchema).max(10).optional(),
   ownedParts: z.array(OwnedPartSchema).max(120).optional(),
+  learningMode: z.boolean().optional(),
+  extras: z.record(z.string().max(40), z.union([z.string().max(200), z.array(z.string().max(80)).max(20)])).optional(),
   devProfile: z.object({
     codingExperience: z.enum(["unanswered", "none", "guided", "independent"]),
     tool: z.enum(["undecided", "claude_code", "codex"]),

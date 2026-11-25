@@ -92,6 +92,12 @@ export type LocalProject = {
   board?: import("./board").Board;
   // 정밀 목업: 하우징 부위와 실측 부품을 실제 치수로 놓고 서버가 겹침·틈을 잰다. mockup.ts
   preciseMockup?: import("./mockup").MockupSpec;
+  // 제작 후 수정: 승인된 설계에 대한 수정안과 그 영향. revision.ts
+  revision?: import("./revision").RevisionState;
+  // 회로 검증 사다리의 진행과 사람이 준 값. verify-ladder.ts
+  verify?: import("./verify-ladder").VerifyState;
+  // 파일마다의 표시(초안·최종·대체됨, 만든 달그락). file-tree.ts
+  fileMarks?: import("./file-tree").FileMarks;
   // Invited user who owns the project; absent for the operator's own projects.
   ownerId?: string;
   // Where the conversation happens: the in-app agents or the owner's own Claude.
@@ -145,6 +151,10 @@ export type MakerSpace = { id: string; name: string; where: string; printers: st
 export type OwnedPart = { id: string; name: string; qty: number; catalogId: string | null; note: string };
 
 export type MakerProfile = {
+  // 학습 모드: 켜면 단계마다 "왜 이렇게 하는지"를 더 자세히 풀어 준다
+  learningMode?: boolean;
+  // 체크리스트의 추가 질문 답(측정 도구, 작업 여건, 사용 환경 등). 키는 checklist.ts의 EXTRA_QUESTIONS
+  extras?: Record<string, string | string[]>;
   tools: string[]; toolsConfirmed: boolean; firmwareExperience: "unanswered" | "none" | "guided" | "independent"; coreBehavior: string;
   makerspaces?: MakerSpace[];
   // 가진 부품. 장비(tools)는 고정된 선택지지만 부품은 사람마다 제각각이라 직접 적는다.
