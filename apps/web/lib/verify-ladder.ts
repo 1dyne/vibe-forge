@@ -266,7 +266,7 @@ export function viewLadder(ladder: Ladder, state: VerifyState): LadderView {
       else if (rung.unavailable) status = "unavailable";
       else status = locked ? "locked" : "todo";
       if (status === "todo" && !current) { current = rung; status = "current"; }
-      if (status in counts && status !== "total") counts[status as "pass" | "fail" | "unknown" | "skipped" | "unavailable"]++;
+      if (status === "pass" || status === "fail" || status === "unknown" || status === "skipped" || status === "unavailable") counts[status]++;
       return { ...rung, status, result };
     });
     // 다음 단계가 열리려면: 모든 칸이 통과했거나, 사람이 이유를 적고 건너뛰었거나, 멀티미터가 없어 할 수 없는 칸이어야 한다.

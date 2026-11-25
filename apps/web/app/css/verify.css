@@ -1,0 +1,44 @@
+/* 검증 사다리 (verify-view.tsx) */
+.vf-wrap{display:grid;gap:14px;font-size:13.5px;line-height:1.7;color:var(--ink);min-width:0}
+.vf-empty{margin:0;color:#6f7d75}
+.vf-head{display:grid;gap:4px;border:1px solid #d8dedb;border-radius:12px;padding:12px 14px;background:#fff}
+.vf-head strong{font-size:15px}.vf-head span{font-size:12.5px;color:#6f7d75}
+.vf-bar{height:6px;border-radius:999px;background:#e9eeeb;overflow:hidden;margin-top:4px}.vf-bar i{display:block;height:100%;background:#3f7a6c;border-radius:999px}
+.vf-note{margin:0;padding:9px 12px;border-radius:10px;background:#f6f6f3;color:#4c5a53;font-size:12.5px}
+.vf-stage{display:grid;gap:8px;min-width:0}
+.vf-stage h4{margin:0;font-size:14px;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}.vf-stage h4 small{font-weight:400;font-size:12px;color:#6f7d75}
+.vf-intro{margin:0;font-size:12.5px;color:#6f7d75}
+.vf-locked{opacity:.55}
+.vf-rungs{list-style:none;margin:0;padding:0;display:grid;gap:8px;min-width:0}
+.vf-group{margin:8px 0 2px;font-size:12px;font-weight:600;color:#3f7a6c}
+.vf-rung{border:1px solid #d8dedb;border-radius:12px;background:#fff;min-width:0;overflow:hidden}
+.vf-rung.vf-now{border-color:#8fd0c3;box-shadow:0 0 0 2px #8fd0c333}
+.vf-rung.vf-fail{border-color:#f0c4b3;background:#fdf7f4}
+.vf-rung.vf-locked,.vf-rung.vf-unavailable{background:#f8f8f6}
+.vf-rung-head{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;border:0;background:none;padding:11px 13px;cursor:pointer;color:inherit;font:inherit}
+.vf-rung-head:disabled{cursor:default}
+.vf-pill{flex:none;font-size:11px;font-weight:700;line-height:1;padding:5px 8px;border-radius:999px;background:#eef1ef;color:#6f7d75;margin-top:2px;white-space:nowrap}
+.vf-current .vf-pill,.vf-now .vf-pill{background:#3f7a6c;color:#fff}
+.vf-pass .vf-pill{background:#e4f0ea;color:#2e6b5c}
+.vf-fail .vf-pill{background:#a2452c;color:#fff}
+.vf-unknown .vf-pill{background:#f3ead2;color:#7a5a12}
+.vf-skipped .vf-pill{background:#eceae6;color:#6f6a60}
+.vf-title{min-width:0;overflow-wrap:anywhere;word-break:keep-all;font-weight:600}
+.vf-got{margin:-4px 13px 11px 13px;padding-left:0;font-size:12.5px;color:#6f7d75;overflow-wrap:anywhere}
+.vf-body{padding:0 13px 13px;display:grid;gap:10px;min-width:0}
+.vf-why{margin:0;color:#4c5a53}
+.vf-how{margin:0;padding-left:20px;display:grid;gap:4px}
+.vf-meter{margin:0;display:flex;flex-wrap:wrap;gap:6px 16px;padding:9px 12px;border-radius:10px;background:#f1f7f4;font-size:12.5px}.vf-meter span{overflow-wrap:anywhere}.vf-meter b{color:#3f7a6c;margin-right:4px}
+.vf-expect{margin:0;font-size:13px;overflow-wrap:anywhere}.vf-expect b{margin-right:6px}.vf-expect small{color:#6f7d75}.vf-expect a{color:#3f7a6c}
+.vf-noref{color:#7a5a12;background:#fbf6e8;padding:8px 11px;border-radius:10px}
+.vf-result{border-radius:10px;padding:10px 12px;background:#f6f6f3;display:grid;gap:2px}.vf-result.vf-pass{background:#e9f3ee}.vf-result.vf-fail{background:#fbeee8}.vf-result.vf-unknown{background:#fbf6e8}
+.vf-result b{font-size:12px}.vf-result span{font-size:13px;overflow-wrap:anywhere}.vf-result p{margin:4px 0 0;font-size:12.5px;color:#4c5a53}
+.vf-form{display:grid;gap:8px;min-width:0}.vf-label{margin:0;font-size:12.5px;color:#4c5a53}
+.vf-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.vf-row input,.vf-row textarea{flex:1 1 140px;min-width:0;border:1px solid #c9d6cf;border-radius:10px;padding:9px 11px;font:inherit;font-size:16px;color:var(--ink);background:#fff;resize:vertical}
+.vf-unit{font-weight:600;color:#6f7d75}
+.vf-primary,.vf-secondary{border-radius:10px;padding:9px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.vf-primary{border:0;background:#3f7a6c;color:#fff}.vf-primary:disabled{opacity:.45;cursor:default}
+.vf-secondary{border:1px solid #f0c4b3;background:#fdf7f4;color:#a2452c}
+.vf-link{justify-self:start;border:0;background:none;padding:0;font:inherit;font-size:12.5px;color:#6f7d75;text-decoration:underline;cursor:pointer}
+@media(max-width:600px){.vf-row .vf-primary,.vf-row .vf-secondary{flex:1 1 auto}}

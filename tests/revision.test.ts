@@ -52,7 +52,8 @@ describe("수정안의 영향 계산", () => {
     expect(impact.invalidated.purchases).toEqual(["D1 LED 5mm 빨강 — 이미 받은 부품인데 더 쓰지 않아요"]);
     expect(impact.cost).toEqual({ addKRW: 3500, saveKRW: 0, unknown: [] });
     expect(costText(impact)).toBe("약 3,500원 더 들어요");
-    expect(impact.wiring).toContain("옮기기: R1.1을(를) LED 선에서 LED 선으로".replace("옮기기: R1.1을(를) LED 선에서 LED 선으로", "새로 잇기: U1.D6 → LED 선"));
+    expect(impact.wiring).toContain("새로 잇기: U1.D6 → LED 선");
+    expect(impact.wiring).toContain("새로 잇기: D1.DIN → LED_A 선");
     expect(impact.wiring).toContain("떼기: U1.D9 (LED 선)");
     expect(impact.wiring).toContain("떼기: D1.K (GND 선)");
     expect(impact.invalidated.firmware).toBe(true);
