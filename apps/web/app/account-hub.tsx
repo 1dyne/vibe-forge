@@ -5,7 +5,7 @@ import { CHECKLIST } from "../lib/checklist";
 import { CODING_EXPERIENCE, DEV_INSTALL_OPTIONS, DEV_TOOLS, emptyDevProfile, projectInstructions } from "../lib/dev-handoff";
 import { emptyProfile, personPart, TOOL_OPTIONS } from "../lib/workflow";
 import AccountPanel from "./account-panel";
-import { HELPER_REPO_URL } from "./helper-composer";
+import { HELPER_COMMAND, HELPER_REPO_URL } from "./helper-composer";
 import MakerspaceList from "./makerspace-list";
 import OwnedPartsField from "./owned-parts-field";
 
@@ -43,7 +43,7 @@ function AiTab({ project }: { project: LocalProject | null }) {
     const timer = setInterval(load, 8000);
     return () => { alive = false; clearInterval(timer); };
   }, []);
-  const command = "npx github:1dyne/dalgrak-helper";
+  const command = HELPER_COMMAND;
   return <>
     <h3 className="connect-subtitle">이 화면에서 바로 대화하기 · 내 ChatGPT 요금제</h3>
     <p className={`helper-state ${helper?.online ? "on" : ""}`}>{helper == null ? "확인하는 중…" : helper.online ? `달그락 도우미가 켜져 있어요${helper.account ? ` · ${helper.account}` : ""}${helper.model ? ` · ${helper.model}` : ""}` : "달그락 도우미가 꺼져 있어요"}</p>

@@ -10,6 +10,7 @@ type Status = { online: boolean; model: string | null; account: string | null };
 type RelayEvent = { type: "delta"; text: string } | { type: "status"; text: string } | { type: "done"; text: string } | { type: "error"; code: string; message: string };
 const USAGE_URL = "https://chatgpt.com/settings/usage";
 export const HELPER_REPO_URL = "https://github.com/1dyne/dalgrak-helper";
+export const HELPER_COMMAND = "npx github:1dyne/dalgrak-helper";
 
 export default function HelperComposer({ project, channel, placeholder, suggestion, onProject, onFinished }: {
   project: LocalProject | null;
@@ -28,6 +29,7 @@ export default function HelperComposer({ project, channel, placeholder, suggesti
   const [live, setLive] = useState("");
   const [step, setStep] = useState("");
   const [error, setError] = useState<{ message: string; usage: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -82,9 +84,10 @@ export default function HelperComposer({ project, channel, placeholder, suggesti
 
   if (!status) return <div className="connector-composer"><p>연결 상태를 확인하고 있어요…</p></div>;
   if (!status.online) return <div className="connector-composer">
-    <strong>컴퓨터의 달그락 도우미를 켜면 여기서 바로 대화할 수 있어요</strong>
-    <p>도우미는 내 컴퓨터에서 도는 작은 앱이에요. 내 ChatGPT 요금제로 답을 만들고, 대화는 이 화면에서 해요. 켜 둔 동안에는 휴대폰에서도 이어서 대화할 수 있어요.</p>
-    <p>지금도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">도우미 설치 방법</a></p>
+    <strong>달그락 도우미가 꺼져 있어요 · 켜면 여기서 바로 대화할 수 있어요</strong>
+    <p>내 컴퓨터의 터미널(윈도우는 PowerShell)에 아래를 붙여넣고 Enter를 누르세요. 전에 로그인했다면 다시 묻지 않고 바로 켜져요. “준비됐어요”가 뜨면 이 화면이 몇 초 안에 입력창으로 바뀌어요.</p>
+    <div className="copy-row"><code>{HELPER_COMMAND}</code><button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(HELPER_COMMAND).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "복사됨" : "복사"}</button></div>
+    <p>터미널 창을 닫으면 도우미도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법</a></p>
   </div>;
   return <>
     {(busy || error) && <div className="helper-live" aria-live="polite">
