@@ -22,6 +22,8 @@ export type HelperJob = {
   projectId: string | null;
   channel: string;
   text: string;
+  /** 사용자가 화면에서 고른 모델. 도우미가 쓸 수 있는 것일 때만 따른다 */
+  model: string | null;
   createdAt: number;
   claimedAt: number | null;
   events: HelperEvent[];
@@ -29,7 +31,8 @@ export type HelperJob = {
   watchers: Set<() => void>;
 };
 
-type Presence = { lastSeen: number; model: string | null; version: string | null; account: string | null };
+export type HelperModel = { slug: string; name: string };
+type Presence = { lastSeen: number; model: string | null; version: string | null; account: string | null; models: HelperModel[] };
 type State = { presence: Map<string, Presence>; queues: Map<string, HelperJob[]>; jobs: Map<string, HelperJob>; pollers: Map<string, Set<() => void>> };
 
 // Next가 라우트마다 모듈을 따로 묶어도 우체통은 하나여야 한다.
@@ -62,25 +65,25 @@ function finish(job: HelperJob, event: HelperEvent) {
 
 export function touchHelper(userId: string, info: Partial<Omit<Presence, "lastSeen">> = {}) {
   const before = state.presence.get(userId);
-  state.presence.set(userId, { lastSeen: Date.now(), model: info.model ?? before?.model ?? null, version: info.version ?? before?.version ?? null, account: info.account ?? before?.account ?? null });
+  state.presence.set(userId, { lastSeen: Date.now(), model: info.model ?? before?.model ?? null, version: info.version ?? before?.version ?? null, account: info.account ?? before?.account ?? null, models: info.models ?? before?.models ?? [] });
 }
 
-export function helperStatus(userId: string, now = Date.now()): { online: boolean; model: string | null; version: string | null; account: string | null } {
+export function helperStatus(userId: string, now = Date.now()): { online: boolean; model: string | null; version: string | null; account: string | null; models: HelperModel[] } {
   const p = state.presence.get(userId);
-  return { online: !!p && now - p.lastSeen < ONLINE_WINDOW_MS, model: p?.model ?? null, version: p?.version ?? null, account: p?.account ?? null };
+  return { online: !!p && now - p.lastSeen < ONLINE_WINDOW_MS, model: p?.model ?? null, version: p?.version ?? null, account: p?.account ?? null, models: p?.models ?? [] };
 }
 
 export class RelayError extends Error {
   constructor(public code: "offline" | "busy" | "not_found", message: string) { super(message); }
 }
 
-export function enqueueJob(input: { userId: string; projectId: string | null; channel: string; text: string }): HelperJob {
+export function enqueueJob(input: { userId: string; projectId: string | null; channel: string; text: string; model?: string | null }): HelperJob {
   sweep();
   if (!helperStatus(input.userId).online) throw new RelayError("offline", "컴퓨터의 달그락 도우미가 꺼져 있어요. 도우미를 켜면 여기서 바로 대화할 수 있어요.");
   const queue = state.queues.get(input.userId) ?? [];
   const active = [...state.jobs.values()].filter((job) => job.userId === input.userId && !job.finished).length;
   if (active >= MAX_QUEUED) throw new RelayError("busy", "앞서 보낸 말에 답하는 중이에요. 답이 끝나면 다시 보내주세요.");
-  const job: HelperJob = { id: randomUUID(), userId: input.userId, projectId: input.projectId, channel: input.channel, text: input.text, createdAt: Date.now(), claimedAt: null, events: [], finished: false, watchers: new Set() };
+  const job: HelperJob = { id: randomUUID(), userId: input.userId, projectId: input.projectId, channel: input.channel, text: input.text, model: input.model ?? null, createdAt: Date.now(), claimedAt: null, events: [], finished: false, watchers: new Set() };
   state.jobs.set(job.id, job);
   queue.push(job);
   state.queues.set(input.userId, queue);

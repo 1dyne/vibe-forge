@@ -376,3 +376,13 @@ tr.is-new{animation-name:new-flash-row}
 .suggest-chip{border:1px dashed #b9d4cb;background:#f1f7f4;color:#3f7a6c;border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.suggest-chip:hover{background:#e4f0ea}
 .account-hub{max-width:640px}.hub-tabs{flex-wrap:wrap}.hub-hint{margin:8px 0 14px}.hub-save{position:sticky;bottom:-1px;background:linear-gradient(to top,var(--paper,#fbfbf8) 78%,transparent);padding:16px 0 4px;margin-top:14px;display:grid;gap:8px}.hub-save small{color:#6f7d75}.hub-more{margin-top:16px;border-top:1px solid #e3e8e5;padding-top:12px}.hub-more summary{cursor:pointer;font-weight:600;font-size:13px}.helper-state{font-size:13px;padding:8px 12px;border-radius:10px;background:#f3f3f0;color:#6f7d75}.helper-state.on{background:#e4f0ea;color:#2e6b5c}
 .person-summary{border:1px solid #d8e6e0;background:#f7fbf9;border-radius:12px;padding:12px 14px;margin:14px 0;display:grid;gap:6px}.person-summary.missing{border-color:#f0c4b3;background:#fdf7f4}.person-summary p{margin:0;font-size:13px;color:#4c5a53}.person-summary button{justify-self:start}
+/* 입력창은 쓴 만큼만 자란다. 높이를 끌어 맞추는 손잡이는 없앴다. */
+.resizable-workspace .composer-area{height:auto;min-height:0;overflow:visible;padding-top:8px;padding-bottom:8px}
+.resizable-workspace .composer{flex:none;min-height:0}
+.resizable-workspace .composer textarea{flex:none;height:auto;min-height:44px;max-height:40vh;font-size:14px;overflow-y:auto}
+.resizable-workspace .helper-composer textarea{min-height:28px}
+.sidebar-resizer{cursor:default}
+.model-select{border:1px solid #d0d9d2;background:#fff;border-radius:8px;font-size:12px;padding:4px 6px;color:var(--ink);max-width:180px}
+.suggest-chip{display:block;margin:0 0 8px;max-width:100%}
+.chat-message .helper-live-step{margin:6px 0 0;font-size:12px;color:#6f7d75}
+@media(max-width:600px){.resizable-workspace .composer textarea{font-size:16px}.composer-tools{flex-wrap:wrap;gap:6px}.model-select{max-width:140px}}

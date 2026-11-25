@@ -14,6 +14,8 @@ export function useWorkspaceLayout(workbenchVisible: boolean) {
       const saved = JSON.parse(localStorage.getItem("forge-layout-v1") ?? "{}");
       setSizes(current => Object.fromEntries(Object.entries(current).map(([key, value]) => {
         const k = key as keyof LayoutSizes;
+        // 사람이 끌어 맞추는 것은 대화와 작업대 사이 한 곳뿐이다. 나머지는 예전에 저장된 값이 있어도 쓰지 않는다.
+        if (k !== "workbench" && k !== "workbenchHeight") return [key, value];
         return [key, typeof saved[key] === "number" && Number.isFinite(saved[key]) ? Math.max(layoutLimits[k][0], Math.min(layoutLimits[k][1], saved[key])) : value];
       })) as LayoutSizes);
     } catch { /* Browser storage is optional. */ }

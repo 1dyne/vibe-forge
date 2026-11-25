@@ -9,7 +9,7 @@ import { canAccess, getViewer, notFound, unauthorized, withViewerVault } from ".
 
 export const dynamic = "force-dynamic";
 
-const Body = z.object({ projectId: z.string().uuid().nullish(), text: z.string().trim().min(1).max(4000), channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main") }).strict();
+const Body = z.object({ projectId: z.string().uuid().nullish(), text: z.string().trim().min(1).max(4000), channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main"), model: z.string().min(1).max(80).nullish() }).strict();
 
 // 화면(휴대폰이든 PC든)에서 한 말을 그 사람 컴퓨터의 도우미에게 넘긴다.
 // AI 호출은 도우미가 그 사람의 ChatGPT 요금제로 하므로 여기서는 비용을 세지 않는다.
@@ -28,7 +28,7 @@ async function handlePOST(request: NextRequest) {
   try {
     // 말을 먼저 기록하고 넘긴다. 도우미는 일을 받을 때 기록을 함께 읽는다.
     if (project) project = await mutateProject(project.id, (p) => { p.messages.push({ id: randomUUID(), role: "user", channel: input.channel, text: input.text, createdAt: new Date().toISOString() }); });
-    const job = enqueueJob({ userId: viewer.user.id, projectId: project?.id ?? null, channel: input.channel, text: input.text });
+    const job = enqueueJob({ userId: viewer.user.id, projectId: project?.id ?? null, channel: input.channel, text: input.text, model: input.model ?? null });
     return NextResponse.json({ jobId: job.id, project });
   } catch (error) {
     if (error instanceof RelayError) return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });

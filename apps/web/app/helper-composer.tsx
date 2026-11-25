@@ -1,46 +1,64 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { LocalProject } from "../lib/project-types";
 
 // 달그락 도우미(내 컴퓨터에서 도는 앱)가 켜져 있으면 여기서 바로 대화한다.
-// 답은 도우미가 내 ChatGPT 요금제로 만들고, 이 화면은 그 답을 흘려 받아 보여준다.
-// 도우미가 꺼져 있으면 기록과 설계는 그대로 보이고, 켜는 방법만 안내한다.
+// 답은 도우미가 내 ChatGPT 요금제로 만들고, 이 화면은 그 답을 흘려 받는다.
+// 흘러오는 답은 입력창이 아니라 대화 목록에 그린다(onLive). 입력창은 입력만 맡는다.
 
-type Status = { online: boolean; model: string | null; account: string | null };
+type Model = { slug: string; name: string };
+type Status = { online: boolean; model: string | null; account: string | null; models?: Model[] };
 type RelayEvent = { type: "delta"; text: string } | { type: "status"; text: string } | { type: "done"; text: string } | { type: "error"; code: string; message: string };
+export type HelperLive = { user: string; text: string; step: string };
+export type HelperTurn = { user: string; assistant: string | null; error: string | null; hadProject: boolean };
 const USAGE_URL = "https://chatgpt.com/settings/usage";
 export const HELPER_REPO_URL = "https://github.com/1dyne/dalgrak-helper";
 export const HELPER_COMMAND = "npx github:1dyne/dalgrak-helper";
+const MODEL_KEY = "forge-helper-model";
 
-export default function HelperComposer({ project, channel, placeholder, suggestion, onProject, onFinished }: {
+export default function HelperComposer({ project, channel, placeholder, suggestion, onProject, onLive, onTurnEnd }: {
   project: LocalProject | null;
   channel: string;
   placeholder: string;
-  /** 다음에 할 법한 말. 입력창이 비어 있을 때 흐리게 보이고, Enter로 그대로 보내거나 Tab으로 채워 고친다 */
+  /** 다음에 할 법한 말. 입력창이 비어 있을 때 칩으로 보이고, 누르면 채워진다 */
   suggestion?: string | null;
   /** 내가 보낸 말이 기록된 프로젝트를 바로 반영한다 */
   onProject: (project: LocalProject) => void;
-  /** 답이 끝났다. 프로젝트 목록을 다시 읽는다(새 프로젝트가 생겼을 수 있다) */
-  onFinished: (hadProject: boolean) => Promise<void> | void;
+  /** 답이 흘러오는 동안의 모습. 끝나면 null */
+  onLive: (live: HelperLive | null) => void;
+  /** 한 턴이 끝났다. 프로젝트 목록을 다시 읽고, 프로젝트가 없던 대화는 화면에 남긴다 */
+  onTurnEnd: (turn: HelperTurn) => Promise<void> | void;
 }) {
   const [status, setStatus] = useState<Status | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [live, setLive] = useState("");
-  const [step, setStep] = useState("");
   const [error, setError] = useState<{ message: string; usage: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [model, setModel] = useState<string | null>(null);
   const alive = useRef(true);
+  const box = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     alive.current = true;
+    try { setModel(localStorage.getItem(MODEL_KEY)); } catch { /* 저장소 없이도 된다 */ }
     let timer: ReturnType<typeof setTimeout>;
     const check = () => fetch("/api/helper/status", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((s) => { if (alive.current && s) setStatus(s); }).catch(() => {}).finally(() => { if (alive.current) timer = setTimeout(check, document.hidden ? 20_000 : 8_000); });
     void check();
     return () => { alive.current = false; clearTimeout(timer); };
   }, []);
 
-  async function follow(jobId: string) {
+  // 입력창은 쓴 만큼만 자란다. 사람이 높이를 끌어 맞출 일이 없게.
+  useLayoutEffect(() => {
+    const el = box.current; if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.4))}px`;
+  }, [text, status?.online]);
+
+  const models = status?.models ?? [];
+  const chosen = models.find((m) => m.slug === model)?.slug ?? status?.model ?? null;
+  const pickModel = (slug: string) => { setModel(slug); try { localStorage.setItem(MODEL_KEY, slug); } catch { /* 이번 화면에서만 기억 */ } };
+
+  async function follow(jobId: string, user: string): Promise<string> {
     let from = 0;
     let shown = "";
     for (let misses = 0; alive.current;) {
@@ -50,35 +68,40 @@ export default function HelperComposer({ project, channel, placeholder, suggesti
       const body = await response.json() as { events: RelayEvent[]; next: number; finished: boolean };
       from = body.next;
       for (const event of body.events) {
-        if (event.type === "delta") { shown += event.text; setLive(shown); setStep(""); }
-        else if (event.type === "status") setStep(event.text);
-        else if (event.type === "error") throw Object.assign(new Error(event.message), { code: event.code });
-        else if (event.type === "done") return;
+        if (event.type === "delta") { shown += event.text; onLive({ user, text: shown, step: "" }); }
+        else if (event.type === "status") onLive({ user, text: shown, step: event.text });
+        else if (event.type === "error") throw Object.assign(new Error(event.message), { code: event.code, partial: shown });
+        else if (event.type === "done") return event.text || shown;
       }
-      if (body.finished) return;
+      if (body.finished) return shown;
     }
+    return shown;
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const message = text.trim() || suggestion?.trim() || "";
+    const message = text.trim();
     if (!message || busy) return;
-    setBusy(true); setError(null); setLive(""); setStep("달그락 도우미에게 전하는 중");
+    const hadProject = !!project;
+    setBusy(true); setError(null);
+    onLive({ user: message, text: "", step: "달그락 도우미에게 전하는 중" });
     try {
-      const response = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project?.id ?? null, text: message, channel }) });
+      const response = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project?.id ?? null, text: message, channel, ...(chosen ? { model: chosen } : {}) }) });
       if (response.status === 401) { window.location.assign("/login"); return; }
       const body = await response.json();
-      if (!response.ok) { if (body.code === "offline") setStatus((s) => ({ online: false, model: s?.model ?? null, account: s?.account ?? null })); throw new Error(body.error ?? "보내지 못했어요."); }
+      if (!response.ok) { if (body.code === "offline") setStatus((s) => ({ ...(s ?? { model: null, account: null }), online: false })); throw new Error(body.error ?? "보내지 못했어요."); }
       setText("");
       if (body.project) onProject(body.project);
-      await follow(body.jobId);
-      await onFinished(!!project);
+      const answer = await follow(body.jobId, message);
+      await onTurnEnd({ user: message, assistant: answer, error: null, hadProject });
     } catch (caught) {
       const code = (caught as { code?: string }).code ?? "";
-      setError({ message: caught instanceof Error ? caught.message : "답변을 받지 못했어요.", usage: code.includes("usage") });
-      await onFinished(!!project);
+      const message2 = caught instanceof Error ? caught.message : "답변을 받지 못했어요.";
+      setError({ message: message2, usage: code.includes("usage") });
+      await onTurnEnd({ user: message, assistant: (caught as { partial?: string }).partial || null, error: message2, hadProject });
     } finally {
-      if (alive.current) { setBusy(false); setLive(""); setStep(""); }
+      onLive(null);
+      if (alive.current) setBusy(false);
     }
   }
 
@@ -90,17 +113,16 @@ export default function HelperComposer({ project, channel, placeholder, suggesti
     <p>터미널 창을 닫으면 도우미도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법</a></p>
   </div>;
   return <>
-    {(busy || error) && <div className="helper-live" aria-live="polite">
-      {live && <p className="helper-live-text">{live}</p>}
-      {busy && <p className="helper-live-step">{step || (live ? "이어서 쓰는 중" : "생각하고 있어요")}…</p>}
-      {error && <p role="alert" className="helper-live-error">{error.message} {error.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>} <button type="button" onClick={() => setError(null)}>닫기</button></p>}
-    </div>}
-    <form className="composer" onSubmit={submit}>
-      <textarea value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={suggestion ? `${suggestion}   ↵ 그대로 보내기 · Tab 고쳐 쓰기` : placeholder} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
+    {error && <p role="alert" className="helper-live-error">{error.message} {error.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>} <button type="button" onClick={() => setError(null)}>닫기</button></p>}
+    {suggestion && !text && !busy && <button type="button" className="suggest-chip" onClick={() => { setText(suggestion); box.current?.focus(); }}>{suggestion}</button>}
+    <form className="composer helper-composer" onSubmit={submit}>
+      <textarea ref={box} rows={1} value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={busy ? "답하는 중이에요…" : placeholder} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
       <div className="composer-tools">
-        {suggestion && !text && !busy && <button type="button" className="suggest-chip" onClick={() => setText(suggestion)}>{suggestion}</button>}
-        <span className="composer-hint">ChatGPT 요금제 사용 중{status.model ? ` · ${status.model}` : ""} · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>
-        <button type="submit" className="send" aria-label="메시지 보내기" disabled={busy || !(text.trim() || suggestion)}>↑</button>
+        <span className="composer-hint">ChatGPT 요금제 사용 중 · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>
+        {models.length > 1
+          ? <select className="model-select" aria-label="모델 선택" value={chosen ?? ""} disabled={busy} onChange={(e) => pickModel(e.target.value)}>{models.map((m) => <option key={m.slug} value={m.slug}>{m.name}</option>)}</select>
+          : chosen && <span className="composer-hint">{chosen}</span>}
+        <button type="submit" className="send" aria-label="메시지 보내기" disabled={busy || !text.trim()}>↑</button>
       </div>
     </form>
   </>;
