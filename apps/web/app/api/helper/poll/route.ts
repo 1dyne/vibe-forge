@@ -29,5 +29,5 @@ export async function POST(request: NextRequest) {
   const owned = project && project.ownerId === session.user.id ? project : null;
   // 마지막 사용자 말은 job.text로 따로 가므로 기록에서는 뺀다.
   const history = (owned?.messages ?? []).filter((m) => (m.channel ?? "main") === job.channel).slice(-HISTORY - 1, -1).map((m) => ({ role: m.role, agent: m.agent ?? null, text: m.text.slice(0, 4000) }));
-  return NextResponse.json({ job: { id: job.id, projectId: owned?.id ?? null, projectName: owned?.name ?? null, channel: job.channel, text: job.text, model: job.model, history } });
+  return NextResponse.json({ job: { id: job.id, projectId: owned?.id ?? null, projectName: owned?.name ?? null, channel: job.channel, text: job.text, model: job.model, images: job.images, history } });
 }

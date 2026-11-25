@@ -24,6 +24,8 @@ export type HelperJob = {
   text: string;
   /** 사용자가 화면에서 고른 모델. 연결 앱이 쓸 수 있는 것일 때만 따른다 */
   model: string | null;
+  /** 이번 말에 붙인 사진. 연결 앱에게 건네는 동안만 메모리에 있고 저장하지 않는다 */
+  images: HelperImage[];
   createdAt: number;
   claimedAt: number | null;
   events: HelperEvent[];
@@ -31,6 +33,9 @@ export type HelperJob = {
   watchers: Set<() => void>;
 };
 
+export type HelperImage = { name: string; dataUrl: string };
+export const MAX_IMAGES = 3;
+export const MAX_IMAGE_CHARS = 2_000_000;
 export type HelperModel = { slug: string; name: string };
 type Presence = { lastSeen: number; model: string | null; version: string | null; account: string | null; models: HelperModel[] };
 type State = { presence: Map<string, Presence>; queues: Map<string, HelperJob[]>; jobs: Map<string, HelperJob>; pollers: Map<string, Set<() => void>> };
@@ -59,6 +64,7 @@ function sweep(now = Date.now()) {
 function finish(job: HelperJob, event: HelperEvent) {
   job.events.push(event);
   job.finished = true;
+  job.images = [];
   for (const wake of job.watchers) wake();
   job.watchers.clear();
 }
@@ -77,13 +83,13 @@ export class RelayError extends Error {
   constructor(public code: "offline" | "busy" | "not_found", message: string) { super(message); }
 }
 
-export function enqueueJob(input: { userId: string; projectId: string | null; channel: string; text: string; model?: string | null }): HelperJob {
+export function enqueueJob(input: { userId: string; projectId: string | null; channel: string; text: string; model?: string | null; images?: HelperImage[] }): HelperJob {
   sweep();
   if (!helperStatus(input.userId).online) throw new RelayError("offline", "컴퓨터의 달그락 연결 앱이 꺼져 있어요. 연결 앱을 켜면 여기서 바로 대화할 수 있어요.");
   const queue = state.queues.get(input.userId) ?? [];
   const active = [...state.jobs.values()].filter((job) => job.userId === input.userId && !job.finished).length;
   if (active >= MAX_QUEUED) throw new RelayError("busy", "앞서 보낸 말에 답하는 중이에요. 답이 끝나면 다시 보내주세요.");
-  const job: HelperJob = { id: randomUUID(), userId: input.userId, projectId: input.projectId, channel: input.channel, text: input.text, model: input.model ?? null, createdAt: Date.now(), claimedAt: null, events: [], finished: false, watchers: new Set() };
+  const job: HelperJob = { id: randomUUID(), userId: input.userId, projectId: input.projectId, channel: input.channel, text: input.text, model: input.model ?? null, images: (input.images ?? []).slice(0, MAX_IMAGES), createdAt: Date.now(), claimedAt: null, events: [], finished: false, watchers: new Set() };
   state.jobs.set(job.id, job);
   queue.push(job);
   state.queues.set(input.userId, queue);

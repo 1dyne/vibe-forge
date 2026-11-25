@@ -15,6 +15,22 @@ const USAGE_URL = "https://chatgpt.com/settings/usage";
 export const HELPER_REPO_URL = "https://github.com/1dyne/dalgrak-helper";
 export const HELPER_COMMAND = "npx github:1dyne/dalgrak-helper";
 const MODEL_KEY = "forge-helper-model";
+type Photo = { name: string; dataUrl: string };
+const MAX_PHOTOS = 3;
+
+// 휴대폰 사진은 몇 MB씩 된다. 긴 변을 1,280px로 줄여 JPEG로 바꿔 보낸다.
+async function shrink(file: File): Promise<Photo> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const el = new Image(); el.onload = () => resolve(el); el.onerror = () => reject(new Error("사진을 읽지 못했어요.")); el.src = url; });
+    const scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext("2d"); if (!ctx) throw new Error("사진을 읽지 못했어요.");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return { name: file.name.slice(0, 120) || "사진", dataUrl: canvas.toDataURL("image/jpeg", 0.82) };
+  } finally { URL.revokeObjectURL(url); }
+}
 
 export default function HelperComposer({ project, channel, speaker, placeholder, suggestion, onProject, onLive, onTurnEnd }: {
   /** 지금 이 방에서 답하는 달그락의 이름 (예: 대장 달그락) */
@@ -36,6 +52,8 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; usage: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const picker = useRef<HTMLInputElement>(null);
   const [model, setModel] = useState<string | null>(null);
   const alive = useRef(true);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -60,6 +78,16 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
   const chosen = models.find((m) => m.slug === model)?.slug ?? status?.model ?? null;
   const pickModel = (slug: string) => { setModel(slug); try { localStorage.setItem(MODEL_KEY, slug); } catch { /* 이번 화면에서만 기억 */ } };
 
+  async function addPhotos(files: FileList | File[] | null) {
+    const list = [...(files ?? [])].filter((f) => f.type.startsWith("image/"));
+    if (!list.length) return;
+    try {
+      const made = await Promise.all(list.slice(0, MAX_PHOTOS).map(shrink));
+      setPhotos((before) => [...before, ...made].slice(0, MAX_PHOTOS));
+      if (photos.length + list.length > MAX_PHOTOS) setError({ message: `사진은 한 번에 ${MAX_PHOTOS}장까지 보낼 수 있어요.`, usage: false });
+    } catch (caught) { setError({ message: caught instanceof Error ? caught.message : "사진을 읽지 못했어요.", usage: false }); }
+  }
+
   async function follow(jobId: string, user: string): Promise<string> {
     let from = 0;
     let shown = "";
@@ -82,17 +110,18 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const message = text.trim();
+    const message = text.trim() || (photos.length ? "이 사진을 봐주세요." : "");
     if (!message || busy) return;
+    const sending = photos;
     const hadProject = !!project;
     setBusy(true); setError(null);
     onLive({ user: message, text: "", step: `${speaker}에게 전하는 중` });
     try {
-      const response = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project?.id ?? null, text: message, channel, ...(chosen ? { model: chosen } : {}) }) });
+      const response = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project?.id ?? null, text: message, channel, ...(chosen ? { model: chosen } : {}), ...(sending.length ? { images: sending } : {}) }) });
       if (response.status === 401) { window.location.assign("/login"); return; }
       const body = await response.json();
       if (!response.ok) { if (body.code === "offline") setStatus((s) => ({ ...(s ?? { model: null, account: null }), online: false })); throw new Error(body.error ?? "보내지 못했어요."); }
-      setText("");
+      setText(""); setPhotos([]);
       if (body.project) onProject(body.project);
       const answer = await follow(body.jobId, message);
       await onTurnEnd({ user: message, assistant: answer, error: null, hadProject });
@@ -116,14 +145,17 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
   </div>;
   return <>
     {error && <p role="alert" className="helper-live-error">{error.message} {error.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>} <button type="button" onClick={() => setError(null)}>닫기</button></p>}
-    <form className="composer helper-composer" onSubmit={submit}>
-      <textarea ref={box} rows={1} value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={busy ? `${speaker}이 답하는 중이에요…` : suggestion ?? placeholder} title={suggestion && !text ? "한 번 누르면 이 문장이 입력돼요" : undefined} onClick={() => { if (!text && suggestion && !busy) setText(suggestion); }} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
+    <form className="composer helper-composer" onSubmit={submit} onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }} onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); void addPhotos(e.dataTransfer.files); } }}>
+      {photos.length > 0 && <div className="photo-strip">{photos.map((photo, index) => <span key={index} className="photo-chip"><img src={photo.dataUrl} alt={photo.name} /><button type="button" aria-label={`${photo.name} 빼기`} onClick={() => setPhotos((before) => before.filter((_, i) => i !== index))}>×</button></span>)}</div>}
+      <textarea ref={box} rows={1} value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={busy ? `${speaker}이 답하는 중이에요…` : suggestion ?? placeholder} title={suggestion && !text ? "한 번 누르면 이 문장이 입력돼요" : undefined} onClick={() => { if (!text && suggestion && !busy) setText(suggestion); }} onChange={(e) => setText(e.target.value)} onPaste={(e) => { const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/")); if (files.length) { e.preventDefault(); void addPhotos(files); } }} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
       <div className="composer-tools">
+        <input ref={picker} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} />
+        <button type="button" className="attach" aria-label="사진 붙이기" title="사진 붙이기 (최대 3장) — 만든 것, 부품, 손그림을 보여주세요" disabled={busy || photos.length >= MAX_PHOTOS} onClick={() => picker.current?.click()}>＋</button>
         <span className="composer-hint">ChatGPT 요금제 사용 중 · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>
         {models.length > 1
           ? <select className="model-select" aria-label="모델 선택" value={chosen ?? ""} disabled={busy} onChange={(e) => pickModel(e.target.value)}>{models.map((m) => <option key={m.slug} value={m.slug}>{m.name}</option>)}</select>
           : chosen && <span className="composer-hint">{chosen}</span>}
-        <button type="submit" className="send" aria-label="메시지 보내기" disabled={busy || !text.trim()}>↑</button>
+        <button type="submit" className="send" aria-label="메시지 보내기" disabled={busy || (!text.trim() && !photos.length)}>↑</button>
       </div>
     </form>
   </>;

@@ -51,3 +51,16 @@ describe("달그락 도우미 우체통", () => {
     expect(() => job()).toThrowError(/답하는 중/);
   });
 });
+
+describe("photos on a job", () => {
+  it("carries at most three photos to the app and drops them when the turn ends", async () => {
+    const relay = await import("../apps/web/lib/helper-relay");
+    relay.resetHelperRelay();
+    relay.touchHelper("photo-user");
+    const photo = { name: "a.jpg", dataUrl: "data:image/jpeg;base64,AAAA" };
+    const job = relay.enqueueJob({ userId: "photo-user", projectId: null, channel: "main", text: "봐주세요", images: [photo, photo, photo, photo] });
+    expect((await relay.claimJob("photo-user", 0))?.images).toHaveLength(3);
+    relay.pushJobEvent(job.id, "photo-user", { type: "done", text: "네" });
+    expect(job.images).toHaveLength(0);
+  });
+});

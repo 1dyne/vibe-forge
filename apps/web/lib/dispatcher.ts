@@ -26,7 +26,7 @@ export async function dispatchForUser(userId: string): Promise<{ projectId: stri
       const again = nextDispatch(boardOf(p), workflowFor(p).activeAgents, now);
       if (!again || again.room !== next.room || again.cardId !== next.cardId) throw new SkipDispatch();
       p.board = markDispatched(boardOf(p), again, now);
-      p.messages.push({ id: randomUUID(), role: "user", channel, text: again.text, createdAt: now, auto: true });
+      p.messages.push({ id: randomUUID(), role: "user", channel, text: again.text, createdAt: now, auto: true, cardTitle: boardOf(p).cards.find((c) => c.id === again.cardId)?.title });
     }).catch((error) => { if (!(error instanceof SkipDispatch)) throw error; });
     if (hasActiveJob(userId)) return null;
     try { enqueueJob({ userId, projectId: project.id, channel, text: next.text }); } catch { return null; }

@@ -39,6 +39,8 @@ export type ChatMessage = {
   shared?: boolean;
   /** 사람이 쓴 말이 아니라 대장이 자동 진행으로 넘긴 지시 */
   auto?: boolean;
+  /** 대장이 넘긴 일이 어느 작업 카드의 것인지. 대화를 카드별로 묶어 보여줄 때 쓴다 */
+  cardTitle?: string;
 };
 
 export type ConnectionKind = "builtin" | "socket" | "qwiic" | "grove" | "breadboard" | "solder";

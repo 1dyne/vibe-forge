@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, FormEvent, useEffect, useRef, useState } from "react";
+import {Fragment, useMemo, FormEvent, useEffect, useRef, useState } from "react";
 import type { AgentId, ChatChannel, ImageAttachment, LocalProject, MakerProfile } from "../lib/project-types";
 import { AGENTS, agentName, emptyProfile, intakeMissing, personPart, TOOL_OPTIONS, workflowFor } from "../lib/workflow";
 import { CODING_EXPERIENCE, DEV_TOOLS, emptyDevProfile } from "../lib/dev-handoff";
@@ -101,17 +101,17 @@ export default function ProjectWorkspace() {
   // 아무도 읽지 않는다. 실제로 하게 만드는 것은 아래 체크리스트가 맡는다.
   const tourStations: Station[] = [
     { key: "hello", title: "달그락 대장간",
-      body: <p>회로도 코드도 몰라도, 머릿속 물건을 실제로 만들어봅니다.</p>,
+      body: <p>회로도 코드도 몰라도, 머릿속 물건을 실제로 만들어봐요.</p>,
       actions: ({ next, close }) => <>
         <button className="primary" onClick={close}>아이디어부터 적어보기</button>
         <button onClick={next}>화면 먼저 둘러보기</button>
       </> },
     { key: "projects", target: "projects", title: "프로젝트",
-      body: <p>아이디어 하나가 프로젝트 하나. 왼쪽 고리가 진행률이에요.</p> },
-    { key: "progress", target: "progress", title: "진행 단계",
-      body: <p>여덟 단계 중 지금 여기. 눌러서 펼쳐보세요.</p> },
+      body: <p>아이디어 하나가 프로젝트 하나예요. 왼쪽 고리가 진행률이에요.</p> },
     { key: "workbench-button", target: "workbench-button", title: "작업대", optional: true,
-      body: <p>설계·회로·3D·부품이 여기 쌓여요. 새로 생기면 주황 점.</p> },
+      body: <p>지금 할 일, 달그락들이 하는 일, 진행 단계가 여기 모여요. 내가 확인할 것이 생기면 숫자가 떠요.</p> },
+    { key: "progress", target: "progress", title: "진행 단계", optional: true, before: () => { setPanelMode("status"); setPanelHidden(false); },
+      body: <p>여덟 단계 중 지금 어디인지 보여요. 눌러서 펼쳐보세요.</p> },
     { key: "composer", target: "composer", title: "시작하기",
       body: <p>만들고 싶은 것을 한 줄로 적어보세요.</p> }
   ];
@@ -250,10 +250,10 @@ export default function ProjectWorkspace() {
         {!project&&!loose.length&&!helperLive&&<div className="welcome"><Avatar large/><p className="eyebrow">YOUR IDEA, OUR NEXT PROJECT</p><h2>무엇을 만들어볼까요?</h2>{connectorOnly?<p>만들고 싶은 것을 아래에 적어주세요.<br/>대장 달그락이 질문하며 함께 구체화하고, 프로젝트 폴더를 만들어요.</p>:<p>아직 다 정해지지 않아도 괜찮아요.<br/>대장 달그락과 이야기하며 첫 설계를 시작해보세요.</p>}{!connectorOnly&&<div className="idea-prompts">{["내 팔에 앉는 부엉이 반려 로봇","식물의 상태를 알려주는 화분","책상 위 작은 집중 타이머"].map(s=><button key={s} onClick={()=>setText(s)}>{s} ↗</button>)}</div>}</div>}
         {project&&<div className="project-intro"><span className="pill">{phaseNames[phase]}</span><p>{project.oneLiner}</p></div>}
         {project&&roomsOn&&board.cards.filter(c=>c.turn!=="done"&&(room==="main"?c.owner==="chief":c.owner===room)).map(c=><div key={c.id} className={"room-card turn-"+c.turn+(c.active?"":" held")}><div><small>{c.heldBy.length?"앞 작업을 기다리는 중":c.turn==="person"?"내 차례":c.turn==="waiting"?"기다리는 중":c.turn==="blocked"?"막힘":"달그락 작업 중"}</small><strong>{c.title}</strong><p>{c.turn==="person"?c.ask:c.turn==="waiting"?(c.waiting?.what??"")+(c.waiting?.expectedAt?" · "+c.waiting.expectedAt+" 예정":""):c.turn==="blocked"?c.note:c.detail}</p></div>{c.turn==="person"&&c.active&&<CardPrompt card={c} busy={!!busy} onAnswer={body=>boardAction({action:"answer",...body})}/>}</div>)}
-        {messages.map(m=><article key={m.id} className={"chat-message "+(m.auto?"assistant agent-chief auto-order":m.role+(m.role==="assistant"?" agent-"+(m.agent??"chief"):""))}>
+        {messages.map(m=><Fragment key={m.id}>{m.auto&&m.cardTitle&&<div className="card-divider" role="separator"><span>{m.cardTitle}</span></div>}<article className={"chat-message "+(m.auto?"assistant agent-chief auto-order":m.role+(m.role==="assistant"?" agent-"+(m.agent??"chief"):""))}>
           {m.role==="assistant"||m.auto?<Avatar agent={m.auto?"chief":m.agent??"chief"}/>:<span className="user-avatar">나</span>}
           <div className="message-body"><div className="message-meta"><strong>{m.auto?agentName("chief",preferences.shortNames)+"의 전달":m.role==="user"?"나":agentName(m.agent??"chief",preferences.shortNames)}</strong>{m.mode==="evaluate"&&<span className="pill unknown">Evaluator</span>}{workshop&&channel==="main"&&m.channel&&m.channel!=="main"&&<small>{agentName(m.channel,preferences.shortNames)} 작업실에서 공유</small>}<time>{new Date(m.createdAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</time></div><MessageText files={fileLinks} text={m.text}/>{m.attachments?.length?<div className="message-images">{m.attachments.map((a,i)=><a href={a.dataUrl} download={a.name} key={i}><img src={a.dataUrl} alt={a.name}/><span>{a.name}</span></a>)}</div>:null}{m.shared&&workshop&&<span className="shared-tag">↗ 팀 공통 기록에 공유됨</span>}</div>
-        </article>)}
+        </article></Fragment>)}
         {project&&room==="main"&&phase==="brainstorm"&&(()=>{const card=stageCardFor(project);const pf=workflow!.profile;const hard=card.kind==="hardware"||card.kind==="both";
           const done=(k:string)=>k==="coreBehavior"?!!pf.coreBehavior.trim():k==="tools"?pf.toolsConfirmed:k==="firmwareExperience"?pf.firmwareExperience!=="unanswered":k==="codingExperience"?(pf.devProfile?.codingExperience??"unanswered")!=="unanswered":k==="whatToMake"?!!project.idea.trim():false;
           return <div className="intake-card"><strong>{card.title}</strong><p>{card.description}</p><div className="intake-status">{card.checklist.map(c=><span key={c.key} className={done(c.key)?"complete":""}>{done(c.key)?"✓":"○"} {c.label}</span>)}</div><button onClick={()=>hard?void openProfile():setHub("skill")} disabled={!!busy}>{card.action}</button>{connectorOnly?<p className="connector-hint">{card.readyHint}</p>:hard&&<button className="primary" disabled={!!busy||intakeMissing(pf).length>0} onClick={()=>action({action:"plan"})}>브레인스토밍 마치고 계획 시작 →</button>}</div>;})()}
