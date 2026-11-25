@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toBlocks } from "../apps/web/app/message-text";
+import { splitFileNames, toBlocks } from "../apps/web/app/message-text";
 
 describe("대화를 문단으로 나누기", () => {
   it("빈 줄로 문단을 가른다", () => {
@@ -34,5 +34,16 @@ describe("대화를 문단으로 나누기", () => {
   it("줄글 한 덩어리는 그대로 한 문단이다", () => {
     const long = "회로를 먼저 정하고 부품을 고른 뒤에 3D 목업을 만듭니다.";
     expect(toBlocks(long)).toEqual([{ kind: "p", lines: [long] }]);
+  });
+});
+
+describe("대화 속 파일 이름 알아보기", () => {
+  it("겹치는 이름은 긴 쪽으로 건다", () => {
+    const files = [{ name: "lid.stl", url: "/a" }, { name: "셈_ME_lid.stl", url: "/b" }];
+    expect(splitFileNames("셈_ME_lid.stl 을 받으세요", files)[0]).toEqual({ kind: "file", name: "셈_ME_lid.stl", url: "/b" });
+  });
+  it("빈칸이 든 한글 파일 이름도 통째로 알아본다", () => {
+    const files = [{ name: "셈 sam v1-설계도.html", url: "/plan" }];
+    expect(splitFileNames("자세한 건 셈 sam v1-설계도.html 에 있어요", files).map((s) => s.kind)).toEqual(["text", "file", "text"]);
   });
 });
