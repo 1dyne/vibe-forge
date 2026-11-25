@@ -6,7 +6,9 @@ const publicPaths = new Set(["/login", "/find", "/join", "/terms", "/privacy", "
 // The install prompt fetches the manifest and icons before anyone logs in.
 // /api/mcp/ authenticates with the participant token in its path; /u/<token>
 // is the older dashboard link form (new links use /u#<token>).
-const publicPrefixes = ["/icons/", "/demo/", "/api/mcp/", "/u/", "/.well-known/", "/api/oauth/", "/api/auth/", "/find/", "/f/", "/api/find/"];
+// /api/helper/ 는 도우미가 OAuth 토큰으로 오는 자리다. 쿠키 관문 대신 각 라우트가 직접 확인한다
+// (도우미 자리는 Bearer 토큰, 화면 자리는 로그인 세션).
+const publicPrefixes = ["/api/helper/", "/icons/", "/demo/", "/api/mcp/", "/u/", "/.well-known/", "/api/oauth/", "/api/auth/", "/find/", "/f/", "/api/find/"];
 // 온보딩 전용 도메인(쉼표로 여러 개). 이 도메인의 첫 화면은 바로 도깨비불 찾기(/find)다.
 const landingHosts = () => (process.env.FIND_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
 

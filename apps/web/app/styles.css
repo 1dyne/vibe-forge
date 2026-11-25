@@ -370,3 +370,5 @@ tr.is-new{animation-name:new-flash-row}
 .buy-wait_design{background:#eef1ec;color:#7b8a74}
 .buy-verify{background:#fbf2da;color:#8d6d2c}
 .buy-blocked{background:#fbe6e2;color:#a2493f}
+.connector-composer p+p{margin-top:8px}.connector-composer a{color:#3f7a6c}
+.helper-live{border:1px solid #d8e6e0;background:#f7fbf9;border-radius:13px;padding:12px 14px;margin-bottom:10px;max-height:38vh;overflow:auto}.helper-live-text{margin:0;font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}.helper-live-step{margin:6px 0 0;font-size:12px;color:#6f7d75}.helper-live-error{margin:6px 0 0;font-size:13px;color:#a2452c}.helper-live-error button{margin-left:8px;font-size:12px}.composer-hint a{color:inherit}

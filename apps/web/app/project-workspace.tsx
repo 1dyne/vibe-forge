@@ -19,6 +19,7 @@ import { ResizeHandle, useWorkspaceLayout, layoutLimits } from "./workspace-layo
 import { useWorkspacePreferences } from "./workspace-preferences";
 import { IconBook, IconDesk, IconHammer, IconLaptop, IconLink, IconPencil, IconPeople, IconPerson, IconPrinter, IconTrash, IconUndo } from "./icons";
 import MessageText from "./message-text";
+import HelperComposer from "./helper-composer";
 
 type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean; projectLimit?: number; credit?: { remainingUsd: number; allowanceUsd: number } | null };
 const phaseNames = {brainstorm:"아이디어",circuit:"계획 · 회로",mockup:"계획 · 3D",handoff:"계획 · 작업 준비",workshop:"대장간"};
@@ -108,6 +109,12 @@ export default function ProjectWorkspace() {
     const added=workbenchItems(p).find(i=>i.kind!=="record"&&!before.some(old=>old.id===i.id&&old.content===i.content&&old.filename===i.filename));
     if(added)setWorkbench(p.id,true,added.id);
     setProjects(ps=>[p,...ps.filter(x=>x.id!==p.id)]);setSelectedId(p.id);expand(p.id);
+  }
+  // 도우미가 답을 끝내면 목록을 다시 읽는다. 프로젝트 없이 시작했다면 도우미가 방금 만든 것을 연다.
+  async function refreshAfterHelper(hadProject:boolean) {
+    const b=await fetch("/api/projects",{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);if(!b)return;
+    const known=new Set(projects.map(p=>p.id));setProjects(b.projects);
+    if(!hadProject){const created=(b.projects as LocalProject[]).find(p=>!known.has(p.id));if(created){setSelectedId(created.id);expand(created.id);}}
   }
   async function request(url:string,body:unknown,label:string) {
     if(busy)return;setBusy(label);setError("");
@@ -222,7 +229,7 @@ export default function ProjectWorkspace() {
       </div>
       <ResizeHandle className="composer-resizer" controls="composer-area" label="대화 입력 영역 높이 조절" axis="y" reverse value={layout.sizes.composer} min={layoutLimits.composer[0]} max={layoutLimits.composer[1]} onResize={v=>resize("composer",v)} onReset={()=>resize("composer",160)}/>
       <footer className="composer-area" data-tour="composer" id="composer-area">{error&&<div role="alert" className="error-banner">{error}<button onClick={()=>setError("")}>닫기</button></div>}{attachments.length>0&&<div className="attachment-previews">{attachments.map((a,i)=><div key={i}><img src={a.dataUrl} alt={a.name}/><button type="button" aria-label={a.name+" 첨부 제거"} onClick={()=>setAttachments(attachments.filter((_,j)=>j!==i))}>×</button></div>)}</div>}
-        {connectorOnly?<div className="connector-composer"><strong>대화는 연결한 AI에서 이어가요</strong><p>연결한 AI가 나눈 이야기와 설계를 이곳에 기록해요. 이 화면은 자동으로 새로고침되고, 회로·3D 승인과 구매·측정 기록은 여기서 직접 해요.</p></div>:<form className="composer" onSubmit={submit}><textarea value={text} aria-label={project?"채팅 메시지":"아이디어 입력"} placeholder={workshop?(channel==="main"?"달그락 팀":agentName(channel,preferences.shortNames))+"에게 이야기해주세요…":"머릿속 아이디어를 들려주세요. 이미지도 좋아요."} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!busy)void submit(e);}}} disabled={!!busy||loading}/><div className="composer-tools"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={e=>attach(e.target.files)}/><button type="button" aria-label="이미지 첨부" disabled={!!busy} onClick={()=>fileInput.current?.click()}>＋ <span>이미지 첨부</span></button><span className="composer-hint">{workshop?(mode==="evaluate"?"평가":"작업")+" · 팀 전체 기록 공유":"대장 달그락과 함께"}</span><button type="submit" className="send" aria-label="메시지 보내기" disabled={!!busy||loading||(!text.trim()&&!attachments.length)}>↑</button></div></form>}<p className="composer-footnote">{project?.origin==="connector"?"이 프로젝트의 대화와 설계는 Claude에서 만들어졌어요. 중요한 제작 결정은 직접 검토해주세요.":project?.lastAgentMode==="mock"?"Mock · 실제 AI 분석 없이 기록만 저장됩니다.":"AI 제안은 확인이 필요해요. 중요한 제작 결정은 함께 검토합니다."}</p>
+        {connectorOnly?<HelperComposer project={project} channel={workshop?channel:"main"} placeholder={workshop?(channel==="main"?"달그락 팀":agentName(channel,preferences.shortNames))+"에게 이야기해주세요…":"머릿속 아이디어를 들려주세요."} onProject={accept} onFinished={refreshAfterHelper}/>:<form className="composer" onSubmit={submit}><textarea value={text} aria-label={project?"채팅 메시지":"아이디어 입력"} placeholder={workshop?(channel==="main"?"달그락 팀":agentName(channel,preferences.shortNames))+"에게 이야기해주세요…":"머릿속 아이디어를 들려주세요. 이미지도 좋아요."} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!busy)void submit(e);}}} disabled={!!busy||loading}/><div className="composer-tools"><input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={e=>attach(e.target.files)}/><button type="button" aria-label="이미지 첨부" disabled={!!busy} onClick={()=>fileInput.current?.click()}>＋ <span>이미지 첨부</span></button><span className="composer-hint">{workshop?(mode==="evaluate"?"평가":"작업")+" · 팀 전체 기록 공유":"대장 달그락과 함께"}</span><button type="submit" className="send" aria-label="메시지 보내기" disabled={!!busy||loading||(!text.trim()&&!attachments.length)}>↑</button></div></form>}<p className="composer-footnote">{project?.origin==="connector"?"이 프로젝트의 대화와 설계는 연결한 AI가 만들었어요. 중요한 제작 결정은 직접 검토해주세요.":project?.lastAgentMode==="mock"?"Mock · 실제 AI 분석 없이 기록만 저장됩니다.":"AI 제안은 확인이 필요해요. 중요한 제작 결정은 함께 검토합니다."}</p>
       </footer>
     </section>
     {showArtifacts&&project&&<>

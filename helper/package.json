@@ -1,0 +1,11 @@
+{
+  "name": "dalgrak-helper",
+  "version": "0.1.0",
+  "description": "달그락 도우미: 내 컴퓨터에서 돌면서, 내 ChatGPT 요금제로 달그락 대장간 대화를 이어주는 작은 오픈소스 앱",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "dalgrak-helper": "bin/dalgrak-helper.mjs" },
+  "engines": { "node": ">=20" },
+  "files": ["bin", "src", "README.md", "LICENSE"],
+  "scripts": { "start": "node bin/dalgrak-helper.mjs start", "test": "node --test test/*.test.mjs" }
+}
