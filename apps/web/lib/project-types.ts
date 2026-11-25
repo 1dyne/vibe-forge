@@ -90,6 +90,8 @@ export type LocalProject = {
   id: string;
   // 현황판: 작업 카드(누구 차례인지)와 화면 밖 현실의 상태. board.ts
   board?: import("./board").Board;
+  // 정밀 목업: 하우징 부위와 실측 부품을 실제 치수로 놓고 서버가 겹침·틈을 잰다. mockup.ts
+  preciseMockup?: import("./mockup").MockupSpec;
   // Invited user who owns the project; absent for the operator's own projects.
   ownerId?: string;
   // Where the conversation happens: the in-app agents or the owner's own Claude.

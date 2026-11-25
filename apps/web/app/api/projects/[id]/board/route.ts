@@ -5,7 +5,7 @@ import { getProject, mutateProject } from "../../../../../lib/local-project-stor
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, getViewer, notFound, unauthorized, withViewerVault } from "../../../../../lib/viewer";
 
-// 현황판에서 사람이 직접 하는 일. 달그락은 MCP 도구로, 사람은 여기로 온다.
+// 작업대에서 사람이 직접 하는 일. 달그락은 MCP 도구로, 사람은 여기로 온다.
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable();
 const Body = z.discriminatedUnion("action", [
   // 사람이 자기 차례인 카드에 답했다 → 달그락 차례로 돌아간다

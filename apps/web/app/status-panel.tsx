@@ -14,15 +14,17 @@ const TURN: Record<CardTurn, string> = { agent: "달그락 작업 중", person: 
 const DELIVERY = { ordered: "주문함", delayed: "지연", arrived: "도착", problem: "문제" } as const;
 const day = (iso: string) => iso.slice(5, 10).replace("-", "/");
 
-export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onClose }: {
-  /** status = 현황판, files = 파일 모아보기 */
+export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onProjectSettings, onDevConnect, onClose }: {
+  /** status = 작업대, files = 파일 모아보기 */
   mode: "status" | "files";
   project: LocalProject; board: BoardView; items: WorkbenchItem[]; newMarks: string[]; shortNames: boolean; busy: boolean;
   onRoom: (room: AgentId) => void;
   onOpenItem: (id: string) => void;
   onAction: (input: Record<string, unknown>) => void;
-  /** 현황판에서 사람이 직접 하는 일(지금 하는 일 적기 등) */
+  /** 작업대에서 사람이 직접 하는 일(지금 하는 일 적기 등) */
   onBoard: (body: Record<string, unknown>) => Promise<void>;
+  onProjectSettings: () => void;
+  onDevConnect: () => void;
   onClose: () => void;
 }) {
   const [now, setNow] = useState(board.real.now?.text ?? "");
@@ -38,8 +40,8 @@ export default function StatusPanel({ mode, project, board, items, newMarks, sho
   </aside>;
 
   // 글을 줄인다: 비어 있는 칸은 아예 보이지 않고, 자세한 목록은 접어 둔다.
-  return <aside className="artifact-panel status-panel" id="workbench-panel" data-tour="workbench" aria-label="현황판">
-    <header className="artifact-header"><div><h2>현황판</h2></div><div className="workbench-header-actions"><button className="icon-button" onClick={onClose} aria-label="현황판 접기">×</button></div></header>
+  return <aside className="artifact-panel status-panel" id="workbench-panel" data-tour="workbench" aria-label="작업대">
+    <header className="artifact-header"><div><h2>작업대</h2></div><div className="workbench-header-actions"><details className="gear-menu"><summary aria-label="이 프로젝트의 설정" title="이 프로젝트의 설정">⚙</summary><div><button onClick={onProjectSettings}>프로젝트 설정<small>목적 · 기한 · 예산</small></button><button onClick={onDevConnect}>앱·코드 만들기 연결<small>쓰는 도구와 명세서</small></button></div></details><button className="icon-button" onClick={onClose} aria-label="작업대 접기">×</button></div></header>
     <div className="status-scroll">
       {board.nextForPerson && <section className="status-block">
         <h3>지금 할 일</h3>

@@ -1,11 +1,11 @@
 import type { AgentId, LocalProject } from "./project-types";
 
-// 현황판: 프로젝트의 일이 지금 누구 차례인지, 그리고 화면 밖 현실에서 무슨 일이
+// 작업대: 프로젝트의 일이 지금 누구 차례인지, 그리고 화면 밖 현실에서 무슨 일이
 // 벌어지고 있는지를 한곳에 둔다.
 //
-// 대화는 방마다 따로 흐르지만 현황판은 하나다. 어느 방의 달그락이든 이것을 읽고
+// 대화는 대장간마다 따로 흐르지만 작업대는 하나다. 어느 대장간의 달그락이든 이것을 읽고
 // 답하므로, HW 달그락도 "ME가 뚜껑 치수를 기다리는 중"과 "로드셀이 금요일에 온다"를
-// 안다. 사람에게는 여기서 계산한 "지금 할 일 하나"와 방마다의 알림 수가 나간다.
+// 안다. 사람에게는 여기서 계산한 "지금 할 일 하나"와 대장간마다의 알림 수가 나간다.
 //
 // 좌표가 아니라 차례를 저장한다: 누가 다음에 움직여야 하는가.
 
@@ -65,7 +65,7 @@ export type BoardView = {
   cards: Array<WorkCard & { /** 앞 카드가 안 끝나 아직 시작할 수 없다 */ heldBy: string[]; /** 지금 움직일 수 있는 카드인가 */ active: boolean; overdue: boolean }>;
   /** 사람이 지금 할 일 하나. 없으면 null */
   nextForPerson: { cardId: string; room: AgentId; title: string; ask: string } | null;
-  /** 방마다 사람 차례인 카드 수 (알림 점) */
+  /** 대장간마다 사람 차례인 카드 수 (알림 점) */
   rooms: Array<{ room: AgentId; myTurn: number; working: number; waiting: number; blocked: number; done: number; total: number }>;
   /** 예정일이 지난 기다림. 달그락이 다음 대화에서 먼저 물어야 한다 */
   overdue: Array<{ kind: "card" | "delivery"; label: string; expectedAt: string; daysLate: number }>;
@@ -101,9 +101,9 @@ export function viewBoard(board: Board, now = Date.now()): BoardView {
   const done = cards.filter((card) => card.turn === "done").length;
 
   const lines: string[] = [];
-  if (!cards.length) lines.push("현황판에 작업 카드가 아직 없어요.");
+  if (!cards.length) lines.push("작업대에 작업 카드가 아직 없어요.");
   else lines.push(`작업 카드 ${cards.length}개 중 ${done}개 완료.`);
-  if (first) lines.push(`사람이 지금 할 일: [${first.owner.toUpperCase()} 방] ${first.title} — ${first.ask ?? "확인 필요"}${mine.length > 1 ? ` (그 뒤로 ${mine.length - 1}개 더)` : ""}`);
+  if (first) lines.push(`사람이 지금 할 일: [${first.owner.toUpperCase()} 대장간] ${first.title} — ${first.ask ?? "확인 필요"}${mine.length > 1 ? ` (그 뒤로 ${mine.length - 1}개 더)` : ""}`);
   for (const card of cards.filter((c) => c.turn === "waiting")) lines.push(`현실 대기: ${card.title} — ${card.waiting?.what ?? "기다리는 중"}${card.waiting?.expectedAt ? ` (예정 ${card.waiting.expectedAt})` : " (예정일 모름)"}`);
   for (const card of cards.filter((c) => c.turn === "blocked")) lines.push(`막힘: ${card.title} — ${card.note ?? "이유 미기록"}`);
   for (const d of board.real.deliveries.filter((x) => x.status !== "arrived")) lines.push(`배송: ${d.label} ${{ ordered: "주문함", delayed: "지연", problem: "문제" }[d.status as "ordered" | "delayed" | "problem"]}${d.expectedAt ? ` · 도착 예정 ${d.expectedAt}` : ""}${d.note ? ` · ${d.note}` : ""}`);

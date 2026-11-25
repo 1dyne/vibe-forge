@@ -113,7 +113,7 @@ describe("도우미 대화 경로", () => {
     // 현실 기록은 회로가 없어도 된다
     const real = await call("record_real_world", { delivery: { label: "5kg 로드셀", status: "ordered", expectedAt: "2026-11-27" }, now: "책상 정리 중" });
     expect(real.isError).toBeFalsy();
-    expect(real.content[0].text).toContain("[현황판]");
+    expect(real.content[0].text).toContain("[작업대]");
     expect(real.content[0].text).toContain("배송: 5kg 로드셀 주문함 · 도착 예정 2026-11-27");
     expect(real.structuredContent.board.real.now.text).toBe("책상 정리 중");
     // 사람이 화면에서 배송이 밀렸다고 고친다
@@ -122,7 +122,7 @@ describe("도우미 대화 경로", () => {
     expect(moved.board.real.deliveries[0]).toMatchObject({ status: "delayed", expectedAt: "2026-12-01" });
     const seen = await (await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(a.linkToken) }), params)).json();
     expect(seen.board.real.events.at(-1).text).toContain("2026-11-27 → 2026-12-01");
-    // 남의 현황판은 볼 수 없다
+    // 남의 작업대는 볼 수 없다
     const b = await person("바");
     expect((await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(b.linkToken) }), params)).status).toBe(404);
   });

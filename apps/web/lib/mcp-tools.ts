@@ -16,6 +16,7 @@ import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
 import { checkProductForm, footprint, placementReadback } from "./form-check";
 import { BoardError, boardOf, moveCard, recordReal, upsertCards, viewBoard } from "./board";
+import { checkMockup, mockupBrief, type MockupSpec } from "./mockup";
 import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
@@ -235,15 +236,26 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 3. write_dev_spec으로 SPEC.md·CLAUDE.md·AGENTS.md를 만들고, 대시보드 "💻 개발 연결"의 설치·연결 순서를 따라가게 한다.
 4. 구현은 Claude Code나 Codex에서 하고, 그쪽 Claude는 log_dev_progress로 진행을 남긴다.
 
-## 현황판: 누구 차례인지와 현실의 상태 (set_work_board · update_work_card · record_real_world)
-달그락들은 방마다 따로 대화하지만 현황판은 하나다. 모든 방의 달그락이 get_project의 board를 읽고 답한다. 사람은 '지금 할 일' 하나와 방마다의 알림을 따라간다.
+## 정밀 목업 (set_precise_mockup): 출력 전에 숫자로 맞춰 본다
+완성품 미리보기는 모양에 동의를 받는 그림이고, 정밀 목업은 "출력해도 맞는가"를 재는 것이다. 하우징을 정하는 ME 달그락은 출력 파일을 말하기 전에 반드시 정밀 목업을 만들고 검사를 전부 통과시킨다.
+- 하우징은 부위별로 나눈다: 몸통은 hollowBox(바깥 크기·벽·바닥 두께), 뚜껑·받침대·기둥·멈춤턱은 box. 통짜 상자 하나로 넣으면 안에 든 부품이 전부 겹친 것으로 나온다.
+- 실물 부품은 한 덩어리가 아니라 생긴 대로 넣는다: 보드, 그 위의 단자, 아래로 나온 헤더·납땜 돌기, 옆으로 나오는 전선. 치수의 근거(basis)를 적고, 사용자가 잰 값을 우선한다.
+- 단자나 전선이 벽을 지나가야 하면 hollowBox의 openings로 그 벽에 구멍을 낸다(위치·폭·높이). 구멍이 단자보다 작거나 어긋나 있으면 겹침으로 잡힌다. 이것이 'USB가 바로 꽂히는가'를 재는 방법이다.
+- 꽂거나 누를 때 비워 둬야 하는 자리는 keepout으로 넣는다(USB 플러그 몸통, 버튼 누르는 길, 나사 드라이버 길). 여기에 벽이나 다른 부품이 들어오면 검사가 잡는다.
+- 설계 의도를 rules로 적는다: 떠 있어야 하는 판은 gap(예: 저울판과 몸통 2mm), 얹혀야 하는 것은 touch, 벽 안에 있어야 하는 것은 inside.
+- 일부러 끼워지는 쌍(헤더와 소켓, 나사와 나사 구멍)만 mates에 적는다. 겹침을 없애려고 mates를 남용하지 않는다.
+- 결과의 실패 목록을 읽고 위치·치수를 고쳐 다시 저장한다. 전부 통과한 뒤에 사람에게 보여주고, 사람이 실물로 확인할 것(끼움 공차, 케이블이 휘는 자리)을 작업 카드로 넘긴다.
+- 출력한 뒤 안 맞은 곳을 사람이 알려주면(사진·실측) 그 치수로 목업을 고쳐 다시 검사한다. 하우징은 출력 뒤에 조율되는 것이 정상이다.
+
+## 작업대: 누구 차례인지와 현실의 상태 (set_work_board · update_work_card · record_real_world)
+달그락들은 저마다의 대장간에서 따로 대화하지만 작업대는 하나다. 모든 대장간의 달그락이 get_project의 board를 읽고 답한다. 사람은 '내 공방'에 모인 알림과 '지금 할 일' 하나를 따라간다. 화면에서 달그락의 자리는 '대장간', 진행을 보는 곳은 '작업대', 내가 확인할 것을 모아 보는 곳은 '내 공방'이라고 부른다.
 - 대장은 설계도(set_build_plan)와 팀(set_team)이 정해지면 set_work_board로 일을 작업 카드로 나눠 담당 달그락에게 맡긴다. 카드는 사람이 알아볼 이름으로, 먼저 끝나야 하는 카드는 dependsOn으로 잇는다.
 - 일을 사람에게 넘길 때는 반드시 update_work_card로 turn=person과 ask를 적는다. ask에는 도구·위치·단위까지 구체적으로 쓴다. 이걸 하지 않으면 사람에게 알림이 가지 않아 자기 차례인지 모른다.
 - 사람이 답하면 그 카드를 turn=agent로 되돌리고 이어서 작업한다. 사람의 확인을 기다리는 카드는 달그락이 혼자 done으로 바꿀 수 없다.
 - 배송·출력·예약·굳는 시간처럼 현실을 기다려야 하면 turn=waiting과 예정일을 적는다. 기다리는 동안 재촉하지 않고, board.canDoMeanwhile에 있는 일을 먼저 하자고 제안한다.
 - 사용자가 "주문했어", "금요일에 온대", "배송이 밀렸어", "지금 납땜하는 중이야", "이번 주는 수요일만 돼"라고 말하면 record_real_world로 남긴다. 말하지 않은 날짜를 지어내지 않는다.
 - board.overdue에 예정일이 지난 것이 있으면 다음 대화에서 먼저 묻는다("로드셀 도착했나요?"). 일정이 밀려 기한(timelineWeeks)이 위험해지면 숫자로 알리고 순서를 다시 제안한다.
-- 다른 방의 카드는 그 담당 달그락의 일이다. 내 방의 카드만 바꾸고, 다른 방에 영향이 있으면 대장에게 알린다(log_team_turn의 sharedSummary).
+- 다른 대장간의 카드는 그 담당 달그락의 일이다. 내 카드만 바꾸고, 다른 대장간에 영향이 있으면 대장에게 알린다(log_team_turn의 sharedSummary).
 
 ## 사람이 하는 일과 기본 원칙
 - 승인 세 가지, 부품 구매, 납땜, 측정, 업로드는 사람이 한다. 사용자가 말해준 결과는 record_task_result, set_purchase_status로 기록한다. 결과 제출은 합격이 아니다.
@@ -350,6 +362,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     board: viewBoard(boardOf(project)),
+    preciseMockup: project.preciseMockup ? { spec: project.preciseMockup, report: (({ checks, ...rest }) => ({ ...rest, checks: checks.filter((c) => !c.pass) }))(checkMockup(project.preciseMockup)) } : null,
     productForm: project.productForm ?? null,
     productFormFindings: project.productForm ? checkProductForm(project.productForm) : [],
     housing: project.housing ?? null,
@@ -399,7 +412,7 @@ function summarize(project: LocalProject, context: ToolContext) {
 const checklistUrl = (project: LocalProject, context: ToolContext) => withLinkParams(context.dashboardUrl, { p: project.id, open: "profile" });
 
 const stored = (project: LocalProject, context: ToolContext, message: string): ToolResult => ({
-  text: `${message}\n다음: ${PHASE_NEXT[workflowFor(project).phase]}${boardOf(project).cards.length || boardOf(project).real.deliveries.length ? `\n\n[현황판]\n${viewBoard(boardOf(project)).brief}` : ""}\n대시보드: ${context.dashboardUrl}`,
+  text: `${message}\n다음: ${PHASE_NEXT[workflowFor(project).phase]}${boardOf(project).cards.length || boardOf(project).real.deliveries.length ? `\n\n[작업대]\n${viewBoard(boardOf(project)).brief}` : ""}\n대시보드: ${context.dashboardUrl}`,
   data: summarize(project, context)
 });
 
@@ -798,13 +811,13 @@ export const TOOLS: ToolDefinition[] = [
     }
   }
   ,{
-    name: "set_work_board", title: "현황판에 작업 카드 정하기",
-    description: "대장이 설계와 팀 배치를 마친 뒤, 해야 할 일을 작업 카드로 나눠 담당 달그락에게 맡긴다. 카드마다 담당(owner: chief·hw·sw·me·id), 먼저 끝나야 하는 카드(dependsOn)를 정한다. 이미 있는 id를 다시 보내면 내용만 고치고 진행 상태는 지킨다. 사람은 대시보드에서 방마다 알림을 보고 '지금 할 일'을 따라간다.",
+    name: "set_work_board", title: "작업대에 작업 카드 정하기",
+    description: "대장이 설계와 팀 배치를 마친 뒤, 해야 할 일을 작업 카드로 나눠 담당 달그락에게 맡긴다. 카드마다 담당(owner: chief·hw·sw·me·id), 먼저 끝나야 하는 카드(dependsOn)를 정한다. 이미 있는 id를 다시 보내면 내용만 고치고 진행 상태는 지킨다. 사람은 '내 공방'과 대장간마다의 알림을 보고 따라간다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "cards"], properties: { projectId, cards: { type: "array", minItems: 1, maxItems: 30, items: { type: "object", additionalProperties: false, required: ["id", "title", "detail", "owner"], properties: {
       id: { type: "string", description: "짧은 영문 id (예: circuit-1, housing-lid). 다시 보낼 때 같은 id를 쓴다" },
       title: { type: "string", description: "사람이 알아볼 이름 (예: 하우징 뚜껑)" },
       detail: { type: "string", description: "무엇을 만들거나 정하는 카드인지 한두 문장" },
-      owner: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "담당 달그락. 이 카드의 대화는 그 방에서 한다" },
+      owner: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "담당 달그락. 이 카드의 대화는 그 달그락의 대장간에서 한다" },
       dependsOn: { type: "array", items: { type: "string" }, description: "먼저 끝나야 하는 카드 id" },
       turn: { type: "string", enum: ["agent", "person"], description: "새 카드의 첫 차례. 기본은 agent(달그락이 먼저 작업)" },
       ask: { type: "string", description: "첫 차례가 person일 때, 사람에게 무엇을 해 달라는지" }
@@ -817,11 +830,11 @@ export const TOOLS: ToolDefinition[] = [
         const w = workflowFor(p);
         p.board = upsertCards(boardOf(p), parsed.cards as Parameters<typeof upsertCards>[1], w.activeAgents, "chief");
         const rooms = [...new Set(parsed.cards.map((c) => c.owner))].map((a) => a.toUpperCase()).join(" · ");
-        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `현황판: 작업 카드 ${parsed.cards.length}개를 ${rooms} 방에 나눴어요.`, createdAt: new Date().toISOString() });
+        w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `작업대: 작업 카드 ${parsed.cards.length}개를 ${rooms} 방에 나눴어요.`, createdAt: new Date().toISOString() });
         p.workflow = w;
         pushActivity(p, { source: "claude", title: "작업 카드 배치" });
       });
-      return stored(updated, context, "작업 카드를 현황판에 올렸어요. 사람에게는 '지금 할 일' 하나와 방마다의 알림으로 보여요.");
+      return stored(updated, context, "작업 카드를 작업대에 올렸어요. 사람에게는 '내 공방'과 대장간마다의 알림으로 보여요.");
     }
   },
   {
@@ -840,7 +853,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "record_real_world", title: "현실에서 벌어진 일 기록",
-    description: "화면 밖 현실의 상태를 현황판에 남긴다. 사용자가 말해준 것만 기록한다: 부품 주문·도착 예정일·지연·도착(delivery), 지금 손으로 하고 있는 일(now, 예: 납땜 3단계 하는 중), 쓸 수 있는 시간 같은 여건(availability), 그 밖의 사건(event, 예: 프린터 노즐 막힘). 모든 방의 달그락이 이것을 보고 순서를 다시 잡는다. 회로가 아직 없어도 부품 이름으로 배송을 기록할 수 있다.",
+    description: "화면 밖 현실의 상태를 작업대에 남긴다. 사용자가 말해준 것만 기록한다: 부품 주문·도착 예정일·지연·도착(delivery), 지금 손으로 하고 있는 일(now, 예: 납땜 3단계 하는 중), 쓸 수 있는 시간 같은 여건(availability), 그 밖의 사건(event, 예: 프린터 노즐 막힘). 모든 대장간의 달그락이 이것을 보고 순서를 다시 잡는다. 회로가 아직 없어도 부품 이름으로 배송을 기록할 수 있다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId"], properties: { projectId,
       delivery: { type: "object", additionalProperties: false, required: ["label", "status"], properties: { label: { type: "string", description: "부품 이름 (예: 5kg 로드셀)" }, ref: { type: "string", description: "회로 부품 ref가 있으면 (예: U2)" }, status: { type: "string", enum: ["ordered", "delayed", "arrived", "problem"] }, expectedAt: { type: ["string", "null"], description: "도착 예정일 YYYY-MM-DD. 모르면 null" }, note: { type: "string" } } },
       now: { type: ["string", "null"], description: "사람이 지금 하고 있는 일. 끝났으면 null" },
@@ -852,11 +865,77 @@ export const TOOLS: ToolDefinition[] = [
       await ownedProject(parsed.projectId, context);
       const updated = await mutateProject(parsed.projectId, (p) => {
         p.board = recordReal(boardOf(p), parsed as Parameters<typeof recordReal>[1]);
-        // 회로 부품이면 기존 구매 상태도 함께 맞춘다. 부품목록과 현황판이 서로 다른 말을 하지 않게.
+        // 회로 부품이면 기존 구매 상태도 함께 맞춘다. 부품목록과 작업대가 서로 다른 말을 하지 않게.
         const d = parsed.delivery;
         if (d?.ref && p.build?.blueprint.components.some((c) => c.ref === d.ref)) { const w = workflowFor(p); w.purchases[d.ref] = d.status === "arrived" ? "received" : d.status === "problem" ? "problem" : "ordered"; p.workflow = w; }
       });
-      return stored(updated, context, "현실의 상태를 현황판에 남겼어요.");
+      return stored(updated, context, "현실의 상태를 작업대에 남겼어요.");
+    }
+  }
+  ,{
+    name: "set_precise_mockup", title: "정밀 목업 (실측 부품과 하우징을 실제 치수로)",
+    description: "하우징 부위와 실물 부품을 실제 치수의 도형으로 놓으면 서버가 모든 쌍의 겹침과, 선언한 틈·포함·맞닿음 규칙을 재서 '검사 N / M 통과'로 돌려준다. 사람은 대시보드에서 돌려 보고, 부품을 켜고 끄고, 분해·투명도로 속을 확인한다. 하우징은 통짜 상자로 넣지 말고 부위별로 나눈다(몸통은 hollowBox, 뚜껑·받침·기둥은 box). 실물 부품은 한 덩어리 상자가 아니라 보드+단자+헤더처럼 여러 도형으로 넣는다. 꽂거나 누를 때 비워 둬야 하는 공간(USB 플러그, 손가락)은 group=keepout으로 넣는다. 실패한 검사가 있으면 사람에게 보여주기 전에 고쳐서 다시 저장한다. 좌표(mm): x 왼쪽(-)→오른쪽(+), y 뒤(-)→앞(+), z 바닥 높이. at은 바닥 중심.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "mockup"], properties: { projectId, mockup: { type: "object", additionalProperties: false, required: ["title", "summary", "parts"], properties: {
+      title: { type: "string" }, summary: { type: "string", description: "무엇을 어떻게 배치했는지, 아직 추정인 것은 무엇인지 두세 문장" },
+      parts: { type: "array", minItems: 1, maxItems: 40, items: { type: "object", additionalProperties: false, required: ["id", "name", "group", "basis", "solids"], properties: {
+        id: { type: "string", description: "짧은 영문 id (예: body, lid, atom, hx711, loadcell)" }, name: { type: "string", description: "사람이 알아볼 이름 (예: 몸통, AtomS3)" },
+        group: { type: "string", enum: ["housing", "measured", "keepout"], description: "housing=만들 하우징 부위, measured=실물 부품, keepout=비워 둘 자리" },
+        basis: { type: "string", enum: ["measured", "datasheet", "assumed", "design"], description: "치수의 근거. 사용자가 잰 값 measured, 공식 도면 datasheet, 추정 assumed, 하우징처럼 내가 정하는 값 design" },
+        color: { type: "string", description: "#RRGGBB (선택)" }, note: { type: "string" },
+        explode: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "분해해서 볼 때 움직일 방향과 거리 [x,y,z] mm (선택)" },
+        solids: { type: "array", minItems: 1, maxItems: 12, items: { type: "object", additionalProperties: false, required: ["shape", "at"], properties: {
+          shape: { type: "string", enum: ["box", "hollowBox", "cylinder"] },
+          at: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "바닥 중심 [x,y,z]. 누운 원기둥(axis x·y)은 중심" },
+          size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "box·hollowBox: [x,y,z] mm" },
+          rotate: { type: "integer", enum: [0, 90, 180, 270], description: "box를 위에서 볼 때 회전" },
+          wall: { type: "number", description: "hollowBox 벽 두께" }, floor: { type: "number", description: "hollowBox 바닥 두께" },
+          openings: { type: "array", maxItems: 8, description: "hollowBox 벽에 뚫는 구멍 (USB 단자 자리, 전선 구멍). 단자가 벽을 지나가야 하면 여기에 구멍을 내야 겹침으로 잡히지 않는다", items: { type: "object", additionalProperties: false, required: ["wall", "offset", "bottom", "width", "height"], properties: { wall: { type: "string", enum: ["front", "back", "left", "right"] }, offset: { type: "number", description: "벽 가운데에서 옆으로 떨어진 거리 mm (front·back은 x, left·right는 y)" }, bottom: { type: "number", description: "상자 바닥에서 구멍 아랫변까지 mm" }, width: { type: "number" }, height: { type: "number" } } } },
+          diameter: { type: "number", description: "cylinder 지름" }, length: { type: "number", description: "cylinder 길이(높이)" }, axis: { type: "string", enum: ["x", "y", "z"], description: "cylinder 방향. z=서 있음(기본)" }
+        } } }
+      } } },
+      mates: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: { type: "string" } }, description: "일부러 서로 끼워지는 부품 쌍의 id (헤더 핀과 소켓, 나사와 나사 구멍). 겹침 검사에서 뺀다" },
+      rules: { type: "array", maxItems: 40, items: { type: "object", additionalProperties: false, required: ["kind", "title", "a", "b"], properties: {
+        kind: { type: "string", enum: ["gap", "inside", "touch"], description: "gap=두 부품 사이 틈, inside=a가 b 범위 안, touch=맞닿음" },
+        title: { type: "string", description: "사람이 알아볼 검사 이름 (예: 저울판과 몸통 사이 2mm 틈)" }, a: { type: "string" }, b: { type: "string" },
+        axis: { type: "string", enum: ["x", "y", "z"], description: "gap: 틈을 재는 방향" }, min: { type: "number", description: "gap: 최소 틈 mm" }, max: { type: "number", description: "gap: 최대 틈 mm (선택)" },
+        margin: { type: "number", description: "inside: 안쪽 여유 mm (선택)" }, tolerance: { type: "number", description: "touch: 허용 오차 mm (기본 0.2)" }
+      } } }
+    } } } },
+    run: async (input, context) => {
+      const N = z.number().min(-500).max(500); const P = z.number().min(0.05).max(500);
+      const V3 = z.tuple([N, N, N]);
+      const Solid = z.discriminatedUnion("shape", [
+        z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(),
+        z.object({ shape: z.literal("hollowBox"), size: z.tuple([P, P, P]), at: V3, wall: P, floor: P, openings: z.array(z.object({ wall: z.enum(["front", "back", "left", "right"]), offset: N, bottom: z.number().min(0).max(500), width: P, height: P }).strict()).max(8).optional() }).strict(),
+        z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()
+      ]);
+      const Rule = z.discriminatedUnion("kind", [
+        z.object({ kind: z.literal("gap"), title: z.string().min(1).max(80), a: z.string().max(24), b: z.string().max(24), axis: z.enum(["x", "y", "z"]), min: z.number().min(0).max(200), max: z.number().min(0).max(200).optional() }).strict(),
+        z.object({ kind: z.literal("inside"), title: z.string().min(1).max(80), a: z.string().max(24), b: z.string().max(24), margin: z.number().min(0).max(50).optional() }).strict(),
+        z.object({ kind: z.literal("touch"), title: z.string().min(1).max(80), a: z.string().max(24), b: z.string().max(24), tolerance: z.number().min(0).max(5).optional() }).strict()
+      ]);
+      const parsed = z.object({ projectId: z.string().uuid(), mockup: z.object({
+        title: z.string().min(1).max(80), summary: z.string().min(1).max(800),
+        parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12) }).strict()).min(1).max(40),
+        mates: z.array(z.tuple([z.string().max(24), z.string().max(24)])).max(40).optional(),
+        rules: z.array(Rule).max(40).optional()
+      }).strict() }).strict().parse(input);
+      const spec = parsed.mockup as MockupSpec;
+      const ids = spec.parts.map((p) => p.id);
+      if (new Set(ids).size !== ids.length) throw new ToolError("부품 id가 겹쳐요. 부품마다 다른 id를 써주세요.");
+      for (const s of spec.parts.flatMap((p) => p.solids)) if (s.shape === "hollowBox" && (s.wall * 2 >= Math.min(s.size[0], s.size[1]) || s.floor >= s.size[2])) throw new ToolError("hollowBox의 벽·바닥 두께가 바깥 크기보다 커요.");
+      const unknown = [...(spec.mates ?? []).flat(), ...(spec.rules ?? []).flatMap((r) => [r.a, r.b])].filter((id) => !ids.includes(id));
+      if (unknown.length) throw new ToolError(`mates·rules에 없는 부품 id가 있어요: ${[...new Set(unknown)].join(", ")}`);
+      await ownedProject(parsed.projectId, context);
+      const report = checkMockup(spec);
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        p.preciseMockup = { ...spec, updatedAt: new Date().toISOString() };
+        const w = workflowFor(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: "me", text: `정밀 목업 「${spec.title}」: 검사 ${report.passed}/${report.total} 통과${report.failed.length ? ` · 고칠 것 ${report.failed.length}개` : ""}`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+        pushActivity(p, { source: "claude", title: "정밀 목업" });
+      });
+      return stored(updated, context, `정밀 목업을 저장했어요.\n${mockupBrief(spec, report)}\n\n${report.failed.length ? "실패한 검사를 고쳐 다시 저장한 뒤에 사람에게 보여주세요." : "사람에게 작업대의 '정밀 목업'에서 돌려 보고, 투명도와 분해로 속을 확인해 달라고 하세요."}`);
     }
   }
 ];

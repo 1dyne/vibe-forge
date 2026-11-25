@@ -10,7 +10,7 @@ export type WorkbenchItem = {
   /** 탭에 보일 짧은 이름. 파일명은 내려받을 때 프로젝트를 알아볼 수 있게 길지만,
       화면의 탭 줄에서는 프로젝트 이름이 탭마다 되풀이돼 정작 무슨 파일인지가 잘린다. */
   label: string;
-  kind: "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
+  kind: "mockup" | "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
 };
@@ -53,6 +53,7 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
   // label은 마지막에 한 번에 붙인다(파일명에서 깎아낸다).
   type Draft = Omit<WorkbenchItem, "label">;
   const items: Draft[] = [];
+  if (project.preciseMockup) items.push({ id: "document:mockup", filename: `${stem}-정밀목업.json`, kind: "mockup", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.preciseMockup, null, 2) });
   if (project.productForm) items.push({ id: "document:product", filename: `${stem}-완성품.json`, kind: "product", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.productForm, null, 2) });
   if (project.assembly) {
     const g = project.assembly;
