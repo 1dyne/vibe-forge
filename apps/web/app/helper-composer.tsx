@@ -16,11 +16,13 @@ export const HELPER_REPO_URL = "https://github.com/1dyne/dalgrak-helper";
 export const HELPER_COMMAND = "npx github:1dyne/dalgrak-helper";
 const MODEL_KEY = "forge-helper-model";
 
-export default function HelperComposer({ project, channel, placeholder, suggestion, onProject, onLive, onTurnEnd }: {
+export default function HelperComposer({ project, channel, speaker, placeholder, suggestion, onProject, onLive, onTurnEnd }: {
+  /** 지금 이 방에서 답하는 달그락의 이름 (예: 대장 달그락) */
+  speaker: string;
   project: LocalProject | null;
   channel: string;
   placeholder: string;
-  /** 다음에 할 법한 말. 입력창이 비어 있을 때 칩으로 보이고, 누르면 채워진다 */
+  /** 다음에 할 법한 말. 입력창이 비어 있을 때 흐린 글자로 보이고, 입력창을 한 번 누르면 그대로 채워진다 */
   suggestion?: string | null;
   /** 내가 보낸 말이 기록된 프로젝트를 바로 반영한다 */
   onProject: (project: LocalProject) => void;
@@ -84,7 +86,7 @@ export default function HelperComposer({ project, channel, placeholder, suggesti
     if (!message || busy) return;
     const hadProject = !!project;
     setBusy(true); setError(null);
-    onLive({ user: message, text: "", step: "달그락 도우미에게 전하는 중" });
+    onLive({ user: message, text: "", step: `${speaker}에게 전하는 중` });
     try {
       const response = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project?.id ?? null, text: message, channel, ...(chosen ? { model: chosen } : {}) }) });
       if (response.status === 401) { window.location.assign("/login"); return; }
@@ -114,9 +116,8 @@ export default function HelperComposer({ project, channel, placeholder, suggesti
   </div>;
   return <>
     {error && <p role="alert" className="helper-live-error">{error.message} {error.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>} <button type="button" onClick={() => setError(null)}>닫기</button></p>}
-    {suggestion && !text && !busy && <button type="button" className="suggest-chip" onClick={() => { setText(suggestion); box.current?.focus(); }}>{suggestion}</button>}
     <form className="composer helper-composer" onSubmit={submit}>
-      <textarea ref={box} rows={1} value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={busy ? "답하는 중이에요…" : placeholder} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
+      <textarea ref={box} rows={1} value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={busy ? `${speaker}이 답하는 중이에요…` : suggestion ?? placeholder} title={suggestion && !text ? "한 번 누르면 이 문장이 입력돼요" : undefined} onClick={() => { if (!text && suggestion && !busy) setText(suggestion); }} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
       <div className="composer-tools">
         <span className="composer-hint">ChatGPT 요금제 사용 중 · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>
         {models.length > 1

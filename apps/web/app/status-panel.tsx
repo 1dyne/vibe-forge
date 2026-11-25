@@ -14,7 +14,9 @@ const TURN: Record<CardTurn, string> = { agent: "달그락 작업 중", person: 
 const DELIVERY = { ordered: "주문함", delayed: "지연", arrived: "도착", problem: "문제" } as const;
 const day = (iso: string) => iso.slice(5, 10).replace("-", "/");
 
-export default function StatusPanel({ project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onClose }: {
+export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onClose }: {
+  /** status = 현황판, files = 파일 모아보기 */
+  mode: "status" | "files";
   project: LocalProject; board: BoardView; items: WorkbenchItem[]; newMarks: string[]; shortNames: boolean; busy: boolean;
   onRoom: (room: AgentId) => void;
   onOpenItem: (id: string) => void;
@@ -28,48 +30,48 @@ export default function StatusPanel({ project, board, items, newMarks, shortName
   const mine = board.cards.filter((card) => card.active && card.turn === "person");
   const open = board.cards.filter((card) => card.turn !== "done");
   const pending = board.real.deliveries.filter((d) => d.status !== "arrived");
+  const files = <ul className="status-list">{items.map((item) => <li key={item.id}><button onClick={() => onOpenItem(item.id)}>{item.label}{newMarks.includes(item.id) && <em className="new-dot" role="img" aria-label="새로 온 것" />}<small>{item.filename.split(".").pop()}</small></button></li>)}</ul>;
+
+  if (mode === "files") return <aside className="artifact-panel status-panel" id="workbench-panel" aria-label="파일">
+    <header className="artifact-header"><div><h2>파일 <span className="artifact-count">{items.length}</span></h2></div><div className="workbench-header-actions"><button className="icon-button" onClick={onClose} aria-label="닫기">×</button></div></header>
+    <div className="status-scroll">{items.length ? files : <p className="status-empty">아직 만들어진 파일이 없어요.</p>}</div>
+  </aside>;
+
+  // 글을 줄인다: 비어 있는 칸은 아예 보이지 않고, 자세한 목록은 접어 둔다.
   return <aside className="artifact-panel status-panel" id="workbench-panel" data-tour="workbench" aria-label="현황판">
     <header className="artifact-header"><div><h2>현황판</h2></div><div className="workbench-header-actions"><button className="icon-button" onClick={onClose} aria-label="현황판 접기">×</button></div></header>
     <div className="status-scroll">
-      <section className="status-block">
+      {board.nextForPerson && <section className="status-block">
         <h3>지금 할 일</h3>
-        {board.nextForPerson
-          ? <button className="next-card" onClick={() => onRoom(board.nextForPerson!.room)}><small>{agentName(board.nextForPerson.room, shortNames)} 방</small><strong>{board.nextForPerson.title}</strong><span>{board.nextForPerson.ask}</span><em>방으로 가기 →</em></button>
-          : <p className="status-empty">{board.cards.length ? (open.length ? "지금은 달그락들이 일하는 중이에요. 내 차례가 오면 여기에 떠요." : "모든 작업 카드가 끝났어요.") : "대장 달그락과 설계를 마치면, 달그락마다 방이 열리고 내가 할 일이 여기에 떠요."}</p>}
-        {mine.length > 1 && <ul className="status-list">{mine.slice(1).map((card) => <li key={card.id}><button onClick={() => onRoom(card.owner)}><span className={"agent-dot dot-" + card.owner} />{card.title}<small>{agentName(card.owner, shortNames)} 방</small></button></li>)}</ul>}
-      </section>
-
-      {board.rooms.length > 0 && <section className="status-block">
-        <h3>방 <small>{board.progress.done}/{board.progress.total} 완료</small></h3>
-        <ul className="status-list rooms-list">{board.rooms.map((room) => <li key={room.room}><button onClick={() => onRoom(room.room)}>
-          <span className={"agent-dot dot-" + room.room} />{agentName(room.room, shortNames)}
-          <small>{[room.working && `작업 ${room.working}`, room.waiting && `대기 ${room.waiting}`, room.blocked && `막힘 ${room.blocked}`, room.done && `완료 ${room.done}`].filter(Boolean).join(" · ") || "카드 없음"}</small>
-          {room.myTurn > 0 && <em className="turn-badge" aria-label={`내 차례 ${room.myTurn}개`}>{room.myTurn}</em>}
-        </button></li>)}</ul>
-        <ul className="card-list">{open.map((card) => <li key={card.id} className={"turn-" + card.turn + (card.active ? "" : " held")}>
-          <span className={"agent-dot dot-" + card.owner} /><b>{card.title}</b>
-          <small>{card.heldBy.length ? "앞 작업을 기다리는 중" : card.turn === "waiting" ? `${card.waiting?.what ?? "기다리는 중"}${card.waiting?.expectedAt ? ` · ${day(card.waiting.expectedAt)} 예정` : ""}${card.overdue ? " · 예정일 지남" : ""}` : card.turn === "blocked" ? `막힘 · ${card.note ?? ""}` : TURN[card.turn]}</small>
-        </li>)}</ul>
+        <button className="next-card" onClick={() => onRoom(board.nextForPerson!.room)}><small>{agentName(board.nextForPerson.room, shortNames)}</small><strong>{board.nextForPerson.title}</strong><span>{board.nextForPerson.ask}</span></button>
+        {mine.length > 1 && <ul className="status-list">{mine.slice(1).map((card) => <li key={card.id}><button onClick={() => onRoom(card.owner)}><span className={"agent-dot dot-" + card.owner} />{card.title}</button></li>)}</ul>}
       </section>}
 
-      <section className="status-block">
-        <h3>현실에서</h3>
+      {board.rooms.length > 0 && <section className="status-block">
+        <h3>달그락들 <small>{board.progress.done}/{board.progress.total}</small></h3>
+        <ul className="status-list rooms-list">{board.rooms.map((room) => { const state = room.myTurn ? "내 차례" : room.blocked ? "막힘" : room.working ? "작업 중" : room.waiting ? "기다리는 중" : "끝남"; return <li key={room.room}><button onClick={() => onRoom(room.room)}>
+          <span className={"agent-dot dot-" + room.room} />{agentName(room.room, shortNames)}<small>{state}</small>
+          {room.myTurn > 0 && <em className="turn-badge" aria-label={`내 차례 ${room.myTurn}개`}>{room.myTurn}</em>}
+        </button></li>; })}</ul>
+        {open.length > 0 && <details className="status-details"><summary>일 목록 {open.length}</summary><ul className="card-list">{open.map((card) => <li key={card.id} className={"turn-" + card.turn + (card.active ? "" : " held")}>
+          <span className={"agent-dot dot-" + card.owner} /><b>{card.title}</b>
+          <small>{card.heldBy.length ? "앞 일을 기다림" : card.turn === "waiting" ? `${card.waiting?.what ?? "기다림"}${card.waiting?.expectedAt ? ` · ${day(card.waiting.expectedAt)}` : ""}${card.overdue ? " · 예정일 지남" : ""}` : card.turn === "blocked" ? `막힘 · ${card.note ?? ""}` : TURN[card.turn]}</small>
+        </li>)}</ul></details>}
+      </section>}
+
+      {(pending.length > 0 || board.real.now || board.real.availability || board.cards.length > 0) && <section className="status-block">
+        <h3>기다리는 것</h3>
+        {pending.length > 0 && <ul className="card-list">{pending.map((d) => { const late = board.overdue.some((o) => o.kind === "delivery" && o.label === d.label); return <li key={d.label} className={late ? "turn-blocked" : "turn-waiting"}><b>{d.label}</b>
+          <button className="mini" disabled={busy} onClick={() => void onBoard({ action: "delivery", label: d.label, ...(d.ref ? { ref: d.ref } : {}), status: "arrived" })}>도착했어요</button>
+          <small>{DELIVERY[d.status]}{d.expectedAt ? ` · ${day(d.expectedAt)}` : ""}{late ? " · 예정일 지남" : ""}</small></li>; })}</ul>}
         {editingNow
           ? <form className="now-form" onSubmit={(e) => { e.preventDefault(); void onBoard({ action: "now", text: now.trim() || null }).then(() => setEditingNow(false)); }}><input autoFocus value={now} maxLength={200} placeholder="예: 납땜 3단계 하는 중" onChange={(e) => setNow(e.target.value)} /><button disabled={busy}>저장</button></form>
-          : <button className="now-line" onClick={() => { setNow(board.real.now?.text ?? ""); setEditingNow(true); }}>{board.real.now ? <>지금: <b>{board.real.now.text}</b></> : "지금 하고 있는 일 적어두기"}<small>달그락들이 보고 맞춰요</small></button>}
-        {board.real.availability && <p className="status-note">여건: {board.real.availability.text}</p>}
-        {pending.length > 0 && <ul className="card-list">{pending.map((d) => { const late = board.overdue.some((o) => o.kind === "delivery" && o.label === d.label); return <li key={d.label} className={late ? "turn-blocked" : "turn-waiting"}><b>{d.label}</b><small>{DELIVERY[d.status]}{d.expectedAt ? ` · ${day(d.expectedAt)} 도착 예정` : " · 도착일 모름"}{late ? " · 예정일 지남" : ""}{d.note ? ` · ${d.note}` : ""}</small>
-          <button className="mini" disabled={busy} onClick={() => void onBoard({ action: "delivery", label: d.label, ...(d.ref ? { ref: d.ref } : {}), status: "arrived" })}>도착했어요</button></li>; })}</ul>}
-        {!pending.length && !board.real.availability && <p className="status-empty">주문·배송·출력처럼 기다려야 하는 일은 달그락에게 말하면 여기에 남아요.</p>}
-      </section>
+          : <button className="now-line" onClick={() => { setNow(board.real.now?.text ?? ""); setEditingNow(true); }}>{board.real.now ? <>지금 <b>{board.real.now.text}</b></> : "지금 하는 일 적기"}</button>}
+      </section>}
 
-      <section className="status-block status-progress"><h3>진행 단계</h3><ProgressPanel project={project} onAction={onAction} busy={busy} /></section>
+      <section className="status-block"><details className="status-details" open={!board.cards.length}><summary>진행 단계</summary><div className="status-progress"><ProgressPanel project={project} onAction={onAction} busy={busy} /></div></details></section>
 
-      <section className="status-block">
-        <h3>결과물 <small>{items.length}</small></h3>
-        {items.length ? <ul className="status-list">{items.map((item) => <li key={item.id}><button onClick={() => onOpenItem(item.id)}>{item.label}{newMarks.includes(item.id) && <em className="new-dot" role="img" aria-label="새로 온 것" />}<small>{item.filename.split(".").pop()}</small></button></li>)}</ul>
-          : <p className="status-empty">설계도·회로·3D·문서가 만들어지면 여기에 쌓여요.</p>}
-      </section>
+      {items.length > 0 && <section className="status-block"><h3>파일 <small>{items.length}</small></h3>{files}</section>}
     </div>
   </aside>;
 }

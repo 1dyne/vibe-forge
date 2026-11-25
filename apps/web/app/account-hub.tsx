@@ -16,13 +16,15 @@ import OwnedPartsField from "./owned-parts-field";
 //
 // 여기 값은 어디서 채워지든 같은 자리다: 처음 들어올 때의 체크리스트, 대장 달그락이
 // 대화하다 물어서 적은 것, 내가 여기서 직접 고친 것.
-export type HubTab = "skill" | "gear" | "place" | "ai" | "account";
+export type HubTab = "skill" | "gear" | "place" | "ai" | "account" | "settings";
+export type HubSettings = { shortNames: boolean; onToggleShortNames: () => void; onTutorial: () => void; onProjectSettings: (() => void) | null; onDevConnect: (() => void) | null; projectName: string | null };
 const TABS: Array<{ id: HubTab; label: string; hint: string }> = [
   { id: "skill", label: "경험", hint: "설명을 얼마나 자세히 할지 정하는 데만 써요. 목표를 낮추지 않아요." },
   { id: "gear", label: "장비·부품", hint: "가진 것은 사라고 하지 않고, 없는 도구는 대신할 방법을 안내해요." },
   { id: "place", label: "만드는 곳", hint: "3D 프린터가 없어도 근처에서 쓸 수 있는 곳을 기준으로 설계해요." },
   { id: "ai", label: "AI 연결", hint: "달그락과의 대화에 어떤 AI를 쓸지 정해요." },
-  { id: "account", label: "로그인·보안", hint: "" }
+  { id: "account", label: "로그인·보안", hint: "" },
+  { id: "settings", label: "설정", hint: "" }
 ];
 const option = (key: "solderingSkill" | "printerAccess" | "travelRange") => CHECKLIST.find((q) => q.key === key)!;
 const EDITED: Array<keyof MakerProfile> = ["tools", "toolsConfirmed", "firmwareExperience", "solderingSkill", "printerAccess", "region", "travelRange", "ownedParts", "devProfile"];
@@ -66,7 +68,8 @@ function AiTab({ project }: { project: LocalProject | null }) {
   </>;
 }
 
-export default function AccountHub({ initialTab = "skill", project, hasAccount, onClose, onSaved }: {
+export default function AccountHub({ initialTab = "skill", project, hasAccount, settings, onClose, onSaved }: {
+  settings: HubSettings;
   initialTab?: HubTab;
   project: LocalProject | null;
   /** 참여자 계정이면 로그인·보안 탭이 있다. 운영자 로그인에는 없다 */
@@ -149,6 +152,19 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
 
       {tab === "ai" && <AiTab project={project} />}
       {tab === "account" && hasAccount && <AccountPanel embedded onClose={onClose} />}
+      {tab === "settings" && <>
+        {settings.projectName && <><h3 className="connect-subtitle">지금 연 프로젝트 · {settings.projectName}</h3>
+          <div className="settings-rows">
+            <button onClick={() => settings.onProjectSettings?.()}><b>프로젝트 설정</b><small>무엇을 만드는지, 목적, 기한, 예산</small></button>
+            <button onClick={() => settings.onDevConnect?.()}><b>앱·코드 만들기 연결</b><small>앱이나 코드가 필요할 때 쓰는 도구와 명세서</small></button>
+          </div></>}
+        <h3 className="connect-subtitle">화면</h3>
+        <div className="settings-rows">
+          <button onClick={settings.onToggleShortNames} aria-pressed={settings.shortNames}><b>달그락 이름 짧게 보기</b><small>{settings.shortNames ? "켜짐" : "꺼짐"}</small></button>
+          <button onClick={settings.onTutorial}><b>사용법 다시 보기</b><small>화면을 한 바퀴 안내해요</small></button>
+        </div>
+        <form method="post" action="/api/session" className="settings-logout"><input type="hidden" name="intent" value="logout" /><button>로그아웃</button></form>
+      </>}
 
       {editable && profile && <div className="hub-save">
         {error && <p className="login-error" role="alert">{error}</p>}

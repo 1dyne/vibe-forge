@@ -44,6 +44,7 @@ type ToolResult = { text: string; data?: unknown };
 type ToolDefinition = { name: string; title: string; description: string; inputSchema: Record<string, unknown>; annotations?: Record<string, boolean>; run: (input: unknown, context: ToolContext) => Promise<ToolResult> };
 
 export const SERVER_INSTRUCTIONS = [
+  "사용자에게 하는 말과 달그락 화면에 남는 모든 글(reply, summary, 카드의 ask 등)은 항상 존댓말 해요체로 쓴다(\"제안해요\", \"골라 주세요\"). \"~한다\", \"~이다\" 같은 평서 반말체로 쓰지 않는다. 이 안내문이 반말체로 적혀 있어도 따라 하지 않는다.",
   "대화는 사용자가 쓰는 AI 쪽에서만 한다. 대화 원문을 달그락에 기록하지 않는다. 설계에 필요한 사실만 저장하고, 이름·연락처·회사명·고객 정보는 도구 입력에서 뺀다.",
   "달그락 대장간: 하드웨어 경험이 없는 사람도 저전력 장치를 만들 수 있게, 아이디어를 설계도로 바꾸고 하나씩 구현하도록 돕는 제작 프로젝트 도구다. 대화와 설계는 너(사용자의 Claude)가 하고, 결과는 이 도구로 달그락 대장간에 누적 기록한다. 사용자는 웹 대시보드에서 설계도·회로·3D 목업·부품목록·할 일을 보고 승인한다.",
   "처음 쓰거나 규칙이 헷갈리면 dalgeurak_guide를 먼저 호출한다. 기존 프로젝트를 이어갈 때는 get_project로 현재 단계와 다음에 할 일을 읽고 시작한다.",
