@@ -1,4 +1,5 @@
 "use client";
+import { checkProductForm, footprint, placementReadback } from "../lib/form-check";
 import { useMemo, useRef, useState } from "react";
 import type { BuildBlueprint, LocalProject, ProductForm } from "../lib/project-types";
 import { AGENTS, agentName, workflowFor } from "../lib/workflow";
@@ -61,7 +62,7 @@ function mockSolids(blueprint: BuildBlueprint, form?: ProductForm): MockSolid[] 
       const d = dims[f.facing];
       out.push({ primitive: "box", size: d, base: [f.position[0], f.position[1], f.position[2] - d[2] / 2], color: featureColor[f.kind], role: "feature", label: `${f.name} (${f.kind})` });
     }
-    for (const part of form?.internals ?? []) out.push({ primitive: "box", size: part.size, base: part.position, color: "#2e786b", role: "internal", label: `${part.ref} · ${part.label} (${part.size.join("×")}mm)` });
+    for (const part of form?.internals ?? []) out.push({ primitive: "box", size: footprint(part), base: part.position, color: "#2e786b", role: "internal", label: `${part.ref} · ${part.label} (${part.size.join("×")}mm)` });
     return out;
   }
   const { widthMm: w, depthMm: d, heightMm: h, wallMm: wall } = blueprint.enclosure;
@@ -90,7 +91,7 @@ export function MockupView({ blueprint, form }: { blueprint: BuildBlueprint; for
     <Mockup3D solids={solids} inside={inside} zoom={zoom} resetKey={resetKey} onFail={() => setWebgl(false)} />
     <div className="mockup3d-hint">드래그로 돌려보기 · 부품을 누르면 이름이 나와요</div>
     <label className="zoom-slider">확대 <input aria-label="3D 확대" type="range" min=".5" max="1.8" step=".05" value={zoom} onChange={(e)=>setZoom(Number(e.target.value))}/></label>
-    {form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
+    {form && <FormFindings form={form}/>}{form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
     {!form && !blueprint.shape?.length && <p className="notice">아직 형태를 안 정해서 기본 상자로 보여줘요. 연결한 AI에게 “완성품 모양부터 정하자”라고 말해주세요.</p>}
     <p className="muted">보드와 부품은 자리표시자예요. 출력 전에 실측하고 간섭을 확인해주세요.</p>
   </div>;
@@ -150,7 +151,7 @@ function MockupSvg({ blueprint, form }: { blueprint: BuildBlueprint; form?: Prod
         const [bx, by, bz] = dims[f.facing];
         box(fx - bx / 2, fy - by / 2, fz - bz / 2, bx, by, bz, featureColor[f.kind], `${f.name} (${f.kind})`);
       }
-      if (inside) for (const part of form?.internals ?? []) box(part.position[0] - part.size[0] / 2, part.position[1] - part.size[1] / 2, part.position[2], part.size[0], part.size[1], part.size[2], "#2e786b", `${part.ref} · ${part.label} (${part.size.join("×")}mm)`);
+      if (inside) for (const part of form?.internals ?? []) box(part.position[0] - footprint(part)[0] / 2, part.position[1] - footprint(part)[1] / 2, part.position[2], footprint(part)[0], footprint(part)[1], part.size[2], "#2e786b", `${part.ref} · ${part.label} (${part.size.join("×")}mm)`);
       return output.sort((a, b) => a.z - b.z);
     }
     box(-w/2,-d/2,0,w,d,wall,"#b5d8d1","하우징 바닥");
@@ -174,7 +175,7 @@ function MockupSvg({ blueprint, form }: { blueprint: BuildBlueprint; form?: Prod
       <text x="22" y="335" fill="#64736e" fontSize="11">드래그 · 방향키로 회전</text>
     </svg>
     <label className="zoom-slider">확대 <input aria-label="3D 확대" type="range" min=".5" max="1.8" step=".05" value={rotation.zoom} onChange={(e)=>setRotation({...rotation,zoom:Number(e.target.value)})}/></label>
-    {form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
+    {form && <FormFindings form={form}/>}{form && <div className="product-notes"><p>{form.summary}</p><p><b>재질·마감</b> {form.material}</p>{form.features.length > 0 && <p><b>겉에 보이는 것</b> {form.features.map((f) => f.name).join(" · ")}</p>}{form.internals.length > 0 && <p><b>안에 들어가는 부품</b> {form.internals.map((i) => `${i.label} ${i.size.join("×")}mm`).join(" · ")}</p>}<details><summary>형태를 정한 질문과 답</summary>{form.answers.map((a, i) => <p key={i}><b>{a.question}</b><br/>{a.answer}</p>)}</details></div>}
     {!form && !blueprint.shape?.length && <p className="notice">아직 형태를 안 정해서 기본 상자로 보여줘요. 연결한 AI에게 “완성품 모양부터 정하자”라고 말해주세요.</p>}
     <p className="muted">보드와 부품은 자리표시자예요. 출력 전에 실측하고 간섭을 확인해주세요.</p>
   </div>;
@@ -200,4 +201,18 @@ export function TaskView({project, onAction, busy, ownerName, newMarks=[], short
   </tbody></table>
   {skipped.length>0&&<div className="skipped-box"><strong>확인하지 않고 넘어간 것 {skipped.length}개</strong><p>넘어가도 괜찮아요. 나중에 안 맞거나 고장 나면 여기부터 되짚어요.</p><ul>{skipped.map(t=><li key={t.id}>{t.title}{t.skipNote?` · ${t.skipNote}`:""}</li>)}</ul></div>}
   <p className="muted">결과는 팀 전체가 봐요 · 측정값을 올려도 합격 처리는 자동으로 되지 않아요.</p></>;
+}
+
+// 서버가 잰 배치 검사 결과. 꼭 고칠 것이 있으면 이 모양으로 출력하면 안 된다는 뜻이다.
+function FormFindings({ form }: { form: ProductForm }) {
+  const findings = checkProductForm(form);
+  const must = findings.filter((f) => f.severity === "blocked");
+  const rest = findings.filter((f) => f.severity !== "blocked");
+  if (!form.internals.length) return null;
+  return <div className={`form-findings ${must.length ? "bad" : "ok"}`}>
+    <strong>{must.length ? `배치에 꼭 고칠 곳이 ${must.length}개 있어요` : "부품끼리 겹치거나 밖으로 나가는 곳은 없어요"}</strong>
+    {must.length > 0 && <ul>{must.map((f, i) => <li key={i}>{f.message}</li>)}</ul>}
+    {rest.length > 0 && <details><summary>확인할 것 {rest.length}개</summary><ul>{rest.map((f, i) => <li key={i}>{f.message}</li>)}</ul></details>}
+    <details><summary>부품 자리 말로 확인하기 (좌우가 맞는지 봐주세요)</summary><ul>{placementReadback(form).map((line, i) => <li key={i}>{line}</li>)}</ul></details>
+  </div>;
 }

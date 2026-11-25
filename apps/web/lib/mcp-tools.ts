@@ -14,6 +14,7 @@ import { resolvePin } from "./parts/rules";
 import { judgeReading, libraryCardsForStep, parseOhms } from "./parts/trouble-cards";
 import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
+import { checkProductForm, footprint, placementReadback } from "./form-check";
 import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
@@ -163,6 +164,10 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 겉 기능 중 안의 부품과 맞닿아야 하는 것(충전 단자 ↔ 배터리·보드의 USB 포트, 카메라 구멍 ↔ 카메라, 버튼 ↔ 스위치)은 features[].linkedRef로 연결한다. 서버가 그 부품의 해당 면과 실제로 맞닿는지 검사하고, 출력용 파일에는 그 자리에 구멍이 뚫린다.
 - 형태 질문을 먼저 한다(선택지가 있으면 선택지로): 전체 크기(손바닥·컵·책 크기 등 비유와 mm), 손에 드는지·책상에 세우는지·몸에 거는지, 사용자가 보는 면(앞면)에 무엇이 있는지, 화면·카메라·버튼·스피커·충전 포트 위치, 재질·마감·색, 사용 자세와 환경. 이미지가 있으면 보이는 구조를 도형으로 나눠 설명하고 맞는지 묻는다(예: 머리=타원구, 귀=원뿔 2개, 몸=원기둥, 눈=카메라 위치). 알기 어려운 부분은 질문한다.
 - shape는 외형, features는 겉에 보이는 화면·카메라 구멍·버튼 등(어느 면을 향하는지), internals는 안에 들어갈 실제 부품을 데이터시트 기준 실제 치수로 넣는다(예: XIAO ESP32S3 21×17.8×3.5mm, 보조배터리 실제 크기). 서버가 부품이 외형 밖으로 나가는지 확인한다.
+- 부품 카드가 있는 부품은 internals[].catalogId를 넣는다(서버가 카드 치수와 견줘 다르면 꼭 고칠 문제로 돌려준다). 크기의 근거를 sizeBasis에 적는다: 사용자가 잰 값 measured, 공식 문서 datasheet, 추정 assumed. 추정이면 서버가 사용자에게 "재주세요" 할 일을 만든다.
+- 서버가 부품끼리 겹치는지 직접 잰다. 겹치면 저장은 되지만 꼭 고칠 문제(blocked)로 돌아오니, 사용자에게 보여주기 전에 위치를 고쳐 다시 저장한다. 헤더·소켓으로 서로 꽂히는 부품(보드 위에 얹는 모듈 등)만 stackedWith에 서로의 ref를 적어 겹침을 허용받는다. 돌려 놓은 부품은 rotation(90·270이면 가로·세로가 바뀜)으로 적는다.
+- 저장 결과의 '서버가 읽은 배치'를 사용자의 설명과 견준다. 좌우·앞뒤가 뒤집혔으면 바로 고친다. 좌표는 앞에서 볼 때 x 왼쪽(-)/오른쪽(+), y 뒤(-)/앞(+), z 바닥 높이다.
+- 형상 자료를 구할 수 없는 부품은 지어내지 않는다. 사용자에게 (1) 판매 페이지 주소, (2) 자 옆에 놓고 위·옆에서 찍은 사진 두 장, (3) 자나 캘리퍼스로 잰 가로·세로·높이 중 할 수 있는 것을 고르게 한다. 체크리스트의 보유 도구에 없는 방법은 권하지 않는다.
 - 사용자가 대시보드에서 돌려보고 "속 보기"로 부품 자리를 확인한 뒤 바꾸고 싶은 곳을 말하면 다시 저장한다. 회로 승인 후 OpenSCAD 외형도 이 모양을 따른다.
 - 더 정밀한 외형(털, 곡면 조형)이 필요하면 Blender를 쓸 수 있다. Blender MCP는 사용자 컴퓨터에 Blender를 설치하고 Claude 데스크톱 앱이나 Claude Code에 연결해야 하며, 웹 claude.ai에서는 쓸 수 없다. 원할 때만 안내한다.
 
@@ -333,6 +338,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     productForm: project.productForm ?? null,
+    productFormFindings: project.productForm ? checkProductForm(project.productForm) : [],
     housing: project.housing ?? null,
     provisional: provisionalReasons(project),
     // 언제 사야 하는지. 구매를 권하는 쪽은 모델이라, 모델이 이걸 봐야 한다.
@@ -444,7 +450,7 @@ const ProductFormSchema = z.object({
   answers: z.array(z.object({ question: z.string().min(1).max(200), answer: z.string().min(1).max(400) }).strict()).min(1).max(12),
   shape: z.array(z.object({ name: z.string().min(1).max(60), primitive: z.enum(["box", "sphere", "cylinder", "cone"]), size: Size3, position: z.tuple([z.number().min(-400).max(400), z.number().min(-400).max(400), z.number().min(0).max(400)]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }).strict()).min(1).max(16),
   features: z.array(z.object({ name: z.string().min(1).max(60), kind: z.enum(["screen", "camera", "button", "speaker", "mic", "port", "light", "other"]), facing: z.enum(["front", "back", "top", "bottom", "left", "right"]), position: Vec3, size: z.tuple([z.number().min(0.5).max(300), z.number().min(0.5).max(300)]), linkedRef: z.string().max(16).optional() }).strict()).max(16),
-  internals: z.array(z.object({ ref: z.string().min(1).max(16), label: z.string().min(1).max(80), size: Size3, position: Vec3 }).strict()).max(16),
+  internals: z.array(z.object({ ref: z.string().min(1).max(16), label: z.string().min(1).max(80), size: Size3, position: Vec3, catalogId: z.string().max(60).optional(), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(), sizeBasis: z.enum(["card", "datasheet", "measured", "assumed"]).optional(), stackedWith: z.array(z.string().max(16)).max(4).optional() }).strict()).max(16),
   material: z.string().min(1).max(200)
 }).strict();
 
@@ -813,7 +819,7 @@ TOOLS.push(
       answers: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["question", "answer"], properties: { question: { type: "string" }, answer: { type: "string" } } } },
       shape: blueprintJsonSchema.properties.shape,
       features: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "kind", "facing", "position", "size"], properties: { linkedRef: { type: "string", description: "이 겉 기능과 맞닿아야 하는 내부 부품 ref (예: 충전 단자 → BAT1). 서버가 위치가 맞는지 검사한다" }, name: { type: "string" }, kind: { type: "string", enum: ["screen", "camera", "button", "speaker", "mic", "port", "light", "other"] }, facing: { type: "string", enum: ["front", "back", "top", "bottom", "left", "right"], description: "front=+y 방향" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "표면 위 중심 [x,y,z] mm" }, size: { type: "array", minItems: 2, maxItems: 2, items: { type: "number" }, description: "[가로, 세로] mm" } } } },
-      internals: { type: "array", items: { type: "object", additionalProperties: false, required: ["ref", "label", "size", "position"], properties: { ref: { type: "string" }, label: { type: "string" }, size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "실제 부품 치수 [x,y,z] mm (데이터시트 기준)" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "바닥 중심 [x,y,z]" } } } },
+      internals: { type: "array", items: { type: "object", additionalProperties: false, required: ["ref", "label", "size", "position"], properties: { ref: { type: "string" }, label: { type: "string" }, size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "실제 부품 치수 [x,y,z] mm (데이터시트 기준)" }, position: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "바닥 중심 [x,y,z] mm. x는 앞에서 볼 때 왼쪽(-)→오른쪽(+), y는 뒤(-)→앞(+), z는 바닥에서의 높이" }, catalogId: { type: "string", description: "find_part_cards로 찾은 부품 카드 ID. 있으면 서버가 카드 치수와 견줘 다르면 알려준다" }, rotation: { type: "integer", enum: [0, 90, 180, 270], description: "위에서 볼 때 회전(도). 90·270이면 size의 가로·세로가 바뀌어 놓인다" }, sizeBasis: { type: "string", enum: ["card", "datasheet", "measured", "assumed"], description: "크기의 근거. 사용자가 잰 값은 measured, 공식 문서는 datasheet, 추정은 assumed. 추정이면 서버가 실측 할 일을 만든다" }, stackedWith: { type: "array", items: { type: "string" }, description: "헤더·소켓으로 이 부품과 서로 꽂히는 부품의 ref. 적지 않은 부품끼리 겹치면 꼭 고칠 문제로 잡힌다" } } } },
       material: { type: "string", description: "재질·마감·색 (예: PLA 출력 후 퍼 원단 감싸기)" }
     } } } },
     run: async (input, context) => {
@@ -825,6 +831,12 @@ TOOLS.push(
         const now = saved.updatedAt;
         snapshot(p, "productForm", "set_product_form", "완성품 형태 바꾸기 전");
         p.productForm = saved;
+        // 크기가 확인되지 않은 부품마다 "재주세요" 할 일을 만든다. 같은 부품에 두 번 만들지 않는다.
+        for (const f of checkProductForm(saved).filter((x) => x.code === "unmeasured")) {
+          const part = saved.internals.find((i) => i.ref === f.refs[0])!;
+          const title = `${part.ref} 크기 확인`;
+          if (!p.tasks.some((t) => t.title === title)) p.tasks.push({ id: randomUUID(), kind: "measure", title, plain: `${part.label}의 가로·세로·높이를 자나 버니어 캘리퍼스로 재서 mm로 알려주세요. 재기 어려우면 판매 페이지 주소나, 자 옆에 놓고 위·옆에서 찍은 사진 두 장을 보내주셔도 돼요. 지금 설계에는 ${part.size.join("×")}mm로 들어가 있어요.`, status: "ready" });
+        }
         // An approved circuit already has CAD; refresh it to the new outer form.
         if (p.build && w.circuitApprovedAt) p.build = approvedCad(p.build, saved);
         const text = `완성품 미리보기를 만들었어요. ${saved.summary}\n작업대의 '완성품 미리보기'에서 돌려보고 '속 보기'로 안에 들어갈 부품 자리도 확인해주세요. 바꾸고 싶은 곳을 말해주면 다시 만들게요.`;
@@ -832,19 +844,28 @@ TOOLS.push(
         w.sharedUpdates.push({ id: randomUUID(), agent: "id", text: `완성품 형태: ${saved.shape.map((part) => part.name).join(" · ")} / 겉 기능 ${saved.features.map((f) => f.name).join(" · ") || "없음"} / 내부 ${saved.internals.map((i) => i.ref).join(" · ") || "없음"}`, createdAt: now });
         p.workflow = w;
       });
-      const overlap = saved.internals.filter((part) => !saved.shape.some((s) => Math.abs(part.position[0]) + part.size[0] / 2 <= Math.abs(s.position[0]) + s.size[0] / 2 + 1 && Math.abs(part.position[1]) + part.size[1] / 2 <= Math.abs(s.position[1]) + s.size[1] / 2 + 1 && part.position[2] + part.size[2] <= s.position[2] + s.size[2] + 1));
+      const findings = checkProductForm(saved);
+      const must = findings.filter((f) => f.severity === "blocked");
+      const soft = findings.filter((f) => f.severity !== "blocked");
       // A linked feature must sit on the face of its internal part that points the same way.
       const misaligned = saved.features.filter((f) => f.linkedRef).flatMap((f) => {
         const part = saved.internals.find((i) => i.ref === f.linkedRef);
         if (!part) return [`${f.name}: 내부 부품 ${f.linkedRef}가 internals에 없어요`];
-        const [px, py, pz] = part.position; const [sx, sy, sz] = part.size; const [fx, fy, fz] = f.position;
+        const [px, py, pz] = part.position; const [sx, sy, sz] = footprint(part); const [fx, fy, fz] = f.position;
         const face = { front: py + sy / 2, back: py - sy / 2, right: px + sx / 2, left: px - sx / 2, top: pz + sz, bottom: pz }[f.facing];
         const along = { front: fy, back: fy, right: fx, left: fx, top: fz, bottom: fz }[f.facing];
         const lateral = f.facing === "front" || f.facing === "back" ? [Math.abs(fx - px) <= sx / 2, fz >= pz && fz <= pz + sz] : f.facing === "left" || f.facing === "right" ? [Math.abs(fy - py) <= sy / 2, fz >= pz && fz <= pz + sz] : [Math.abs(fx - px) <= sx / 2, Math.abs(fy - py) <= sy / 2];
         const gap = Math.abs(along - face);
         return gap > 6 || !lateral.every(Boolean) ? [`${f.name}가 ${f.linkedRef}의 ${f.facing} 면과 맞지 않아요 (면까지 ${gap.toFixed(1)}mm${lateral.every(Boolean) ? "" : ", 옆으로 벗어남"})`] : [];
       });
-      return stored(updated, context, `완성품 미리보기를 저장했어요.${overlap.length ? ` 확인 필요: ${overlap.map((p) => p.ref).join(", ")}이(가) 외형 밖으로 나갈 수 있어요. 외형 크기나 부품 배치를 조정하세요.` : ""}${misaligned.length ? ` 위치 불일치: ${misaligned.join(" / ")}. 부품 위치나 기능 위치를 고쳐 다시 저장하세요.` : ""} 사용자에게 대시보드에서 돌려보고 마음에 드는지 물어보세요.`);
+      const lines = [
+        must.length ? `완성품 미리보기를 저장했지만 꼭 고쳐야 할 배치 문제가 ${must.length}개 있어요. 사용자에게 보여주기 전에 고쳐서 다시 저장하세요:\n${must.map((f) => `- ${f.message}`).join("\n")}` : "완성품 미리보기를 저장했어요. 부품끼리 겹치거나 외형 밖으로 나가는 곳은 없어요.",
+        misaligned.length ? `겉 기능 위치 불일치:\n${misaligned.map((m) => `- ${m}`).join("\n")}` : "",
+        soft.length ? `확인할 것:\n${soft.map((f) => `- ${f.message}`).join("\n")}` : "",
+        saved.internals.length ? `서버가 읽은 배치(좌우가 뒤집히지 않았는지 사용자의 설명과 견줘보세요):\n${placementReadback(saved).map((l) => `- ${l}`).join("\n")}` : "",
+        must.length ? "" : "사용자에게 대시보드에서 돌려보고 '속 보기'로 부품 자리를 확인해 달라고 하세요."
+      ].filter(Boolean);
+      return stored(updated, context, lines.join("\n\n"));
     }
   },
   {

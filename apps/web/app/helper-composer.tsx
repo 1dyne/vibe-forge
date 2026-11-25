@@ -11,10 +11,12 @@ type RelayEvent = { type: "delta"; text: string } | { type: "status"; text: stri
 const USAGE_URL = "https://chatgpt.com/settings/usage";
 export const HELPER_REPO_URL = "https://github.com/1dyne/dalgrak-helper";
 
-export default function HelperComposer({ project, channel, placeholder, onProject, onFinished }: {
+export default function HelperComposer({ project, channel, placeholder, suggestion, onProject, onFinished }: {
   project: LocalProject | null;
   channel: string;
   placeholder: string;
+  /** 다음에 할 법한 말. 입력창이 비어 있을 때 흐리게 보이고, Enter로 그대로 보내거나 Tab으로 채워 고친다 */
+  suggestion?: string | null;
   /** 내가 보낸 말이 기록된 프로젝트를 바로 반영한다 */
   onProject: (project: LocalProject) => void;
   /** 답이 끝났다. 프로젝트 목록을 다시 읽는다(새 프로젝트가 생겼을 수 있다) */
@@ -57,7 +59,7 @@ export default function HelperComposer({ project, channel, placeholder, onProjec
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const message = text.trim();
+    const message = text.trim() || suggestion?.trim() || "";
     if (!message || busy) return;
     setBusy(true); setError(null); setLive(""); setStep("달그락 도우미에게 전하는 중");
     try {
@@ -91,10 +93,11 @@ export default function HelperComposer({ project, channel, placeholder, onProjec
       {error && <p role="alert" className="helper-live-error">{error.message} {error.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>} <button type="button" onClick={() => setError(null)}>닫기</button></p>}
     </div>}
     <form className="composer" onSubmit={submit}>
-      <textarea value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={placeholder} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
+      <textarea value={text} aria-label={project ? "채팅 메시지" : "아이디어 입력"} placeholder={suggestion ? `${suggestion}   ↵ 그대로 보내기 · Tab 고쳐 쓰기` : placeholder} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Tab" && !e.shiftKey && !text && suggestion) { e.preventDefault(); setText(suggestion); return; } if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!busy) void submit(e); } }} disabled={busy} />
       <div className="composer-tools">
+        {suggestion && !text && !busy && <button type="button" className="suggest-chip" onClick={() => setText(suggestion)}>{suggestion}</button>}
         <span className="composer-hint">ChatGPT 요금제 사용 중{status.model ? ` · ${status.model}` : ""} · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>
-        <button type="submit" className="send" aria-label="메시지 보내기" disabled={busy || !text.trim()}>↑</button>
+        <button type="submit" className="send" aria-label="메시지 보내기" disabled={busy || !(text.trim() || suggestion)}>↑</button>
       </div>
     </form>
   </>;

@@ -164,7 +164,17 @@ export type MakerProfile = {
 // linkedRef ties a visible feature (e.g. the charging port) to the internal
 // part that must line up with it; the server checks they actually meet.
 export type ProductFeature = { name: string; kind: "screen" | "camera" | "button" | "speaker" | "mic" | "port" | "light" | "other"; facing: "front" | "back" | "top" | "bottom" | "left" | "right"; position: [number, number, number]; size: [number, number]; linkedRef?: string };
-export type ProductInternal = { ref: string; label: string; size: [number, number, number]; position: [number, number, number] };
+export type ProductInternal = {
+  ref: string; label: string; size: [number, number, number]; position: [number, number, number];
+  /** 부품 카드 ID. 있으면 서버가 카드 치수와 견준다 */
+  catalogId?: string;
+  /** 위에서 볼 때 시계 반대 방향 회전. 90·270이면 size의 가로·세로가 바뀌어 놓인다 */
+  rotation?: 0 | 90 | 180 | 270;
+  /** 이 크기를 어디서 얻었나. assumed이거나 비어 있으면(카드도 없으면) 실측이 필요하다 */
+  sizeBasis?: "card" | "datasheet" | "measured" | "assumed";
+  /** 헤더·소켓으로 서로 꽂히는 부품의 ref. 이 쌍의 겹침은 허용한다 */
+  stackedWith?: string[];
+};
 export type ProductForm = {
   summary: string;
   answers: Array<{ question: string; answer: string }>;
