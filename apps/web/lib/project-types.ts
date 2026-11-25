@@ -37,6 +37,8 @@ export type ChatMessage = {
   mode?: "work" | "evaluate";
   attachments?: ImageAttachment[];
   shared?: boolean;
+  /** 사람이 쓴 말이 아니라 대장이 자동 진행으로 넘긴 지시 */
+  auto?: boolean;
 };
 
 export type ConnectionKind = "builtin" | "socket" | "qwiic" | "grove" | "breadboard" | "solder";

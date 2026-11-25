@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import type { BoardView, CardTurn } from "../lib/board";
+import type { BoardView, CardTurn, autoStatus } from "../lib/board";
 import type { AgentId, LocalProject } from "../lib/project-types";
 import type { WorkbenchItem } from "../lib/workbench";
 import { agentName } from "../lib/workflow";
@@ -19,7 +19,7 @@ const TURN: Record<CardTurn, string> = { agent: "달그락 작업 중", person: 
 const DELIVERY = { ordered: "주문함", delayed: "지연", arrived: "도착", problem: "문제" } as const;
 const day = (iso: string) => iso.slice(5, 10).replace("-", "/");
 
-export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, onBoard, onProjectSettings, onDevConnect, activeRoom, liveRoom, onMarkFile, onDecide, onVerify, onClose }: {
+export default function StatusPanel({ mode, project, board, items, newMarks, shortNames, busy, onRoom, onOpenItem, onAction, auto, onBoard, onProjectSettings, onDevConnect, activeRoom, liveRoom, onMarkFile, onDecide, onVerify, onClose }: {
   /** status = 작업대, files = 파일 모아보기 */
   mode: "status" | "files";
   project: LocalProject; board: BoardView; items: WorkbenchItem[]; newMarks: string[]; shortNames: boolean; busy: boolean;
@@ -27,6 +27,8 @@ export default function StatusPanel({ mode, project, board, items, newMarks, sho
   onOpenItem: (id: string) => void;
   onAction: (input: Record<string, unknown>) => void;
   /** 작업대에서 사람이 직접 하는 일(지금 하는 일 적기 등) */
+  /** 대장의 자동 진행 상태 */
+  auto: ReturnType<typeof autoStatus>;
   onBoard: (body: Record<string, unknown>) => Promise<void>;
   onProjectSettings: () => void;
   onDevConnect: () => void;
@@ -54,6 +56,7 @@ export default function StatusPanel({ mode, project, board, items, newMarks, sho
   return <aside className="artifact-panel status-panel" id="workbench-panel" data-tour="workbench" aria-label="작업대">
     <header className="artifact-header"><div><h2>작업대</h2></div><div className="workbench-header-actions"><details className="gear-menu"><summary aria-label="이 프로젝트의 설정" title="이 프로젝트의 설정">⚙</summary><div><button onClick={onProjectSettings}>프로젝트 설정<small>목적 · 기한 · 예산</small></button><button onClick={onDevConnect}>앱·코드 만들기 연결<small>쓰는 도구와 명세서</small></button></div></details><button className="icon-button" onClick={onClose} aria-label="작업대 접기">×</button></div></header>
     <div className="status-scroll">
+      {board.cards.length > 0 && <div className="auto-line"><button className={auto.on ? "on" : ""} disabled={busy} aria-pressed={auto.on} onClick={() => void onBoard({ action: "auto", on: !auto.on })}>{auto.on ? "잠시 멈추기" : "달그락들에게 맡기기"}</button><span className="auto-state">{auto.on ? auto.text : "켜면 대장이 다음 일을 달그락들에게 차례로 넘겨요. 나는 내 공방에 온 것에만 답하면 돼요."}</span></div>}
       <ForgeScene compact board={board} shortNames={shortNames} activeRoom={activeRoom} liveRoom={liveRoom} onRoom={onRoom} />
       {revisionOf(project).proposals.length > 0 && <section className="status-block"><details className="status-details" open={revisionOf(project).proposals.some((p) => p.status === "proposed")}><summary>수정안 {revisionOf(project).proposals.filter((p) => p.status === "proposed").length || ""}</summary><RevisionView project={project} busy={busy} shortNames={shortNames} onDecide={onDecide} /></details></section>}
       {board.nextForPerson && <section className="status-block">

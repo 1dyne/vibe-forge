@@ -16,6 +16,21 @@ export type CardTurn =
   | "blocked"   // 막힘: 무엇 때문인지 note에 적는다
   | "done";
 
+// 사람에게 차례를 넘기는 세 가지 방식.
+//   요청(request)  : 사실을 알려 달라. 재서, 세어서, 확인해서 적는 칸(폼)으로 받는다.
+//   질문(question) : 사람의 뜻을 더 구체화한다. 고를 수 있는 보기와 그 차이를 준다.
+//   제안(proposal) : 병목이나 충돌이 생겼을 때 길을 고르게 한다. 보기마다 무엇이 달라지는지 적는다.
+export type PromptField = { id: string; label: string; kind: "number" | "text" | "choice" | "multi" | "date" | "yes_no"; unit?: string; options?: string[]; hint?: string; required?: boolean };
+export type PromptOption = { id: string; label: string; /** 이걸 고르면 무엇이 달라지는지 (비용·기간·바뀌는 것) */ effect?: string };
+export type CardPrompt =
+  | { kind: "request"; fields: PromptField[] }
+  | { kind: "question"; options: PromptOption[]; allowOther?: boolean }
+  | { kind: "proposal"; options: PromptOption[]; /** 달그락이 권하는 보기의 id와 이유 */ recommend?: { id: string; why: string } };
+export type CardAnswer = { at: string; values?: Record<string, string | number | boolean | string[]>; choice?: string; note?: string };
+
+/** 한 달그락의 결정이나 현실의 변화가 다른 달그락의 일에 영향을 줄 때 남기는 알림 */
+export type Notice = { id: string; from: AgentId | "person" | "system"; text: string; affects: AgentId[]; at: string; seenBy: AgentId[] };
+
 export type WorkCard = {
   id: string;
   title: string;
@@ -36,6 +51,12 @@ export type WorkCard = {
   createdAt: string;
   updatedAt: string;
   history: Array<{ at: string; by: AgentId | "person"; turn: CardTurn; note: string }>;
+  /** turn=person일 때 사람에게 보여줄 요청·질문·제안 */
+  prompt?: CardPrompt;
+  /** 사람이 마지막으로 준 답. 달그락이 읽고 이어서 작업한다 */
+  answer?: CardAnswer;
+  /** 대장이 이 카드를 담당 달그락에게 몇 번, 언제 넘겼는지 (자동 진행) */
+  dispatch?: { count: number; at: string };
 };
 
 export type Delivery = { label: string; ref?: string; status: "ordered" | "delayed" | "arrived" | "problem"; orderedAt?: string; expectedAt?: string | null; arrivedAt?: string; note?: string; updatedAt: string };
@@ -48,7 +69,8 @@ export type RealWorld = {
   /** 현실에서 일어난 일의 기록 (배송 지연, 부품 파손, 프린터 고장) */
   events: Array<{ at: string; text: string }>;
 };
-export type Board = { cards: WorkCard[]; real: RealWorld; updatedAt: string };
+export type AutoState = { on: boolean; day?: string; count?: number; pausedReason?: string };
+export type Board = { cards: WorkCard[]; real: RealWorld; updatedAt: string; notices?: Notice[]; /** 대장이 사람 없이 달그락들에게 일을 이어서 맡기는 중인지 */ auto?: AutoState };
 
 export const emptyReal = (): RealWorld => ({ now: null, availability: null, deliveries: [], events: [] });
 export const emptyBoard = (): Board => ({ cards: [], real: emptyReal(), updatedAt: new Date(0).toISOString() });
@@ -110,6 +132,8 @@ export function viewBoard(board: Board, now = Date.now()): BoardView {
   for (const o of overdue) lines.push(`예정일 지남(${o.daysLate}일): ${o.label} — 도착했는지, 끝났는지 먼저 물어보세요.`);
   if (board.real.now) lines.push(`사람이 지금 하는 일: ${board.real.now.text} (${board.real.now.at.slice(0, 16).replace("T", " ")} 기준)`);
   if (board.real.availability) lines.push(`사람의 여건: ${board.real.availability.text}`);
+  for (const n of (board.notices ?? []).filter((x) => x.seenBy.length < x.affects.length).slice(-5)) lines.push(`바뀐 것(확인 안 한 달그락: ${n.affects.filter((a) => !n.seenBy.includes(a)).map((a) => a.toUpperCase()).join("·")}): ${n.text}`);
+  for (const card of cards.filter((c) => c.turn === "agent" && c.answer)) lines.push(`사람의 답(${card.title}): ${answerText(card)}`);
   if (canDoMeanwhile.length) lines.push(`기다리는 동안 할 수 있는 일: ${canDoMeanwhile.map((c) => `[${c.room.toUpperCase()}] ${c.title}`).join(", ")}`);
 
   return { cards, nextForPerson: first ? { cardId: first.id, room: first.owner, title: first.title, ask: first.ask ?? "확인이 필요해요" } : null, rooms, overdue, canDoMeanwhile, progress: { done, total: cards.length }, real: board.real, brief: lines.join("\n") };
@@ -155,7 +179,7 @@ export function upsertCards(board: Board, input: Array<{ id: string; title: stri
   return { ...board, cards: next, updatedAt: now };
 }
 
-export function moveCard(board: Board, cardId: string, change: { turn: CardTurn; ask?: string; waiting?: WorkCard["waiting"]; note?: string }, by: AgentId | "person", now = new Date().toISOString()): Board {
+export function moveCard(board: Board, cardId: string, change: { turn: CardTurn; ask?: string; waiting?: WorkCard["waiting"]; note?: string; prompt?: CardPrompt }, by: AgentId | "person", now = new Date().toISOString()): Board {
   const card = board.cards.find((c) => c.id === cardId);
   if (!card) throw new BoardError("작업 카드를 찾을 수 없어요. get_project의 board.cards에서 id를 확인하세요.");
   if (change.turn === "person" && !change.ask?.trim()) throw new BoardError("사람 차례로 넘기려면 무엇을 해 달라는지(ask)를 구체적으로 적어주세요. 예: '뚜껑 안쪽 폭을 캘리퍼스로 재서 mm로 알려주세요'");
@@ -167,7 +191,13 @@ export function moveCard(board: Board, cardId: string, change: { turn: CardTurn;
   if (change.turn === "done" && unfinished.length) throw new BoardError(`먼저 끝나야 하는 카드가 남아 있어요: ${unfinished.join(", ")}`);
   const next: WorkCard = { ...card, turn: change.turn, updatedAt: now, history: [...card.history, { at: now, by, turn: change.turn, note: (change.ask ?? change.waiting?.what ?? change.note ?? "").slice(0, 300) }].slice(-30) };
   delete next.ask; delete next.waiting;
-  if (change.turn === "person") next.ask = change.ask!.trim();
+  if (change.turn === "person") {
+    next.ask = change.ask!.trim();
+    delete next.prompt; delete next.answer;
+    if (change.prompt) { checkPrompt(change.prompt); next.prompt = change.prompt; }
+  }
+  // 차례가 바뀌면 "몇 번 넘겼는지"를 새로 센다.
+  if (change.turn !== card.turn) delete next.dispatch;
   if (change.turn === "waiting") next.waiting = { what: change.waiting!.what.trim(), kind: change.waiting!.kind ?? "other", expectedAt: change.waiting!.expectedAt ?? null };
   if (change.note?.trim()) next.note = change.note.trim(); else if (change.turn !== "blocked") delete next.note;
   return { ...board, cards: board.cards.map((c) => (c.id === cardId ? next : c)), updatedAt: now };
@@ -196,4 +226,139 @@ export function recordReal(board: Board, input: { now?: string | null; availabil
     if (d.status === "arrived" && before?.status !== "arrived") real.events = [...real.events, { at, text: `${next.label} 도착` }].slice(-40);
   }
   return { ...board, real, updatedAt: at };
+}
+
+
+// ── 요청·질문·제안과 그 답 ───────────────────────────────────────────────────
+
+function checkPrompt(prompt: CardPrompt) {
+  if (prompt.kind === "request") {
+    if (!prompt.fields.length) throw new BoardError("요청에는 사람이 채울 칸(fields)이 하나 이상 있어야 해요.");
+    const ids = new Set(prompt.fields.map((f) => f.id));
+    if (ids.size !== prompt.fields.length) throw new BoardError("요청의 칸 id가 겹쳐요.");
+    for (const f of prompt.fields) if ((f.kind === "choice" || f.kind === "multi") && !(f.options?.length)) throw new BoardError(`'${f.label}' 칸은 고를 보기(options)가 있어야 해요.`);
+  } else {
+    if (prompt.options.length < 2) throw new BoardError("질문과 제안에는 고를 보기가 둘 이상 있어야 해요.");
+    if (new Set(prompt.options.map((o) => o.id)).size !== prompt.options.length) throw new BoardError("보기 id가 겹쳐요.");
+    if (prompt.kind === "proposal") {
+      if (prompt.options.some((o) => !o.effect?.trim())) throw new BoardError("제안의 보기마다 무엇이 달라지는지(effect: 비용·기간·바뀌는 것)를 적어주세요. 사람이 비교해서 고를 수 있어야 해요.");
+      if (prompt.recommend && !prompt.options.some((o) => o.id === prompt.recommend!.id)) throw new BoardError("권하는 보기(recommend.id)가 보기 목록에 없어요.");
+    }
+  }
+}
+
+/** 사람이 준 답을 한 줄 글로. 달그락에게 그대로 전한다. */
+export function answerText(card: Pick<WorkCard, "prompt" | "answer">): string {
+  const a = card.answer; if (!a) return "";
+  const parts: string[] = [];
+  const p = card.prompt;
+  if (a.choice) parts.push(p && p.kind !== "request" ? (p.options.find((o) => o.id === a.choice)?.label ?? a.choice) : a.choice);
+  if (a.values) for (const [id, value] of Object.entries(a.values)) {
+    const field = p?.kind === "request" ? p.fields.find((f) => f.id === id) : undefined;
+    const shown = typeof value === "boolean" ? (value ? "예" : "아니요") : Array.isArray(value) ? value.join(", ") : String(value);
+    parts.push(`${field?.label ?? id}: ${shown}${field?.unit && typeof value === "number" ? field.unit : ""}`);
+  }
+  if (a.note?.trim()) parts.push(a.note.trim());
+  return parts.join(" / ");
+}
+
+/** 사람이 자기 차례인 카드에 답한다. 답은 카드에 남고 차례는 달그락에게 돌아간다. */
+export function answerCard(board: Board, cardId: string, input: { values?: CardAnswer["values"]; choice?: string; note?: string }, now = new Date().toISOString()): Board {
+  const card = board.cards.find((c) => c.id === cardId);
+  if (!card) throw new BoardError("작업 카드를 찾을 수 없어요.");
+  if (card.turn !== "person") throw new BoardError("지금은 답을 기다리는 카드가 아니에요.");
+  const p = card.prompt;
+  const answer: CardAnswer = { at: now };
+  if (p?.kind === "request") {
+    const values: NonNullable<CardAnswer["values"]> = {};
+    for (const f of p.fields) {
+      const v = input.values?.[f.id];
+      const empty = v == null || v === "" || (Array.isArray(v) && !v.length);
+// 모르는 칸은 비워 둘 수 있다. 다만 왜 비웠는지 메모가 있어야 한다(모르는 것을 지어내게 하지 않는다).
+      if (empty) { if (f.required !== false && !input.note?.trim()) throw new BoardError(`'${f.label}'을(를) 적어주세요. 모르면 비워 두고 아래 메모에 모른다고 적어주세요.`); continue; }
+      if (f.kind === "number" && typeof v !== "number") throw new BoardError(`'${f.label}'은(는) 숫자로 적어주세요.`);
+      if (f.kind === "yes_no" && typeof v !== "boolean") throw new BoardError(`'${f.label}'은(는) 예/아니요로 골라주세요.`);
+      if (f.kind === "choice" && !(typeof v === "string" && f.options!.includes(v))) throw new BoardError(`'${f.label}'은(는) 보기 가운데서 골라주세요.`);
+      if (f.kind === "multi" && !(Array.isArray(v) && v.every((x) => f.options!.includes(x)))) throw new BoardError(`'${f.label}'은(는) 보기 가운데서 골라주세요.`);
+      values[f.id] = v as string | number | boolean | string[];
+    }
+    answer.values = values;
+  } else if (p) {
+    const known = input.choice && p.options.some((o) => o.id === input.choice);
+    const other = p.kind === "question" && p.allowOther !== false && !!input.note?.trim();
+    if (!known && !other) throw new BoardError(p.kind === "proposal" ? "보기 가운데 하나를 골라주세요. 다른 길을 원하면 달그락에게 대화로 말해주세요." : "보기를 고르거나 생각을 직접 적어주세요.");
+    if (known) answer.choice = input.choice;
+  }
+  if (input.note?.trim()) answer.note = input.note.trim().slice(0, 600);
+  const withAnswer = { ...card, answer };
+  const text = answerText(withAnswer) || "확인했어요";
+  const next: WorkCard = { ...withAnswer, turn: "agent", updatedAt: now, history: [...card.history, { at: now, by: "person" as const, turn: "agent" as const, note: `답: ${text}`.slice(0, 300) }].slice(-30) };
+  delete next.ask; delete next.dispatch;
+  return { ...board, cards: board.cards.map((c) => (c.id === cardId ? next : c)), updatedAt: now };
+}
+
+// ── 알림: 한 곳의 변화가 다른 달그락의 일에 닿을 때 ──────────────────────────
+
+export function postNotice(board: Board, input: { from: Notice["from"]; text: string; affects: AgentId[] }, id: string, now = new Date().toISOString()): Board {
+  const affects = [...new Set(input.affects)].filter((a) => a !== input.from);
+  if (!input.text.trim() || !affects.length) return board;
+  const notice: Notice = { id, from: input.from, text: input.text.trim().slice(0, 500), affects, at: now, seenBy: [] };
+  return { ...board, notices: [...(board.notices ?? []), notice].slice(-60), updatedAt: now };
+}
+export const unseenNotices = (board: Board, room: AgentId) => (board.notices ?? []).filter((n) => n.affects.includes(room) && !n.seenBy.includes(room));
+export function seeNotices(board: Board, room: AgentId, ids?: string[]): Board {
+  return { ...board, notices: (board.notices ?? []).map((n) => (n.affects.includes(room) && !n.seenBy.includes(room) && (!ids || ids.includes(n.id)) ? { ...n, seenBy: [...n.seenBy, room] } : n)) };
+}
+
+// ── 자동 진행: 대장이 다음에 누구에게 무엇을 시킬지 ────────────────────────────
+
+export const AUTO_DAILY_LIMIT = 40;   // 하루에 자동으로 넘기는 횟수의 한도. 사람의 요금제 사용량을 지킨다.
+const RETRY_LIMIT = 2;                // 같은 카드를 차례 변화 없이 다시 넘기는 횟수
+
+export type Dispatch = { room: AgentId; reason: "answer" | "notice" | "card"; cardId?: string; noticeIds?: string[]; text: string };
+
+/** 지금 달그락에게 넘길 일 하나. 사람을 기다려야 하면 null. */
+export function nextDispatch(board: Board, team: AgentId[], now = new Date().toISOString()): Dispatch | null {
+  const auto = board.auto;
+  if (!auto?.on) return null;
+  if (auto.day === now.slice(0, 10) && (auto.count ?? 0) >= AUTO_DAILY_LIMIT) return null;
+  const view = viewBoard(board, new Date(now).getTime());
+  const rooms: AgentId[] = ["chief", ...team.filter((a) => a !== "chief")];
+  // 1. 사람이 방금 답한 카드: 답을 읽고 이어서 한다.
+  for (const card of view.cards) {
+    if (card.turn === "agent" && card.active && card.answer && !card.dispatch && rooms.includes(card.owner))
+      return { room: card.owner, reason: "answer", cardId: card.id, text: `[대장의 전달] 「${card.title}」에 사람이 답했어요: ${answerText(card)}\n이 답을 반영해 이어서 작업하고, 끝나면 update_work_card로 차례를 넘겨 주세요(사람이 더 할 것이 있으면 person, 기다릴 것이 있으면 waiting, 다 됐으면 done).` };
+  }
+  // 2. 아직 확인하지 않은 변경 알림
+  for (const room of rooms) {
+    const unseen = unseenNotices(board, room);
+    if (unseen.length) return { room, reason: "notice", noticeIds: unseen.map((n) => n.id), text: `[대장의 전달] 다른 곳에서 바뀐 것이 있어요:\n${unseen.map((n) => `- ${n.text}`).join("\n")}\n이 변화가 내 작업(카드, 파일, 치수, 부품)에 주는 영향을 확인해 주세요. 고칠 것이 있으면 고치고, 승인된 설계를 바꿔야 하면 propose_design_change로 수정안을 내고, 사람이 정해야 하면 update_work_card로 제안(proposal)을 넘겨 주세요. 영향이 없으면 없다고 한 줄로 답해 주세요.` };
+  }
+  // 3. 달그락 차례인 카드. 차례 변화 없이 두 번 넘겼으면 더 넘기지 않는다(같은 자리에서 맴도는 것을 막는다).
+  for (const card of view.cards) {
+    if (card.turn === "agent" && card.active && rooms.includes(card.owner) && (card.dispatch?.count ?? 0) < RETRY_LIMIT)
+      return { room: card.owner, reason: "card", cardId: card.id, text: `[대장의 작업 지시] 「${card.title}」: ${card.detail}${card.answer ? `\n사람이 준 답: ${answerText(card)}` : ""}\n지금 할 수 있는 데까지 작업하고 결과를 도구로 기록해 주세요. 끝나면 반드시 update_work_card로 차례를 넘겨 주세요: 사람에게 사실을 받아야 하면 요청(request), 사람의 뜻을 물어야 하면 질문(question), 막힌 것을 풀 길을 골라야 하면 제안(proposal), 현실을 기다려야 하면 waiting, 다 됐으면 done.${(card.dispatch?.count ?? 0) > 0 ? "\n(앞서 한 번 넘겼는데 차례가 그대로였어요. 이번에는 꼭 차례를 바꿔 주세요.)" : ""}` };
+  }
+  return null;
+}
+
+export function markDispatched(board: Board, d: Dispatch, now = new Date().toISOString()): Board {
+  const day = now.slice(0, 10);
+  const auto: AutoState = { ...(board.auto ?? { on: true }), day, count: (board.auto?.day === day ? board.auto.count ?? 0 : 0) + 1 };
+  let next: Board = { ...board, auto, updatedAt: now };
+  if (d.cardId) next = { ...next, cards: next.cards.map((c) => (c.id === d.cardId ? { ...c, dispatch: { count: (c.dispatch?.count ?? 0) + 1, at: now } } : c)) };
+  if (d.noticeIds?.length) next = seeNotices(next, d.room, d.noticeIds);
+  return next;
+}
+
+/** 자동 진행이 멈춰 있는 까닭(화면과 달그락에게 보여준다) */
+export function autoStatus(board: Board, team: AgentId[], now = new Date().toISOString()): { on: boolean; state: "off" | "running" | "waiting_person" | "waiting_world" | "stalled" | "limit" | "idle"; text: string } {
+  if (!board.auto?.on) return { on: false, state: "off", text: "자동 진행이 꺼져 있어요" };
+  if (board.auto.day === now.slice(0, 10) && (board.auto.count ?? 0) >= AUTO_DAILY_LIMIT) return { on: true, state: "limit", text: "오늘 자동으로 넘길 수 있는 횟수를 다 썼어요. 내일 이어가거나 직접 말을 걸어 주세요" };
+  if (nextDispatch(board, team, now)) return { on: true, state: "running", text: "달그락들이 이어서 일하는 중이에요" };
+  const view = viewBoard(board, new Date(now).getTime());
+  if (view.nextForPerson) return { on: true, state: "waiting_person", text: "내 답을 기다리고 있어요" };
+  if (view.cards.some((c) => c.turn === "agent" && c.active && (c.dispatch?.count ?? 0) >= RETRY_LIMIT)) return { on: true, state: "stalled", text: "달그락이 차례를 넘기지 않아 멈췄어요. 그 대장간에서 직접 말을 걸어 주세요" };
+  if (view.cards.some((c) => c.turn === "waiting")) return { on: true, state: "waiting_world", text: "도착이나 출력을 기다리는 중이에요" };
+  return { on: true, state: "idle", text: view.cards.length && view.cards.every((c) => c.turn === "done") ? "모든 일이 끝났어요" : "지금 넘길 일이 없어요" };
 }

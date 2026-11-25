@@ -4,6 +4,7 @@ import { helperSession, helperUnauthorized } from "../../../../lib/helper-auth";
 import { claimJob, touchHelper } from "../../../../lib/helper-relay";
 import { getProject } from "../../../../lib/local-project-store";
 import { withVault } from "../../../../lib/vault";
+import { dispatchForUser } from "../../../../lib/dispatcher";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,6 +20,8 @@ export async function POST(request: NextRequest) {
   const hello = Hello.safeParse(await request.json().catch(() => ({})));
   if (!hello.success) return NextResponse.json({ error: "invalid request" }, { status: 400 });
   touchHelper(session.user.id, hello.data as Parameters<typeof touchHelper>[1]);
+  // 연결 앱이 한가하면, 자동 진행을 켠 프로젝트의 다음 일을 대장이 넘긴다.
+  await withVault(session.vault, () => dispatchForUser(session.user.id)).catch(() => null);
   const job = await claimJob(session.user.id, hello.data.wait ? undefined : 0);
   touchHelper(session.user.id);
   if (!job) return NextResponse.json({ job: null });

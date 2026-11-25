@@ -7,6 +7,8 @@ import { hasValidOrigin } from "../../../../../lib/request-security";
 import { RevisionError, applyProposal, proposalSummary, rejectProposal, revisionOf } from "../../../../../lib/revision";
 import { canAccess, getViewer, notFound, unauthorized, withViewerVault } from "../../../../../lib/viewer";
 import { workflowFor } from "../../../../../lib/workflow";
+import { boardOf, postNotice } from "../../../../../lib/board";
+import { dispatchForUser } from "../../../../../lib/dispatcher";
 
 // 수정안의 승인과 거절. 달그락은 수정안을 낼 수만 있고(MCP 도구), 적용은 사람이 여기서 한다.
 const Body = z.object({ action: z.enum(["approve", "reject"]), proposalId: z.string().uuid() }).strict();
@@ -42,11 +44,14 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         // 회로가 승인된 프로젝트는 승인본에 CAD가 붙어 있다. 회로나 형태가 바뀌었으면 새 값으로 다시 붙인다.
         if (p.build && w.circuitApprovedAt && (approved.changes.build || approved.changes.productForm)) p.build = approvedCad(p.build, p.productForm);
         const redo = approved.impact.redo.map((task) => task.title);
+        // 설계가 바뀌었으니 다른 달그락들이 자기 일에 주는 영향을 확인해야 한다.
+        p.board = postNotice(boardOf(p), { from: approved.by, text: `수정안 「${approved.title}」이(가) 승인돼 설계가 바뀌었어요 (${approved.impact.fields.join(", ")}). 까닭: ${approved.reason}`, affects: ["chief", ...w.activeAgents] }, randomUUID(), now);
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `수정안 「${approved.title}」을(를) 승인했어요.${redo.length ? `\n\n다시 할 일: ${redo.join(", ")}` : ""}`, createdAt: now, shared: true });
         w.sharedUpdates.push({ id: randomUUID(), agent: approved.by, text: `수정안 「${approved.title}」 승인·적용: ${approved.impact.fields.join(", ")} 변경${redo.length ? ` · 사람이 다시 할 일 ${redo.length}개` : ""}`, createdAt: now });
       }
       p.workflow = w;
     });
+    if (viewer.kind === "user") await dispatchForUser(viewer.user.id).catch(() => null);
     return NextResponse.json({ project: updated, proposals: revisionOf(updated).proposals.map(proposalSummary) });
   } catch (error) {
     if (error instanceof RevisionError) return NextResponse.json({ error: error.message }, { status: 409 });

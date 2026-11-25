@@ -149,3 +149,9 @@ export async function readJobEvents(jobId: string, userId: string, from: number,
 export function resetHelperRelay() {
   state.presence.clear(); state.queues.clear(); state.jobs.clear(); state.pollers.clear();
 }
+
+/** 그 사람의 연결 앱이 지금 답하고 있거나 답할 일이 쌓여 있는가 */
+export function hasActiveJob(userId: string): boolean {
+  sweep();
+  return [...state.jobs.values()].some((job) => job.userId === userId && !job.finished);
+}

@@ -7,6 +7,7 @@ import { getProject, mutateProject } from "../../../../../lib/local-project-stor
 import type { AgentId, ChatChannel } from "../../../../../lib/project-types";
 import { hit } from "../../../../../lib/rate-limit";
 import { getViewer, unauthorized } from "../../../../../lib/viewer";
+import { dispatchForUser } from "../../../../../lib/dispatcher";
 import { withVault } from "../../../../../lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         });
       }
     }
+    // 한 턴이 끝났으면 대장이 다음 일을 넘긴다(자동 진행을 켠 프로젝트만).
+    if (jobFor(id, session.user.id).finished) await withVault(session.vault, () => dispatchForUser(session.user.id)).catch((error) => console.error("auto dispatch failed", error instanceof Error ? error.message : "unknown"));
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof RelayError) return NextResponse.json({ error: error.message, code: error.code }, { status: 404 });

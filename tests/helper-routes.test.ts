@@ -127,6 +127,50 @@ describe("도우미 대화 경로", () => {
     expect((await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(b.linkToken) }), params)).status).toBe(404);
   });
 
+  it("자동 진행: 맡기기를 켜면 대장이 다음 일을 대장간에 넘기고, 사람이 답하면 그 답이 달그락에게 간다", async () => {
+    const a = await person("사");
+    const params = { params: Promise.resolve({ id: a.projectId }) };
+    const board = (body: Record<string, unknown>) => boardPost(post(`/api/projects/${a.projectId}/board`, body, cookie(a.linkToken)), params);
+    // 설계도와 카드는 도구를 거치지 않고 직접 채운다(설계도 입력이 길어서).
+    const { withVault, vaultFor } = await import("../apps/web/lib/vault");
+    const { mutateProject, getProject } = await import("../apps/web/lib/local-project-store");
+    const { upsertCards, boardOf, emptyBoard } = await import("../apps/web/lib/board");
+    const { findUserByToken } = await import("../apps/web/lib/users");
+    const user = (await findUserByToken(a.linkToken))!;
+    const vault = vaultFor(a.linkToken, user.id);
+    await withVault(vault, () => mutateProject(a.projectId, (p) => {
+      p.workflow = { ...(p.workflow as NonNullable<typeof p.workflow>), activeAgents: ["hw", "me"] };
+      p.board = upsertCards(emptyBoard(), [{ id: "circuit", title: "1단계 회로", detail: "값 읽기", owner: "hw" }], ["hw", "me"], "chief");
+    }));
+    // 연결 앱이 켜진다. 맡기기 전에는 아무 일도 오지 않는다.
+    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).toEqual({ job: null });
+    // 맡기기를 켜면 대장의 지시가 하드웨어 대장간으로 간다.
+    const on = await (await board({ action: "auto", on: true })).json();
+    expect(on.auto.on).toBe(true);
+    const first = (await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).job;
+    expect(first).toMatchObject({ projectId: a.projectId, channel: "hw" });
+    expect(first.text).toContain("[대장의 작업 지시] 「1단계 회로」");
+    // 달그락이 요청을 넘기고 턴을 끝낸다.
+    const call = async (name: string, args: Record<string, unknown>) => (await (await mcp(post("/api/mcp", { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { projectId: a.projectId, ...args } } }, bearer(a.access)))).json()).result;
+    const asked = await call("update_work_card", { cardId: "circuit", by: "hw", turn: "person", ask: "로드셀이 도착했는지 알려주세요", prompt: { kind: "request", fields: [{ id: "arrived", label: "로드셀이 도착했나요", kind: "yes_no" }] } });
+    expect(asked.isError).toBeFalsy();
+    await reportJob(post(`/api/helper/jobs/${first.id}`, { events: [{ type: "done", text: "로드셀이 도착했는지 알려주세요." }] }, bearer(a.access)), jobParams(first.id));
+    // 사람을 기다리는 동안에는 더 넘기지 않는다.
+    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).toEqual({ job: null });
+    const waiting = await (await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(a.linkToken) }), params)).json();
+    expect(waiting.board.nextForPerson).toMatchObject({ cardId: "circuit", room: "hw" });
+    // 잘못된 답은 받지 않고, 맞는 답은 달그락에게 전달된다.
+    expect((await board({ action: "answer", cardId: "circuit", values: {} })).status).toBe(409);
+    expect((await board({ action: "answer", cardId: "circuit", values: { arrived: true } })).status).toBe(200);
+    const second = (await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).job;
+    expect(second.channel).toBe("hw");
+    expect(second.text).toContain("사람이 답했어요: 로드셀이 도착했나요: 예");
+    // 대장의 전달은 그 대장간의 대화에 남는다.
+    const saved = await withVault(vault, () => getProject(a.projectId));
+    expect(saved!.messages.filter((m) => m.auto).map((m) => m.channel)).toEqual(["hw", "hw"]);
+    expect(boardOf(saved!).auto!.count).toBe(2);
+  });
+
   it("로그인 없이는 도우미 자리에도 화면 자리에도 설 수 없다", async () => {
     expect((await poll(post("/api/helper/poll", {}))).status).toBe(401);
     expect((await poll(post("/api/helper/poll", {}, bearer("wrong")))).status).toBe(401);

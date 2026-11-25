@@ -1,0 +1,18 @@
+/* 요청 · 질문 · 제안에 답하는 폼 */
+.cp{display:grid;gap:10px;margin-top:10px;width:100%}
+.cp-kind{justify-self:start;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#fff;border:1px solid #f0c4b3;color:#a2452c}
+.cp-request .cp-kind{border-color:#cfe0d9;color:#3f7a6c}.cp-question .cp-kind{border-color:#cdd3ee;color:#4a56a0}
+.cp-fields{display:grid;gap:10px}.cp-field{display:grid;gap:5px;font-size:13px}.cp-field>span:first-child{font-weight:600}.cp-field small{color:#6f7d75;font-weight:400}
+.cp input[type=text],.cp input[type=number],.cp input[type=date],.cp-foot input,.cp-plain input{border:1px solid #cfd8d2;border-radius:9px;padding:8px 10px;font-size:14px;background:#fff;color:var(--ink);min-width:0;width:100%}
+.cp-number{display:flex;align-items:center;gap:6px}.cp-number input{max-width:140px}.cp-number em{font-style:normal;color:#6f7d75;font-size:13px}
+.cp-choices{display:flex;flex-wrap:wrap;gap:6px}.cp-choices button{border:1px solid #cfd8d2;background:#fff;border-radius:999px;padding:6px 13px;font-size:13px;cursor:pointer;color:var(--ink)}.cp-choices button.on{background:#e4f0ea;border-color:#3f7a6c;color:#2e6b5c;font-weight:600}
+.cp-hint{line-height:1.6}
+.cp-options{display:grid;gap:7px}.cp-option{display:grid;gap:3px;text-align:left;border:1px solid #d8dedb;background:#fff;border-radius:11px;padding:10px 12px;cursor:pointer;color:var(--ink);font-size:13.5px}
+.cp-option.on{border-color:#3f7a6c;box-shadow:0 0 0 2px #cfe6dd}.cp-option b{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.cp-option b em{font-style:normal;font-size:11px;font-weight:600;color:#3f7a6c;background:#e4f0ea;border-radius:999px;padding:1px 8px}
+.cp-option span{color:#4c5a53;font-size:12.5px;line-height:1.6}.cp-option small{color:#6f7d75;font-size:12px}
+.cp-foot,.cp-plain{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cp-foot input,.cp-plain input{flex:1 1 180px}
+.cp-send{flex:none;border:0;background:var(--ink,#1f2a25);color:#fff;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}.cp-send:disabled{opacity:.5}
+.room-card.turn-person{flex-direction:column;align-items:stretch}
+.auto-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 4px;font-size:12.5px;color:#4c5a53}.auto-line button{border:1px solid #c9d6cf;background:#fff;border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-weight:600;color:var(--ink)}.auto-line button.on{background:#e4f0ea;border-color:#3f7a6c;color:#2e6b5c}.auto-line .auto-state{flex:1;min-width:120px}
+.chat-message.auto-order .message-body{border-left:3px solid #cfe0d9;padding-left:10px}.chat-message.auto-order .message-meta strong{color:#3f7a6c}
+.notice-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:12.5px;color:#4c5a53}.notice-list li{padding:6px 8px;border-radius:8px;background:#f4f6f3;line-height:1.6}

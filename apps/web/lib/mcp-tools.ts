@@ -15,7 +15,7 @@ import { judgeReading, libraryCardsForStep, parseOhms } from "./parts/trouble-ca
 import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
 import { checkProductForm, footprint, placementReadback } from "./form-check";
-import { BoardError, boardOf, moveCard, recordReal, upsertCards, viewBoard } from "./board";
+import { BoardError, autoStatus, boardOf, moveCard, postNotice, recordReal, seeNotices, unseenNotices, upsertCards, viewBoard } from "./board";
 import { checkMockup, mockupBrief, type MockupSpec } from "./mockup";
 import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
@@ -264,6 +264,19 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - board.overdue에 예정일이 지난 것이 있으면 다음 대화에서 먼저 묻는다("로드셀 도착했나요?"). 일정이 밀려 기한(timelineWeeks)이 위험해지면 숫자로 알리고 순서를 다시 제안한다.
 - 다른 대장간의 카드는 그 담당 달그락의 일이다. 내 카드만 바꾸고, 다른 대장간에 영향이 있으면 대장에게 알린다(log_team_turn의 sharedSummary).
 
+## 대장의 자동 진행: 일괄 작업 → 요청·질문·제안 → 이어서 작업
+사람이 작업대에서 "달그락들에게 맡기기"를 켜면, 대장이 사람 없이 다음 일을 담당 달그락에게 차례로 넘긴다([대장의 작업 지시]·[대장의 전달]로 시작하는 말이 그것이다). 사람은 내 공방에 모인 것에만 답하면 된다. get_project의 autoProgress가 지금 상태다.
+- 지시를 받은 달그락은 할 수 있는 데까지 작업하고 도구로 기록한 뒤, 반드시 update_work_card로 차례를 넘긴다. 차례를 넘기지 않으면 같은 지시가 한 번 더 오고, 그래도 그대로면 자동 진행이 멈춘다.
+- 사람에게 넘길 때는 셋 중 하나를 고른다(update_work_card의 prompt).
+  - 요청(request): 사실을 알려 달라. 재서·세어서·확인해서 적는 칸으로 받는다. 칸마다 무엇을 어디서 어떻게 재는지 hint에 적고, 숫자에는 단위를 붙인다. 예: 도착했는지, 실측 치수, 쓸 수 있는 시간, 가진 부품의 값.
+  - 질문(question): 사람의 뜻을 더 구체화한다. 고를 수 있는 보기를 둘 이상 주고, 보기 밖의 생각도 적을 수 있게 한다. 예: 눈이 앞을 볼지 위를 볼지.
+  - 제안(proposal): 전체를 점검하다 병목이나 충돌이 생겼을 때 길을 고르게 한다. 보기마다 무엇이 달라지는지(비용 몇 원, 일정 며칠, 무엇을 다시 해야 하는지)를 숫자로 적고, 권하는 보기와 이유를 붙인다. 예: 배송이 밀렸다 → 기다린다 / 대체 부품으로 바꾼다 / 순서를 바꿔 하우징부터 한다.
+- 사람이 답하면 그 답이 [대장의 전달]로 담당 달그락에게 돌아온다. 답을 반영해 이어서 작업한다. 답에 없는 것을 짐작해 채우지 않는다.
+- 대화 중에(자동 진행이 아니어도) 사람이 사실이나 결정을 말하면 그 자리에서 기록한다: 부품을 바꾸면 record_part_source와 해당 설계 도구, 도착·지연은 record_real_world, 가진 부품은 set_maker_profile. 그리고 그 변화가 다른 달그락의 일에 닿으면 post_notice로 알린다(치수가 바뀌면 ME에게, 핀·전압이 바뀌면 HW에게, 데이터 형식이 바뀌면 SW에게, 겉모양·쓰임이 바뀌면 ID에게, 일정·비용이 바뀌면 대장에게).
+- [대장의 전달]로 변경 알림을 받으면: 내 카드·파일·치수에 주는 영향을 확인하고, 고칠 수 있으면 고치고, 승인된 설계를 바꿔야 하면 propose_design_change, 사람이 정해야 하면 제안(proposal)으로 넘긴다. 영향이 없으면 없다고 한 줄로 답한다.
+- 실제로 살 수 있는 부품이 설계와 다르면(단종, 품절, 다른 판형) 지어내지 않고, 찾은 대체품의 차이(치수·핀·전압·가격)를 적어 제안(proposal)으로 사람에게 고르게 한 뒤, 고른 대로 설계를 고치고 post_notice로 알린다.
+- 대장은 한 바퀴 돌 때마다 전체를 점검한다: 기한(timelineWeeks)과 예산에 비춰 밀린 것, 서로 기다리는 것, 예정일이 지난 것. 조절이 필요하면 제안으로 사람에게 넘긴다.
+
 ## 사람이 하는 일과 기본 원칙
 - 승인 세 가지, 부품 구매, 납땜, 측정, 업로드는 사람이 한다. 사용자가 말해준 결과는 record_task_result, set_purchase_status로 기록한다. 결과 제출은 합격이 아니다.
 - 결정은 사람이 한다. 확인 안 한 건 unknown. 사용자 기술 수준은 설명 방식과 연습 단계에 반영하고, 목표 자체를 임의로 낮추지 않는다.
@@ -368,6 +381,8 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     board: viewBoard(boardOf(project)),
+    autoProgress: autoStatus(boardOf(project), workflow.activeAgents),
+    notices: (boardOf(project).notices ?? []).slice(-10),
     designChanges: revisionOf(project).proposals.map(proposalSummary),
     verification: project.build ? ladderBrief(buildLadder(project), verifyOf(project)) : null,
     preciseMockup: project.preciseMockup ? { spec: project.preciseMockup, report: (({ checks, ...rest }) => ({ ...rest, checks: checks.filter((c) => !c.pass) }))(checkMockup(project.preciseMockup)) } : null,
@@ -861,11 +876,27 @@ export const TOOLS: ToolDefinition[] = [
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "cardId", "turn", "by"], properties: { projectId, cardId: { type: "string" }, by: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "지금 이 카드를 바꾸는 달그락" }, turn: { type: "string", enum: ["agent", "person", "waiting", "blocked", "done"] },
       ask: { type: "string", description: "turn=person: 사람에게 해 달라는 것. 도구·위치·단위까지 (예: 멀티미터 DC 20V로 3V3 핀과 GND 사이 전압을 재서 알려주세요)" },
       waiting: { type: "object", additionalProperties: false, required: ["what"], properties: { what: { type: "string", description: "무엇을 기다리는지 (예: 로드셀 배송)" }, kind: { type: "string", enum: ["delivery", "print", "booking", "curing", "other"] }, expectedAt: { type: ["string", "null"], description: "예정일 YYYY-MM-DD. 모르면 null" } } },
-      note: { type: "string", description: "막힌 이유나 참고 메모" } } },
+      note: { type: "string", description: "막힌 이유나 참고 메모" },
+      prompt: { type: "object", description: "turn=person일 때 사람에게 보여줄 것. kind로 셋 중 하나를 고른다. request(요청)=사실을 알려 달라: fields에 사람이 채울 칸을 만든다(재는 값은 number+unit, 날짜는 date, 고르는 것은 choice/multi+options, 예·아니요는 yes_no). question(질문)=사람의 뜻을 구체화한다: options에 보기를 둘 이상. proposal(제안)=병목이나 충돌을 풀 길을 고르게 한다: options마다 effect(비용·기간·바뀌는 것)를 반드시 적고, 권하는 보기는 recommend에 이유와 함께. 한 번에 묻는 칸은 다섯 개 이하로.", additionalProperties: true, required: ["kind"], properties: {
+        kind: { type: "string", enum: ["request", "question", "proposal"] },
+        fields: { type: "array", maxItems: 5, items: { type: "object", additionalProperties: false, required: ["id", "label", "kind"], properties: { id: { type: "string" }, label: { type: "string", description: "사람이 읽을 칸 이름 (예: HX711 보드의 짧은 쪽 길이)" }, kind: { type: "string", enum: ["number", "text", "choice", "multi", "date", "yes_no"] }, unit: { type: "string", description: "number의 단위 (mm, V, g, 개)" }, options: { type: "array", items: { type: "string" } }, hint: { type: "string", description: "어떻게 재거나 어디서 찾는지 한 줄" }, required: { type: "boolean" } } } },
+        options: { type: "array", maxItems: 5, items: { type: "object", additionalProperties: false, required: ["id", "label"], properties: { id: { type: "string" }, label: { type: "string" }, effect: { type: "string", description: "이걸 고르면 무엇이 달라지는지 (비용 +3,000원, 일정 +4일, 뚜껑만 다시 출력 등)" } } } },
+        allowOther: { type: "boolean", description: "question: 보기 밖의 생각을 직접 적어도 되는지 (기본 true)" },
+        recommend: { type: "object", additionalProperties: false, required: ["id", "why"], properties: { id: { type: "string" }, why: { type: "string" } } } } } } },
     run: async (input, context) => {
-      const parsed = z.object({ projectId: z.string().uuid(), cardId: z.string().max(40), by: z.enum(["chief", "hw", "sw", "me", "id"]), turn: z.enum(["agent", "person", "waiting", "blocked", "done"]), ask: z.string().max(400).optional(), waiting: z.object({ what: z.string().min(1).max(200), kind: z.enum(["delivery", "print", "booking", "curing", "other"]).default("other"), expectedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null) }).strict().optional(), note: z.string().max(400).optional() }).strict().parse(input);
+      const Field = z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,23}$/), label: z.string().min(1).max(80), kind: z.enum(["number", "text", "choice", "multi", "date", "yes_no"]), unit: z.string().max(12).optional(), options: z.array(z.string().min(1).max(60)).max(8).optional(), hint: z.string().max(200).optional(), required: z.boolean().optional() }).strict();
+      const Option = z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,23}$/), label: z.string().min(1).max(100), effect: z.string().max(240).optional() }).strict();
+      const Prompt = z.discriminatedUnion("kind", [
+        z.object({ kind: z.literal("request"), fields: z.array(Field).min(1).max(5) }).strict(),
+        z.object({ kind: z.literal("question"), options: z.array(Option).min(2).max(5), allowOther: z.boolean().optional() }).strict(),
+        z.object({ kind: z.literal("proposal"), options: z.array(Option).min(2).max(5), recommend: z.object({ id: z.string().max(24), why: z.string().min(1).max(240) }).strict().optional() }).strict()
+      ]);
+      const parsed = z.object({ projectId: z.string().uuid(), cardId: z.string().max(40), by: z.enum(["chief", "hw", "sw", "me", "id"]), turn: z.enum(["agent", "person", "waiting", "blocked", "done"]), ask: z.string().max(400).optional(), prompt: Prompt.optional(), waiting: z.object({ what: z.string().min(1).max(200), kind: z.enum(["delivery", "print", "booking", "curing", "other"]).default("other"), expectedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null) }).strict().optional(), note: z.string().max(400).optional() }).strict().parse(input);
       await ownedProject(parsed.projectId, context);
-      const updated = await mutateProject(parsed.projectId, (p) => { p.board = moveCard(boardOf(p), parsed.cardId, parsed as Parameters<typeof moveCard>[2], parsed.by); });
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        // 이 달그락이 움직였다는 것은 자기 앞으로 온 변경 알림을 읽었다는 뜻이다.
+        p.board = seeNotices(moveCard(boardOf(p), parsed.cardId, parsed as Parameters<typeof moveCard>[2], parsed.by), parsed.by);
+      });
       return stored(updated, context, "작업 카드의 차례를 바꿨어요.");
     }
   },
@@ -883,6 +914,10 @@ export const TOOLS: ToolDefinition[] = [
       await ownedProject(parsed.projectId, context);
       const updated = await mutateProject(parsed.projectId, (p) => {
         p.board = recordReal(boardOf(p), parsed as Parameters<typeof recordReal>[1]);
+        // 배송 지연·문제·도착, 그리고 현실의 사건은 다른 달그락의 순서에 영향을 준다.
+        const dl = parsed.delivery;
+        const changed = dl && dl.status !== "ordered" ? `${dl.label} ${{ delayed: "배송이 밀렸어요", problem: "배송에 문제가 생겼어요", arrived: "도착했어요" }[dl.status as "delayed" | "problem" | "arrived"]}${dl.expectedAt ? ` (새 예정일 ${dl.expectedAt})` : ""}${dl.note ? ` · ${dl.note}` : ""}` : parsed.event ?? (parsed.availability ? `사람의 여건: ${parsed.availability}` : "");
+        if (changed) p.board = postNotice(p.board, { from: "person", text: changed, affects: ["chief", ...workflowFor(p).activeAgents] }, randomUUID());
         // 회로 부품이면 기존 구매 상태도 함께 맞춘다. 부품목록과 작업대가 서로 다른 말을 하지 않게.
         const d = parsed.delivery;
         if (d?.ref && p.build?.blueprint.components.some((c) => c.ref === d.ref)) { const w = workflowFor(p); w.purchases[d.ref] = d.status === "arrived" ? "received" : d.status === "problem" ? "problem" : "ordered"; p.workflow = w; }
@@ -954,6 +989,25 @@ export const TOOLS: ToolDefinition[] = [
         pushActivity(p, { source: "claude", title: "정밀 목업" });
       });
       return stored(updated, context, `정밀 목업을 저장했어요.\n${mockupBrief(spec, report)}\n\n${report.failed.length ? "실패한 검사를 고쳐 다시 저장한 뒤에 사람에게 보여주세요." : "사람에게 작업대의 '정밀 목업'에서 돌려 보고, 투명도와 분해로 속을 확인해 달라고 하세요."}`);
+    }
+  }
+  ,{
+    name: "post_notice", title: "다른 달그락에게 변경 알리기",
+    description: "내 대장간에서 정해진 것이나 사람이 말해준 것이 다른 달그락의 일에 영향을 줄 때 남긴다. 예: 부품을 다른 모델로 바꿈(치수·핀이 달라짐), 실제로 살 수 있는 부품이 달라짐, 보드 크기가 바뀜, 핀 배치가 바뀜, 데이터 형식이 바뀜, 일정이 밀림. 받는 달그락은 다음 차례에 이 알림을 보고 자기 카드·파일·치수를 고친다. 누구에게 영향이 가는지(affects)를 정확히 고른다.",
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "from", "text", "affects"], properties: { projectId, from: { type: "string", enum: ["chief", "hw", "sw", "me", "id"] }, text: { type: "string", description: "무엇이 어떻게 바뀌었는지 숫자와 함께 (예: 로드셀을 80mm형에서 130mm형으로 바꿨어요. 길이 130.2mm, 구멍 간격 15mm는 같음)" }, affects: { type: "array", minItems: 1, items: { type: "string", enum: ["chief", "hw", "sw", "me", "id"] } } } },
+    run: async (input, context) => {
+      const parsed = z.object({ projectId: z.string().uuid(), from: z.enum(["chief", "hw", "sw", "me", "id"]), text: z.string().min(1).max(500), affects: z.array(z.enum(["chief", "hw", "sw", "me", "id"])).min(1).max(5) }).strict().parse(input);
+      const project = await ownedProject(parsed.projectId, context);
+      const team = ["chief", ...workflowFor(project).activeAgents];
+      const outside = parsed.affects.filter((a) => !team.includes(a));
+      if (outside.length) throw new ToolError(`팀에 없는 달그락이에요: ${outside.map((a) => a.toUpperCase()).join(", ")}. 지금 팀은 ${team.map((a) => a.toUpperCase()).join(", ")}예요.`);
+      const updated = await mutateProject(parsed.projectId, (p) => {
+        p.board = postNotice(boardOf(p), parsed as Parameters<typeof postNotice>[1], randomUUID());
+        const w = workflowFor(p);
+        w.sharedUpdates.push({ id: randomUUID(), agent: parsed.from as AgentId, text: `변경 알림 → ${parsed.affects.map((a) => a.toUpperCase()).join("·")}: ${parsed.text}`, createdAt: new Date().toISOString() });
+        p.workflow = w;
+      });
+      return stored(updated, context, "변경을 알렸어요. 받는 달그락이 다음 차례에 확인해요.");
     }
   }
 ];
