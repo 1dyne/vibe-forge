@@ -49,7 +49,7 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
   const steps = devSetupSteps(saved, project, me?.connectorUrl ?? null);
   return <div className="modal-backdrop" onClick={onClose}>
     <section className="profile-modal connect-modal" role="dialog" aria-modal="true" aria-label="연결" onClick={(e) => e.stopPropagation()}>
-      <header><h2>{project.name}</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
+      <header><h2>연결</h2><button aria-label="닫기" onClick={onClose}>×</button></header>
       <div className="connect-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "ai"} className={tab === "ai" ? "active" : ""} onClick={() => onTab("ai")}><IconLink/> AI 연결</button>
         <button role="tab" aria-selected={tab === "dev"} className={tab === "dev" ? "active" : ""} onClick={() => onTab("dev")}><IconLaptop/> 개발 연결</button>
@@ -69,8 +69,8 @@ export default function ConnectPanel({ project, tab, busy, onTab, onClose, onAct
           <h3 className="connect-subtitle">커넥터 주소</h3>
           <div className="copy-row"><code>{me.connectorUrl}</code><Copy value={me.connectorUrl} /></div>
           <small className="muted">이 주소는 모두 같아서 남에게 보여도 괜찮아요. 내 기록은 허용 창을 거친 뒤에만 열려요.</small>
-          <h3 className="connect-subtitle">지침 문구</h3>
-          <p className="muted">이 프로젝트에만 기록이 쌓이도록 AI에게 먼저 주는 문구예요.</p>
+          <h3 className="connect-subtitle">「{project.name}」 전용 지침 문구</h3>
+          <p className="muted">지금 열어 둔 프로젝트 「{project.name}」에만 기록이 쌓이도록 AI에게 먼저 주는 문구예요. 다른 프로젝트를 열면 그 프로젝트의 문구로 바뀌어요.</p>
           <pre className="instructions-box">{instructions}</pre><Copy value={instructions} label="지침 복사" />
         </> : <p>{me?.kind === "operator" ? "운영자 계정에는 커넥터 주소가 없어요. 참여자 관리에서 본인 이름으로 링크를 만들어 쓰세요." : "커넥터 주소를 불러오지 못했어요. 운영자에게 받은 주소를 사용해주세요."}</p>}
       </>}
