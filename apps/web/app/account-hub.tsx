@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { LocalProject, MakerProfile } from "../lib/project-types";
-import { CHECKLIST } from "../lib/checklist";
+import { CHECKLIST, extraQuestionsFor, type ExtraAnswers } from "../lib/checklist";
 import { CODING_EXPERIENCE, DEV_INSTALL_OPTIONS, DEV_TOOLS, emptyDevProfile, projectInstructions } from "../lib/dev-handoff";
 import { emptyProfile, personPart, TOOL_OPTIONS } from "../lib/workflow";
 import AccountPanel from "./account-panel";
 import { HELPER_COMMAND, HELPER_REPO_URL } from "./helper-composer";
 import MakerspaceList from "./makerspace-list";
 import OwnedPartsField from "./owned-parts-field";
+import { ExtraFields } from "./project-extras";
 
 // 나에 대한 것은 전부 여기 한 곳에 모은다. 예전에는 '내 계정', '제작 프로필',
 // '메이커스페이스', 'AI 연결', '개발 연결'이 사이드바에 따로 있었고, 같은 질문(코딩 경험,
@@ -27,7 +28,7 @@ const TABS: Array<{ id: HubTab; label: string; hint: string }> = [
   { id: "settings", label: "설정", hint: "" }
 ];
 const option = (key: "solderingSkill" | "printerAccess" | "travelRange") => CHECKLIST.find((q) => q.key === key)!;
-const EDITED: Array<keyof MakerProfile> = ["tools", "toolsConfirmed", "firmwareExperience", "solderingSkill", "printerAccess", "region", "travelRange", "ownedParts", "devProfile"];
+const EDITED: Array<keyof MakerProfile> = ["tools", "toolsConfirmed", "firmwareExperience", "solderingSkill", "printerAccess", "region", "travelRange", "ownedParts", "devProfile", "extras", "learningMode"];
 
 function Copy({ value, label = "복사" }: { value: string; label?: string }) {
   const [done, setDone] = useState(false);
@@ -113,8 +114,11 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
   }
   const close = () => { if (!dirty || window.confirm("저장하지 않은 변경이 있어요. 닫을까요?")) onClose(); };
   const radios = (key: "solderingSkill" | "printerAccess" | "travelRange") => <fieldset><legend>{option(key).question}</legend>{option(key).options!.map((o) => <label className="radio-option" key={o.value}><input type="radio" name={`hub-${key}`} checked={profile?.[key] === o.value} onChange={() => change({ [key]: o.value } as Partial<MakerProfile>)} />{o.label}</label>)}</fieldset>;
+  // 추가 질문은 접어 둔다. 탭이 글로 가득 차면 정작 필수 항목이 안 보인다.
+  const extras = (which: "skill" | "gear" | "place") => { const questions = extraQuestionsFor(which); const answers: ExtraAnswers = profile?.extras ?? {}; const done = questions.filter((q) => Array.isArray(answers[q.id]) ? (answers[q.id] as string[]).length > 0 : !!answers[q.id]).length;
+    return <details className="px-more"><summary>더 알려주면 더 잘 맞춰요 <small>{done}/{questions.length}</small></summary><ExtraFields questions={questions} answers={answers} name={`hub-extra-${which}`} onChange={(next) => change({ extras: next })} /></details>; };
   const current = tabs.find((t) => t.id === tab) ?? tabs[0];
-  const editable = tab === "skill" || tab === "gear" || tab === "place";
+  const editable = tab === "skill" || tab === "gear" || tab === "place" || tab === "settings";
 
   return <div className="modal-backdrop" onClick={close}>
     <section className="profile-modal connect-modal account-hub" role="dialog" aria-modal="true" aria-label="내 계정" onClick={(e) => e.stopPropagation()}>
@@ -131,12 +135,14 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
         <fieldset><legend>코드를 만들 때 쓸 도구 <small>(선택)</small></legend><div className="choice-row">{(["claude_code", "codex", "undecided"] as const).map((v) => <label key={v} className={dev.tool === v ? "on" : ""}><input type="radio" name="hub-devtool" checked={dev.tool === v} onChange={() => changeDev({ tool: v })} />{DEV_TOOLS[v]}</label>)}</div></fieldset>
         <fieldset><legend>내 컴퓨터</legend><div className="choice-row">{(["mac", "windows", "linux"] as const).map((v) => <label key={v} className={dev.os === v ? "on" : ""}><input type="radio" name="hub-os" checked={dev.os === v} onChange={() => changeDev({ os: v })} />{{ mac: "Mac", windows: "Windows", linux: "Linux" }[v]}</label>)}</div></fieldset>
         <fieldset><legend>컴퓨터에 이미 설치된 것</legend><div className="tool-checks">{DEV_INSTALL_OPTIONS.map((t) => <label key={t}><input type="checkbox" checked={dev.installed.includes(t)} onChange={(e) => changeDev({ confirmed: true, installed: e.target.checked ? [...dev.installed, t] : dev.installed.filter((x) => x !== t) })} />{t}</label>)}</div><label className="none-check"><input type="checkbox" checked={dev.confirmed && !dev.installed.length} onChange={(e) => changeDev({ installed: [], confirmed: e.target.checked })} />아무것도 설치하지 않았어요</label></fieldset>
+        {extras("skill")}
       </>}
 
       {tab === "gear" && profile && <>
         <fieldset><legend>사용할 수 있는 제작 도구</legend><div className="tool-checks">{TOOL_OPTIONS.map((t) => <label key={t}><input type="checkbox" checked={profile.tools.includes(t)} onChange={(e) => change({ toolsConfirmed: true, tools: e.target.checked ? [...profile.tools, t] : profile.tools.filter((x) => x !== t) })} />{t}</label>)}</div><label className="none-check"><input type="checkbox" checked={profile.toolsConfirmed && !profile.tools.length} onChange={(e) => change({ tools: [], toolsConfirmed: e.target.checked })} />아직 보유한 도구가 없어요</label></fieldset>
         <OwnedPartsField parts={profile.ownedParts ?? []} onChange={(next) => change({ ownedParts: next })} />
         {radios("printerAccess")}
+        {extras("gear")}
       </>}
 
       {tab === "place" && profile && <>
@@ -148,6 +154,7 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
           <p>3D 프린터, 레이저 커터, 납땜 도구 같은 장비를 기본 교육을 받은 뒤 무료나 재료비 정도로 빌려 쓰는 작업 공간이에요. 비슷한 곳으로 팹랩(Fab Lab), 무한상상실, 도서관·과학관 메이커존, 구청·시청 메이커스페이스, 대학 팹랩·창업지원센터가 있고, 직접 출력하기 어려우면 3D 출력 대행 서비스도 있어요.</p>
           <ul className="maker-tips"><li><b>메이크올(makeall.com)</b>에서 지역으로 메이커스페이스와 보유 장비를 검색해요.</li><li>검색어: “[내 지역] 메이커스페이스 3D 프린터 예약”, “[내 지역] 팹랩”, “[내 지역] 무한상상실”.</li><li>이용 조건(기본 교육 이수, 예약 방법, 재료비)과 운영 시간은 방문 전에 공식 페이지에서 꼭 확인하세요.</li><li>달그락에게 “내 근처 메이커스페이스 찾아줘”라고 말해도 돼요.</li></ul>
         </details>
+        {extras("place")}
       </>}
 
       {tab === "ai" && <AiTab project={project} />}
@@ -158,6 +165,8 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
             <button onClick={() => settings.onProjectSettings?.()}><b>프로젝트 설정</b><small>무엇을 만드는지, 목적, 기한, 예산</small></button>
             <button onClick={() => settings.onDevConnect?.()}><b>앱·코드 만들기 연결</b><small>앱이나 코드가 필요할 때 쓰는 도구와 명세서</small></button>
           </div></>}
+        <h3 className="connect-subtitle">배우면서 만들기</h3>
+        <label className="ld-toggle"><input type="checkbox" checked={profile?.learningMode === true} disabled={!profile} onChange={(e) => change({ learningMode: e.target.checked })} /><span><b>학습 모드</b><small>단계마다 왜 이렇게 하는지 더 자세히 알려줘요. 설명이 있는 자리에 작은 회색 i가 붙고, 누르면 볼 수 있어요.</small></span></label>
         <h3 className="connect-subtitle">화면</h3>
         <div className="settings-rows">
           <button onClick={settings.onToggleShortNames} aria-pressed={settings.shortNames}><b>달그락 이름 짧게 보기</b><small>{settings.shortNames ? "켜짐" : "꺼짐"}</small></button>
