@@ -11,7 +11,9 @@ import { agentName } from "../lib/workflow";
 export type RoomState = "my_turn" | "blocked" | "working" | "waiting" | "done" | "idle";
 
 /** styles.css의 .agent-dot.dot-* 와 같은 색 */
-export const AGENT_COLOR: Record<AgentId, string> = { chief: "#548b7c", hw: "#c07a4e", sw: "#8087bc", me: "#bb9868", id: "#bf88a3" };
+export const AGENT_COLOR: Record<AgentId, string> = { chief: "#548b7c", hw: "#d2594b", sw: "#5b8fd9", me: "#d9a928", id: "#8f6fd0" };
+/** 팀 색으로 칠한 달그락 그림 */
+const art = (room: AgentId, frame: "idle" | "thinking_1" | "thinking_2") => `/characters/${room === "chief" ? "" : `${room}/`}${frame}.png`;
 const STATE_LABEL: Record<RoomState, string> = { my_turn: "내 차례", blocked: "막힘", working: "작업 중", waiting: "기다리는 중", done: "끝남", idle: "쉬는 중" };
 
 /** 대장은 카드가 없어도 늘 있다. 나머지는 작업대에 카드가 있는 달그락만. */
@@ -90,8 +92,8 @@ function Station({ room, state, count, selected, live, compact, late }: { room: 
     {/* 달그락 */}
     <g className="fs-body">
       {working
-        ? <><image className="fs-frame fs-frame-a" href="/characters/thinking_1.png" x="26" y="26" width="62" height="62" /><image className="fs-frame fs-frame-b" href="/characters/thinking_2.png" x="26" y="26" width="62" height="62" /></>
-        : <image href="/characters/idle.png" x={state === "my_turn" ? 30 : 26} y="26" width="62" height="62" />}
+        ? <><image className="fs-frame fs-frame-a" href={art(room, "thinking_1")} x="26" y="26" width="62" height="62" /><image className="fs-frame fs-frame-b" href={art(room, "thinking_2")} x="26" y="26" width="62" height="62" /></>
+        : <image href={art(room, "idle")} x={state === "my_turn" ? 30 : 26} y="26" width="62" height="62" />}
     </g>
 
     {working && <g>

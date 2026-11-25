@@ -451,3 +451,6 @@ tr.is-new{animation-name:new-flash-row}
 .gear-menu{position:relative}.gear-menu summary{list-style:none;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:16px;color:#6f7d75}.gear-menu summary::-webkit-details-marker{display:none}.gear-menu summary:hover{background:#eef3f0}.gear-menu[open]>div{position:absolute;right:0;top:36px;z-index:5;background:#fff;border:1px solid #d8dedb;border-radius:12px;box-shadow:0 8px 24px #223c3020;padding:6px;display:grid;gap:2px;min-width:210px}.gear-menu button{display:grid;gap:2px;text-align:left;border:0;background:none;border-radius:8px;padding:9px 10px;font-size:13px;cursor:pointer;color:var(--ink)}.gear-menu button:hover{background:#eef3f0}.gear-menu small{color:#7a877f;font-size:11.5px}
 .pm-summary{margin:0 0 12px;font-size:13px;color:#4c5a53;line-height:1.7}
 .gear-menu summary{border:0;background:none;padding:0}
+/* 팀 색: 하드웨어 붉은색 · 소프트웨어 파란색 · 기구설계 노란색 · 제품 디자인 보라색 (대장은 민트) */
+.dot-hw{background:#d2594b}.dot-sw{background:#5b8fd9}.dot-me{background:#d9a928}.dot-id{background:#8f6fd0}
+.agent-hw .message-meta strong{color:#b03f33}.agent-sw .message-meta strong{color:#3c6fb8}.agent-me .message-meta strong{color:#987312}.agent-id .message-meta strong{color:#6d4fb3}
