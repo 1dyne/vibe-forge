@@ -454,3 +454,9 @@ tr.is-new{animation-name:new-flash-row}
 /* 팀 색: 하드웨어 붉은색 · 소프트웨어 파란색 · 기구설계 노란색 · 제품 디자인 보라색 (대장은 민트) */
 .dot-hw{background:#d2594b}.dot-sw{background:#5b8fd9}.dot-me{background:#d9a928}.dot-id{background:#8f6fd0}
 .agent-hw .message-meta strong{color:#b03f33}.agent-sw .message-meta strong{color:#3c6fb8}.agent-me .message-meta strong{color:#987312}.agent-id .message-meta strong{color:#6d4fb3}
+/* 가입·로그인 방법: 같은 크기의 버튼 */
+.join-methods{display:grid;gap:8px;margin:6px 0}.join-methods.two{grid-template-columns:1fr 1fr}
+.join-method{display:flex;align-items:center;justify-content:center;min-height:46px;border:1px solid #cfd8d2;background:#fff;border-radius:11px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;text-decoration:none;padding:0 12px;text-align:center}
+.join-method:hover{background:#f3f7f5}.join-method.on{border-color:#3f7a6c;background:#e4f0ea;color:#2e6b5c}
+.join-email-fields{display:grid;gap:8px;margin-top:6px;padding-top:10px;border-top:1px solid #e3e8e5}
+@media(max-width:420px){.join-methods.two{grid-template-columns:1fr}}

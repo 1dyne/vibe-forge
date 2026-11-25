@@ -37,6 +37,7 @@ beforeAll(async () => {
   vi.stubEnv("VAULT_MASTER_KEY", "test-vault-master-key-0123456789abcdef");
   vi.stubEnv("APP_BASE_URL", ORIGIN);
   vi.stubEnv("SIGNUP_MODE", "open");
+  vi.stubEnv("EMAIL_SIGNUP", "on");
   vi.stubEnv("GOOGLE_CLIENT_ID", "google-client");
   vi.stubEnv("GOOGLE_CLIENT_SECRET", "google-secret");
 });
@@ -256,5 +257,16 @@ describe("old link accounts", () => {
     const later = await signIn("linker@example.com", "converted password");
     expect((await projectsOf(later.cookie))!.map((p) => p.idea)).toEqual(["링크 시절 아이디어"]);
     expect((await listUsers()).find((u) => u.email === "linker@example.com")).toMatchObject({ auth: "password", lock: "password" });
+  });
+});
+
+describe("email sign-up switch", () => {
+  it("refuses email sign-up while the switch is off", async () => {
+    vi.stubEnv("EMAIL_SIGNUP", "");
+    try {
+      const { POST } = await import("../apps/web/app/api/auth/signup/route");
+      const res = await POST(new Request(`${ORIGIN}/api/auth/signup`, { method: "POST", headers: { "content-type": "application/json", origin: ORIGIN }, body: JSON.stringify({ name: "가", email: "off@example.com", password: "long-enough-password", agreeTerms: true, agreePrivacy: true, isAdult: true }) }) as never);
+      expect(res.status).toBe(403);
+    } finally { vi.stubEnv("EMAIL_SIGNUP", "on"); }
   });
 });

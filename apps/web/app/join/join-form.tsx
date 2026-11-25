@@ -5,7 +5,9 @@ import RecoveryCode from "../recovery-code";
 
 type Done = { name: string; email: string; recoveryCode: string };
 
-export default function JoinForm({ needsCode, google, askGoogleConsent }: { needsCode: boolean; google: boolean; askGoogleConsent: boolean }) {
+export default function JoinForm({ needsCode, google, email: emailOpen, askGoogleConsent }: { needsCode: boolean; google: boolean; /** 이메일 가입을 화면에 내놓을지 */ email: boolean; askGoogleConsent: boolean }) {
+  // 가입 방법은 같은 크기의 버튼 둘로 고른다. 이메일을 고르면 그때 입력 칸이 열린다.
+  const [byEmail, setByEmail] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,7 +26,7 @@ export default function JoinForm({ needsCode, google, askGoogleConsent }: { need
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !emailOpen || !byEmail) return;
     if (password !== confirm) { setError("비밀번호 확인이 일치하지 않아요."); return; }
     setBusy(true); setError("");
     try {
@@ -67,24 +69,30 @@ export default function JoinForm({ needsCode, google, askGoogleConsent }: { need
 
   return <>
     <form onSubmit={submit} className="join-form">
-      <p>Claude와 함께 아이디어를 하드웨어로 만들어요.</p>
+      <p>달그락과 함께 아이디어를 하드웨어로 만들어요.</p>
       {error && <p className="login-error" role="alert">{error}</p>}
       <label htmlFor="join-name">별명 <small>(다른 사람에게 보이지 않아요. 실명 대신 별명을 권해요)</small></label>
       <input id="join-name" value={name} maxLength={30} required onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
-      <label htmlFor="join-email">이메일</label>
-      <input id="join-email" type="email" value={email} maxLength={254} required onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-      <label htmlFor="join-password">비밀번호 <small>(10자 이상)</small></label>
-      <input id="join-password" type="password" value={password} minLength={10} maxLength={200} required onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-      <label htmlFor="join-confirm">비밀번호 확인</label>
-      <input id="join-confirm" type="password" value={confirm} maxLength={200} required onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
       {needsCode && <><label htmlFor="join-code">초대 코드</label><input id="join-code" value={code} maxLength={40} required onChange={(e) => setCode(e.target.value)} autoComplete="off" /></>}
       <label className="remember-session"><input type="checkbox" checked={age14} onChange={(e) => setAge14(e.target.checked)} />만 14세 이상이에요</label>
       <label className="remember-session"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} /><span><a href="/terms" target="_blank">이용약관</a>에 동의해요 (필수)</span></label>
       <label className="remember-session"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} /><span><a href="/privacy" target="_blank">개인정보 수집·이용</a>에 동의해요 (필수)</span></label>
-      <p className="muted"><small>이메일로 가입하면 내 기록이 내 비밀번호로 잠겨서 운영자도 볼 수 없어요.</small></p>
-      <button type="submit" disabled={busy || !name.trim() || !email.trim() || password.length < 10 || !confirm || !agreedAll || (needsCode && !code.trim())}>{busy ? "가입하는 중…" : "이메일로 가입하기"}</button>
-      {google && <><div className="or-divider"><span>또는</span></div><button type="button" className="google-button" onClick={openGoogle}>구글로 가입하기</button></>}
+      {!google && !emailOpen && <p className="notice">지금은 가입 방법을 준비하고 있어요. 운영자에게 문의해주세요.</p>}
+      <div className={"join-methods" + (google && emailOpen ? " two" : "")}>
+        {google && <button type="button" className="join-method google" onClick={openGoogle}>구글로 가입하기</button>}
+        {emailOpen && <button type="button" className={"join-method" + (byEmail ? " on" : "")} aria-expanded={byEmail} onClick={() => setByEmail((v) => !v)}>이메일로 가입하기</button>}
+      </div>
+      {google && emailOpen && <p className="muted"><small>구글은 빠르고, 이메일은 내 기록이 내 비밀번호로 잠겨 운영자도 볼 수 없어요.</small></p>}
+      {emailOpen && byEmail && <div className="join-email-fields">
+      <label htmlFor="join-email">이메일</label>
+      <input id="join-email" type="email" value={email} maxLength={254} required={byEmail} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+      <label htmlFor="join-password">비밀번호 <small>(10자 이상)</small></label>
+      <input id="join-password" type="password" value={password} minLength={10} maxLength={200} required={byEmail} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+      <label htmlFor="join-confirm">비밀번호 확인</label>
+      <input id="join-confirm" type="password" value={confirm} maxLength={200} required={byEmail} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
+        <button type="submit" disabled={busy || !name.trim() || !email.trim() || password.length < 10 || !confirm || !agreedAll || (needsCode && !code.trim())}>{busy ? "가입하는 중…" : "이메일로 가입 마치기"}</button>
+      </div>}
     </form>
-    {notice && <GoogleNotice onClose={() => setNotice(false)} onEmail={() => { setNotice(false); document.getElementById("join-email")?.focus(); }} onContinue={continueGoogle} />}
+    {notice && <GoogleNotice onClose={() => setNotice(false)} onEmail={() => { setNotice(false); if (emailOpen) { setByEmail(true); setTimeout(() => document.getElementById("join-email")?.focus(), 50); } }} onContinue={continueGoogle} />}
   </>;
 }

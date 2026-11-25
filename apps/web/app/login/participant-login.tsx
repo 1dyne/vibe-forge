@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 export default function ParticipantLogin({ next, google, unlock, canJoin }: { next: string; google: boolean; unlock: boolean; canJoin: boolean }) {
   const [mode, setMode] = useState<"login" | "forgot">("login");
   const [email, setEmail] = useState("");
+  const [byEmail, setByEmail] = useState(false);
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -59,18 +60,24 @@ export default function ParticipantLogin({ next, google, unlock, canJoin }: { ne
     <button type="button" className="link-button" onClick={() => { setMode("login"); setInfo(""); setError(""); }}>← 로그인으로</button>
   </form>;
 
+  // 구글이 켜져 있으면 구글을 먼저, 이메일은 같은 크기의 버튼을 눌러 펼친다.
   return <form className="join-form" onSubmit={login}>
     {error && <p className="login-error" role="alert">{error}</p>}
     {unverified && <button type="button" onClick={() => void resend()}>인증 메일 다시 받기</button>}
     {info && <p className="notice" role="status">{info}</p>}
-    <label htmlFor="login-email">이메일</label>
-    <input id="login-email" type="email" value={email} required onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-    <label htmlFor="login-password">비밀번호</label>
-    <input id="login-password" type="password" value={password} required onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-    <label className="remember-session"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />로그인 유지 <small>30일 · 내 기기에서만</small></label>
-    <button disabled={busy || !email.trim() || !password}>{busy ? "로그인하는 중…" : "로그인"}</button>
-    <button type="button" className="link-button" onClick={() => { setMode("forgot"); setError(""); }}>비밀번호를 잊었어요</button>
-    {google && <><div className="or-divider"><span>또는</span></div><a className="google-button" href={`/api/auth/google/start?intent=login&next=${encodeURIComponent(next)}`}>구글로 로그인</a></>}
+    <div className={"join-methods" + (google ? " two" : "")}>
+      {google && <a className="join-method google" href={`/api/auth/google/start?intent=login&next=${encodeURIComponent(next)}`}>구글로 로그인</a>}
+      {google && <button type="button" className={"join-method" + (byEmail ? " on" : "")} aria-expanded={byEmail} onClick={() => setByEmail((v) => !v)}>이메일로 로그인</button>}
+    </div>
+    {(byEmail || !google) && <div className="join-email-fields">
+      <label htmlFor="login-email">이메일</label>
+      <input id="login-email" type="email" value={email} required onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+      <label htmlFor="login-password">비밀번호</label>
+      <input id="login-password" type="password" value={password} required onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+      <label className="remember-session"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />로그인 유지 <small>30일 · 내 기기에서만</small></label>
+      <button disabled={busy || !email.trim() || !password}>{busy ? "로그인하는 중…" : "로그인"}</button>
+      <button type="button" className="link-button" onClick={() => { setMode("forgot"); setError(""); }}>비밀번호를 잊었어요</button>
+    </div>}
     {canJoin && <p className="login-links">처음이라면 <a href="/join">가입하기</a></p>}
   </form>;
 }

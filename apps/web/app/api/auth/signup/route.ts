@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { signUpWithEmail } from "../../../../lib/account-service";
 import { failure, origin } from "../../../../lib/auth-http";
-import { signupMode } from "../../../../lib/policies";
+import { emailSignupOpen, signupMode } from "../../../../lib/policies";
 import { clientIp, hit, tooMany } from "../../../../lib/rate-limit";
 import { hasValidOrigin } from "../../../../lib/request-security";
 
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });
   const mode = signupMode();
   if (mode === "closed") return NextResponse.json({ error: "지금은 가입을 받지 않아요." }, { status: 403 });
+  if (!emailSignupOpen()) return NextResponse.json({ error: "이메일 가입은 아직 준비 중이에요. 지금은 구글로 가입할 수 있어요." }, { status: 403 });
   const limited = hit("signup", clientIp(request));
   if (!limited.ok) return tooMany(limited.retryAfterSec);
   const parsed = Signup.safeParse(await request.json().catch(() => null));
