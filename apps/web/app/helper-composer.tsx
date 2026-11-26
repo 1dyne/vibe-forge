@@ -10,8 +10,12 @@ import TerminalHelp from "./terminal-help";
 type Model = { slug: string; name: string };
 type Status = { online: boolean; model: string | null; account: string | null; models?: Model[] };
 type RelayEvent = { type: "delta"; text: string } | { type: "status"; text: string } | { type: "done"; text: string } | { type: "error"; code: string; message: string };
-export type HelperLive = { user: string; text: string; step: string };
-export type HelperTurn = { user: string; assistant: string | null; error: string | null; hadProject: boolean };
+// 한 번 말을 거는 일(보내고 → 답을 받기)에 붙는 id. 다시 보내기는 같은 id를 그대로 쓰므로,
+// 화면은 먼저 그린 실패한 턴을 지우고 새 결과로 갈아 끼운다. 같은 말이 두 줄로 남지 않는다.
+export type HelperLive = { turnId: string; user: string; text: string; step: string };
+export type HelperTurn = { turnId: string; user: string; assistant: string | null; error: string | null; hadProject: boolean };
+let turnSeq = 0;
+const newTurnId = () => `turn-${Date.now().toString(36)}-${++turnSeq}`;
 const USAGE_URL = "https://chatgpt.com/settings/usage";
 export const HELPER_REPO_URL = "https://github.com/1dyne/dalgrak-helper";
 export const HELPER_COMMAND = "npx github:1dyne/dalgrak-helper";
@@ -21,7 +25,7 @@ const MAX_PHOTOS = 3;
 const CLAUDE_INSTALL = "npm install -g @anthropic-ai/claude-code";
 const CLAUDE_LOGIN = "claude";
 /** 보내지 못한 말. 다시 보내기를 누르면 그대로 다시 보낸다 */
-type Failed = { message: string; usage: boolean; code: string; text: string; photos: Photo[] };
+type Failed = { turnId: string; message: string; usage: boolean; code: string; text: string; photos: Photo[] };
 
 // 휴대폰 사진은 몇 MB씩 된다. 긴 변을 1,280px로 줄여 JPEG로 바꿔 보낸다.
 async function shrink(file: File): Promise<Photo> {
@@ -100,7 +104,7 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
     } catch (caught) { setError({ message: caught instanceof Error ? caught.message : "사진을 읽지 못했어요.", usage: false }); }
   }
 
-  async function follow(jobId: string, user: string): Promise<string> {
+  async function follow(jobId: string, turnId: string, user: string): Promise<string> {
     let from = 0;
     let shown = "";
     for (let misses = 0; alive.current;) {
@@ -110,8 +114,8 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
       const body = await response.json() as { events: RelayEvent[]; next: number; finished: boolean };
       from = body.next;
       for (const event of body.events) {
-        if (event.type === "delta") { shown += event.text; onLive({ user, text: shown, step: "" }); }
-        else if (event.type === "status") onLive({ user, text: shown, step: event.text });
+        if (event.type === "delta") { shown += event.text; onLive({ turnId, user, text: shown, step: "" }); }
+        else if (event.type === "status") onLive({ turnId, user, text: shown, step: event.text });
         else if (event.type === "error") throw Object.assign(new Error(event.message), { code: event.code, partial: shown });
         else if (event.type === "done") return event.text || shown;
       }
@@ -125,10 +129,11 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
     const message = again ? again.text : text.trim() || (photos.length ? "이 사진을 봐주세요." : "");
     if (!message || busy) return;
     const sending = again ? again.photos : photos;
+    const turnId = again ? again.turnId : newTurnId();
     setFailed(null);
     const hadProject = !!project;
     setBusy(true); setError(null);
-    onLive({ user: message, text: "", step: `${speaker}에게 전하는 중` });
+    onLive({ turnId, user: message, text: "", step: `${speaker}에게 전하는 중` });
     try {
       const response = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project?.id ?? null, text: message, channel, ...(chosen ? { model: chosen } : {}), ...(sending.length ? { images: sending } : {}), ...(again ? { retry: true } : {}) }) });
       if (response.status === 401) { window.location.assign("/login"); return; }
@@ -136,15 +141,15 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
       if (!response.ok) { if (body.code === "offline") setStatus((s) => ({ ...(s ?? { model: null, account: null }), online: false })); throw Object.assign(new Error(body.error ?? "보내지 못했어요."), { code: body.code ?? "" }); }
       if (!again) { setText(""); setPhotos([]); }
       if (body.project) onProject(body.project);
-      const answer = await follow(body.jobId, message);
-      await onTurnEnd({ user: message, assistant: answer, error: null, hadProject });
+      const answer = await follow(body.jobId, turnId, message);
+      await onTurnEnd({ turnId, user: message, assistant: answer, error: null, hadProject });
     } catch (caught) {
       const code = (caught as { code?: string }).code ?? "";
       const message2 = caught instanceof Error ? caught.message : "답변을 받지 못했어요.";
       // 보내지 못한 말은 버리지 않는다. 전송 실패로 남기고 다시 보낼 수 있게 한다.
-      setFailed({ message: message2, usage: code.includes("usage"), code, text: message, photos: sending });
+      setFailed({ turnId, message: message2, usage: code.includes("usage"), code, text: message, photos: sending });
       if (!again) { setText(""); setPhotos([]); }
-      await onTurnEnd({ user: message, assistant: (caught as { partial?: string }).partial || null, error: message2, hadProject });
+      await onTurnEnd({ turnId, user: message, assistant: (caught as { partial?: string }).partial || null, error: message2, hadProject });
     } finally {
       onLive(null);
       if (alive.current) setBusy(false);

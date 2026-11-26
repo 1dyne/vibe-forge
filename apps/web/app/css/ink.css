@@ -41,6 +41,10 @@ input:not([type=checkbox]):not([type=radio]):not(.find *),textarea:not(.find *),
 .composer textarea{border:0;border-radius:0}
 .model-select{border:2px solid var(--ink);border-radius:10px}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--c-ee);outline-offset:2px}
+/* 입력칸의 먹선 테두리가 곧 글 쓰는 자리다. 그 안의 textarea에 파란 테를 또 두르면 칸이 둘로 보인다.
+   초점은 칸 하나가 통째로 받고, 그림자만 한 칸 더 들린다. */
+.composer textarea:focus-visible,.composer textarea:focus{outline:0}
+.composer:focus-within{box-shadow:5px 5px 0 var(--ink)}
 
 /* 카드와 이름표 */
 .stage-card,.intake-card,.handoff-card,.room-card,.next-card,.status-block,.print-files,.finish-routes article,.next-banner,.rv-card,.workshop-modal,.profile-modal,.fs-room,.pm-wrap,.files-view,.auto-line{border:2px solid var(--ink);border-radius:16px;box-shadow:none}

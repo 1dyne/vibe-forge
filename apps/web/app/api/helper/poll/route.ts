@@ -27,7 +27,12 @@ export async function POST(request: NextRequest) {
   if (!job) return NextResponse.json({ job: null });
   const project = job.projectId ? await withVault(session.vault, () => getProject(job.projectId!)) : null;
   const owned = project && project.ownerId === session.user.id ? project : null;
-  // 마지막 사용자 말은 job.text로 따로 가므로 기록에서는 뺀다.
-  const history = (owned?.messages ?? []).filter((m) => (m.channel ?? "main") === job.channel).slice(-HISTORY - 1, -1).map((m) => ({ role: m.role, agent: m.agent ?? null, text: m.text.slice(0, 4000) }));
+  // 지금 넘기는 말은 job.text로 따로 가므로 기록에서는 뺀다. 맨 끝만 보면 안 된다:
+  // 다시 보내기라 그 말을 새로 적지 않았다면, 끊긴 턴의 답이 그 뒤에 적혀 있을 수 있다.
+  // 그 답도 이번 턴의 것이므로 같이 뺀다. 그보다 앞에 있는 같은 말은 지난 대화이니 남긴다.
+  const said = (owned?.messages ?? []).filter((m) => (m.channel ?? "main") === job.channel);
+  const asked = said.findLastIndex((m) => m.role === "user" && m.text === job.text);
+  const past = asked >= 0 && asked >= said.length - 2 ? said.slice(0, asked) : said;
+  const history = past.slice(-HISTORY).map((m) => ({ role: m.role, agent: m.agent ?? null, text: m.text.slice(0, 4000) }));
   return NextResponse.json({ job: { id: job.id, projectId: owned?.id ?? null, projectName: owned?.name ?? null, channel: job.channel, text: job.text, model: job.model, images: job.images, history } });
 }

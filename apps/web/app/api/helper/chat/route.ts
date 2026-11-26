@@ -28,8 +28,9 @@ async function handlePOST(request: NextRequest) {
   const images = (input.images ?? []).map((image) => ({ name: image.name ?? "사진", dataUrl: image.dataUrl as string }));
   try {
     // 말을 먼저 기록하고 넘긴다. 연결 앱은 일을 받을 때 기록을 함께 읽는다.
-    // 다시 보내기: 방금 기록한 같은 말이 맨 끝에 있으면 한 번 더 적지 않는다.
-    const recorded = (text: string) => { const last = project!.messages.filter((m) => (m.channel ?? "main") === input.channel).at(-1); return !!input.retry && last?.role === "user" && last.text === text; };
+    // 다시 보내기: 방금 기록한 같은 말이 끝자락에 있으면 한 번 더 적지 않는다.
+    // 맨 끝만 보면 안 된다. 답이 기록된 뒤에 받기만 끊긴 경우에는 그 답이 맨 끝이고, 내 말은 그 앞에 있다.
+    const recorded = (text: string) => !!input.retry && project!.messages.filter((m) => (m.channel ?? "main") === input.channel).slice(-4).some((m) => m.role === "user" && m.text === text);
     if (project && !recorded(images.length ? `${input.text}\n\n(사진 ${images.length}장을 함께 보냈어요)` : input.text)) project = await mutateProject(project.id, (p) => { p.messages.push({ id: randomUUID(), role: "user", channel: input.channel, text: images.length ? `${input.text}\n\n(사진 ${images.length}장을 함께 보냈어요)` : input.text, createdAt: new Date().toISOString() }); });
     const job = enqueueJob({ userId: viewer.user.id, projectId: project?.id ?? null, channel: input.channel, text: input.text, model: input.model ?? null, images });
     return NextResponse.json({ jobId: job.id, project });

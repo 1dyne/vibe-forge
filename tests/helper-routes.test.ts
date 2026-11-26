@@ -91,6 +91,28 @@ describe("도우미 대화 경로", () => {
     expect(project.messages.slice(-2)).toMatchObject([{ role: "user", text: "납땜 없이 만들 수 있어?" }, { role: "assistant", agent: "chief", text: "네, 브레드보드로 돼요." }]);
   });
 
+  it("다시 보내기는 같은 말을 두 번 적지 않는다", async () => {
+    const a = await person("두");
+    await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)));
+    const line = "이 부품 집에 있는 걸로 돼?";
+
+    // 처음 보낸다. 답까지 기록됐는데 화면이 그 답을 받지 못했다(새로고침, 끊긴 연결).
+    const sent = await (await chat(post("/api/helper/chat", { projectId: a.projectId, text: line }, cookie(a.linkToken)))).json();
+    const { job } = await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json();
+    await reportJob(post(`/api/helper/jobs/${job.id}`, { events: [{ type: "done", text: "네, 가지고 계신 걸 씁니다." }] }, bearer(a.access)), jobParams(job.id));
+
+    // 다시 보내기. 내 말이 한 번 더 적히면 화면에 같은 말이 두 줄로 남는다.
+    const again = await (await chat(post("/api/helper/chat", { projectId: a.projectId, text: line, retry: true }, cookie(a.linkToken)))).json();
+    expect(again.jobId).not.toBe(sent.jobId);
+    const mine = (again.project.messages as Array<{ role: string; text: string }>).filter((m) => m.role === "user" && m.text === line);
+    expect(mine).toHaveLength(1);
+
+    // 끊긴 턴의 내 말과 그 답은 이번 턴의 것이므로 기록(history)에서 빠진다.
+    const retried = (await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).job;
+    expect(retried.text).toBe(line);
+    expect(retried.history.some((m: { text: string }) => m.text === line || m.text === "네, 가지고 계신 걸 씁니다.")).toBe(false);
+  });
+
   it("다른 사람의 도우미는 내 말을 받지 못하고, 다른 사람은 내 답을 읽지 못한다", async () => {
     const a = await person("다"); const b = await person("라");
     await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)));
