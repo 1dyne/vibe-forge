@@ -7,6 +7,9 @@ import { POST as mcpPost } from "../apps/web/app/api/mcp/[token]/route";
 import { POST as workflowPost } from "../apps/web/app/api/projects/[id]/workflow/route";
 import { POST as chatPost } from "../apps/web/app/api/helper/chat/route";
 import { POST as finishPost } from "../apps/web/app/api/meetup/finish/route";
+import { POST as inboxPost } from "../apps/web/app/api/meetup/inbox/route";
+import { GET as startGet } from "../apps/web/app/api/meetup/start/route";
+import { POST as ideaPost } from "../apps/web/app/api/find/meetup-idea/route";
 import { createUser } from "../apps/web/lib/users";
 import { userSessionValue } from "../apps/web/lib/session";
 import { MEETUP_FINISH, isMeetup, meetupLetterIds, meetupPrompt, parseMeetupLetter } from "../apps/web/lib/meetup";
@@ -65,6 +68,20 @@ describe("밋업 시연 모드", () => {
     expect(two.project.meetup!.ideas.map((i) => i.text)).toEqual(["배터리로 들고 다닐 수 있으면 좋겠어요", "앱에서 엑셀로 바로 내보내고 싶어요"]);
     expect(meetupPrompt(two.project)).toContain("2. 앱에서 엑셀로 바로 내보내고 싶어요");
 
+    // 로그인 없는 사람의 아이디어: 주인의 화면이 열려 있을 때만 받고, 주인의 화면이 가져가서 적는다
+    const drop = async (body: unknown) => ideaPost(new NextRequest("http://localhost:3000/api/find/meetup-idea", { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-forwarded-for": "203.0.113.9" }, body: JSON.stringify(body) }));
+    const inbox = async () => (await inboxPost(new NextRequest("http://localhost:3000/api/meetup/inbox", { method: "POST", headers, body: JSON.stringify({ projectId: id }) }))).json() as Promise<{ code: string; project: LocalProject | null; added?: number }>;
+    expect((await drop({ code: "0123abcd", text: "받는 화면이 없는 주소" })).status).toBe(409);
+    const opened = await inbox();
+    expect(opened.code).toMatch(/^[0-9a-f]{8}$/);
+    expect(opened.project).toBeNull();
+    expect((await drop({ code: opened.code, text: "방수가 되면\n**좋겠어요**", name: "하늘" })).status).toBe(200);
+    expect((await drop({ code: opened.code, text: "x" })).status).toBe(400);
+    const taken = await inbox();
+    expect(taken.added).toBe(1);
+    expect(taken.project!.meetup!.ideas.at(-1)!.text).toBe("하늘: 방수가 되면 좋겠어요");
+    expect((await inbox()).project).toBeNull();
+
     // 완성: 연결 앱이 없으면 정해진 기준의 편지가 바로 온다. 축하 → 편지 → 아이디어마다 조언
     const finish = async () => (await finishPost(new NextRequest("http://localhost:3000/api/meetup/finish", { method: "POST", headers, body: JSON.stringify({ projectId: id, channel: "main" }) }))).json() as Promise<{ jobId: string | null; project: LocalProject }>;
     const done = await finish();
@@ -75,12 +92,13 @@ describe("밋업 시연 모드", () => {
     expect(letter.text.indexOf("축하")).toBeLessThan(letter.text.indexOf("편지를 하나 준비했어요"));
     expect(letter.text).toContain("**1번째 아이디어** — 배터리로 들고 다닐 수 있으면 좋겠어요");
     expect(letter.text).toContain("전자회로 달그락");
+    expect(letter.text).toContain("**3번째 아이디어** — 하늘: 방수가 되면 좋겠어요");
     expect(letter.text).toContain("소프트웨어 달그락");
     // 편지는 채팅 안에서 카드로 그린다: 인사 / 아이디어별 (설계 더하기 · 해 볼 것) / 맺음말
     expect([...meetupLetterIds(done.project)]).toEqual([letter.id]);
     const parts = parseMeetupLetter(letter.text);
     expect(parts.intro.join(" ")).toContain("편지를 하나 준비했어요");
-    expect(parts.ideas.map((i) => i.title)).toEqual(["배터리로 들고 다닐 수 있으면 좋겠어요", "앱에서 엑셀로 바로 내보내고 싶어요"]);
+    expect(parts.ideas.map((i) => i.title)).toEqual(["배터리로 들고 다닐 수 있으면 좋겠어요", "앱에서 엑셀로 바로 내보내고 싶어요", "하늘: 방수가 되면 좋겠어요"]);
     expect(parts.ideas.every((i) => i.design && i.tryIt)).toBe(true);
     expect(parts.outro[0]).toContain("수고했어요");
     // AI가 쓴 편지도 같은 모양이면 읽힌다 (굵은 글씨·점 모양이 조금 달라도)
@@ -92,6 +110,25 @@ describe("밋업 시연 모드", () => {
     // 한 번 더 눌러도 '완성했어요'가 겹쳐 쌓이지 않는다
     const again = await finish();
     expect(again.project.messages.filter((m) => m.text === MEETUP_FINISH)).toHaveLength(1);
+    // 받기 주소: 다른 참여자가 열면 자기 계정에 같은 시연 프로젝트가 생기고, 다시 열어도 하나뿐이다
+    const guest = await createUser("밋업 참여자", false);
+    const guestCookie = "dalgeurak_session=" + userSessionValue(guest.token);
+    const start = async () => startGet(new NextRequest("http://localhost:3000/api/meetup/start", { headers: { cookie: guestCookie } }));
+    const first = await start();
+    expect(first.status).toBe(303);
+    const where = new URL(first.headers.get("location")!).searchParams.get("p");
+    expect(where).toMatch(/^[0-9a-f-]{36}$/);
+    expect(where).not.toBe(id);
+    expect(new URL((await start()).headers.get("location")!).searchParams.get("p")).toBe(where);
+    // 참여자의 기록은 그 사람의 열쇠로 잠겨 있으므로, 그 사람의 연결로 읽어 본다
+    const asGuest = async (name: string, args: Record<string, unknown>) => (await (await mcpPost(new NextRequest(`http://localhost/api/mcp/${guest.token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) }), { params: Promise.resolve({ token: guest.token }) })).json()).result as { structuredContent?: Record<string, any>; isError?: boolean };
+    const list = (await asGuest("list_projects", {})).structuredContent!.projects as Array<{ id: string; name: string }>;
+    expect(list.map((p) => p.name)).toEqual(["사만다 재고 저울"]);
+    const theirs = (await asGuest("get_project", { projectId: where })).structuredContent!;
+    expect(theirs.assembly.steps).toHaveLength(5);
+    expect(theirs.testPlan.cases).toHaveLength(6);
+    expect((await asGuest("set_test_plan", { projectId: where, cases: [] })).isError).toBe(true);
+
     // 설계는 그대로다
     expect(again.project.build!.blueprint.components!.map((c) => c.ref)).toEqual(["U1", "HX1", "LC1"]);
   });
