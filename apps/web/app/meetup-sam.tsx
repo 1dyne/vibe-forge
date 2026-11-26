@@ -104,8 +104,8 @@ export function SamStory({ standalone = false }: { standalone?: boolean }) {
     <Card kick={standalone ? "재고 측정기" : "소프트웨어 달그락 · 다 만들었어요"} title="셈(SAM), 돌멩이로 세던 그 일">
       <p>사람이 처음 수를 셀 때 쓴 건 <b>돌멩이</b>였대요. 하나에 하나씩 옮겨 놓으며 셌어요. &lsquo;계산&rsquo;을 뜻하는 영어 calculate도 조약돌(calculus)에서 온 말이에요. 그래서 재고를 같이 세어 주는 둘은 돌멩이예요.</p>
       <div className="cast">
-        <div className="who"><img src="/meetup/sem.webp" alt="삼각형 돌멩이 셈" /><div><b>셈 · 새뮤엘</b>삼각형 돌멩이. 앱 안에서 무엇을 어떻게 셀지 묻고 안내해요. 사진으로 셀 때 개수를 잡아 주는 것도 셈이에요.</div></div>
-        <div className="who"><img src="/meetup/sam-green.webp" alt="네모난 돌멩이 사만다" /><div><b>사만다</b>네모난 돌멩이 모양 저울. 오늘 만든 바로 그 기계예요. 화면 속 사만다의 눈 색이 저울의 LED 색과 같아요.</div></div>
+        <div className="who"><img src="/find/meetup/sem.webp" alt="삼각형 돌멩이 셈" /><div><b>셈 · 새뮤엘</b>삼각형 돌멩이. 앱 안에서 무엇을 어떻게 셀지 묻고 안내해요. 사진으로 셀 때 개수를 잡아 주는 것도 셈이에요.</div></div>
+        <div className="who"><img src="/find/meetup/sam-green.webp" alt="네모난 돌멩이 사만다" /><div><b>사만다</b>네모난 돌멩이 모양 저울. 오늘 만든 바로 그 기계예요. 화면 속 사만다의 눈 색이 저울의 LED 색과 같아요.</div></div>
       </div>
       <div className="btns"><a className="main" href={SAM_APP_URL} target="_blank" rel="noreferrer">셈 앱 열기</a><a href={SAM_REPO_URL} target="_blank" rel="noreferrer">GitHub에서 받기 (MIT)</a>{!standalone && <a href="/find/sam" target="_blank" rel="noreferrer">이 설명서만 따로 열기</a>}</div>
 
