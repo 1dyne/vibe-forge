@@ -3,6 +3,7 @@ import { housingFiles, housingMarkdown } from "./housing";
 import { provisionalReasons, stickerHtml } from "./provisional";
 import { contractHeader, contractMarkdown, contractTs } from "./contract";
 import { workflowFor } from "./workflow";
+import { housingParts, mockupCadQuery, mockupScad } from "./mockup-export";
 
 export type WorkbenchItem = {
   id: string;
@@ -13,6 +14,8 @@ export type WorkbenchItem = {
   kind: "mockup" | "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
+  /** 내려받을 때 서버가 만들어 내는 파일(출력용 STL). content에는 바뀜을 알아보는 원본만 든다 */
+  generate?: { kind: "mockup-stl"; partId: string };
 };
 
 function escapeHtml(value: string) {
@@ -54,6 +57,11 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
   type Draft = Omit<WorkbenchItem, "label">;
   const items: Draft[] = [];
   if (project.preciseMockup) items.push({ id: "document:mockup", filename: `${stem}-정밀목업.json`, kind: "mockup", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.preciseMockup, null, 2) });
+  if (project.preciseMockup && opts.files && housingParts(project.preciseMockup).length) {
+    const spec = project.preciseMockup;
+    for (const part of housingParts(spec)) items.push({ id: `mockup:${part.id}:stl`, filename: `${stem}-${part.name}-출력용.stl`, kind: "file", mimeType: "model/stl", content: JSON.stringify({ solids: part.solids, cuts: part.cuts ?? [] }), generate: { kind: "mockup-stl", partId: part.id } });
+    items.push({ id: "mockup:scad", filename: `${stem}-하우징.scad`, kind: "file", mimeType: "text/plain; charset=utf-8", content: mockupScad(spec) }, { id: "mockup:cadquery", filename: `${stem}-하우징-cadquery.py`, kind: "file", mimeType: "text/plain; charset=utf-8", content: mockupCadQuery(spec) });
+  }
   if (project.productForm) items.push({ id: "document:product", filename: `${stem}-완성품.json`, kind: "product", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.productForm, null, 2) });
   if (project.assembly) {
     const g = project.assembly;

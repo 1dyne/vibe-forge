@@ -251,6 +251,10 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 꽂거나 누를 때 비워 둬야 하는 자리는 keepout으로 넣는다(USB 플러그 몸통, 버튼 누르는 길, 나사 드라이버 길). 여기에 벽이나 다른 부품이 들어오면 검사가 잡는다.
 - 설계 의도를 rules로 적는다: 떠 있어야 하는 판은 gap(예: 저울판과 몸통 2mm), 얹혀야 하는 것은 touch, 벽 안에 있어야 하는 것은 inside.
 - 일부러 끼워지는 쌍(헤더와 소켓, 나사와 나사 구멍)만 mates에 적는다. 겹침을 없애려고 mates를 남용하지 않는다.
+- 출력 파일은 이 목업에서 바로 나온다: 검사를 통과한 목업의 housing 부위마다 구멍이 뚫린 STL이 작업대 파일에 생기고, 같은 모양의 OpenSCAD(.scad)·CadQuery(.py) 파일도 함께 나온다. 따로 출력 파일을 써 주겠다고 하지 말고 "작업대의 파일에서 받으세요"라고 안내한다.
+- 그래서 목업은 "뽑을 모양 그대로"여야 한다. 나사 구멍·표시창·버튼 구멍·전선 길은 그 부위의 cuts로 판다. 나사 기둥과 보드 받침은 cylinder·box로 몸통 부위의 solids에 넣는다(바닥에 닿게).
+- 출력 공차를 치수에 미리 넣는다: 부품이 들어가는 자리는 부품보다 한쪽 0.3mm씩 크게, 끼워 맞추는 뚜껑은 0.2~0.3mm 틈, M3 나사가 지나가는 구멍 3.4mm·나사가 직접 파고드는 구멍 2.5mm, M2는 2.4mm·1.6mm. 벽은 1.6mm 이상, 바닥은 1.2mm 이상.
+- 받침 없이 뽑히게 한다: 부위마다 넓고 평평한 면이 바닥에 놓이도록 나누고, 공중에 뜬 수평 턱은 피하거나 별도 부위로 나눈다.
 - 결과의 실패 목록을 읽고 위치·치수를 고쳐 다시 저장한다. 전부 통과한 뒤에 사람에게 보여주고, 사람이 실물로 확인할 것(끼움 공차, 케이블이 휘는 자리)을 작업 카드로 넘긴다.
 - 출력한 뒤 안 맞은 곳을 사람이 알려주면(사진·실측) 그 치수로 목업을 고쳐 다시 검사한다. 하우징은 출력 뒤에 조율되는 것이 정상이다.
 
@@ -936,6 +940,7 @@ export const TOOLS: ToolDefinition[] = [
         basis: { type: "string", enum: ["measured", "datasheet", "assumed", "design"], description: "치수의 근거. 사용자가 잰 값 measured, 공식 도면 datasheet, 추정 assumed, 하우징처럼 내가 정하는 값 design" },
         color: { type: "string", description: "#RRGGBB (선택)" }, note: { type: "string" },
         explode: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "분해해서 볼 때 움직일 방향과 거리 [x,y,z] mm (선택)" },
+        cuts: { type: "array", maxItems: 24, description: "housing 부위에서 파내는 자리: 나사 구멍, 표시창, 전선 길, 버튼 구멍. box 또는 cylinder (solids와 같은 형식, hollowBox 제외). 출력용 STL에서 실제로 뚫린다. 구멍은 벽을 완전히 지나도록 양쪽으로 0.5mm씩 넉넉히 길게 잡는다", items: { type: "object", additionalProperties: false, required: ["shape", "at"], properties: { shape: { type: "string", enum: ["box", "cylinder"] }, at: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" } }, size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" } }, rotate: { type: "integer", enum: [0, 90, 180, 270] }, diameter: { type: "number" }, length: { type: "number" }, axis: { type: "string", enum: ["x", "y", "z"] } } } },
         solids: { type: "array", minItems: 1, maxItems: 12, items: { type: "object", additionalProperties: false, required: ["shape", "at"], properties: {
           shape: { type: "string", enum: ["box", "hollowBox", "cylinder"] },
           at: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "바닥 중심 [x,y,z]. 누운 원기둥(axis x·y)은 중심" },
@@ -969,7 +974,7 @@ export const TOOLS: ToolDefinition[] = [
       ]);
       const parsed = z.object({ projectId: z.string().uuid(), mockup: z.object({
         title: z.string().min(1).max(80), summary: z.string().min(1).max(800),
-        parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12) }).strict()).min(1).max(40),
+        parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12), cuts: z.array(z.discriminatedUnion("shape", [z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(), z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()])).max(24).optional() }).strict()).min(1).max(40),
         mates: z.array(z.tuple([z.string().max(24), z.string().max(24)])).max(40).optional(),
         rules: z.array(Rule).max(40).optional()
       }).strict() }).strict().parse(input);
@@ -977,6 +982,7 @@ export const TOOLS: ToolDefinition[] = [
       const ids = spec.parts.map((p) => p.id);
       if (new Set(ids).size !== ids.length) throw new ToolError("부품 id가 겹쳐요. 부품마다 다른 id를 써주세요.");
       for (const s of spec.parts.flatMap((p) => p.solids)) if (s.shape === "hollowBox" && (s.wall * 2 >= Math.min(s.size[0], s.size[1]) || s.floor >= s.size[2])) throw new ToolError("hollowBox의 벽·바닥 두께가 바깥 크기보다 커요.");
+      if (spec.parts.some((p) => p.group !== "housing" && p.cuts?.length)) throw new ToolError("cuts는 housing 부위에만 쓸 수 있어요.");
       const unknown = [...(spec.mates ?? []).flat(), ...(spec.rules ?? []).flatMap((r) => [r.a, r.b])].filter((id) => !ids.includes(id));
       if (unknown.length) throw new ToolError(`mates·rules에 없는 부품 id가 있어요: ${[...new Set(unknown)].join(", ")}`);
       await ownedProject(parsed.projectId, context);

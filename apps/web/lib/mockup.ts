@@ -27,6 +27,8 @@ export type MockupPart = {
   /** 치수의 근거 */
   basis: "measured" | "datasheet" | "assumed" | "design";
   solids: MockupSolid[];
+  /** 이 부위에서 파내는 자리(나사 구멍, 창, 전선 길). 하우징에만 쓴다. 출력 파일에서 실제로 뚫린다 */
+  cuts?: Array<Extract<MockupSolid, { shape: "box" | "cylinder" }>>;
   /** 분해해서 볼 때 움직일 방향과 거리(mm) */
   explode?: [number, number, number];
   note?: string;

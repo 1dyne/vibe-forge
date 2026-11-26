@@ -1,4 +1,6 @@
 "use client";
+import { checkMockup } from "../lib/mockup";
+import { housingParts, printNotes } from "../lib/mockup-export";
 import { useEffect, useRef, useState } from "react";
 import type { LocalProject } from "../lib/project-types";
 import type { WorkbenchItem } from "../lib/workbench";
@@ -51,7 +53,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
       {source || !hasPreview ? <pre className="file-source">{item.content}</pre> : <>
         {item.kind === "circuit" && project.build && <><div className="artifact-title"><span className="pill">회로 초안</span><h3>{project.build.blueprint.title}</h3></div><CircuitView blueprint={project.build.blueprint} /><div className="check-list">{project.build.checks.map(c => <div key={c.id} className={c.verdict}><span>{c.verdict === "pass" ? "✓" : c.verdict === "unknown" ? "?" : "!"}</span><p><b>{c.id}</b>{c.message}</p></div>)}</div><details><summary>HW / SW 검토 결과</summary><p>{project.build.evaluator.summary}</p>{[project.build.evaluator.hw, project.build.evaluator.sw].map((v, i) => <p key={i}><span className={`pill ${v.verdict}`}>{i ? "SW" : "HW"} · {v.verdict}</span> {v.findings.join(" ")}</p>)}</details></>}
         {item.kind === "circuit" && project.build && <CircuitReading blueprint={project.build.blueprint} />}
-        {item.kind === "mockup" && project.preciseMockup && <><div className="artifact-title"><span className="pill">정밀 목업</span><h3>{project.preciseMockup.title}</h3></div><p className="pm-summary">{project.preciseMockup.summary}</p><PreciseMockup spec={project.preciseMockup} /></>}
+        {item.kind === "mockup" && project.preciseMockup && <><div className="artifact-title"><span className="pill">정밀 목업</span><h3>{project.preciseMockup.title}</h3></div><p className="pm-summary">{project.preciseMockup.summary}</p><PreciseMockup spec={project.preciseMockup} /><PrintFiles project={project} /></>}
         {item.kind === "product" && project.productForm && <><div className="artifact-title"><span className="pill">완성품 미리보기</span><h3>{project.name}</h3></div><MockupView blueprint={project.build?.blueprint ?? { title: project.name, board: "", supplyVoltage: 5, components: [], nets: [], enclosure: { widthMm: 40, depthMm: 40, heightMm: 40, wallMm: 2 }, firmware: { platform: "arduino", behavior: "", pinAssignments: [], loopSteps: [] }, assumptions: [], humanChecks: [] }} form={project.productForm} /></>}
         {item.kind === "contract" && project.dataContract && <ContractView project={project} onAction={onAction} busy={busy} />}
         {item.kind === "power" && project.power && <PowerView project={project} />}
@@ -116,4 +118,25 @@ function BomView({ project, workflow, busy, onAction }: {
       })}
     </tbody></table>
   </>;
+}
+
+// 정밀 목업에서 바로 나오는 출력용 파일. 검사에 실패한 채로 뽑지 않게 먼저 알린다.
+function PrintFiles({ project }: { project: LocalProject }) {
+  const spec = project.preciseMockup;
+  if (!spec) return null;
+  const parts = housingParts(spec);
+  if (!parts.length) return null;
+  const report = checkMockup(spec);
+  const notes = printNotes(spec);
+  const stem = project.name.replace(/[\\/:*?"<>|\r\n]/g, "-").slice(0, 80) || "project";
+  const href = (id: string) => `/api/projects/${project.id}/workbench/${encodeURIComponent(id)}`;
+  return <section className="print-files" aria-label="출력용 파일">
+    <h4>출력용 파일</h4>
+    {report.failed.length > 0 && <p className="print-warn">검사에서 고칠 것이 {report.failed.length}개 남아 있어요. 그대로 뽑으면 안 맞을 수 있어요.</p>}
+    <p className="muted">위 목업 그대로, 구멍까지 뚫린 한 덩어리로 나와요. 받은 STL을 슬라이서(Bambu Studio, Cura 등)에 그대로 올리면 돼요.</p>
+    <ul>{parts.map((part) => <li key={part.id}><a href={href(`mockup:${part.id}:stl`)} download>{part.name} · STL</a></li>)}</ul>
+    <p className="muted">직접 다듬고 싶다면: <a href={href("mockup:scad")} download>OpenSCAD 파일</a> · <a href={href("mockup:cadquery")} download>CadQuery 파일</a> <small>({stem})</small></p>
+    {notes.length > 0 && <><h5>뽑기 전에 확인할 것</h5><ul className="print-notes">{notes.map((note, i) => <li key={i}>{note}</li>)}</ul></>}
+    <p className="muted"><small>첫 출력은 맞춤 확인용이에요. 안 맞는 곳을 재서 알려주면 달그락이 치수를 고쳐 다시 만들어요.</small></p>
+  </section>;
 }

@@ -51,7 +51,7 @@ const Rule = z.discriminatedUnion("kind", [
 ]);
 const MockupSchema = z.object({
   title: z.string().min(1).max(80), summary: z.string().min(1).max(800),
-  parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12) }).strict()).min(1).max(40),
+  parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12), cuts: z.array(z.discriminatedUnion("shape", [z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(), z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()])).max(24).optional() }).strict()).min(1).max(40),
   mates: z.array(z.tuple([z.string().max(24), z.string().max(24)])).max(40).optional(),
   rules: z.array(Rule).max(40).optional()
 }).strict();

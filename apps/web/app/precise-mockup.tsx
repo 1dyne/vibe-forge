@@ -89,8 +89,9 @@ function Scene({ spec, failedIds, colors, hidden, explode, opacity, focus, view,
         const group = new three.Group();
         const mats: T.MeshStandardMaterial[] = []; const edges: T.LineBasicMaterial[] = [];
         const bad = failed.has(part.id);
-        for (const piece of part.solids.flatMap(pieces)) {
-          const mat = new three.MeshStandardMaterial({ color: colors[part.id], roughness: part.group === "housing" ? 0.85 : 0.6, metalness: 0, transparent: true, emissive: new three.Color(bad ? "#D2452B" : "#000000"), emissiveIntensity: bad ? (part.group === "housing" ? 0.12 : 0.45) : 0 });
+        // 파내는 자리(cuts)는 어두운 덩어리로 겹쳐 그려 구멍이 어디인지 보이게 한다.
+        for (const { piece, cut } of [...part.solids.flatMap(pieces).map((piece) => ({ piece, cut: false })), ...(part.cuts ?? []).flatMap(pieces).map((piece) => ({ piece, cut: true }))]) {
+          const mat = new three.MeshStandardMaterial({ color: cut ? "#1d2326" : colors[part.id], roughness: part.group === "housing" ? 0.85 : 0.6, metalness: 0, transparent: true, emissive: new three.Color(bad ? "#D2452B" : "#000000"), emissiveIntensity: bad ? (part.group === "housing" ? 0.12 : 0.45) : 0 });
           // 하우징은 덩치가 커서 통째로 붉히면 다른 것이 안 보인다. 테두리만 붉게 하고 살짝만 물들인다.
           const line = new three.LineBasicMaterial({ color: bad ? "#C2351D" : "#3C4A45", transparent: true, opacity: bad ? 0.95 : 0.4 });
           disposables.push(mat, line); mats.push(mat); edges.push(line);

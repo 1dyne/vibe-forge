@@ -28,3 +28,9 @@
 .ft-actions button:hover,.ft-actions a:hover,.ft-out-actions button:hover,.ft-out-actions a:hover{background:#eef3f0}
 .ft-actions .ft-final{border-color:#3f7a6c;color:#3f7a6c;font-weight:600}.ft-actions .ft-quiet{border-color:transparent;color:#8a968f}
 .ft-actions button:disabled{opacity:.5;cursor:default}
+.print-files{margin-top:16px;padding:14px 16px;border:1px solid #d7e2dc;border-radius:12px;background:#f6faf8}
+.print-files h4{margin:0 0 6px;font-size:14px}.print-files h5{margin:12px 0 4px;font-size:12.5px}
+.print-files ul{margin:8px 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px}
+.print-files ul a{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:9px;background:#2e6b5c;color:#fff;font-size:13px;font-weight:600;text-decoration:none}
+.print-files ul.print-notes{display:block;list-style:disc;padding-left:18px;font-size:12.5px;color:#5a4a1e}
+.print-files .print-warn{margin:6px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#a2331f;font-size:13px}

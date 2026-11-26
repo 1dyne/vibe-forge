@@ -15,6 +15,8 @@ const securityHeaders = [
 const config: NextConfig = {
   devIndicators: false,
   poweredByHeader: false,
+  // WASM을 스스로 읽는 패키지라 묶지 않고 그대로 쓴다.
+  serverExternalPackages: ["manifold-3d"],
   experimental: {
     externalDir: true
   },
