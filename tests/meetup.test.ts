@@ -9,7 +9,7 @@ import { POST as chatPost } from "../apps/web/app/api/helper/chat/route";
 import { POST as finishPost } from "../apps/web/app/api/meetup/finish/route";
 import { createUser } from "../apps/web/lib/users";
 import { userSessionValue } from "../apps/web/lib/session";
-import { MEETUP_FINISH, isMeetup, meetupPrompt } from "../apps/web/lib/meetup";
+import { MEETUP_FINISH, isMeetup, meetupLetterIds, meetupPrompt, parseMeetupLetter } from "../apps/web/lib/meetup";
 import type { LocalProject } from "../apps/web/lib/project-types";
 
 // MEETUP: 2026-11-28 밋업 시연 모드. 밋업이 끝나 lib/meetup.ts를 지울 때 이 파일도 같이 지운다.
@@ -76,6 +76,19 @@ describe("밋업 시연 모드", () => {
     expect(letter.text).toContain("**1번째 아이디어** — 배터리로 들고 다닐 수 있으면 좋겠어요");
     expect(letter.text).toContain("전자회로 달그락");
     expect(letter.text).toContain("소프트웨어 달그락");
+    // 편지는 채팅 안에서 카드로 그린다: 인사 / 아이디어별 (설계 더하기 · 해 볼 것) / 맺음말
+    expect([...meetupLetterIds(done.project)]).toEqual([letter.id]);
+    const parts = parseMeetupLetter(letter.text);
+    expect(parts.intro.join(" ")).toContain("편지를 하나 준비했어요");
+    expect(parts.ideas.map((i) => i.title)).toEqual(["배터리로 들고 다닐 수 있으면 좋겠어요", "앱에서 엑셀로 바로 내보내고 싶어요"]);
+    expect(parts.ideas.every((i) => i.design && i.tryIt)).toBe(true);
+    expect(parts.outro[0]).toContain("수고했어요");
+    // AI가 쓴 편지도 같은 모양이면 읽힌다 (굵은 글씨·점 모양이 조금 달라도)
+    const ai = parseMeetupLetter("축하해요!\n\n편지를 하나 준비했어요.\n\n**1번째 아이디어** — 방수가 되면 좋겠어요\n- **더 들어가야 할 설계:** 기구설계 달그락(ME). 틈을 막아야 해서요.\n- 해 볼 것: 테이프로 틈을 막고 물을 한 방울 떨어뜨려 봐요.\n\n2번째 아이디어: 소리로 알려 주기\n• 더 들어가야 할 설계: 전자회로 달그락(EE)\n• 해볼 것: 부저 하나를 따로 울려 봐요.\n\n다음에 또 만나요!");
+    expect(ai.ideas).toHaveLength(2);
+    expect(ai.ideas[0].design).toContain("기구설계");
+    expect(ai.ideas[1].tryIt).toContain("부저");
+    expect(ai.outro).toEqual(["다음에 또 만나요!"]);
     // 한 번 더 눌러도 '완성했어요'가 겹쳐 쌓이지 않는다
     const again = await finish();
     expect(again.project.messages.filter((m) => m.text === MEETUP_FINISH)).toHaveLength(1);

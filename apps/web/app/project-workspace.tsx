@@ -30,7 +30,8 @@ import { IconBook, IconDesk, IconHammer, IconLaptop, IconLink, IconPencil, IconP
 import MessageText from "./message-text";
 import HelperComposer, { type HelperLive, type HelperTurn } from "./helper-composer";
 import MeetupFinish from "./meetup-finish";
-import { isMeetup, meetupChat, meetupLocked } from "../lib/meetup";
+import MeetupLetter from "./meetup-letter";
+import { isMeetup, meetupChat, meetupLetterIds, meetupLocked } from "../lib/meetup";
 import { suggestNext } from "../lib/suggest";
 
 type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean; projectLimit?: number; credit?: { remainingUsd: number; allowanceUsd: number } | null };
@@ -170,6 +171,7 @@ export default function ProjectWorkspace() {
   function switchProject(id:string|null,room:ChatChannel="main"){if(busy)return;setLoose([]);setNavOpen(false);if(layout.mobile)setPanelHidden(true);setConnectTab(null);setSelectedId(id);setChannel(room);setText("");setAttachments([]);setError("");setMode("work");setShowProfile(false);if(id)expand(id);}
   function toggleAgent(agent:AgentId) {if(!workflow)return;const next=workflow.activeAgents.includes(agent)?workflow.activeAgents.filter(a=>a!==agent):[...workflow.activeAgents,agent];if(!next.length){setError("함께 작업할 에이전트를 하나 이상 선택해주세요.");return;}if(channel===agent)setChannel("main");void action({action:"agents",agents:next});}
   // 방이 열리면 방마다 자기 대화만 본다. 메인에는 대장과 나눈 이야기만 남는다.
+  const letterIds=project?meetupLetterIds(project):new Set<string>(); // MEETUP: 편지는 카드로 그린다
   const messages=project?.messages.filter(m=>!roomsOn||(room==="main"?["main","chief"].includes(m.channel??"main"):(m.channel??"main")===room))??[];
   const activeSpeaker=channel==="main"?"chief":channel;
   // 이름은 목록에서 바로 고친다. 먼저 화면에 반영하고 서버가 거절하면 되돌린다.
@@ -256,7 +258,7 @@ export default function ProjectWorkspace() {
         {project&&roomsOn&&board.cards.filter(c=>c.turn!=="done"&&(room==="main"?c.owner==="chief":c.owner===room)).map(c=><div key={c.id} className={"room-card turn-"+c.turn+(c.active?"":" held")}><div><small>{c.heldBy.length?"앞 작업을 기다리는 중":c.turn==="person"?"내 차례":c.turn==="waiting"?"기다리는 중":c.turn==="blocked"?"막힘":"달그락 작업 중"}</small><strong>{c.title}</strong><p>{c.turn==="person"?c.ask:c.turn==="waiting"?(c.waiting?.what??"")+(c.waiting?.expectedAt?" · "+c.waiting.expectedAt+" 예정":""):c.turn==="blocked"?c.note:c.detail}</p></div>{c.turn==="person"&&c.active&&<CardPrompt card={c} busy={!!busy} onAnswer={body=>boardAction({action:"answer",...body})}/>}</div>)}
         {messages.map(m=><Fragment key={m.id}>{m.auto&&m.cardTitle&&<div className="card-divider" role="separator"><span>{m.cardTitle}</span></div>}<article className={"chat-message "+(m.auto?"assistant agent-chief auto-order":m.role+(m.role==="assistant"?" agent-"+(m.agent??"chief"):""))}>
           {m.role==="assistant"||m.auto?<Avatar agent={m.auto?"chief":m.agent??"chief"}/>:<span className="user-avatar">나</span>}
-          <div className="message-body"><div className="message-meta"><strong>{m.auto?agentName("chief",preferences.shortNames)+"의 전달":m.role==="user"?"나":agentName(m.agent??"chief",preferences.shortNames)}</strong>{m.mode==="evaluate"&&<span className="pill unknown">Evaluator</span>}{workshop&&channel==="main"&&m.channel&&m.channel!=="main"&&<small>{agentName(m.channel,preferences.shortNames)} 작업실에서 공유</small>}<time>{new Date(m.createdAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</time></div><MessageText files={fileLinks} text={m.text}/>{m.attachments?.length?<div className="message-images">{m.attachments.map((a,i)=><a href={a.dataUrl} download={a.name} key={i}><img src={a.dataUrl} alt={a.name}/><span>{a.name}</span></a>)}</div>:null}{m.shared&&workshop&&<span className="shared-tag">↗ 팀 공통 기록에 공유됨</span>}</div>
+          <div className="message-body"><div className="message-meta"><strong>{m.auto?agentName("chief",preferences.shortNames)+"의 전달":m.role==="user"?"나":agentName(m.agent??"chief",preferences.shortNames)}</strong>{m.mode==="evaluate"&&<span className="pill unknown">Evaluator</span>}{workshop&&channel==="main"&&m.channel&&m.channel!=="main"&&<small>{agentName(m.channel,preferences.shortNames)} 작업실에서 공유</small>}<time>{new Date(m.createdAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</time></div>{letterIds.has(m.id)?<MeetupLetter text={m.text}/>:<MessageText files={fileLinks} text={m.text}/>}{m.attachments?.length?<div className="message-images">{m.attachments.map((a,i)=><a href={a.dataUrl} download={a.name} key={i}><img src={a.dataUrl} alt={a.name}/><span>{a.name}</span></a>)}</div>:null}{m.shared&&workshop&&<span className="shared-tag">↗ 팀 공통 기록에 공유됨</span>}</div>
         </article></Fragment>)}
         {project&&room==="main"&&phase==="brainstorm"&&(()=>{const card=stageCardFor(project);const pf=workflow!.profile;const hard=card.kind==="hardware"||card.kind==="both";
           const done=(k:string)=>k==="coreBehavior"?!!pf.coreBehavior.trim():k==="tools"?pf.toolsConfirmed:k==="firmwareExperience"?pf.firmwareExperience!=="unanswered":k==="codingExperience"?(pf.devProfile?.codingExperience??"unanswered")!=="unanswered":k==="whereToRun"?(pf.devProfile?.os??"unanswered")!=="unanswered":k==="whatToMake"?!!project.idea.trim():false;

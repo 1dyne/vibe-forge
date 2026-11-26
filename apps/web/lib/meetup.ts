@@ -56,13 +56,13 @@ export function meetupPrompt(project: LocalProject) {
     "쓰는 순서:",
     "1. 완성을 축하하는 인사 두세 문장. 오늘 만든 것(로드셀 + HX711 + ATOMS3 Lite, 납땜 두 번과 꽂기 한 번)을 짚어 주세요.",
     "2. \"편지를 하나 준비했어요.\"라고 말하고 줄을 바꿔요.",
-    "3. 현장에서 나온 아이디어를 하나씩. 번호 목록(1. 2.)을 쓰지 말고 \"**1번째 아이디어** — …\"처럼 굵은 글씨로 시작해요:",
-    "   - 아이디어를 한 줄로 다시 적고",
-    "   - 조언: 어느 달그락의 설계가 더 들어가야 하는지(전자회로 EE / 소프트웨어 SW / 기구설계 ME / 제품 디자인 ID 중에서, 이유 한 문장)",
-    "   - 해 볼 것: 내일 바로 해 볼 수 있는 가장 작은 실험 하나",
+    "3. 현장에서 나온 아이디어를 하나씩, 아래 세 줄 모양 그대로 써요. 화면이 이 모양을 읽어 카드로 그려요. 머리말 글자를 바꾸지 마세요:",
+    "   **1번째 아이디어** — (아이디어를 한 줄로)",
+    "   - 더 들어가야 할 설계: (전자회로 달그락(EE) / 소프트웨어 달그락(SW) / 기구설계 달그락(ME) / 제품 디자인 달그락(ID) 중에서 고르고, 이유 한 문장)",
+    "   - 해 볼 것: (내일 바로 해 볼 수 있는 가장 작은 실험 하나)",
     "4. 마지막에 한 문장으로 응원해요.",
     "",
-    "규칙: 존댓말 해요체. 아이디어 하나에 네 줄을 넘기지 않아요. 확인하지 않은 가격·수치는 지어내지 않아요.",
+    "규칙: 존댓말 해요체. 아이디어 하나는 위 세 줄만 써요. 번호 목록(1. 2.)이나 표는 쓰지 않아요. 확인하지 않은 가격·수치는 지어내지 않아요.",
     "",
     ideas.length ? `현장에서 나온 아이디어 ${ideas.length}개:\n${ideas.map((t, i) => `${i + 1}. ${t}`).join("\n")}` : "오늘은 현장 아이디어가 적히지 않았어요. 3번 대신, 사만다를 다음에 더 키워 볼 방향 두 가지를 같은 형식(어느 달그락 / 해 볼 것)으로 제안해 주세요."
   ].join("\n");
@@ -94,4 +94,43 @@ export function fallbackLetter(project: LocalProject) {
   });
   lines.push("오늘 만든 한 대가 다음 아이디어의 출발점이에요. 수고했어요!", "", "(연결 앱이 닿지 않아, 이 편지는 정해진 기준으로만 썼어요. 연결 앱을 켜고 다시 누르면 더 자세히 써 드려요.)");
   return lines.join("\n");
+}
+
+/** 편지인 말풍선: '완성했어요'를 누른 바로 뒤에 온 대장의 답 */
+export function meetupLetterIds(project: LocalProject): Set<string> {
+  const ids = new Set<string>();
+  if (!isMeetup(project)) return ids;
+  let after = false;
+  for (const m of project.messages) {
+    if (!meetupChat(m.channel ?? "main")) continue;
+    if (m.role === "user") after = m.text === MEETUP_FINISH;
+    else if (after && m.role === "assistant") ids.add(m.id);
+  }
+  return ids;
+}
+
+export type MeetupLetterParts = { intro: string[]; ideas: Array<{ title: string; design: string; tryIt: string; extra: string[] }>; outro: string[] };
+const IDEA_HEAD = /^\s*(?:#+\s*)?\**\s*\d+\s*번째\s*아이디어\s*\**\s*[—–:-]\s*(.+)$/;
+const DESIGN_LINE = /^\s*[-•*]?\s*\**\s*(?:더 들어가야 할 설계|설계 더하기|조언)\s*\**\s*[:：]\s*(.+)$/;
+const TRY_LINE = /^\s*[-•*]?\s*\**\s*(?:해 볼 것|해볼 것)\s*\**\s*[:：]\s*(.+)$/;
+
+/** 편지 글을 인사 / 아이디어별 조언 / 맺음말로 나눈다. 모양이 어긋난 줄은 버리지 않고 가까운 칸에 그대로 둔다 */
+export function parseMeetupLetter(text: string): MeetupLetterParts {
+  const out: MeetupLetterParts = { intro: [], ideas: [], outro: [] };
+  let cur: MeetupLetterParts["ideas"][number] | null = null;
+  let closing = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const head = line.match(IDEA_HEAD);
+    if (head) { cur = { title: head[1], design: "", tryIt: "", extra: [] }; out.ideas.push(cur); closing = false; continue; }
+    if (!cur) { out.intro.push(line); continue; }
+    const design = line.match(DESIGN_LINE), tryIt = line.match(TRY_LINE);
+    if (!closing && design) { cur.design = cur.design ? `${cur.design} ${design[1]}` : design[1]; continue; }
+    if (!closing && tryIt) { cur.tryIt = cur.tryIt ? `${cur.tryIt} ${tryIt[1]}` : tryIt[1]; continue; }
+    // 두 칸이 다 찬 뒤에 오는 줄글은 맺음말이다
+    if (closing || (cur.design && cur.tryIt)) { closing = true; out.outro.push(line); continue; }
+    cur.extra.push(line.replace(/^[-•*]\s*/, ""));
+  }
+  return out;
 }
