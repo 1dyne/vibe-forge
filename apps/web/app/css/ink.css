@@ -98,3 +98,6 @@ h1:not(.find *),h2:not(.find *),h3:not(.find *),h4:not(.find *),.brand span,.nav
 /* 대장간에서 마을로 */
 .village-link{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:10px 12px;border:2px solid var(--ink);border-radius:12px;background:#f0dfa7;color:var(--ink);text-decoration:none;font-family:var(--font-display),var(--font-sans),sans-serif;font-size:13px;box-shadow:var(--pop-s)}
 .village-link em{margin-left:auto;font-style:normal;font-size:12px;opacity:.75}.village-link:active{transform:translate(2px,2px);box-shadow:none}
+
+/* 아직 베타라는 걸 이름 옆에 작게 적어 둔다. 처음 온 사람이 완성된 서비스로 기대하지 않게. */
+.beta-badge{display:inline-block;margin-left:6px;padding:1px 7px;border:1.5px solid var(--ink);border-radius:999px;background:#ffe9a8;color:var(--ink);font-size:.52em;font-style:normal;font-weight:700;letter-spacing:0;line-height:1.5;vertical-align:middle;white-space:nowrap}

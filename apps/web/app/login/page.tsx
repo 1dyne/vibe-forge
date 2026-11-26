@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <section className="login-card">
         <img src="/characters/idle.png" alt="대장 달그락" width="85" height="85" style={{ objectFit: "contain" }} />
         <p className="eyebrow">나만의 제작 작업 공간</p>
-        <h1>달그락 대장간</h1>
+        <h1>달그락 대장간<em className="beta-badge">베타</em></h1>
         {params.error && MESSAGES[params.error] && <p className="login-error" role="alert">{MESSAGES[params.error]}</p>}
         <ParticipantLogin next={next} google={googleConfigured()} unlock={params.unlock === "1"} canJoin={signupMode() !== "closed"} />
         {operatorReady && <details className="operator-login" open>

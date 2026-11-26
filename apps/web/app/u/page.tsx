@@ -20,7 +20,7 @@ export default function LinkSignIn() {
   }, []);
   return <main className="login-shell"><section className="login-card">
     <img src="/characters/thinking_1.png" alt="" width="85" height="85" style={{ objectFit: "contain" }} />
-    <h1>달그락 대장간</h1>
+    <h1>달그락 대장간<em className="beta-badge">베타</em></h1>
     {error ? <><p className="login-error" role="alert">{error}</p><p className="login-links"><a href="/login">로그인 화면으로</a></p></> : <p>내 대장간을 여는 중…</p>}
   </section></main>;
 }
