@@ -21,7 +21,7 @@ export default async function Neighbors() {
           : list.map((f) => (
             <a key={f.id} className="shelf-row" href={`/f/${f.id}`}><i style={{ background: "var(--teal)" }} /><span>{f.nickname}의 대장간</span><small>{alleyName(f.theme)}</small></a>
           ))}
-        <p className="fine-left">이웃의 소식(부품을 골랐대, 회로가 완성됐대)은 대장간이 문을 열면 여기로 와.</p>
+        <p className="fine-left">이웃이 대장간에서 얼마나 만들었는지는 그 집 설계도를 눌러 보면 보여. 진행할수록 그 집 방이 자라.</p>
         <nav className="town-tabs" aria-label="마을 길"><a href="/find/home">내 대장간</a><a href="/find/neighbors">이웃</a><a href="/find/dex">도감</a><a href="/find/random">아무 대장간이나</a></nav>
       </section>
     </main>

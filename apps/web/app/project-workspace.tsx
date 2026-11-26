@@ -129,6 +129,8 @@ export default function ProjectWorkspace() {
   const connectorOnly=viewer.kind==="user"&&!viewer.webAi;
   const busyRef=useRef("");busyRef.current=busy;
   useEffect(()=>{fetch("/api/projects",{cache:"no-store"}).then(async r=>{if(r.status===401){window.location.assign("/login");return;}if(!r.ok)throw new Error("프로젝트를 불러오지 못했습니다. 로그인 상태를 확인해주세요.");const b=await r.json();setProjects(b.projects);if(b.viewer)setViewer(b.viewer);
+    // 마을의 내 방이 대장간의 진행만큼 자라게 숫자만 알려 둔다.
+    void fetch("/api/me/forge-progress",{method:"POST"}).catch(()=>{});
     // Links from Claude can name a project and a panel (?p=<id>&open=profile|claude|dev).
     const query=new URLSearchParams(window.location.search);if(query.get("open")==="account"){setHub("account");window.history.replaceState(null,"","/");}const target=(b.projects as LocalProject[]).find(x=>x.id===query.get("p"));
     if(target){setSelectedId(target.id);expand(target.id);const open=query.get("open");if(open==="profile"){setProfile(workflowFor(target).profile);setShowProfile(true);}else if(open==="ai"||open==="claude")setHub("ai");else if(open==="dev")setConnectTab("dev");window.history.replaceState(null,"","/");}

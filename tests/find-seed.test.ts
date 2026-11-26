@@ -19,3 +19,20 @@ describe("온보딩 아이디어 쪽지", () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe("대장간의 진행이 마을의 방을 키운다", () => {
+  it("이름과 내용 없이 숫자만 만들고, 멀리 갈수록 방이 자란다", async () => {
+    const { progressOf, roomStage, readProgress } = await import("../apps/web/lib/find/progress");
+    const p = (extra: object) => ({ name: "비밀 프로젝트", idea: "비밀", tasks: [], messages: [], ...extra }) as never;
+    expect(roomStage(null)).toBe(1);
+    const idea = progressOf([p({})]);
+    expect(idea).toMatchObject({ projects: 1, furthest: 0 }); expect(roomStage(idea)).toBe(1);
+    const planned = progressOf([p({}), p({ buildPlan: {} })]);
+    expect(planned.furthest).toBe(1); expect(roomStage(planned)).toBe(2);
+    const mocked = progressOf([p({ preciseMockup: {} })]);
+    expect(mocked).toMatchObject({ furthest: 3, printed: 1 }); expect(roomStage(mocked)).toBe(3);
+    expect(JSON.stringify(mocked)).not.toContain("비밀");
+    expect(readProgress(JSON.stringify(mocked))?.furthest).toBe(3);
+    expect(readProgress("not json")).toBeNull();
+  });
+});

@@ -1,3 +1,4 @@
+import { readProgress, roomStage } from "../../../lib/find/progress";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
@@ -6,7 +7,7 @@ import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
 import { getFire } from "../../../lib/find/store";
 import { alleyName, houseStage, villageOf } from "../../../lib/find/village";
-import { forgeFires, forgeForOwner, getForge, hashToken, recordVisit, socialState, touchForge } from "../../../lib/find/village-store";
+import { getMeta, forgeFires, forgeForOwner, getForge, hashToken, recordVisit, socialState, touchForge } from "../../../lib/find/village-store";
 import Dokkaebi from "../../find/dokkaebi";
 import FireCardView, { Roast } from "../../find/fire-card";
 import ForgeView from "../../find/forge-view";
@@ -64,8 +65,11 @@ export default async function SharedPage({ params, searchParams }: Props) {
     const owner = viewer?.id === forge.id;
     if (forge.visibility === "private" && !owner) notFound();
     if (owner) await touchForge(forge.id).catch(() => undefined);
+    // 주인이 대장간에서 프로젝트를 진행한 만큼 방이 자란다(숫자만 온다).
+    const progress = readProgress(await getMeta(`forge_progress:${forge.id}`));
+    const grown = roomStage(progress);
     const CAT: Record<string, string> = { f: "형태", r: "반응", s: "감지", w: "누구" };
-    const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, peak: f.peak, sentence: f.sentence, card: f.card, stage: houseStage(f.picked), cats: [...new Set(f.picked.map((c) => CAT[c.split("_")[0]]).filter(Boolean))] }));
+    const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, peak: f.peak, sentence: f.sentence, card: f.card, stage: Math.max(houseStage(f.picked), grown) as 1 | 2 | 3, cats: [...new Set(f.picked.map((c) => CAT[c.split("_")[0]]).filter(Boolean))] }));
     // 놀러 온 사람: 방문 기록 + 이 집 도깨비불을 내 도감에 한 칸씩
     const dexAdded = owner ? 0 : await recordVisit(viewer?.id ?? null, forge.id, fires.slice(0, 5).map((f) => f.id)).catch(() => 0);
     const social = await socialState(forge.id, viewer?.id ?? null);
@@ -76,7 +80,7 @@ export default async function SharedPage({ params, searchParams }: Props) {
     const lanterns = { mine: owner ? own : null, allowance: lanternAllowance(fires.length), shown };
     return (
       <main className="find forge-page" style={{ ["--fire" as string]: fires[0]?.color ?? "#4FB3A6" }}>
-        <ForgeView news={owner ? <VillageNews /> : null} lanterns={lanterns} memoCount={owner ? (await forgeMemos(forge.id)).length : 0} forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
+        <ForgeView progress={progress} news={owner ? <VillageNews /> : null} lanterns={lanterns} memoCount={owner ? (await forgeMemos(forge.id)).length : 0} forge={{ id: forge.id, nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, visibility: forge.visibility, theme: forge.theme, village: villageOf(forge.theme)?.id ?? "kkomul", decor: forge.decor ?? {} }} fires={fires} isOwner={owner} couponText={COUPON_TEXT} social={social} viewerHasForge={Boolean(viewer)} dexAdded={dexAdded} />
       </main>
     );
   }

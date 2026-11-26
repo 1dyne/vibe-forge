@@ -4,6 +4,7 @@ import type { FireCard } from "../../lib/find/card";
 import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
 import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
+import { FURTHEST_LABEL, type ForgeProgress } from "../../lib/find/progress";
 import { MyLanterns, RopeSheet } from "./lantern-panel";
 import { MemoSheet } from "./memo-panel";
 import { QuestionSheet, useQuestion } from "./question-panel";
@@ -12,7 +13,6 @@ import { ROOFS, SIGNS, YARD, YARD_MAX, yardUnlocked, type Decor } from "../../li
 import FireCardView, { Roast } from "./fire-card";
 import { MailSheet } from "./mailbox";
 import { track } from "./track";
-import ForgeSignup from "./waitlist";
 import Kkachi from "./kkachi";
 import { PracticeSheet, SkillsSheet } from "./practice-sheet";
 import { createForgeSound } from "./world/world-sound";
@@ -20,6 +20,8 @@ import { createForgeSound } from "./world/world-sound";
 export type ForgeFire = { id: string; name: string; color: string; reactKind: string; peak: number; sentence: string; card: FireCard | null; stage: 1 | 2 | 3; cats: string[] };
 export type Social = { fuelToday: number; fuelTotal: number; wants: number; notes: Array<{ phrase: string; from: string; nickname: string; at: string }>; neighbors: number; visitsWeek: number; mine: { fuelGivenToday: boolean; wanted: boolean; notedToday: boolean; neighbor: boolean } };
 type Props = {
+  /** 주인이 달그락 대장간에서 진행한 만큼(숫자만) */
+  progress?: ForgeProgress | null;
   forge: { id: string; nickname: string; alley: string; plotNo: number; visibility: "public" | "link" | "private"; theme: string; village: string; decor: Decor };
   fires: ForgeFire[];
   isOwner: boolean;
@@ -43,7 +45,7 @@ const ROOM_TINT: Record<string, [string, string, string]> = {
 };
 const VIS_LABEL = { public: "전체 공개", link: "링크로만", private: "비공개" } as const;
 
-export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news, memoCount: initialMemos = 0 }: Props) {
+export default function ForgeView({ forge, fires, isOwner, couponText, social: initialSocial, viewerHasForge, dexAdded, lanterns, news, progress = null, memoCount: initialMemos = 0 }: Props) {
   const [memoCount, setMemoCount] = useState(initialMemos);
   const [mailNews, setMailNews] = useState(false);
   // 처음 들어온 주인에게 대장간에서 할 수 있는 일을 알려준다 (이 기기에서 한 번, ? 버튼으로 다시)
@@ -319,9 +321,13 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
               <>
                 {latest && <div className="note"><div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div><div className="sentence">{latest.sentence}</div></div>}
                 {isOwner && <button className="btn btn-ghost" type="button" onClick={() => show("memo")}>작업실 메모 열기{memoCount ? ` (${memoCount})` : ""}</button>}
-                {isOwner ? <ForgeSignup fire={latest ? { id: latest.id, name: latest.name } : null} forgeId={forge.id} refCode={null} couponText={couponText} /> : (
-                  <p className="body">설계도의 나머지 칸(부품·회로·하우징·조립)은 대장간이 문을 열면 켜져.</p>
-                )}
+                <div className="note">
+                  <div className="tiny muted">달그락 대장간에서의 진행</div>
+                  {progress && progress.projects > 0
+                    ? <><div className="steps-row">{FURTHEST_LABEL.map((label, i) => <span key={label} className={i <= progress.furthest ? "on" : ""}>{label}</span>)}</div><div className="small body">프로젝트 {progress.projects}개 · 가장 멀리 간 곳은 “{FURTHEST_LABEL[progress.furthest]}”{progress.printed ? ` · 3D 목업 ${progress.printed}개` : ""}. 진행할수록 이 방이 넓어지고 물건이 늘어.</div></>
+                    : <div className="small body">{isOwner ? "아직 대장간에서 시작한 프로젝트가 없어. 시작하면 설계도·회로·3D 목업 칸이 하나씩 켜지고 이 방도 자라." : "주인이 대장간에서 만들기 시작하면 여기 칸이 하나씩 켜져."}</div>}
+                </div>
+                {isOwner && <a className="btn btn-fire" href="/" style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>달그락 대장간에서 이어 만들기</a>}
               </>
             )}
             {open === "invention" && (
