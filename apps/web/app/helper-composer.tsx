@@ -156,7 +156,7 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
     <strong>달그락 연결 앱이 꺼져 있어요 · 켜면 여기서 바로 대화할 수 있어요</strong>
     <p>내 컴퓨터의 <button type="button" className="term-link" onClick={() => setTerminal(HELPER_COMMAND)}>터미널(윈도우는 PowerShell)</button>에 아래를 붙여넣고 Enter를 누르세요. 전에 로그인했다면 다시 묻지 않고 바로 켜져요. “준비됐어요”가 뜨면 이 화면이 몇 초 안에 입력창으로 바뀌어요.</p>
     <div className="copy-row"><code>{HELPER_COMMAND}</code><button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(HELPER_COMMAND).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "복사됨" : "복사"}</button></div>
-    <p>터미널 창을 닫으면 연결 앱도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법 · 더블클릭으로 켜는 파일 받기</a></p>
+    <p>터미널 창을 닫으면 연결 앱도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법 · 더블클릭으로 켜는 파일 받기</a> · <a href={HELPER_REPO_URL + "/blob/main/SECURITY.md"} target="_blank" rel="noreferrer noopener">이 앱이 하는 일과 하지 않는 일(보안 안내)</a></p>
     {terminal && <TerminalHelp command={terminal} onClose={() => setTerminal(null)} />}
   </div>;
   return <>
