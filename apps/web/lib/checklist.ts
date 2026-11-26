@@ -23,7 +23,7 @@ export function checklistMissing(profile: MakerProfile): { required: string[]; r
   const recommended = [
     (profile.solderingSkill ?? "unanswered") === "unanswered" && "납땜 경험",
     (profile.printerAccess ?? "unanswered") === "unanswered" && "3D 프린터",
-    profile.budgetKRW == null && "예산",
+    profile.budgetKRW == null && !profile.budgetOff && "예산",
     (profile.purpose ?? "unanswered") === "unanswered" && "목적",
     profile.purpose === "sell" && profile.targetPriceKRW == null && "판매가"
   ].filter(Boolean) as string[];

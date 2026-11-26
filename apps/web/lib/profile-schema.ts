@@ -34,6 +34,7 @@ export const PersonProfileSchema = z.object({
   makerspaces: z.array(MakerSpaceSchema).max(10).optional(),
   ownedParts: z.array(OwnedPartSchema).max(120).optional(),
   learningMode: z.boolean().optional(),
+  preferredShops: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
   extras: z.record(z.string().max(40), z.union([z.string().max(200), z.array(z.string().max(80)).max(20)])).optional(),
   devProfile: z.object({
     codingExperience: z.enum(["unanswered", "none", "guided", "independent"]),
@@ -48,6 +49,7 @@ export const PersonProfileSchema = z.object({
 export const ProfileSchema = PersonProfileSchema.extend({
   coreBehavior: z.string().max(1800),
   budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  budgetOff: z.boolean().optional(),
   purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(),
   targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   timelineWeeks: z.number().min(0.5).max(104).nullable().optional(),

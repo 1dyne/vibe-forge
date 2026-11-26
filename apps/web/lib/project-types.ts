@@ -175,6 +175,10 @@ export type MakerProfile = {
   printerAccess?: "unanswered" | "own" | "makerspace" | "service" | "none";
   region?: string;
   budgetKRW?: number | null;
+  /** 이 프로젝트는 예산을 정하지 않는다(묻지도, 예산으로 부품을 낮추지도 않는다) */
+  budgetOff?: boolean;
+  /** 자주 쓰는 구매처. 부품을 찾을 때 먼저 본다 (계정에 붙는다) */
+  preferredShops?: string[];
   purpose?: "unanswered" | "personal" | "gift" | "sell" | "lecture";
   targetPriceKRW?: number | null;
   travelRange?: "unanswered" | "walk" | "transit30" | "transit60" | "car";

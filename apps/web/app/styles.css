@@ -480,3 +480,6 @@ tr.is-new{animation-name:new-flash-row}
 .turn-badge,.rv-heading em{background:var(--c-user);color:var(--ink-user)}
 .user-avatar{background:var(--c-user);color:var(--ink-user);font-weight:700}
 .rooms .room-team{justify-content:flex-start;text-align:left;margin:8px 0 2px 12px}
+.switch-line{display:flex;align-items:center;gap:8px;font-weight:600;margin:4px 0 6px}
+.shop-add{display:flex;gap:8px;margin-top:8px}.shop-add input{flex:1}
+.space-shortcut{margin:10px 0 14px;padding:12px 14px;border-radius:12px;background:#fdf3ec;border:1.5px solid var(--c-user)}.space-shortcut p{margin:4px 0 0;font-size:13px}

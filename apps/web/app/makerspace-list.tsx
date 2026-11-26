@@ -49,6 +49,7 @@ export default function MakerspaceList() {
   return <div className="makerspace-list">
     <h3>자주 가는 곳 등록</h3>
     <p className="muted">한 번 등록해두면 모든 프로젝트에서 같이 써요. 출력 크기를 적으면 그 안에 들어가게 설계해요.</p>
+    <div className="space-shortcut"><b>칸을 채우지 않고 등록하기</b><p>대화창에 예약 확인 화면 캡처나 장비 안내 사진을 붙이거나, 네이버 지도·예약 페이지 주소를 붙여넣고 “여기 등록해 주세요”라고 말해보세요. 달그락이 읽어서 여기에 채워 넣어요. “우리 동네 메이커스페이스 찾아줘”라고 하면 찾아서 보여주기도 해요.</p></div>
     {spaces.length > 0 && <ul className="space-items">{spaces.map((space) => <li key={space.id}>
       <div><b>{space.name}</b>{space.where && <small> · {space.where}</small>}
         {space.printers && <small className="space-line">장비: {space.printers}</small>}

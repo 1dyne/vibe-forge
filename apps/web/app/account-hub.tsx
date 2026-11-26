@@ -141,6 +141,7 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
       {tab === "gear" && profile && <>
         <fieldset><legend>사용할 수 있는 제작 도구</legend><div className="tool-checks">{TOOL_OPTIONS.map((t) => <label key={t}><input type="checkbox" checked={profile.tools.includes(t)} onChange={(e) => change({ toolsConfirmed: true, tools: e.target.checked ? [...profile.tools, t] : profile.tools.filter((x) => x !== t) })} />{t}</label>)}</div><label className="none-check"><input type="checkbox" checked={profile.toolsConfirmed && !profile.tools.length} onChange={(e) => change({ tools: [], toolsConfirmed: e.target.checked })} />아직 보유한 도구가 없어요</label></fieldset>
         <OwnedPartsField parts={profile.ownedParts ?? []} onChange={(next) => change({ ownedParts: next })} />
+        <ShopsField shops={profile.preferredShops ?? []} onChange={(next) => change({ preferredShops: next })} />
         {radios("printerAccess")}
         {extras("gear")}
       </>}
@@ -183,4 +184,17 @@ export default function AccountHub({ initialTab = "skill", project, hasAccount, 
       </div>}
     </section>
   </div>;
+}
+
+// 자주 쓰는 구매처. 달그락이 부품을 찾을 때 먼저 본다.
+const SHOP_OPTIONS = ["디바이스마트", "엘레파츠", "아이씨뱅큐", "메카솔루션", "쿠팡", "네이버 쇼핑", "알리익스프레스", "디지키", "마우저"];
+function ShopsField({ shops, onChange }: { shops: string[]; onChange: (next: string[]) => void }) {
+  const [text, setText] = useState("");
+  const toggle = (name: string) => onChange(shops.includes(name) ? shops.filter((s) => s !== name) : [...shops, name].slice(0, 12));
+  const add = () => { const name = text.trim().slice(0, 40); if (name && !shops.includes(name)) onChange([...shops, name].slice(0, 12)); setText(""); };
+  return <fieldset><legend>자주 쓰는 구매처 <small>(선택)</small></legend>
+    <small className="muted">고른 곳을 먼저 찾아봐요. 거기에 없거나 많이 비쌀 때만 다른 곳을 함께 보여드려요.</small>
+    <div className="tool-checks">{[...SHOP_OPTIONS, ...shops.filter((s) => !SHOP_OPTIONS.includes(s))].map((name) => <label key={name}><input type="checkbox" checked={shops.includes(name)} onChange={() => toggle(name)} />{name}</label>)}</div>
+    <div className="shop-add"><input className="profile-input" maxLength={40} placeholder="다른 곳 직접 적기" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} /><button type="button" onClick={add} disabled={!text.trim()}>추가</button></div>
+  </fieldset>;
 }

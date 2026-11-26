@@ -42,6 +42,7 @@ import type { HousingPlan } from "./project-types";
 
 import { tools as fileTools, GUIDE_SECTION as FILE_GUIDE } from "./tools/file-tools";
 import { tools as finishTools, GUIDE_SECTION as FINISH_GUIDE } from "./tools/finish-tools";
+import { tools as placeTools, GUIDE_SECTION as PLACE_GUIDE } from "./tools/place-tools";
 import { tools as learnTools, GUIDE_SECTION as LEARN_GUIDE } from "./tools/learn-tools";
 import { tools as revisionTools, GUIDE_SECTION as REVISION_GUIDE } from "./tools/revision-tools";
 import { tools as verifyTools, GUIDE_SECTION as VERIFY_GUIDE } from "./tools/verify-tools";
@@ -474,6 +475,8 @@ const ProfileInput = z.object({
   printerAccess: z.enum(["unanswered", "own", "makerspace", "service", "none"]).optional(),
   region: z.string().trim().max(60).optional(),
   budgetKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
+  budgetOff: z.boolean().optional(),
+  preferredShops: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
   purpose: z.enum(["unanswered", "personal", "gift", "sell", "lecture"]).optional(),
   targetPriceKRW: z.number().int().min(0).max(100_000_000).nullable().optional(),
   travelRange: z.enum(["unanswered", "walk", "transit30", "transit60", "car"]).optional(),
@@ -579,7 +582,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "달그락 대장간의 단계, 역할, 기록 규칙을 읽는다. 처음 쓸 때나 규칙이 헷갈릴 때 먼저 호출한다.",
     inputSchema: { type: "object", additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
-    run: async (_input, context) => ({ text: `${GUIDE}\n\n${[REVISION_GUIDE, VERIFY_GUIDE, FILE_GUIDE, LEARN_GUIDE, FINISH_GUIDE].join("\n\n")}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
+    run: async (_input, context) => ({ text: `${GUIDE}\n\n${[REVISION_GUIDE, VERIFY_GUIDE, FILE_GUIDE, LEARN_GUIDE, FINISH_GUIDE, PLACE_GUIDE].join("\n\n")}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
   },
   {
     name: "list_projects", title: "내 프로젝트 목록",
@@ -636,6 +639,8 @@ export const TOOLS: ToolDefinition[] = [
       purpose: { type: "string", enum: ["unanswered", "personal", "gift", "sell", "lecture"] }, targetPriceKRW: { type: ["integer", "null"], description: "판매 목적일 때 목표 판매가(원)" },
       travelRange: { type: "string", enum: ["unanswered", "walk", "transit30", "transit60", "car"], description: "메이커스페이스까지 이동 가능 범위" }, timelineWeeks: { type: ["number", "null"], description: "원하는 완성 기간(주). 선택" },
       learningMode: { type: "boolean", description: "학습 모드. 사용자가 더 자세한 설명을 원하면 true" },
+      budgetOff: { type: "boolean", description: "이 프로젝트는 예산을 정하지 않는다. 사용자가 예산 없이 가자고 하면 true" },
+      preferredShops: { type: "array", maxItems: 12, items: { type: "string" }, description: "자주 쓰는 구매처 이름 (예: 디바이스마트, 엘레파츠, 알리익스프레스). 보내면 목록 전체가 바뀐다" },
       extras: { type: "object", description: "추가 질문의 답 가운데 사람에게 붙는 것 (get_checklist의 extraQuestions의 id → 선택지 value 또는 value 배열). 기존 답은 보낸 키만 바뀐다", additionalProperties: true },
       projectExtras: { type: "object", description: "추가 질문의 답 가운데 이 프로젝트에만 해당하는 것 (사용 환경, 완성도 기대 등)", additionalProperties: true },
       ownedParts: { type: "array", description: "사용자가 이미 가지고 있다고 말한 부품. 보내면 이 목록으로 전체가 바뀐다(한 줄만 추가하려면 기존 목록을 함께 보낸다). 부품목록에서 이미 가진 것을 빼는 데 쓰인다. find_part_cards로 카드가 있으면 catalogId를 넣으면 사양까지 함께 본다.", items: { type: "object", additionalProperties: false, required: ["name"], properties: {
@@ -1620,4 +1625,4 @@ export async function callTool(name: string, input: unknown, context: ToolContex
 // lib/tools/ 아래의 도구 묶음이 쓰는 공용 함수를 채운다.
 kit.ownedProject = ownedProject;
 kit.stored = stored;
-TOOLS.push(...revisionTools, ...verifyTools, ...fileTools, ...learnTools, ...finishTools);
+TOOLS.push(...revisionTools, ...verifyTools, ...fileTools, ...learnTools, ...finishTools, ...placeTools);
