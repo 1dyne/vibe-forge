@@ -393,7 +393,7 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
           <div className="muted small">최고 화력 <span className="display ink" style={{ fontSize: 20 }}>{fire.peak}</span> · {fireLabel(fire.peak)}</div>
         </div>
       )}
-      <button className="btn btn-fire next-top" type="button" onClick={() => { track("about_from_top"); onForge(); }}>이 아이디어, 진짜로 만들어 보기 →</button>
+      <button className="btn btn-fire next-top" type="button" onClick={() => { track("about_from_top"); onForge(); }}>이 아이디어 직접 만들어 보기 →</button>
       <div className="note">
         <div className="tiny muted">도깨비가 받아 적은 설계 한 줄</div>
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
@@ -450,9 +450,9 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
       <div className="next-card">
         <b>이 카드는 아직 스케치야.</b>
         <span>달그락 대장간에서는 이걸 3D로 미리 보고, 부품 목록·회로·출력 파일로 만들어서 네 손으로 조립하게 도와줘.</span>
-        <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>진짜로 만들어 보기 →</button>
+        <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>이 아이디어 직접 만들어 보기 →</button>
       </div>
-      <div className="next-bar"><span>이 아이디어, 진짜로 만들 수 있어</span><button className="btn btn-fire" type="button" onClick={() => { track("about_from_bar"); onForge(); }}>달그락 대장간이 뭐예요? →</button></div>
+      <div className="next-bar"><span>달그락 대장간이 어떻게 도와주는지 볼래?</span><button className="btn btn-fire" type="button" onClick={() => { track("about_from_bar"); onForge(); }}>이 아이디어 직접 만들어 보기 →</button></div>
       <div className="two">
         <button className="btn btn-ghost" type="button" onClick={onShare}>카드 저장·공유</button>
         <button className="btn btn-ghost" type="button" onClick={onAgain}>다시 피우기</button>
