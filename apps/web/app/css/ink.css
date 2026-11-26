@@ -4,7 +4,7 @@
    도톰한 제목 글꼴. 색은 달그락 색 한 벌(styles.css 끝)만 쓴다. */
 :root{--bg:#f6f1e7;--paper:#fffdf8;--ink:#232323;--line:#232323;--muted:#6f6a61;--soft:#e9e2d3;--pop:3px 3px 0 var(--ink);--pop-s:2px 2px 0 var(--ink)}
 body{background:var(--bg)}
-h1,h2,h3,h4,.brand span,.artifact-header h2,.chat-header h1,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-project,.my-workshop,.me-button,.join-method,.artifact-title h3{font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400;letter-spacing:.01em}
+h1:not(.find *),h2:not(.find *),h3:not(.find *),h4:not(.find *),.brand span,.artifact-header h2,.chat-header h1,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-project,.my-workshop,.me-button,.join-method,.artifact-title h3{font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400;letter-spacing:.01em}
 .brand span{font-size:21px}.chat-header h1{font-size:21px}
 
 /* 큰 판: 종이 위에 먹선으로 그린 칸 */
@@ -15,9 +15,9 @@ h1,h2,h3,h4,.brand span,.artifact-header h2,.chat-header h1,.nav-caption,.pill,.
 .chat-scroll{background:transparent}
 
 /* 누르는 것: 먹선 + 딱 떨어지는 그림자, 누르면 눌린다 */
-button{border:2px solid var(--ink);border-radius:12px;background:#fff;transition:transform .08s,box-shadow .08s,background .15s}
-button:hover:not(:disabled){background:#fff7e8}
-button:active:not(:disabled){transform:translate(2px,2px);box-shadow:none!important}
+button:not(.find *){border:2px solid var(--ink);border-radius:12px;background:#fff;transition:transform .08s,box-shadow .08s,background .15s}
+button:hover:not(:disabled):not(.find *){background:#fff7e8}
+button:active:not(:disabled):not(.find *){transform:translate(2px,2px);box-shadow:none!important}
 .new-project,.my-workshop,.me-button,.workbench-toggle,.join-method,.primary,button.primary,.send,.finish-routes button,.print-files ul a,.auto-line button{box-shadow:var(--pop-s)}
 .new-project{background:var(--c-chief);border-color:var(--ink);color:var(--ink)}
 .new-project:hover:not(:disabled){background:#b5dfd7}
@@ -37,7 +37,7 @@ button:active:not(:disabled){transform:translate(2px,2px);box-shadow:none!import
 
 /* 쓰는 곳 */
 .composer{border:2px solid var(--ink);border-radius:18px;box-shadow:var(--pop);background:#fff}
-input:not([type=checkbox]):not([type=radio]),textarea,select{border:2px solid var(--ink);border-radius:10px;background:#fff}
+input:not([type=checkbox]):not([type=radio]):not(.find *),textarea:not(.find *),select:not(.find *){border:2px solid var(--ink);border-radius:10px;background:#fff}
 .composer textarea{border:0;border-radius:0}
 .model-select{border:2px solid var(--ink);border-radius:10px}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--c-ee);outline-offset:2px}
@@ -71,7 +71,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 .me-button{border:2px solid var(--ink)}
 .icon-button{border:2px solid var(--ink);border-radius:12px;background:#fff}
 /* 도톰한 글꼴은 굵기가 하나뿐이다. 굵게를 덧입히면 번지므로 막는다 */
-h1,h2,h3,h4,.brand span,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-project,.my-workshop,.me-button,.join-method{font-weight:400!important;font-synthesis:none}
+h1:not(.find *),h2:not(.find *),h3:not(.find *),h4:not(.find *),.brand span,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-project,.my-workshop,.me-button,.join-method{font-weight:400!important;font-synthesis:none}
 .welcome h2{font-size:30px}
 .idea-prompts button{border:2px solid var(--ink);box-shadow:var(--pop-s);background:#fff}
 .nav-toggle{border:2px solid var(--ink)}

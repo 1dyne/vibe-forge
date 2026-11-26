@@ -80,7 +80,7 @@ export default function AboutView({ joinUrl, seed, token, contact }: { joinUrl: 
 
     <section>
       <Reveal kind="pop"><div className="maker-note">
-        <div className="smith"><img src="/characters/idle.png" alt="" /><div><b>대장장이 1dyne</b><small>달그락 대장간과 달그락 마을을 만들고 지키는 사람</small></div></div>
+        <div className="smith"><img src="/find/smith.webp" alt="노트북으로 작업하는 대장장이 1dyne 그림" /><div><b>대장장이 1dyne</b><small>달그락 대장간과 달그락 마을을 만들고 지키는 사람</small></div></div>
         <p>AI와 대화하면서 처음으로 하드웨어를 만든 문과생 메이커예요. 그때 가장 힘들었던 건 회로가 아니라 <b>“지금 뭘 해야 하는지”</b>였어요. 그래서 그 길을 그대로 옮겨 달그락 대장간을 만들었어요.</p>
         <p className="contact">궁금한 것, 막히는 것, 같이 해보고 싶은 것은 <a href={`mailto:${contact}`}>{contact}</a> 으로 보내 주세요.</p>
       </div></Reveal>

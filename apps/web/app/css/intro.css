@@ -59,3 +59,4 @@
 .intro .smith{display:flex;align-items:center;gap:14px}.intro .smith img{width:64px;height:64px;object-fit:contain;border:2px solid var(--ink);border-radius:50%;background:#9DD2C8;padding:4px}
 .intro .smith b{display:block;font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400;font-size:22px}.intro .smith small{color:#6f6a61;font-size:13px}
 .intro .cta h2{line-height:1.35}
+.intro .smith img{width:84px;height:104px;border-radius:16px;background:#fff;padding:2px;object-fit:cover}
