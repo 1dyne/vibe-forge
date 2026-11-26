@@ -1,0 +1,77 @@
+/* ── 먹선 테마 ────────────────────────────────────────────────────────────────
+   달그락 그림은 굵은 검은 선 + 납작한 파스텔 색이다. 화면도 같은 말투로 맞춘다:
+   옅은 회색 실선과 흐린 그림자 대신 먹선과 딱 떨어지는 그림자, 따뜻한 종이색 바탕,
+   도톰한 제목 글꼴. 색은 달그락 색 한 벌(styles.css 끝)만 쓴다. */
+:root{--bg:#f6f1e7;--paper:#fffdf8;--ink:#232323;--line:#232323;--muted:#6f6a61;--soft:#e9e2d3;--pop:3px 3px 0 var(--ink);--pop-s:2px 2px 0 var(--ink)}
+body{background:var(--bg)}
+h1,h2,h3,h4,.brand span,.artifact-header h2,.chat-header h1,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-project,.my-workshop,.me-button,.join-method,.artifact-title h3{font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400;letter-spacing:.01em}
+.brand span{font-size:21px}.chat-header h1{font-size:21px}
+
+/* 큰 판: 종이 위에 먹선으로 그린 칸 */
+.sidebar{background:transparent}
+.chat-panel,.artifact-panel{background:var(--paper);border:2px solid var(--ink);border-radius:20px;box-shadow:none}
+.chat-header{border-bottom:2px solid var(--ink);background:transparent}
+.composer-area{background:transparent}
+.chat-scroll{background:transparent}
+
+/* 누르는 것: 먹선 + 딱 떨어지는 그림자, 누르면 눌린다 */
+button{border:2px solid var(--ink);border-radius:12px;background:#fff;transition:transform .08s,box-shadow .08s,background .15s}
+button:hover:not(:disabled){background:#fff7e8}
+button:active:not(:disabled){transform:translate(2px,2px);box-shadow:none!important}
+.new-project,.my-workshop,.me-button,.workbench-toggle,.join-method,.primary,button.primary,.send,.finish-routes button,.print-files ul a,.auto-line button{box-shadow:var(--pop-s)}
+.new-project{background:var(--c-chief);border-color:var(--ink);color:var(--ink)}
+.new-project:hover:not(:disabled){background:#b5dfd7}
+.my-workshop,.me-button{border:2px solid var(--ink);background:#fff}
+.my-workshop.has-turn{background:var(--c-user);border-color:var(--ink)}
+.primary,button.primary{background:var(--c-chief);border:2px solid var(--ink);color:var(--ink)}
+.primary:hover:not(:disabled),button.primary:hover:not(:disabled){background:#b5dfd7}
+.workbench-toggle{background:#fff;border:2px solid var(--ink)}
+.workbench-toggle[aria-pressed=true]{background:var(--c-chief)}
+.workbench-toggle.has-new{box-shadow:var(--pop-s);background:#fdeee3}
+.send{background:var(--ink);color:#fff;border-color:var(--ink);border-radius:12px}.send:disabled{background:#b9b3a7;border-color:#b9b3a7}
+.finish-routes button,.print-files ul a{background:var(--c-chief);color:var(--ink);border:2px solid var(--ink)}
+.icon-button,.folder-toggle,.folder-delete,.folder-rename-button,.nav-toggle,.nav-close,.link-button,.projects-toggle,.project-tree button,.rooms button,.status-list button,.photo-chip button,.copy-button,.gear-menu button{box-shadow:none}
+.project-tree button,.rooms button,.projects-toggle,.status-list button,.link-button,.folder-toggle,.folder-delete,.folder-rename-button{border-color:transparent;background:transparent}
+.project-tree button:hover:not(:disabled),.rooms button:hover:not(:disabled),.status-list button:hover:not(:disabled){background:var(--soft)}
+.rooms button.selected,.project-tree .selected{background:#fff;border:2px solid var(--ink);box-shadow:var(--pop-s)}
+
+/* 쓰는 곳 */
+.composer{border:2px solid var(--ink);border-radius:18px;box-shadow:var(--pop);background:#fff}
+input:not([type=checkbox]):not([type=radio]),textarea,select{border:2px solid var(--ink);border-radius:10px;background:#fff}
+.composer textarea{border:0;border-radius:0}
+.model-select{border:2px solid var(--ink);border-radius:10px}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--c-ee);outline-offset:2px}
+
+/* 카드와 이름표 */
+.stage-card,.intake-card,.handoff-card,.room-card,.next-card,.status-block,.print-files,.finish-routes article,.next-banner,.rv-card,.workshop-modal,.profile-modal,.fs-room,.pm-wrap,.files-view,.auto-line{border:2px solid var(--ink);border-radius:16px;box-shadow:none}
+.stage-card,.intake-card,.status-block{background:#fff}
+.next-banner,.room-card.turn-person{background:#fdeee3;border-color:var(--ink);box-shadow:var(--pop-s)}
+.next-banner em,.room-card.turn-person small{color:var(--ink-user)}
+.turn-badge,.rv-heading em{border:1.5px solid var(--ink);min-width:20px;height:20px}
+.pill{border:1.5px solid var(--ink);background:#fff;color:var(--ink);border-radius:999px}
+.print-files{background:#fff}.finish-routes article.chosen{background:#e6f4f0}
+.finish-limits li{border:1.5px solid var(--ink);background:#fbf1cf}
+.modal-backdrop{background:rgba(35,35,35,.45)}
+.workshop-modal,.profile-modal{box-shadow:6px 6px 0 var(--ink)}
+
+/* 말풍선: 내 말은 사용자 색, 달그락 말은 종이 그대로 */
+.chat-message.user .message-body>*:not(.message-meta){background:#fdeee3;border:2px solid var(--ink);border-radius:14px 14px 14px 4px;padding:10px 14px;display:inline-block}
+.user-avatar{border:2px solid var(--ink)}
+.card-divider::before,.card-divider::after{background:var(--ink);height:2px}
+.agent-dot,.fs-dot{box-shadow:0 0 0 1.5px var(--ink)}
+.room-team::before{box-shadow:0 0 0 1.5px var(--ink)}
+
+/* 가입·로그인 */
+.join-method{border:2px solid var(--ink);border-radius:12px}.join-method.google{background:var(--c-chief)}.join-method.on{background:var(--c-user);border-color:var(--ink);color:var(--ink)}
+/* 다듬기 */
+.rooms .room-team{display:flex;align-items:center;gap:7px;justify-content:flex-start;margin:10px 0 2px 10px;font-size:11.5px;color:var(--muted);border:0;padding:0}
+.rooms .room-team::before{flex:none;width:8px;height:8px;border-radius:50%;position:static}
+.status-block{border:0;border-radius:0;background:transparent}
+.status-scroll>.status-block,.status-scroll>details{border-top:2px solid var(--soft)}
+.me-button{border:2px solid var(--ink)}
+.icon-button{border:2px solid var(--ink);border-radius:12px;background:#fff}
+/* 도톰한 글꼴은 굵기가 하나뿐이다. 굵게를 덧입히면 번지므로 막는다 */
+h1,h2,h3,h4,.brand span,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-project,.my-workshop,.me-button,.join-method{font-weight:400!important;font-synthesis:none}
+.welcome h2{font-size:30px}
+.idea-prompts button{border:2px solid var(--ink);box-shadow:var(--pop-s);background:#fff}
+.nav-toggle{border:2px solid var(--ink)}
