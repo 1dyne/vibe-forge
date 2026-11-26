@@ -160,6 +160,8 @@ describe("bench practice kits", () => {
       it("solders only where something was inserted, a wire ends, or on a module pad", () => {
         const filled = new Set<string>();
         for (const p of kit.parts) if (p.kind === "sensor_module") (p.spec?.pinNames ?? []).forEach((n) => filled.add(`${p.ref}.${n}`));
+        // 프로젝트 조립 가이드에서 온 모듈은 제 패드에 헤더를 납땜할 수 있다
+        for (const p of kit.parts) if (p.kind === "module") (p.spec?.pinXY ?? []).forEach((x) => filled.add(`${p.ref}.${x.name}`));
         for (const o of ops) {
           if (o.op === "jumper") { filled.add(o.from); filled.add(o.to); }
           if (o.op === "insert") o.holes.forEach((h) => filled.add(h));

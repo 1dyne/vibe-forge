@@ -8,7 +8,7 @@ export function PracticeSheet({ forgeId, hue, onClose }: { forgeId: string; hue:
   const [done, setDone] = useState<Record<string, string>>({});
   useEffect(() => { try { setDone(JSON.parse(localStorage.getItem("dalgeurak_practice") ?? "{}")); } catch { /* 저장소가 막혀도 목록은 보인다 */ } }, []);
   const back = encodeURIComponent(`/f/${forgeId}`);
-  const kits = KITS.filter((k) => !k.draft);
+  const kits = KITS.filter((k) => !k.draft && !k.unlisted);
   const n = kits.filter((k) => done[k.id]).length;
   return (
     <div className="overlay" role="dialog" aria-label="연장 걸이" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -37,7 +37,7 @@ export function PracticeSheet({ forgeId, hue, onClose }: { forgeId: string; hue:
 export function SkillsSheet({ onPractice, onClose }: { onPractice: () => void; onClose: () => void }) {
   const [done, setDone] = useState<Record<string, string>>({});
   useEffect(() => { try { setDone(JSON.parse(localStorage.getItem("dalgeurak_practice") ?? "{}")); } catch { /* 무시 */ } }, []);
-  const kits = KITS.filter((k) => !k.draft);
+  const kits = KITS.filter((k) => !k.draft && !k.unlisted);
   const got = kits.filter((k) => done[k.id]);
   return (
     <div className="overlay" role="dialog" aria-label="연장 걸이" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

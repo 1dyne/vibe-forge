@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { MAX_IMAGES, MAX_IMAGE_CHARS, RelayError, enqueueJob, helperStatus } from "../../../../lib/helper-relay";
 import { getProject, mutateProject } from "../../../../lib/local-project-store";
+import { meetupChat, meetupLocked, recordMeetupIdea } from "../../../../lib/meetup";
 import { hit } from "../../../../lib/rate-limit";
 import { hasValidOrigin } from "../../../../lib/request-security";
 import { canAccess, getViewer, notFound, unauthorized, withViewerVault } from "../../../../lib/viewer";
@@ -22,9 +23,11 @@ async function handlePOST(request: NextRequest) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "메시지는 4,000자 이내, 사진은 3장까지 보낼 수 있어요." }, { status: 400 });
   const input = parsed.data;
-  if (!helperStatus(viewer.user.id).online) return NextResponse.json({ error: "컴퓨터의 달그락 연결 앱이 꺼져 있어요. 연결 앱을 켜면 여기서 바로 대화할 수 있어요.", code: "offline" }, { status: 409 });
   let project = input.projectId ? await getProject(input.projectId) : null;
   if (input.projectId && (!project || !canAccess(viewer, project))) return notFound();
+  // MEETUP: 시연용 프로젝트의 대장 방에 적는 말은 현장 아이디어로 바로 적는다 (AI 호출 없음)
+  if (project && meetupLocked(project) && meetupChat(input.channel)) return NextResponse.json({ jobId: null, project: await mutateProject(project.id, (p) => recordMeetupIdea(p, input.text, input.channel as "main" | "chief")) });
+  if (!helperStatus(viewer.user.id).online) return NextResponse.json({ error: "컴퓨터의 달그락 연결 앱이 꺼져 있어요. 연결 앱을 켜면 여기서 바로 대화할 수 있어요.", code: "offline" }, { status: 409 });
   const images = (input.images ?? []).map((image) => ({ name: image.name ?? "사진", dataUrl: image.dataUrl as string }));
   try {
     // 말을 먼저 기록하고 넘긴다. 연결 앱은 일을 받을 때 기록을 함께 읽는다.

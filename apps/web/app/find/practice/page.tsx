@@ -14,7 +14,7 @@ export default function PracticeIndex() {
         <p className="lead">부품을 사기 전에 3D 작업대에서 납땜 순서를 익혀 봐요. 실수하기 쉬운 곳도 미리 보여 줄게요.</p>
         <a className="practice-kit" href="/find/setup?back=/find/practice"><div className="pk-top"><b>💻 보드에 코드 넣기 준비</b><span>약 15분 · 처음</span></div><p>아두이노 IDE가 뭔지부터, 설치하고 LED를 깜빡이는 것까지</p></a>
         <div className="practice-list">
-          {KITS.map((k) => (
+          {KITS.filter((k) => !k.unlisted).map((k) => (
             <a key={k.id} className={`practice-kit ${k.draft ? "soon" : ""}`} href={k.draft ? undefined : `/find/practice/${k.id}`} aria-disabled={k.draft || undefined}>
               <div className="pk-top"><b>{k.title}</b><span>{k.draft ? "준비 중" : `약 ${k.minutes}분 · ${k.level}`}</span></div>
               <p>{k.subtitle}</p>

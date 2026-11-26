@@ -135,6 +135,8 @@ export type LocalProject = {
   liveStatus?: LiveStatus;
   activity?: ActivityEntry[];
   workspaceFiles?: Array<{ id: string; agent: AgentId; filename: string; content: string; createdAt: string }>;
+  /** MEETUP: 밋업 시연용 프로젝트에만 생기는 현장 아이디어 기록 (lib/meetup.ts) */
+  meetup?: { ideas: Array<{ text: string; at: string }>; finishedAt?: string };
   designRevision: number;
   slots: DesignSlot[];
   tasks: ProjectTask[];

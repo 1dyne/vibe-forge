@@ -92,6 +92,8 @@ export type BenchKit = {
   faq: BenchFaq[];
   /** 데이터만 있고 아직 3D 연출이 완성되지 않은 키트 */
   draft?: boolean;
+  /** 목록에는 보이지 않고 주소로만 여는 키트 */
+  unlisted?: boolean;
   /** '바뀔 수 있어요' 스티커에 붙일 이유 (프로젝트) */
   provisional?: string[];
 };

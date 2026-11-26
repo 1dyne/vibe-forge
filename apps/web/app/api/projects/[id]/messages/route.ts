@@ -3,6 +3,7 @@ import { z } from "zod";
 import { budgetDenied, chargeTurn } from "../../../../../lib/usage";
 import { runDesignAgent } from "../../../../../lib/design-agent";
 import { applyAgentPlan, getProject, mutateProject } from "../../../../../lib/local-project-store";
+import { meetupChat, meetupLocked, recordMeetupIdea } from "../../../../../lib/meetup";
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
 import { randomUUID } from "node:crypto";
@@ -21,6 +22,8 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
     const { id } = await context.params;
     const project = await getProject(id);
     if (!project || !canAccess(viewer, project)) return notFound();
+    // MEETUP: 시연용 프로젝트의 대장 방에 적는 말은 현장 아이디어로 바로 적는다 (AI 호출 없음)
+    if (meetupLocked(project)) { const said = Message.safeParse(await request.clone().json().catch(() => null)); if (said.success && meetupChat(said.data.channel)) return NextResponse.json({ project: await mutateProject(id, (p) => recordMeetupIdea(p, said.data.text, said.data.channel as "main" | "chief")) }); }
     if (!canUseWebAi(viewer)) return webAiDenied();
     // 무료 분량이 남았는지 보고, 모자라면 여기서 멈춘다. 실패한 호출도 토큰은 나가므로
     // 보수적으로 먼저 적는다(운영자 계정은 자기 키를 쓰므로 세지 않는다).

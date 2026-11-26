@@ -7,6 +7,7 @@ import type { AgentId, AgentPlan, DevProfile, LocalProject, MakerProfile } from 
 import { CHECKLIST, checklistMissing, checklistText } from "./checklist";
 import type { AssemblyGuide, BuildPlan, ProductForm } from "./project-types";
 import { approvedCad, blockingChecks } from "./build-pipeline";
+import { MEETUP_LOCKED_TOOLS, MEETUP_LOCK_MESSAGE, meetupLocked } from "./meetup";
 import { QuotaError, annotateProject } from "./local-project-store";
 import { withLinkParams } from "./links";
 import { PART_CARDS, cardSummary, findCard } from "./parts/catalog";
@@ -1612,6 +1613,8 @@ export async function callTool(name: string, input: unknown, context: ToolContex
   const tool = TOOLS.find((item) => item.name === name);
   if (!tool) return { content: [{ type: "text", text: `알 수 없는 도구: ${name}` }], isError: true };
   try {
+    // MEETUP: 시연용 프로젝트는 설계를 바꾸는 도구를 받지 않는다
+    if (MEETUP_LOCKED_TOOLS.has(name)) { const ref = (input as { projectId?: unknown } | null)?.projectId; const locked = typeof ref === "string" && /^[0-9a-f-]{36}$/i.test(ref) ? await getProject(ref).catch(() => null) : null; if (locked && locked.ownerId === context.user.id && meetupLocked(locked)) return { content: [{ type: "text", text: MEETUP_LOCK_MESSAGE }], isError: true }; }
     const result = await tool.run(input ?? {}, context);
     const projectRef = (input as { projectId?: unknown } | null)?.projectId;
     if (typeof projectRef === "string" && !tool.annotations?.readOnlyHint && tool.name !== "report_progress") {

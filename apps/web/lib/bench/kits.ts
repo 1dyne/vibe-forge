@@ -1,4 +1,5 @@
 import type { BenchFaq, BenchKit, BenchMistake } from "./types";
+import { samKit } from "./sam-kit";
 
 // 온보딩 '미리 만들어보기' 연습 키트 (명세서 2차 v0.1 §5).
 // AI 호출 없이 정해진 데이터로만 돈다. 값은 일반적인 취미 납땜 기준이며,
@@ -132,6 +133,9 @@ export const KITS: BenchKit[] = [
     faq: [...SOLDER_FAQ, { q: "OUT에서 0V가 나와요", a: "보호회로가 잠긴 상태일 수 있어요(과방전 뒤). USB를 잠깐 꽂으면 풀리는 경우가 많아요. 그래도 0V면 B+/B−와 전지 극성을 다시 확인해요." }, { q: "모듈이 뜨거워요", a: "충전 전류가 전지에 비해 크면 뜨거워요(기본 1A). 500mAh 같은 작은 전지는 RPROG 저항을 바꿔 전류를 낮춰야 해요. 일단 USB를 빼요." }]
   }
 ];
+
+// 목록에는 안 나오고 주소로만 여는 키트 (밋업 시연: /find/practice/sam-scale)
+KITS.push(samKit());
 
 export function kitById(id: string) {
   return KITS.find((k) => k.id === id) ?? null;

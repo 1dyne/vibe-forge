@@ -46,7 +46,9 @@ function CopyRow({ text }: { text: string }) {
   return <span className="copy-row"><code>{text}</code><button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? "복사됨" : "복사"}</button></span>;
 }
 
-export default function HelperComposer({ project, channel, speaker, placeholder, suggestion, onProject, onLive, onTurnEnd }: {
+export default function HelperComposer({ project, channel, speaker, placeholder, suggestion, onProject, onLive, onTurnEnd, offlineOk = false }: {
+  /** MEETUP: 시연용 프로젝트는 연결 앱이 꺼져 있어도 입력칸을 연다 (아이디어는 서버가 바로 적는다) */
+  offlineOk?: boolean;
   /** 지금 이 방에서 답하는 달그락의 이름 (예: 대장 달그락) */
   speaker: string;
   project: LocalProject | null;
@@ -141,6 +143,7 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
       if (!response.ok) { if (body.code === "offline") setStatus((s) => ({ ...(s ?? { model: null, account: null }), online: false })); throw Object.assign(new Error(body.error ?? "보내지 못했어요."), { code: body.code ?? "" }); }
       if (!again) { setText(""); setPhotos([]); }
       if (body.project) onProject(body.project);
+      if (!body.jobId) return; // MEETUP: 시연용 프로젝트의 현장 아이디어는 서버가 바로 적는다 (AI 호출 없음)
       const answer = await follow(body.jobId, turnId, message);
       await onTurnEnd({ turnId, user: message, assistant: answer, error: null, hadProject });
     } catch (caught) {
@@ -157,7 +160,7 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
   }
 
   if (!status) return <div className="connector-composer"><p>연결 상태를 확인하고 있어요…</p></div>;
-  if (!status.online) return <div className="connector-composer">
+  if (!status.online && !offlineOk) return <div className="connector-composer">
     <strong>달그락 연결 앱이 꺼져 있어요 · 켜면 여기서 바로 대화할 수 있어요</strong>
     <p>내 컴퓨터의 <button type="button" className="term-link" onClick={() => setTerminal(HELPER_COMMAND)}>터미널(윈도우는 PowerShell)</button>에 아래를 붙여넣고 Enter를 누르세요. 전에 로그인했다면 다시 묻지 않고 바로 켜져요. “준비됐어요”가 뜨면 이 화면이 몇 초 안에 입력창으로 바뀌어요.</p>
     <div className="copy-row"><code>{HELPER_COMMAND}</code><button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(HELPER_COMMAND).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "복사됨" : "복사"}</button></div>
