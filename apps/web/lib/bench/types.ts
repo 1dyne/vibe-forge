@@ -25,7 +25,7 @@ export type BenchPart = {
     ohms?: number; color?: string; pins?: number; cols?: number; rows?: number; pinNames?: string[]; silk?: string;
     /** module: 기판 위 자리(기판 왼쪽 위 기준 mm)와 핀 위치(같은 좌표계, 회전 적용 후) */
     catalogId?: string; partType?: string; model?: string;
-    foot?: { x: number; y: number; w: number; h: number; rotation: number };
+    foot?: { x: number; y: number; w: number; h: number; rotation: number; lift?: number };
     pinXY?: Array<{ name: string; x: number; y: number }>;
     /** plate·perfboard·breadboard 크기 (mm) */
     widthMm?: number; heightMm?: number;
@@ -72,6 +72,8 @@ export type BenchStep = {
   mistakes?: BenchMistake[];
   /** 실물로 확인하는 방법 */
   doneWhen: string;
+  /** 미리 해 둔 단계: 화면을 따라 하지 않아도 바로 완료로 넘길 수 있다 */
+  prepared?: boolean;
 };
 
 export type BenchFaq = { q: string; a: string };

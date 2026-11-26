@@ -41,6 +41,31 @@ export function AssemblyView({ project, busy, onAction, connectorOnly = false }:
     return hw?.text ?? "기록했어요. 작업실에서 답을 확인해 주세요.";
   };
 
+  // 연결 앱으로 대화하는 사람: 작업대 안의 질문도 채팅창과 같은 길(내 컴퓨터의 연결 앱)로 보낸다.
+  // 예전에는 질문 문구를 복사만 해 줘서, 조립하다 말고 다른 창으로 옮겨 붙여 넣어야 했다.
+  const askHelper = async (text: string, photos: BenchPhoto[]) => {
+    const w = workflowFor(project);
+    const channel = w.phase === "workshop" && w.activeAgents.includes("hw") ? "hw" : "main";
+    const r = await fetch("/api/helper/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: project.id, text, channel, ...(photos.length ? { images: photos } : {}) }) });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok || !b.jobId) throw new Error(b.code === "offline" ? "달그락 연결 앱이 꺼져 있어요. 내 컴퓨터에서 연결 앱을 켜고 다시 보내 주세요." : b.error ?? "지금은 보내지 못했어요. 잠시 뒤 다시 보내 주세요.");
+    let from = 0, shown = "";
+    for (let misses = 0, turns = 0; turns < 600; turns++) {
+      const res = await fetch(`/api/helper/jobs/${b.jobId}?from=${from}`, { cache: "no-store" }).catch(() => null);
+      if (!res?.ok) { if (++misses > 5 || res?.status === 404) throw new Error("답변을 이어 받지 못했어요. 작업실 대화에서 확인해 주세요."); await new Promise((x) => setTimeout(x, 1500)); continue; }
+      misses = 0;
+      const body = await res.json() as { events: Array<{ type: string; text?: string; message?: string }>; next: number; finished: boolean };
+      from = body.next;
+      for (const e of body.events) {
+        if (e.type === "delta") shown += e.text ?? "";
+        else if (e.type === "error") throw new Error(e.message ?? "답변을 받지 못했어요.");
+        else if (e.type === "done") return e.text || shown || "기록했어요. 작업실 대화에서 답을 확인해 주세요.";
+      }
+      if (body.finished) break;
+    }
+    return shown || "기록했어요. 작업실 대화에서 답을 확인해 주세요.";
+  };
+
   const reports = project.assemblyReports ?? [];
   const reportedSteps = [...new Set(reports.filter((r) => !r.cardId).map((r) => r.step))];
   const [step, setStep] = useState(0);
@@ -101,7 +126,7 @@ export function AssemblyView({ project, busy, onAction, connectorOnly = false }:
       pastRefs={new Set(visible.filter((p) => (placedAt.get(p.ref) ?? 0) < step).map((p) => p.ref))} activePins={activePins} />}
     <div className="board-actions"><button className="primary bench-open" onClick={() => setBench(true)}>🔥 3D 작업대에서 따라 하기</button><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button>{kit && !no3d && <button aria-pressed={flat} onClick={() => setFlat(!flat)}>{flat ? "3D로 보기" : "평면 배치도"}</button>}</div>
     {bench && kit && typeof document !== "undefined" && createPortal(
-      <div className="bench-overlay"><BenchViewScreen kit={kit} mode="project" onClose={() => setBench(false)} onAsk={connectorOnly ? undefined : askHw} connectorOnly={connectorOnly} reported={reportedSteps}
+      <div className="bench-overlay"><BenchViewScreen kit={kit} mode="project" onClose={() => setBench(false)} onAsk={connectorOnly ? askHelper : askHw} connectorOnly={connectorOnly} reported={reportedSteps}
         onReport={(n, text) => onAction({ action: "assembly_report", step: n, text })} /></div>, document.body)}
     {fallbacks.length > 0 && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 준비되지 않아 사각형으로 보여요. 핀 위치는 {fallbacks.some((p) => p.card?.pins.length) ? "부품 카드" : "가이드"} 기준이니, 판매 페이지 사진과 핀 이름으로 방향을 확인하세요.</p>}
     <div className="assembly-controls">

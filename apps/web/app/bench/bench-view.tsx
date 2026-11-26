@@ -149,6 +149,15 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
     window.setTimeout(() => { setStep(next); api.current?.goto(next); advancing.current = false; setPlaying(false); }, 950);
   }, [kit, total, say, storeKey, onFinish, motion]);
 
+  // 미리 해 둔 단계(납땜을 끝내 온 부품 등)는 화면을 따라 하지 않고 바로 완료로 넘긴다
+  const passPrepared = useCallback(() => {
+    const s = stepRef.current;
+    if (!api.current || s >= total || advancing.current) return;
+    advancing.current = true;
+    setPlaying(true); setFeedback(null); setMistake(null); setHoldUi(null);
+    finishStep(s);
+  }, [total, finishStep]);
+
   const advance = useCallback(() => {
     const s = stepRef.current;
     // 보여주는 중이거나, 끝나고 다음 단계로 넘어가는 0.95초 사이에는 다시 누르지 못하게 (연타하면 멈추던 문제)
@@ -457,11 +466,12 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             <button type="button" className="btn-ghost nav" disabled={playing || step >= doneSteps} onClick={() => goStep(step + 1)} aria-label="다음 단계">▶</button>
           </div>
         )}
-        {mode === "project" && onReport && !finished && cur && (
+        {!finished && cur && ((mode === "project" && onReport) || (cur.prepared && doneSteps <= step)) && (
           <div className="report-row">
-            {reported.includes(step + 1) ? <span className="sent">✓ 실물 완료를 보냈어요</span>
-              : <button type="button" className="btn-ghost" disabled={doneSteps <= step} onClick={() => onReport(step + 1, `3D 작업대 ${step + 1}단계(${cur.title})를 실물로 마쳤어요.`)}>✋ 실제로 했어요</button>}
-            <span className="muted-s">{doneSteps <= step ? "화면에서 먼저 해 보면 눌러져요" : "실물로 마쳤으면 눌러요"}</span>
+            {cur.prepared && doneSteps <= step ? <button type="button" className="btn-ghost" disabled={playing} onClick={() => { if (onReport && !reported.includes(step + 1)) onReport(step + 1, `3D 작업대 ${step + 1}단계(${cur.title})는 미리 해 뒀어요.`); passPrepared(); }}>✓ 미리 해 뒀어요 · 넘어가기</button>
+              : reported.includes(step + 1) ? <span className="sent">✓ 실물 완료를 보냈어요</span>
+              : <button type="button" className="btn-ghost" disabled={doneSteps <= step} onClick={() => onReport?.(step + 1, `3D 작업대 ${step + 1}단계(${cur.title})를 실물로 마쳤어요.`)}>✋ 실제로 했어요</button>}
+            <span className="muted-s">{cur.prepared && doneSteps <= step ? "미리 끝내 둔 단계예요. 어떻게 했는지 보려면 ‘보여줘’" : doneSteps <= step ? "화면에서 먼저 해 보면 눌러져요" : "실물로 마쳤으면 눌러요"}</span>
           </div>
         )}
         {!finished && <p className="tap-hint">{challenge ? "직접 하기: 손으로 한 동작씩 해요. 막히면 ‘직접’을 끄고 ‘보여줘’" : "빛나는 곳을 누르거나 ‘보여줘’"} · 실물: {cur?.doneWhen}</p>}
@@ -492,7 +502,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             {asking && <p className="hw-msg typing">EE 달그락이 보고 있어요…</p>}
           </div>
           {terms.length > 0 && <div className="quick terms" aria-label="말 뜻 묻기">{terms.map((e) => <button key={e.term} type="button" onClick={() => ask(`‘${e.term}’ 뜻이 뭐예요?`, e.short)}>ⓘ {e.term} 뜻?</button>)}</div>}
-          {mode === "project" && connectorOnly ? <>
+          {mode === "project" && connectorOnly && !onAsk ? <>
             <div className="quick">{kit.faq.map((f) => <button key={f.q} type="button" onClick={() => copyAsk(f.q)}>{f.q}</button>)}</div>
             <p className="note">대화는 연결한 AI에서 해요. 위 문구를 누르면 지금 단계가 담긴 질문이 복사돼요. 내 Claude에 붙여 넣고 사진도 같이 보내 주세요.{copied ? " ✓ 복사했어요" : ""}</p>
           </> : mode === "project" && onAsk ? <>
@@ -504,7 +514,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
               <input value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="예: 5V 핀 납땜이 회색이에요" aria-label="EE 달그락에게 보낼 말" />
               <button type="submit" className="send" disabled={asking || !askText.trim()}>보내기</button>
             </form>
-            <p className="note">대화는 HW 작업실에 기록되고 팀이 같이 봐요.</p>
+            <p className="note">{connectorOnly ? "내 컴퓨터의 연결 앱이 켜져 있어야 답이 와요. 대화는 작업실에 기록돼요." : "대화는 HW 작업실에 기록되고 팀이 같이 봐요."}</p>
           </> : <>
             <div className="quick">{kit.faq.map((f) => <button key={f.q} type="button" onClick={() => ask(f.q, f.a)}>{f.q}</button>)}</div>
             <p className="note">연습에서는 정해진 답만 해요. 실제 프로젝트에서는 납땜 사진을 올리면 EE 달그락이 직접 보고 답해요.</p>

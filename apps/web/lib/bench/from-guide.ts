@@ -10,7 +10,7 @@ import type { BenchFaq, BenchKit, BenchOp, BenchPart, BenchStep } from "./types"
 // 가이드의 기판 좌표(왼쪽 위 기준 mm)와 부품 카드 핀 위치를 그대로 쓴다. 새 값을 지어내지 않는다:
 // 카드에도 가이드에도 핀 위치가 없으면 그 핀은 3D에서 부품 가운데에 표시하고 '대략 위치'로 알린다.
 
-type Placed = { ref: string; label: string; x: number; y: number; w: number; h: number; rotation: number; card: PartCard | null; pins?: Array<{ name: string; x: number; y: number }>; color?: string };
+type Placed = { ref: string; label: string; x: number; y: number; w: number; h: number; rotation: number; card: PartCard | null; pins?: Array<{ name: string; x: number; y: number }>; color?: string; lift?: number };
 
 function rotatePoint(x: number, y: number, w: number, h: number, rotation: number): [number, number] {
   const cx = w / 2, cy = h / 2, dx = x - cx, dy = y - cy, r = (rotation * Math.PI) / 180;
@@ -22,7 +22,7 @@ function placeAll(guide: AssemblyGuide, catalogOf: (ref: string) => string | und
     const card = findCard(part.catalogId ?? catalogOf(part.ref));
     const tag = card?.renderer.type === "wokwi" ? card.renderer.ref.replace(/^wokwi-/, "") : null;
     const size = tag ? (wokwiSizes as Record<string, { widthMm: number; heightMm: number }>)[tag] : null;
-    return { ref: part.ref, label: part.label, x: part.x, y: part.y, w: size?.widthMm ?? part.width, h: size?.heightMm ?? part.height, rotation: part.rotation ?? 0, card, pins: part.pins, color: part.color };
+    return { ref: part.ref, label: part.label, x: part.x, y: part.y, w: size?.widthMm ?? part.width, h: size?.heightMm ?? part.height, rotation: part.rotation ?? 0, card, pins: part.pins, color: part.color, lift: part.lift };
   });
 }
 
@@ -71,7 +71,7 @@ export function guideToKit(project: LocalProject): BenchKit | null {
     parts.push({
       ref: p.ref, kind: "module", label: p.label,
       about: [p.card?.model ?? comp?.valueOrModel ?? p.label, comp?.reason, p.card ? null : "부품 카드가 없어 대략 모양으로 보여요"].filter(Boolean).join(" · "),
-      spec: { catalogId: p.card?.id, partType: p.card?.type ?? comp?.type, model: p.card?.model ?? comp?.valueOrModel ?? p.label, color: p.color, foot: { x: p.x, y: p.y, w: p.w, h: p.h, rotation: p.rotation }, pinXY: pinXYs }
+      spec: { catalogId: p.card?.id, partType: p.card?.type ?? comp?.type, model: p.card?.model ?? comp?.valueOrModel ?? p.label, color: p.color, foot: { x: p.x, y: p.y, w: p.w, h: p.h, rotation: p.rotation, lift: p.lift }, pinXY: pinXYs }
     });
   }
 
@@ -100,7 +100,8 @@ export function guideToKit(project: LocalProject): BenchKit | null {
       tapHint: firstWire ? `${firstWire.from} 핀을 눌러` : s.place[0] ? `${s.place[0]}가 놓일 빛나는 자리를 눌러` : "빛나는 곳을 눌러",
       caution: s.cards[0] ? `막히면: ${s.cards[0].symptom} → ${s.cards[0].check}` : undefined,
       mistakes: solders ? [{ kind: "cold", title: "냉납", looks: "회색이고 울퉁불퉁", fix: "다리와 패드를 같이 데우고 납을 조금 더" }, { kind: "bridge", title: "브리지", looks: "이웃 핀까지 납이 이어짐", fix: "깨끗한 인두로 쓸어내거나 솔더윅" }] : undefined,
-      doneWhen: s.check || "설명대로 놓였다"
+      doneWhen: s.check || "설명대로 놓였다",
+      prepared: s.prepared
     };
   });
 

@@ -216,7 +216,9 @@ export type ProductForm = {
 
 // Step-by-step build on the real board footprint, with trouble cards the
 // person checks and reports back from.
-export type AssemblyPart = { ref: string; label: string; x: number; y: number; width: number; height: number; color?: string; pins?: Array<{ name: string; x: number; y: number }>; catalogId?: string; rotation?: 0 | 90 | 180 | 270 };
+export type AssemblyPart = { ref: string; label: string; x: number; y: number; width: number; height: number; color?: string; pins?: Array<{ name: string; x: number; y: number }>; catalogId?: string; rotation?: 0 | 90 | 180 | 270;
+  /** 바닥(기판 윗면)에서 띄운 높이 mm. 받침 위에 놓이거나 다른 부품의 헤더 위에 꽂히는 부품 */
+  lift?: number };
 export type AssemblyWire = { from: string; to: string; color: string; label?: string };
 export type TroubleCard = { id: string; symptom: string; check: string; expected: string; ifNot: string };
 // 3D 조립 책상에서 연출할 추가 동작 (명세서 2차 v0.1 §3). 없으면 place·wires만으로 연출한다.
@@ -225,7 +227,9 @@ export type AssemblyOp =
   | { op: "solder"; joints: string[]; side: "top" | "bottom" }
   | { op: "trim"; refs: string[] }
   | { op: "check"; how: "look" | "continuity" | "power_on"; targets: string[]; expected: string };
-export type AssemblyStep = { title: string; action: string; place: string[]; wires: AssemblyWire[]; check: string; cards: TroubleCard[]; ops?: AssemblyOp[] };
+export type AssemblyStep = { title: string; action: string; place: string[]; wires: AssemblyWire[]; check: string; cards: TroubleCard[]; ops?: AssemblyOp[];
+  /** 미리 해 둔 단계 (예: 납땜을 끝내서 가져온 부품). 작업대에서 화면을 따라 하지 않고 바로 완료로 넘길 수 있다 */
+  prepared?: boolean };
 export type AssemblyGuide = {
   stage: string;
   base: { name: string; kind: "breadboard" | "board" | "stack" | "perfboard"; width: number; height: number };

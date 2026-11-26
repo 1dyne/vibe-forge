@@ -302,6 +302,43 @@ const NEW_CARDS: PartCard[] = [
     renderer: { type: "fallback", ref: null }, isMotor: true,
     warnings: ["모터 전원 VM은 10.8V를 넘기지 않아요.", "채널당 연속 1.2A로 설계해요. 2A는 짧은 순간 최대값이에요.", "흔한 빨간 복제 보드는 전류 제한 저항이 없을 수 있어요. 모터가 멈춰 있을 때 전류가 크게 흘러요.", "SLP(슬립)를 HIGH로 둬야 동작하는 보드가 있어요. 모듈 표시를 확인하세요.", SNIPPET],
     sourceUrls: ["https://www.adafruit.com/product/3297", "https://learn.adafruit.com/adafruit-drv8833-dc-stepper-motor-driver-breakout-board/overview"], verifiedAt: null
+  },
+  // ── 셈(SAM) 재고 저울에 쓰는 부품 ──
+  // 핀 순서는 실물 사진(2026-11-27, 다인)과 SAM_SPEC §2.2 기준. 핀 위치(mm)는 사진에서 잰 값이라 ±0.5mm쯤 어긋날 수 있다.
+  {
+    id: "m5stack-atoms3-lite", model: "M5Stack ATOMS3 Lite (ESP32-S3FN8)", aliases: ["ATOMS3 Lite", "AtomS3 Lite", "아톰S3 라이트", "M5 ATOM S3", "ATOMS3"], type: "board", boardCompatibility: "Arduino IDE(ESP32 보드 패키지, 보드 M5AtomS3) · Wi-Fi 2.4GHz·블루투스 · 24mm 정사각",
+    voltageMin: 5, voltageMax: 5, logicVoltage: 3.3, typicalCurrentMa: null, maxCurrentMa: null, interface: ["GPIO", "I2C", "UART", "Wi-Fi", "Bluetooth", "USB-C", "Grove(HY2.0-4P)"], i2cAddresses: [],
+    pins: [
+      ...["3V3", "G5", "G6", "G7", "G8"].map((name, i): CardPin => ({ name, roles: name === "3V3" ? ["power_3v3"] : ["gpio", "analog", "pwm"], xMm: 20.89, yMm: Number((7.6 + i * 2.54).toFixed(2)) })),
+      ...["G39", "G38", "5V", "GND"].map((name, i): CardPin => ({ name, roles: name === "5V" ? ["power_5v"] : name === "GND" ? ["ground"] : ["gpio", "pwm"], xMm: 3.11, yMm: Number((5.1 + i * 2.54).toFixed(2)) })),
+      { name: "G2", roles: ["gpio", "analog", "pwm", "i2c_sda"], xMm: null, yMm: null }, { name: "G1", roles: ["gpio", "analog", "pwm", "i2c_scl"], xMm: null, yMm: null }
+    ],
+    dimensionsMm: [24, 24, 9.5],
+    renderer: { type: "fallback", ref: null },
+    warnings: ["핀 위치는 윗면(버튼 쪽)을 위로, USB-C를 내 쪽으로 두고 본 기준이에요. 핀 이름 스티커는 아랫면에 있어서, 뒤집어 보면 좌우가 바뀌어요.", "소켓은 아랫면에 있어요. 3V3·G5·G6·G7·G8 다섯 구멍과 G39·G38·5V·G 네 구멍이 서로 다른 쪽이에요. 한 칸 밀려 꽂기 쉬우니 3V3 자리부터 맞춰요.", "GPIO는 3.3V예요. 5V 신호를 직접 넣으면 안 돼요.", "내장 버튼은 G41(누르면 LOW), 내장 RGB LED는 G35예요. 밖으로 나온 핀이 아니에요.", "PSRAM이 없어요. Arduino IDE에서 PSRAM을 켜면 G35 LED가 안 켜져요.", "핀 위치(mm)는 사진에서 잰 대략값이에요. 실물 소켓으로 확인하세요."],
+    board: { platform: "arduino", ioRecommendedMa: null, ioAbsoluteMaxMa: null, rail3v3MaxMa: null, rail5vMaxMa: null, ioTolerates5V: false },
+    sourceUrls: ["https://docs.m5stack.com/en/core/AtomS3%20Lite", "https://github.com/m5stack/M5Unified"], verifiedAt: null
+  },
+  {
+    id: "hx711-module", model: "HX711 로드셀 앰프 모듈 (24비트 ADC)", aliases: ["HX711", "로드셀 앰프", "무게 센서 모듈", "SZH-SSBH-016"], type: "sensor", boardCompatibility: "디지털 핀 2개(DT·SCK) · 로드셀 4선 연결",
+    voltageMin: 2.6, voltageMax: 5.5, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: null, interface: ["2선 직렬(DT·SCK)"], i2cAddresses: [],
+    pins: [
+      ...["E+", "E-", "A-", "A+", "B-", "B+"].map((name, i): CardPin => ({ name, roles: ["passive"], xMm: 3.4, yMm: Number((4.15 + i * 2.54).toFixed(2)) })),
+      ...([["GND", ["ground"]], ["DT", ["signal"]], ["SCK", ["signal"]], ["VCC", ["power_in"]]] as Array<[string, PinRole[]]>).map(([name, roles], i): CardPin => ({ name, roles, xMm: 29.2, yMm: Number((6.69 + i * 2.54).toFixed(2)) }))
+    ],
+    dimensionsMm: [33.7, 21, null],
+    renderer: { type: "fallback", ref: null },
+    warnings: ["로드셀 선 색은 빨강 E+, 검정 E−, 흰색 A−, 초록 A+가 흔해요. 제조사마다 흰색과 초록이 바뀐 것도 있어서, 값이 거꾸로 움직이면 두 선을 바꿔요.", "B−·B+는 두 번째 로드셀용이에요. 하나만 쓰면 비워 둬요.", "DT·SCK 신호 전압은 VCC를 따라가요. 3.3V 보드에는 VCC를 3V3에 이어요.", "전원이 흔들리면 값이 흔들려요. GND를 보드의 진짜 GND가 아닌 곳에 이었다면 영점이 몇 g 어긋날 수 있어요.", "전압 범위(2.6~5.5V)는 HX711 칩 데이터시트 값이고, 이 카드를 만들 때 다시 열어 확인하지는 못했어요. 핀 순서와 크기는 실물 사진 기준이에요."],
+    sourceUrls: ["https://cdn.sparkfun.com/datasheets/Sensors/ForceFlex/hx711_english.pdf"], verifiedAt: null
+  },
+  {
+    id: "loadcell-bar-5kg", model: "5kg 바형 로드셀 (4선)", aliases: ["로드셀", "5kg 로드셀", "load cell", "무게 센서", "스트레인 게이지"], type: "sensor", boardCompatibility: "HX711 같은 로드셀 앰프가 꼭 필요 · 보드에 바로 못 이음",
+    voltageMin: null, voltageMax: null, logicVoltage: null, typicalCurrentMa: null, maxCurrentMa: null, interface: ["아날로그(브리지, mV 단위)"], i2cAddresses: [],
+    pins: ([["RED", 3.2], ["BLK", 5.3], ["WHT", 7.4], ["GRN", 9.5]] as Array<[string, number]>).map(([name, yMm]): CardPin => ({ name, roles: ["passive"], xMm: 79.6, yMm })),
+    dimensionsMm: [80.6, 12.7, 12.7],
+    renderer: { type: "fallback", ref: null },
+    warnings: ["한쪽 끝만 바닥에 고정하고, 반대쪽 끝에 저울판을 달아요. 가운데(흰 실리콘이 덮인 곳)는 어디에도 닿으면 안 돼요.", "옆면 화살표가 누르는 방향이에요. 뒤집어 달면 값이 거꾸로 움직여요.", "선이 아주 가늘어요. 잡아당기면 뿌리에서 끊어져요.", "5kg을 넘겨 누르면 영구히 휘어요.", "길이 80.6mm·굵기 12.7mm는 실물을 잰 값이에요. 정격 출력과 권장 전압은 확인하지 않았어요."],
+    sourceUrls: [], verifiedAt: null
   }
 ];
 PART_CARDS.push(...NEW_CARDS);

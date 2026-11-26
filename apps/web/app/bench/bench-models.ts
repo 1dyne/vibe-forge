@@ -789,7 +789,8 @@ export type ModuleSpec = {
   label?: string;
   /** 부품 카드의 Wokwi 태그 (있으면 2D와 같은 그림을 윗면에 쓴다) */
   wokwiTag?: string;
-  foot: { x: number; y: number; w: number; h: number; rotation: number };
+  /** lift: 바닥에서 띄운 높이 mm (받침 위, 다른 부품 헤더 위) */
+  foot: { x: number; y: number; w: number; h: number; rotation: number; lift?: number };
   pinXY: Array<{ name: string; x: number; y: number }>;
 };
 export type ModuleModel = { group: T.Group; pinLocal: Map<string, T.Vector3>; lift: number; led?: { lens: T.MeshStandardMaterial; glow: T.PointLight }; tails: T.Mesh[] };
@@ -798,7 +799,7 @@ const PCB_COLOR: Record<string, string> = {
   "arduino-uno-r3": "#14808a", "arduino-nano": "#1f5fae", "esp32-devkit-v1": "#1c1d20", "xiao-esp32s3-sense": "#24262a",
   "raspberry-pi-pico": "#2d7a3c", "nucode-nu40-dk": "#1e4f8f", "seeed-round-display-xiao": "#1c1d20", "ssd1306-oled-128x64": "#1d4fae",
   "tp4056-protected": "#2a4fb0", "mt3608-boost": "#2a4fb0", "ams1117-3v3": "#2a4fb0", "hc-sr04": "#1f5fae", "aht20-module": "#1c1d20",
-  "mpu6050-gy521": "#1d4fae", "inmp441-i2s-mic": "#2a4fb0", "drv8833-driver": "#b8232b"
+  "mpu6050-gy521": "#1d4fae", "inmp441-i2s-mic": "#2a4fb0", "drv8833-driver": "#b8232b", "hx711-module": "#1f8f45"
 };
 const TYPE_COLOR: Record<string, string> = { power: "#2a4fb0", board: "#2a6f5f", display: "#1d4fae", sensor: "#1d4fae", actuator: "#2a6fd0", input: "#2f3238", indicator: "#2f3238", passive: "#2f3238", audio: "#1f2023" };
 
@@ -837,7 +838,7 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
   const lift = onBreadboard && !["sg90-servo"].includes(id) ? 10.5 : 0;
   const T2 = 1.6;
   const pcbCol = PCB_COLOR[id] ?? spec.color ?? TYPE_COLOR[spec.partType ?? ""] ?? "#2a6f5f";
-  const pcbLike = !["sg90-servo", "active-buzzer", "tact-switch-12mm", "potentiometer-10k", "fsr-402", "ws2812b-ring-12", "holder-18650", "lipo-1s-jstph", "slide-switch-spdt"].includes(id);
+  const pcbLike = !["sg90-servo", "active-buzzer", "tact-switch-12mm", "potentiometer-10k", "fsr-402", "ws2812b-ring-12", "holder-18650", "lipo-1s-jstph", "slide-switch-spdt", "m5stack-atoms3-lite", "loadcell-bar-5kg"].includes(id);
 
   const art = spec.wokwiTag ? k.artTex(spec.wokwiTag) : null;
   // 몸체 좌표(회전 전)의 핀 자리
@@ -853,6 +854,13 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
       x.strokeStyle = "rgba(255,255,255,.07)"; x.lineWidth = 5; for (let i = 0; i < 12; i++) { x.beginPath(); x.moveTo((i * 0.13 * w) % w, h * 0.2); x.lineTo(((i * 0.13 + 0.08) * w) % w, h * 0.8); x.stroke(); }
       x.fillStyle = "rgba(255,255,255,.88)"; x.textAlign = "center"; x.textBaseline = "middle";
       const fs = Math.max(10, Math.min(2.6 * pxmm, (w / Math.max(6, spec.model.length)) * 1.3));
+      if (id === "hx711-module") {
+        // 실물처럼 핀 옆에 이름을 적는다 (몸체 좌표 → 캔버스: 왼쪽 위가 원점)
+        x.font = `700 ${Math.round(1.55 * pxmm)}px "IBM Plex Sans KR", sans-serif`;
+        for (const p of bodyPins) { const px = (p.x + W / 2) * pxmm, py = (p.z + D / 2) * pxmm; const left = p.x < 0; x.textAlign = left ? "left" : "right"; x.fillText(p.name.replace("-", "−"), px + (left ? 1 : -1) * 1.7 * pxmm, py + 1); }
+        x.textAlign = "center"; x.font = `700 ${Math.round(1.9 * pxmm)}px "IBM Plex Sans KR", sans-serif`; x.fillStyle = "rgba(255,255,255,.7)"; x.fillText("HX711", w * 0.47, h * 0.9);
+        return;
+      }
       x.font = `700 ${fs}px "IBM Plex Sans KR", sans-serif`; x.fillText(spec.model.replace(/\(.*?\)/g, "").trim().slice(0, 28), w / 2, h * 0.5);
     });
     const side = k.std(pcbCol, { rough: 0.6 });
@@ -874,7 +882,54 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
     if (id === "tp4056-protected") { k.box(7.5, 2.6, 5.6, k.steel, -W / 2 + 3, lift + T2 + 1.3, 0, body); k.box(3.2, 1, 4, k.std("#151515"), W * 0.08, lift + T2 + 0.5, -D * 0.15, body); }
     if (id === "mt3608-boost") { k.box(6.5, 4.5, 3.5, k.std("#2563c9"), W * 0.2, lift + T2 + 2.25, -D * 0.2, body); const coil = k.mesh(new three.CylinderGeometry(2.8, 2.8, 3, 20), k.std("#3a3a3a"), body); coil.position.set(-W * 0.12, lift + T2 + 1.5, 0); }
     if (id === "drv8833-driver" || id === "ams1117-3v3" || id === "inmp441-i2s-mic") k.box(Math.min(W, D) * 0.3, 1, Math.min(W, D) * 0.3, k.std("#151515"), 0, lift + T2 + 0.5, 0, body);
-    if (spec.partType === "sensor" && id !== "fsr-402" && id !== "hc-sr04") k.box(Math.min(W, D) * 0.25, 1, Math.min(W, D) * 0.25, k.std("#151515"), 0, lift + T2 + 0.5, -D * 0.15, body);
+    if (id === "hx711-module") {
+      // SOP-16 칩 + P1(GND·DT·SCK·VCC)에 납땜한 4핀 헤더. 이 헤더가 보드 소켓에 꽂힌다.
+      k.box(4.2, 1.5, 10, k.std("#151515", { rough: 0.45 }), -W * 0.06, lift + T2 + 0.75, -D * 0.04, body);
+      const p1 = bodyPins.filter((p) => ["GND", "DT", "SCK", "VCC"].includes(p.name));
+      if (p1.length) {
+        const hx = p1.reduce((a, p) => a + p.x, 0) / p1.length, zs = p1.map((p) => p.z);
+        k.box(2.5, 2.5, Math.max(...zs) - Math.min(...zs) + 2.54, k.std("#1d1e20", { rough: 0.55 }), hx, lift + T2 + 1.25, (Math.max(...zs) + Math.min(...zs)) / 2, body);
+        for (const p of p1) k.box(0.64, 8.5, 0.64, k.gold, p.x, lift + T2 + 4.25, p.z, body);
+      }
+    }
+    if (spec.partType === "sensor" && id !== "fsr-402" && id !== "hc-sr04" && id !== "hx711-module") k.box(Math.min(W, D) * 0.25, 1, Math.min(W, D) * 0.25, k.std("#151515"), 0, lift + T2 + 0.5, -D * 0.15, body);
+  } else if (id === "m5stack-atoms3-lite") {
+    // 24×24×9.5mm 흰 상자. 윗면 전체가 버튼, 앞면에 USB-C, 아랫면에 소켓 두 줄.
+    const H = 9.5, white = k.std("#f4f3ef", { rough: 0.42 });
+    k.rbox(W, H, D, 2.4, white, body);
+    // 핀 이름표: 실물은 아랫면 스티커에 있지만, 꽂을 때 위에서 보이도록 소켓 바로 위 윗면에 같은 색으로 적는다
+    const pxmm = 16;
+    const tagTex = k.canvasTex(`atoms3-top-${bodyPins.length}`, Math.round(W * pxmm), Math.round(D * pxmm), (x, w, h) => {
+      x.clearRect(0, 0, w, h);
+      x.font = `700 ${Math.round(1.5 * pxmm)}px "IBM Plex Sans KR", sans-serif`; x.textBaseline = "middle"; x.textAlign = "center";
+      for (const p of bodyPins) {
+        const px = (p.x + W / 2) * pxmm, py = (p.z + D / 2) * pxmm, tw = 4.6 * pxmm, th = 2.1 * pxmm;
+        x.fillStyle = /^(3V3|5V)$/.test(p.name) ? "#d8322a" : p.name === "GND" ? "#1c1c1e" : "#1f9d55";
+        x.beginPath(); x.roundRect(px - tw / 2, py - th / 2, tw, th, 0.5 * pxmm); x.fill();
+        x.fillStyle = "#fff"; x.fillText(p.name === "GND" ? "G" : p.name, px, py + 1);
+      }
+    });
+    const tags = k.mesh(new three.PlaneGeometry(W, D), new three.MeshStandardMaterial({ map: tagTex, transparent: true, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 }), body, false);
+    tags.rotation.x = -Math.PI / 2; tags.position.y = H + 0.68;
+    const btn = k.rbox(12.5, 0.5, 11, 1.6, k.std("#e9e6df", { rough: 0.35 }), body); btn.position.set(0, H + 0.2, 1.5);
+    k.box(2.4, 0.14, 0.7, new three.MeshStandardMaterial({ color: "#bfeee6", emissive: "#3ad6c0", emissiveIntensity: 0.5, roughness: 0.3 }), 0, H + 0.75, 0.2, body);
+    k.box(9.2, 3.3, 2.6, k.steel, 0, 7.6, D / 2 - 0.4, body);
+    k.box(7.4, 1.7, 0.3, k.std("#141414", { rough: 0.5 }), 0, 7.6, D / 2 + 0.92, body);
+    for (const side of [-1, 1]) {
+      const col = bodyPins.filter((p) => Math.sign(p.x) === side);
+      if (!col.length) continue;
+      const zs = col.map((p) => p.z), cx2 = col.reduce((a, p) => a + p.x, 0) / col.length;
+      k.box(2.7, 0.5, Math.max(...zs) - Math.min(...zs) + 2.54, k.std("#18191b", { rough: 0.55 }), cx2, 0.02, (Math.max(...zs) + Math.min(...zs)) / 2, body);
+    }
+  } else if (id === "loadcell-bar-5kg") {
+    // 알루미늄 막대. 가운데 흰 실리콘 밑에 스트레인 게이지가 있고, 양 끝에 나사 구멍이 둘씩 있다.
+    const H = 12.7, alu = k.std("#c9cdd3", { metal: 0.85, rough: 0.38 });
+    k.box(W, H, D, alu, 0, H / 2, 0, body);
+    const glue = k.rbox(17, 1.1, D + 0.5, 2, k.std("#f6f6f3", { rough: 0.35 }), body); glue.position.set(1, H - 0.3, 0);
+    for (const hx of [-W / 2 + 5, -W / 2 + 20, W / 2 - 20, W / 2 - 5]) { const hole = k.mesh(new three.CylinderGeometry(2.2, 2.2, 0.3, 20), k.std("#3b3e44", { rough: 0.6 }), body); hole.position.set(hx, H + 0.02, 0); }
+    for (const sx of [-4.6, 4.6]) { const c = k.mesh(new three.CylinderGeometry(4.2, 4.2, D + 0.3, 24), k.std("#8d9299", { metal: 0.6, rough: 0.5 }), body); c.rotation.x = Math.PI / 2; c.position.set(sx, H / 2, 0); }
+    const wireCol: Record<string, string> = { RED: "#d8322a", BLK: "#1c1c1e", WHT: "#f1f1ee", GRN: "#1f9d55" };
+    for (const p of bodyPins) k.box(3.4, 0.9, 0.9, k.std(wireCol[p.name] ?? "#888", { rough: 0.5 }), p.x + 0.7, H / 2, p.z, body);
   } else if (id === "fsr-402") {
     fsrModel(k, body, bodyPins, W, D);
   } else if (id === "sg90-servo") {
@@ -927,6 +982,9 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
       if (!uno) { padAt.push([p.x, topY + 0.06, p.z]); stubAt.push([p.x, topY + 1.1, p.z]); }
       if (lift > 0) legAt.push([p.x, (lift + T2 + 2) / 2 - 0.2, p.z]);
       pinLocal.set(p.name, new three.Vector3(p.x, topY, p.z));
+    } else if (id === "m5stack-atoms3-lite" || id === "loadcell-bar-5kg") {
+      // 소켓은 아랫면에 있지만 이름표는 윗면에서 보이게 한다. 로드셀은 끝면에서 나오는 선의 뿌리.
+      pinLocal.set(p.name, new three.Vector3(p.x, id === "loadcell-bar-5kg" ? 6.35 : 9.8, p.z));
     } else {
       tinAt.push([p.x, onBreadboard ? -1 : 1, p.z]);
       pinLocal.set(p.name, new three.Vector3(p.x, 1.0, p.z));
@@ -945,6 +1003,9 @@ export function moduleModel(k: Kit3D, spec: ModuleSpec, onBreadboard: boolean): 
       k.box(maxX - minX + 2.54, 2.5, 2.5, k.std("#1d1e20", { rough: 0.55 }), (minX + maxX) / 2, 1.25, r[0].z, group);
     }
   }
+  // 받침 위나 다른 부품의 헤더 위에 얹히는 부품은 통째로 띄운다
+  const raise = foot.lift ?? 0;
+  if (raise > 0) { for (const c of group.children) c.position.y += raise; for (const v of pinLocal.values()) v.y += raise; }
   return { group, pinLocal, lift, tails };
 }
 
