@@ -92,3 +92,14 @@ describe("현황판", () => {
     expect(viewBoard(recordReal(board, { now: null }, T0)).real.now).toBeNull();
   });
 });
+
+describe("하드웨어 달그락", () => {
+  it("전자회로나 기구설계가 팀에 있으면 따로 고르지 않아도 함께한다", async () => {
+    const { withHardwareLead, AGENTS, AGENT_TEAM } = await import("../apps/web/lib/workflow");
+    expect(withHardwareLead(["hw", "sw"])).toEqual(["hwlead", "hw", "sw"]);
+    expect(withHardwareLead(["sw", "id"])).toEqual(["sw", "id"]);
+    expect(withHardwareLead(["hwlead", "me"])).toEqual(["hwlead", "me"]);
+    expect(AGENTS.hwlead.name).toBe("하드웨어 달그락");
+    expect([AGENT_TEAM.hwlead, AGENT_TEAM.hw, AGENT_TEAM.me]).toEqual(["하드웨어", "하드웨어", "하드웨어"]);
+  });
+});

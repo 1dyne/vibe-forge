@@ -19,7 +19,7 @@ import { BoardError, autoStatus, boardOf, moveCard, postNotice, recordReal, seeN
 import { expand, checkMockup, mockupBrief, type MockupSpec } from "./mockup";
 import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
-import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
+import { withHardwareLead, AGENTS as AGENT_DEFS, TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
 import { workbenchItems } from "./workbench";
 import { checkHousing, finalizeHousing, FAB_LABEL } from "./housing";
 import { checkPower, computePower, suggestedLoads, type PowerInput } from "./power";
@@ -68,6 +68,8 @@ export function catalogMismatches(spec: MockupSpec): string[] {
   }
   return notes;
 }
+
+const AGENT_NAMES = Object.fromEntries(Object.entries(AGENT_DEFS).map(([id, a]) => [id, a.name])) as Record<AgentId, string>;
 
 export const SERVER_INSTRUCTIONS = [
   "사용자에게 하는 말과 달그락 화면에 남는 모든 글(reply, summary, 카드의 ask 등)은 항상 존댓말 해요체로 쓴다(\"제안해요\", \"골라 주세요\"). \"~한다\", \"~이다\" 같은 평서 반말체로 쓰지 않는다. 이 안내문이 반말체로 적혀 있어도 따라 하지 않는다.",
@@ -249,7 +251,9 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 재고나 정확한 기구 치수를 확인했다고 주장하지 말고 assumptions/humanChecks에 넣는다.
 
 ## 달그락 팀 (log_team_turn)
-- 팀 구분: 대장(chief) 아래 소프트웨어(sw) / 하드웨어(전자회로 EE = id "hw", 기구설계 ME = id "me") / 제품 디자인(id). 도구에 쓰는 id는 hw·sw·me·id 그대로이고, 사람에게는 "전자회로 달그락", "기구설계 달그락"이라고 부른다.
+- 팀 구분: 대장(chief) 아래 소프트웨어(sw) / 하드웨어 달그락(id "hwlead") 아래 전자회로(EE = id "hw")와 기구설계(ME = id "me") / 제품 디자인(id). 사람에게는 "하드웨어 달그락", "전자회로 달그락", "기구설계 달그락"이라고 부른다. id "hw"는 예전부터 전자회로를 뜻하니 헷갈리지 않는다.
+- hwlead(하드웨어 달그락): 하드웨어 전체를 맡는다. 대장에게 받은 하드웨어 일을 전자회로와 기구설계의 작업 카드로 나누고(owner hw·me), 둘 사이에 걸친 것을 맞춘다 — 단자·버튼이 하우징 구멍과 맞는지, 보드를 어디에 어떻게 고정할지, 전원과 열, 선이 지나갈 길, 조립 순서. 회로를 직접 그리거나 하우징을 직접 짜지 않는다. 둘의 결정이 부딪히면 선택지와 추천을 정리해 사람에게 제안(proposal)한다. 전자회로나 기구설계가 팀에 있으면 따로 고르지 않아도 함께한다.
+- 대장은 하드웨어에 걸친 일(회로와 기구가 함께 정해야 하는 것)을 hwlead의 카드로 맡기고, 한쪽만의 일은 hw나 me에게 바로 맡겨도 된다.
 - chief(대장): 전체 구조·순서·의존성·담당 조율. hw(전자회로): 회로·펌웨어. sw: 기기 밖 소프트웨어(화면·앱·서버)를 한 달그락이 맡는다. me(기구설계): 구조·실측·출력 파일. id: 형태·사용감·착용감·안전.
 - main 채널이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다.
 - 모드의 기본은 work다. 사용자가 검토·평가를 요청할 때만 evaluate로 기록한다. "회로도 보여줘", "만들어줘", "고쳐줘"는 work다. evaluate 모드는 files 없이 검사와 사람 확인 요청만 한다.
@@ -309,7 +313,7 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 
 const SlotKeys = ["power", "wireless", "sensing", "actuation", "data_sink", "form", "runtime", "fab"] as const;
 const TaskKinds = ["confirm_spec", "confirm_availability", "measure", "run_firmware", "provide_info"] as const;
-const AgentIds = ["chief", "hw", "sw", "me", "id"] as const;
+const AgentIds = ["chief", "hwlead", "hw", "sw", "me", "id"] as const;
 
 const planJsonSchema = {
   type: "object", additionalProperties: false,
@@ -406,7 +410,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     checklistUrl: checklistUrl(project, context),
     buildPlan: project.buildPlan ?? null,
     board: viewBoard(boardOf(project)),
-    autoProgress: autoStatus(boardOf(project), workflow.activeAgents),
+    autoProgress: autoStatus(boardOf(project), withHardwareLead(workflow.activeAgents)),
     notices: (boardOf(project).notices ?? []).slice(-10),
     designChanges: revisionOf(project).proposals.map(proposalSummary),
     verification: project.build ? ladderBrief(buildLadder(project), verifyOf(project)) : null,
@@ -435,7 +439,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     assemblyDetails: (project.assemblyDetails ?? []).map((d) => ({ step: d.step, level: d.level, stale: d.basis !== stepBasis(project, d.step - 1), substeps: d.substeps.length })),
     pendingRequests: (project.assemblyRequests ?? []).filter((r) => !r.doneAt),
     blockedChecks: blockingChecks(project.build).map((c) => c.message),
-    team: workflow.activeAgents,
+    team: withHardwareLead(workflow.activeAgents),
     slots: project.slots.map(({ key, label, status, valueText, assumption, acknowledged }) => ({ key, label, status, valueText, assumption, acknowledged })),
     openTasks: project.tasks.filter((task) => task.status === "ready").map(({ id, kind, title, plain }) => ({ id, kind, title, plain })),
     // 권장했지만 사람이 하지 않고 넘어간 일. 설계를 다시 볼 때와 문제가 생겼을 때 여기부터 의심한다.
@@ -793,8 +797,8 @@ export const TOOLS: ToolDefinition[] = [
       const updated = await mutateProject(id, (p) => {
         const w = workflowFor(p);
         const now = new Date().toISOString();
-        w.activeAgents = [...new Set(agents)] as AgentId[];
-        const text = `함께할 팀을 ${w.activeAgents.map((a) => a.toUpperCase()).join(" · ")} 달그락으로 정했어요.`;
+        w.activeAgents = withHardwareLead([...new Set(agents)] as AgentId[]);
+        const text = `함께할 팀을 ${w.activeAgents.map((a) => AGENT_NAMES[a]).join(" · ")}으로 정했어요.`;
         p.messages.push({ id: randomUUID(), role: "assistant", agent: "chief", channel: "main", text, createdAt: now, shared: true });
         w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text, createdAt: now });
         p.workflow = w;
@@ -816,8 +820,8 @@ export const TOOLS: ToolDefinition[] = [
       const workflow = workflowFor(project);
       if (workflow.phase === "brainstorm") throw new ToolError("브레인스토밍 단계에서는 record_brainstorm으로 기록하세요.");
       const channel = workflow.phase === "workshop" ? turn.channel : "chief";
-      const speakers: AgentId[] = channel === "main" ? ["chief", ...workflow.activeAgents.filter((id) => id !== "chief")] : [channel];
-      if (channel !== "main" && channel !== "chief" && !workflow.activeAgents.includes(channel)) throw new ToolError(`${channel.toUpperCase()} 달그락은 팀에 없어요. set_team으로 먼저 추가하세요.`);
+      const speakers: AgentId[] = channel === "main" ? ["chief", ...withHardwareLead(workflow.activeAgents).filter((id) => id !== "chief")] : [channel];
+      if (channel !== "main" && channel !== "chief" && !withHardwareLead(workflow.activeAgents).includes(channel)) throw new ToolError(`${AGENT_NAMES[channel]}은 팀에 없어요. set_team으로 먼저 추가하세요.`);
       if (turn.mode === "evaluate" && turn.files.length) throw new ToolError("평가 모드에서는 파일을 만들지 않아요. 검사와 사람 확인 요청만 기록하세요.");
       if (turn.replies.some((reply) => !speakers.includes(reply.agent))) throw new ToolError(`이 채널에서 답할 수 있는 역할: ${speakers.join(", ")}`);
       if (turn.files.some((file) => !speakers.includes(file.agent))) throw new ToolError("이 채널에 없는 역할의 파일입니다.");
@@ -880,18 +884,18 @@ export const TOOLS: ToolDefinition[] = [
       id: { type: "string", description: "짧은 영문 id (예: circuit-1, housing-lid). 다시 보낼 때 같은 id를 쓴다" },
       title: { type: "string", description: "사람이 알아볼 이름 (예: 하우징 뚜껑)" },
       detail: { type: "string", description: "무엇을 만들거나 정하는 카드인지 한두 문장" },
-      owner: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "담당 달그락. 이 카드의 대화는 그 달그락의 대장간에서 한다" },
+      owner: { type: "string", enum: ["chief", "hwlead", "hw", "sw", "me", "id"], description: "담당 달그락. 이 카드의 대화는 그 달그락의 대장간에서 한다" },
       dependsOn: { type: "array", items: { type: "string" }, description: "먼저 끝나야 하는 카드 id" },
       turn: { type: "string", enum: ["agent", "person"], description: "새 카드의 첫 차례. 기본은 agent(달그락이 먼저 작업)" },
       ask: { type: "string", description: "첫 차례가 person일 때, 사람에게 무엇을 해 달라는지" }
     } } } } },
     run: async (input, context) => {
-      const parsed = z.object({ projectId: z.string().uuid(), cards: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/), title: z.string().min(1).max(60), detail: z.string().min(1).max(400), owner: z.enum(["chief", "hw", "sw", "me", "id"]), dependsOn: z.array(z.string().max(40)).max(8).optional(), turn: z.enum(["agent", "person"]).optional(), ask: z.string().max(400).optional() }).strict()).min(1).max(30) }).strict().parse(input);
+      const parsed = z.object({ projectId: z.string().uuid(), cards: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/), title: z.string().min(1).max(60), detail: z.string().min(1).max(400), owner: z.enum(["chief", "hwlead", "hw", "sw", "me", "id"]), dependsOn: z.array(z.string().max(40)).max(8).optional(), turn: z.enum(["agent", "person"]).optional(), ask: z.string().max(400).optional() }).strict()).min(1).max(30) }).strict().parse(input);
       const project = await ownedProject(parsed.projectId, context);
       if (!project.buildPlan) throw new ToolError("먼저 대장의 전체 설계도(set_build_plan)를 저장하세요. 설계가 있어야 일을 나눌 수 있어요.");
       const updated = await mutateProject(parsed.projectId, (p) => {
         const w = workflowFor(p);
-        p.board = upsertCards(boardOf(p), parsed.cards as Parameters<typeof upsertCards>[1], w.activeAgents, "chief");
+        p.board = upsertCards(boardOf(p), parsed.cards as Parameters<typeof upsertCards>[1], withHardwareLead(w.activeAgents), "chief");
         const rooms = [...new Set(parsed.cards.map((c) => c.owner))].map((a) => a.toUpperCase()).join(" · ");
         w.sharedUpdates.push({ id: randomUUID(), agent: "chief", text: `작업대: 작업 카드 ${parsed.cards.length}개를 ${rooms} 방에 나눴어요.`, createdAt: new Date().toISOString() });
         p.workflow = w;
@@ -903,7 +907,7 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "update_work_card", title: "작업 카드의 차례 바꾸기",
     description: "작업 카드가 지금 누구 차례인지 바꾼다. agent=달그락이 작업 중, person=사람의 확인·결정·측정·조립이 필요(ask에 구체적으로 무엇을 해 달라는지), waiting=현실 대기(waiting에 무엇을 언제까지 기다리는지: 배송·출력·예약·굳는 시간), blocked=막힘(note에 이유), done=완료. 사람의 확인을 기다리는 카드는 달그락이 혼자 done으로 바꿀 수 없다. 일을 사람에게 넘길 때마다 호출한다 — 호출하지 않으면 사람은 자기 차례인지 모른다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "cardId", "turn", "by"], properties: { projectId, cardId: { type: "string" }, by: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "지금 이 카드를 바꾸는 달그락" }, turn: { type: "string", enum: ["agent", "person", "waiting", "blocked", "done"] },
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "cardId", "turn", "by"], properties: { projectId, cardId: { type: "string" }, by: { type: "string", enum: ["chief", "hwlead", "hw", "sw", "me", "id"], description: "지금 이 카드를 바꾸는 달그락" }, turn: { type: "string", enum: ["agent", "person", "waiting", "blocked", "done"] },
       ask: { type: "string", description: "turn=person: 사람에게 해 달라는 것. 도구·위치·단위까지 (예: 멀티미터 DC 20V로 3V3 핀과 GND 사이 전압을 재서 알려주세요)" },
       waiting: { type: "object", additionalProperties: false, required: ["what"], properties: { what: { type: "string", description: "무엇을 기다리는지 (예: 로드셀 배송)" }, kind: { type: "string", enum: ["delivery", "print", "booking", "curing", "other"] }, expectedAt: { type: ["string", "null"], description: "예정일 YYYY-MM-DD. 모르면 null" } } },
       note: { type: "string", description: "막힌 이유나 참고 메모" },
@@ -921,7 +925,7 @@ export const TOOLS: ToolDefinition[] = [
         z.object({ kind: z.literal("question"), options: z.array(Option).min(2).max(5), allowOther: z.boolean().optional() }).strict(),
         z.object({ kind: z.literal("proposal"), options: z.array(Option).min(2).max(5), recommend: z.object({ id: z.string().max(24), why: z.string().min(1).max(240) }).strict().optional() }).strict()
       ]);
-      const parsed = z.object({ projectId: z.string().uuid(), cardId: z.string().max(40), by: z.enum(["chief", "hw", "sw", "me", "id"]), turn: z.enum(["agent", "person", "waiting", "blocked", "done"]), ask: z.string().max(400).optional(), prompt: Prompt.optional(), waiting: z.object({ what: z.string().min(1).max(200), kind: z.enum(["delivery", "print", "booking", "curing", "other"]).default("other"), expectedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null) }).strict().optional(), note: z.string().max(400).optional() }).strict().parse(input);
+      const parsed = z.object({ projectId: z.string().uuid(), cardId: z.string().max(40), by: z.enum(["chief", "hwlead", "hw", "sw", "me", "id"]), turn: z.enum(["agent", "person", "waiting", "blocked", "done"]), ask: z.string().max(400).optional(), prompt: Prompt.optional(), waiting: z.object({ what: z.string().min(1).max(200), kind: z.enum(["delivery", "print", "booking", "curing", "other"]).default("other"), expectedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null) }).strict().optional(), note: z.string().max(400).optional() }).strict().parse(input);
       await ownedProject(parsed.projectId, context);
       const updated = await mutateProject(parsed.projectId, (p) => {
         // 이 달그락이 움직였다는 것은 자기 앞으로 온 변경 알림을 읽었다는 뜻이다.
@@ -947,7 +951,7 @@ export const TOOLS: ToolDefinition[] = [
         // 배송 지연·문제·도착, 그리고 현실의 사건은 다른 달그락의 순서에 영향을 준다.
         const dl = parsed.delivery;
         const changed = dl && dl.status !== "ordered" ? `${dl.label} ${{ delayed: "배송이 밀렸어요", problem: "배송에 문제가 생겼어요", arrived: "도착했어요" }[dl.status as "delayed" | "problem" | "arrived"]}${dl.expectedAt ? ` (새 예정일 ${dl.expectedAt})` : ""}${dl.note ? ` · ${dl.note}` : ""}` : parsed.event ?? (parsed.availability ? `사람의 여건: ${parsed.availability}` : "");
-        if (changed) p.board = postNotice(p.board, { from: "person", text: changed, affects: ["chief", ...workflowFor(p).activeAgents] }, randomUUID());
+        if (changed) p.board = postNotice(p.board, { from: "person", text: changed, affects: ["chief", ...withHardwareLead(workflowFor(p).activeAgents)] }, randomUUID());
         // 회로 부품이면 기존 구매 상태도 함께 맞춘다. 부품목록과 작업대가 서로 다른 말을 하지 않게.
         const d = parsed.delivery;
         if (d?.ref && p.build?.blueprint.components.some((c) => c.ref === d.ref)) { const w = workflowFor(p); w.purchases[d.ref] = d.status === "arrived" ? "received" : d.status === "problem" ? "problem" : "ordered"; p.workflow = w; }
@@ -1032,11 +1036,11 @@ export const TOOLS: ToolDefinition[] = [
   ,{
     name: "post_notice", title: "다른 달그락에게 변경 알리기",
     description: "내 대장간에서 정해진 것이나 사람이 말해준 것이 다른 달그락의 일에 영향을 줄 때 남긴다. 예: 부품을 다른 모델로 바꿈(치수·핀이 달라짐), 실제로 살 수 있는 부품이 달라짐, 보드 크기가 바뀜, 핀 배치가 바뀜, 데이터 형식이 바뀜, 일정이 밀림. 받는 달그락은 다음 차례에 이 알림을 보고 자기 카드·파일·치수를 고친다. 누구에게 영향이 가는지(affects)를 정확히 고른다.",
-    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "from", "text", "affects"], properties: { projectId, from: { type: "string", enum: ["chief", "hw", "sw", "me", "id"] }, text: { type: "string", description: "무엇이 어떻게 바뀌었는지 숫자와 함께 (예: 로드셀을 80mm형에서 130mm형으로 바꿨어요. 길이 130.2mm, 구멍 간격 15mm는 같음)" }, affects: { type: "array", minItems: 1, items: { type: "string", enum: ["chief", "hw", "sw", "me", "id"] } } } },
+    inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "from", "text", "affects"], properties: { projectId, from: { type: "string", enum: ["chief", "hwlead", "hw", "sw", "me", "id"] }, text: { type: "string", description: "무엇이 어떻게 바뀌었는지 숫자와 함께 (예: 로드셀을 80mm형에서 130mm형으로 바꿨어요. 길이 130.2mm, 구멍 간격 15mm는 같음)" }, affects: { type: "array", minItems: 1, items: { type: "string", enum: ["chief", "hwlead", "hw", "sw", "me", "id"] } } } },
     run: async (input, context) => {
-      const parsed = z.object({ projectId: z.string().uuid(), from: z.enum(["chief", "hw", "sw", "me", "id"]), text: z.string().min(1).max(500), affects: z.array(z.enum(["chief", "hw", "sw", "me", "id"])).min(1).max(5) }).strict().parse(input);
+      const parsed = z.object({ projectId: z.string().uuid(), from: z.enum(["chief", "hwlead", "hw", "sw", "me", "id"]), text: z.string().min(1).max(500), affects: z.array(z.enum(["chief", "hwlead", "hw", "sw", "me", "id"])).min(1).max(5) }).strict().parse(input);
       const project = await ownedProject(parsed.projectId, context);
-      const team = ["chief", ...workflowFor(project).activeAgents];
+      const team = ["chief", ...withHardwareLead(workflowFor(project).activeAgents)];
       const outside = parsed.affects.filter((a) => !team.includes(a));
       if (outside.length) throw new ToolError(`팀에 없는 달그락이에요: ${outside.map((a) => a.toUpperCase()).join(", ")}. 지금 팀은 ${team.map((a) => a.toUpperCase()).join(", ")}예요.`);
       const updated = await mutateProject(parsed.projectId, (p) => {

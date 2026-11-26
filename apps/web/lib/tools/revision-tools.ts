@@ -59,7 +59,7 @@ const MockupSchema = z.object({
 
 const Input = z.object({
   projectId: z.string().uuid(),
-  by: z.enum(["chief", "hw", "sw", "me", "id"]),
+  by: z.enum(["chief", "hwlead", "hw", "sw", "me", "id"]),
   title: z.string().trim().min(1).max(80),
   reason: z.string().trim().min(5).max(600),
   changes: z.object({
@@ -75,7 +75,7 @@ export const tools: ToolDefinition[] = [
     description: "승인된 설계(회로, 완성품 형태, 정밀 목업)를 고쳐야 할 때 수정안을 낸다. 수정안은 적용되지 않고 따로 저장되며, 서버가 지금 설계와 견줘 바뀌는 것과 사람이 다시 할 일(안 쓰게 된 부품, 다시 이을 선, 다시 올릴 코드, 다시 뽑을 하우징 부위, 다시 할 테스트, 비용 차이)을 계산해 돌려준다. 사람이 작업대에서 승인해야 적용된다. reason에는 현실에서 실제로 일어난 일을 적는다. changes에는 바꾸는 항목만 바뀐 뒤의 값을 통째로 넣는다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "by", "title", "reason", "changes"], properties: {
       projectId: projectIdSchema,
-      by: { type: "string", enum: ["chief", "hw", "sw", "me", "id"], description: "수정안을 내는 달그락" },
+      by: { type: "string", enum: ["chief", "hwlead", "hw", "sw", "me", "id"], description: "수정안을 내는 달그락" },
       title: { type: "string", description: "사람이 알아볼 이름 (예: USB 구멍 1mm 올리기)" },
       reason: { type: "string", description: "현실에서 일어난 일. 사용자가 말했거나 잰 것만 (예: 출력해 보니 USB 구멍이 플러그보다 1mm 낮았어요)" },
       changes: { type: "object", additionalProperties: false, description: "바꾸는 항목만 넣는다", properties: {

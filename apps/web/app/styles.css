@@ -483,3 +483,5 @@ tr.is-new{animation-name:new-flash-row}
 .switch-line{display:flex;align-items:center;gap:8px;font-weight:600;margin:4px 0 6px}
 .shop-add{display:flex;gap:8px;margin-top:8px}.shop-add input{flex:1}
 .space-shortcut{margin:10px 0 14px;padding:12px 14px;border-radius:12px;background:#fdf3ec;border:1.5px solid var(--c-user)}.space-shortcut p{margin:4px 0 0;font-size:13px}
+.dot-hwlead{background:var(--c-hw-team)}.agent-hwlead .message-meta strong{color:#5f5a94}
+.rooms button.sub-room{margin-left:16px;width:calc(100% - 16px)}

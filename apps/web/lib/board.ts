@@ -108,7 +108,7 @@ export function viewBoard(board: Board, now = Date.now()): BoardView {
   });
   const mine = cards.filter((card) => card.active && card.turn === "person");
   const first = mine[0];
-  const rooms = (["chief", "hw", "sw", "me", "id"] as AgentId[]).map((room) => {
+  const rooms = (["chief", "hwlead", "hw", "sw", "me", "id"] as AgentId[]).map((room) => {
     const own = cards.filter((card) => card.owner === room);
     const count = (turn: CardTurn) => own.filter((card) => card.turn === turn).length;
     return { room, myTurn: own.filter((card) => card.active && card.turn === "person").length, working: count("agent"), waiting: count("waiting"), blocked: count("blocked"), done: count("done"), total: own.length };

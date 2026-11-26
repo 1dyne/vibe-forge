@@ -6,7 +6,7 @@ import { ProfileSchema } from "../../../../../lib/profile-schema";
 import { getMakerProfile, getProject, mutateProject, saveMakerProfile } from "../../../../../lib/local-project-store";
 import { hasValidOrigin } from "../../../../../lib/request-security";
 import { canAccess, canUseWebAi, getViewer, notFound, ownerIdOf, unauthorized, webAiDenied, withViewerVault } from "../../../../../lib/viewer";
-import { emptyProfile, transition, workflowFor } from "../../../../../lib/workflow";
+import { withHardwareLead, AGENTS, emptyProfile, transition, workflowFor } from "../../../../../lib/workflow";
 import { approvedCad, blockingChecks, runBuildPipeline } from "../../../../../lib/build-pipeline";
 import { pushActivity, recordAssembly, resetStage } from "../../../../../lib/mcp-tools";
 import type { DevProfile, MakerProfile } from "../../../../../lib/project-types";
@@ -114,8 +114,8 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
       } else if (input.action === "dev_profile") {
         w.devProfile = input.devProfile as DevProfile;
       } else if (input.action === "agents") {
-        w.activeAgents = [...new Set(input.agents)];
-        announce(`함께할 팀을 ${w.activeAgents.map((a) => a.toUpperCase()).join(" · ")} 달그락으로 변경했어요. 공통 프로젝트 기록을 함께 참고합니다.`);
+        w.activeAgents = withHardwareLead([...new Set(input.agents)]);
+        announce(`함께할 팀을 ${w.activeAgents.map((a) => AGENTS[a].name).join(" · ")}으로 변경했어요. 공통 프로젝트 기록을 함께 참고합니다.`);
       } else if (input.action === "evidence") {
         const task = p.tasks.find((t) => t.id === input.taskId);
         if (!task) throw new Error("작업을 찾을 수 없습니다.");

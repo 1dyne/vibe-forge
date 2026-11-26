@@ -143,7 +143,8 @@ export type LocalProject = {
   updatedAt: string;
 };
 
-export type AgentId = "chief" | "hw" | "sw" | "me" | "id";
+// hwlead = 하드웨어 달그락(전자회로 hw와 기구설계 me를 조율). hw는 예전부터 전자회로를 뜻한다.
+export type AgentId = "chief" | "hwlead" | "hw" | "sw" | "me" | "id";
 export type ChatChannel = "main" | AgentId;
 export type ImageAttachment = { name: string; dataUrl: string };
 // 자주 가는 메이커스페이스. 예약 자체는 공간마다 제각각이라 여기서 걸지 않고,

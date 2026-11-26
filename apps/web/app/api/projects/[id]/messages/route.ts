@@ -11,7 +11,7 @@ import { runWorkshopAgent } from "../../../../../lib/workshop-agent";
 import { workflowFor } from "../../../../../lib/workflow";
 import type { ImageAttachment } from "../../../../../lib/project-types";
 
-const Message = z.object({ text: z.string().trim().min(1).max(4000), attachments: AttachmentsSchema, channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main"), mode: z.enum(["work", "evaluate"]).default("work") }).strict();
+const Message = z.object({ text: z.string().trim().min(1).max(4000), attachments: AttachmentsSchema, channel: z.enum(["main", "chief", "hwlead", "hw", "sw", "me", "id"]).default("main"), mode: z.enum(["work", "evaluate"]).default("work") }).strict();
 
 async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   if (!hasValidOrigin(request)) return NextResponse.json({ error: "invalid origin" }, { status: 403 });

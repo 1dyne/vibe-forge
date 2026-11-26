@@ -11,14 +11,14 @@ import { agentName } from "../lib/workflow";
 export type RoomState = "my_turn" | "blocked" | "working" | "waiting" | "done" | "idle";
 
 /** styles.css의 .agent-dot.dot-* 와 같은 색 */
-export const AGENT_COLOR: Record<AgentId, string> = { chief: "#9DD2C8", hw: "#9DA2DF", sw: "#AAC8DF", me: "#DCB2D2", id: "#F0DFA7" };
+export const AGENT_COLOR: Record<AgentId, string> = { chief: "#9DD2C8", hwlead: "#B7B3D7", hw: "#9DA2DF", sw: "#AAC8DF", me: "#DCB2D2", id: "#F0DFA7" };
 /** 팀 색으로 칠한 달그락 그림 */
 const art = (room: AgentId, frame: "idle" | "thinking_1" | "thinking_2") => `/characters/${room === "chief" ? "" : `${room}/`}${frame}.png`;
 const STATE_LABEL: Record<RoomState, string> = { my_turn: "내 차례", blocked: "막힘", working: "작업 중", waiting: "기다리는 중", done: "끝남", idle: "쉬는 중" };
 
 /** 대장은 카드가 없어도 늘 있다. 나머지는 작업대에 카드가 있는 달그락만. */
 export function sceneRooms(board: BoardView): AgentId[] {
-  const order: AgentId[] = ["chief", "hw", "sw", "me", "id"];
+  const order: AgentId[] = ["chief", "hwlead", "hw", "sw", "me", "id"];
   return order.filter((room) => room === "chief" || board.rooms.some((r) => r.room === room));
 }
 

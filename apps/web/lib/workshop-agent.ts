@@ -6,7 +6,7 @@ import { withLocalCostReservation } from "./local-cost-ledger";
 import { AGENTS, workflowFor } from "./workflow";
 import type { AgentId, ChatChannel, ImageAttachment, LocalProject } from "./project-types";
 
-const ReplySchema = z.object({ replies: z.array(z.object({ agent: z.enum(["chief", "hw", "sw", "me", "id"]), text: z.string().min(1).max(1800) }).strict()).min(1).max(5), sharedSummary: z.string().min(1).max(1000), files: z.array(z.object({ agent: z.enum(["hw", "sw", "me", "id"]), filename: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/), content: z.string().min(1).max(14000) }).strict()).max(2) }).strict();
+const ReplySchema = z.object({ replies: z.array(z.object({ agent: z.enum(["chief", "hwlead", "hw", "sw", "me", "id"]), text: z.string().min(1).max(1800) }).strict()).min(1).max(5), sharedSummary: z.string().min(1).max(1000), files: z.array(z.object({ agent: z.enum(["hw", "sw", "me", "id"]), filename: z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/), content: z.string().min(1).max(14000) }).strict()).max(2) }).strict();
 export type WorkshopReply = { replies: Array<{ agent: AgentId; text: string }>; sharedSummary: string; files: Array<{ agent: AgentId; filename: string; content: string }> };
 
 export function teamContext(project: LocalProject) {

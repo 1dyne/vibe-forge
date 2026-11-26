@@ -9,7 +9,7 @@ import { canAccess, getViewer, notFound, unauthorized, withViewerVault } from ".
 
 export const dynamic = "force-dynamic";
 
-const Body = z.object({ projectId: z.string().uuid().nullish(), text: z.string().trim().min(1).max(4000), channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main"), model: z.string().min(1).max(80).nullish(), images: z.array(z.object({ name: z.string().max(120).default("사진"), dataUrl: z.string().max(MAX_IMAGE_CHARS).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/) }).strict()).max(MAX_IMAGES).optional(), retry: z.boolean().optional() }).strict();
+const Body = z.object({ projectId: z.string().uuid().nullish(), text: z.string().trim().min(1).max(4000), channel: z.enum(["main", "chief", "hwlead", "hw", "sw", "me", "id"]).default("main"), model: z.string().min(1).max(80).nullish(), images: z.array(z.object({ name: z.string().max(120).default("사진"), dataUrl: z.string().max(MAX_IMAGE_CHARS).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/) }).strict()).max(MAX_IMAGES).optional(), retry: z.boolean().optional() }).strict();
 
 // 화면(휴대폰이든 PC든)에서 한 말을 그 사람 컴퓨터의 연결 앱에게 넘긴다.
 // AI 호출은 연결 앱이 그 사람의 ChatGPT 요금제로 하므로 여기서는 비용을 세지 않는다.
