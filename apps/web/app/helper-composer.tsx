@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import type { LocalProject } from "../lib/project-types";
 
 // 달그락 연결 앱(내 컴퓨터에서 도는 앱)가 켜져 있으면 여기서 바로 대화한다.
-// 답은 연결 앱이 내 ChatGPT 요금제로 만들고, 이 화면은 그 답을 흘려 받는다.
+// 답은 연결 앱이 내 ChatGPT 요금제로, 또는 내 컴퓨터의 Claude Code(내 Claude 구독)로 만들고, 이 화면은 그 답을 흘려 받는다.
 // 흘러오는 답은 입력창이 아니라 대화 목록에 그린다(onLive). 입력창은 입력만 맡는다.
 
 type Model = { slug: string; name: string };
@@ -151,7 +151,9 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
       <div className="composer-tools">
         <input ref={picker} type="file" accept="image/*" multiple hidden onChange={(e) => { void addPhotos(e.target.files); e.target.value = ""; }} />
         <button type="button" className="attach" aria-label="사진 붙이기" title="사진 붙이기 (최대 3장) — 만든 것, 부품, 손그림을 보여주세요" disabled={busy || photos.length >= MAX_PHOTOS} onClick={() => picker.current?.click()}>＋</button>
-        <span className="composer-hint">ChatGPT 요금제 사용 중 · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>
+        {chosen?.startsWith("claude:")
+          ? <span className="composer-hint" title="내 컴퓨터에 깔린 Claude Code가 내 Claude 구독으로 답해요">Claude 구독 사용 중 · 내 컴퓨터의 Claude Code</span>
+          : <span className="composer-hint">ChatGPT 요금제 사용 중 · <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a></span>}
         {models.length > 1
           ? <select className="model-select" aria-label="모델 선택" value={chosen ?? ""} disabled={busy} onChange={(e) => pickModel(e.target.value)}>{models.map((m) => <option key={m.slug} value={m.slug}>{m.name}</option>)}</select>
           : chosen && <span className="composer-hint">{chosen}</span>}
