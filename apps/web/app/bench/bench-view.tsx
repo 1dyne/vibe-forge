@@ -314,7 +314,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
       const root = document.querySelector(".bench") as HTMLElement | null;
       if (panel && root) root.style.setProperty("--panel-real", `${Math.ceil(panel.getBoundingClientRect().height)}px`);
       const top = topRef.current?.getBoundingClientRect().bottom ?? 0;
-      // 아래쪽은 시점 알약과 HW 달그락 중 더 높은 것까지 가린 것으로 본다
+      // 아래쪽은 시점 알약과 EE 달그락 중 더 높은 것까지 가린 것으로 본다
       const mascot = document.querySelector(".bench-mascot") as HTMLElement | null;
       const low = Math.min(lowRef.current?.getBoundingClientRect().top ?? H, mascot?.getBoundingClientRect().top ?? H);
       if (W >= 900) api.current?.setInsets(0, 0, 0, 424); else api.current?.setInsets(top + 12, H - low + 14);
@@ -391,7 +391,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
       </header>
 
       {bubble && <div className="bench-bubble" role="status">{bubble}</div>}
-      <button type="button" className="bench-mascot" onClick={onMascot} aria-label="HW 달그락 (두 번 누르면 물어보기)" style={{ ["--hue" as string]: `${hue}deg` }}>
+      <button type="button" className="bench-mascot" onClick={onMascot} aria-label="EE 달그락 (두 번 누르면 물어보기)" style={{ ["--hue" as string]: `${hue}deg` }}>
         <span className="aura" />
         <span key={mot.k} className={`dk-sprite m-${mot.m}`} />
       </button>
@@ -409,7 +409,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             <div className="phase">완성</div>
             {mode === "practice" ? <>
               <p className="action">다 했어요! 🔥 이 손 기술은 내 대장간 연장 걸이에 걸어 둘게요.</p>
-              <p className="why">실제 프로젝트에서는 HW 달그락이 같은 화면으로 내 설계도대로 안내해요.</p>
+              <p className="why">실제 프로젝트에서는 EE 달그락이 같은 화면으로 내 설계도대로 안내해요.</p>
             </> : <>
               <p className="action">화면 속 조립을 끝까지 봤어요. 🔥</p>
               <p className="why">실물로 마친 단계는 ‘실제로 했어요’로 보내 주세요. 전원을 넣기 전에 문제 카드의 측정부터 해요.</p>
@@ -483,13 +483,13 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
       )}
 
       {drawer && (
-        <div className="bench-sheet hw" role="dialog" aria-label="HW 달그락에게 묻기">
-          <div className="hw-head"><b>HW 달그락</b><button type="button" className="x" onClick={() => setDrawer(false)} aria-label="닫기">×</button></div>
+        <div className="bench-sheet hw" role="dialog" aria-label="EE 달그락에게 묻기">
+          <div className="hw-head"><b>EE 달그락</b><button type="button" className="x" onClick={() => setDrawer(false)} aria-label="닫기">×</button></div>
           <p className="ctx">{contextLine}</p>
           <div className="chat">
             <p className="hw-msg">{mode === "project" ? "지금 이 단계 보고 있어. 뭐가 이상해? 사진이 있으면 같이 보내 줘." : "지금 어디서 막혔어? 아래에서 골라 봐."}</p>
             {chat.map((m, i) => <p key={i} className={m.who === "me" ? "me-msg" : "hw-msg"}>{m.text}</p>)}
-            {asking && <p className="hw-msg typing">HW 달그락이 보고 있어요…</p>}
+            {asking && <p className="hw-msg typing">EE 달그락이 보고 있어요…</p>}
           </div>
           {terms.length > 0 && <div className="quick terms" aria-label="말 뜻 묻기">{terms.map((e) => <button key={e.term} type="button" onClick={() => ask(`‘${e.term}’ 뜻이 뭐예요?`, e.short)}>ⓘ {e.term} 뜻?</button>)}</div>}
           {mode === "project" && connectorOnly ? <>
@@ -501,13 +501,13 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
             <form className="ask" onSubmit={(e) => { e.preventDefault(); void askReal(askText); }}>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
               <button type="button" className="clip" aria-label="사진 첨부" onClick={() => fileRef.current?.click()}>📷</button>
-              <input value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="예: 5V 핀 납땜이 회색이에요" aria-label="HW 달그락에게 보낼 말" />
+              <input value={askText} onChange={(e) => setAskText(e.target.value)} placeholder="예: 5V 핀 납땜이 회색이에요" aria-label="EE 달그락에게 보낼 말" />
               <button type="submit" className="send" disabled={asking || !askText.trim()}>보내기</button>
             </form>
             <p className="note">대화는 HW 작업실에 기록되고 팀이 같이 봐요.</p>
           </> : <>
             <div className="quick">{kit.faq.map((f) => <button key={f.q} type="button" onClick={() => ask(f.q, f.a)}>{f.q}</button>)}</div>
-            <p className="note">연습에서는 정해진 답만 해요. 실제 프로젝트에서는 납땜 사진을 올리면 HW 달그락이 직접 보고 답해요.</p>
+            <p className="note">연습에서는 정해진 답만 해요. 실제 프로젝트에서는 납땜 사진을 올리면 EE 달그락이 직접 보고 답해요.</p>
           </>}
         </div>
       )}

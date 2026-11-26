@@ -1,6 +1,7 @@
 "use client";
 import { checkMockup } from "../lib/mockup";
 import { housingParts, printNotes } from "../lib/mockup-export";
+import { FINISH_ROUTES } from "../lib/tools/finish-labels";
 import { useEffect, useRef, useState } from "react";
 import type { LocalProject } from "../lib/project-types";
 import type { WorkbenchItem } from "../lib/workbench";
@@ -29,7 +30,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
   if (!item) return null;
   const source = sourceItem === item.id;
   const workflow = workflowFor(project);
-  const hasPreview = ["mockup", "product", "assembly", "housing", "power", "tests", "safety", "contract", "circuit", "cad", "bom", "tasks", "record"].includes(item.kind) || item.mimeType.startsWith("text/html");
+  const hasPreview = ["mockup", "finish", "product", "assembly", "housing", "power", "tests", "safety", "contract", "circuit", "cad", "bom", "tasks", "record"].includes(item.kind) || item.mimeType.startsWith("text/html");
   const downloadUrl = workbenchDownloadUrl(project.id, item.id);
   function select(id: string) { setSourceItem(null); onSelect(id); }
   return <aside className="artifact-panel" id="workbench-panel" data-tour="workbench" aria-label="작업대">
@@ -54,6 +55,7 @@ export default function WorkbenchPanel({ project, items, selected, busy, onSelec
         {item.kind === "circuit" && project.build && <><div className="artifact-title"><span className="pill">회로 초안</span><h3>{project.build.blueprint.title}</h3></div><CircuitView blueprint={project.build.blueprint} /><div className="check-list">{project.build.checks.map(c => <div key={c.id} className={c.verdict}><span>{c.verdict === "pass" ? "✓" : c.verdict === "unknown" ? "?" : "!"}</span><p><b>{c.id}</b>{c.message}</p></div>)}</div><details><summary>HW / SW 검토 결과</summary><p>{project.build.evaluator.summary}</p>{[project.build.evaluator.hw, project.build.evaluator.sw].map((v, i) => <p key={i}><span className={`pill ${v.verdict}`}>{i ? "SW" : "HW"} · {v.verdict}</span> {v.findings.join(" ")}</p>)}</details></>}
         {item.kind === "circuit" && project.build && <CircuitReading blueprint={project.build.blueprint} />}
         {item.kind === "mockup" && project.preciseMockup && <><div className="artifact-title"><span className="pill">정밀 목업</span><h3>{project.preciseMockup.title}</h3></div><p className="pm-summary">{project.preciseMockup.summary}</p><PreciseMockup spec={project.preciseMockup} /><PrintFiles project={project} /></>}
+        {item.kind === "finish" && project.designFinish && <FinishView project={project} onAction={onAction} busy={busy} />}
         {item.kind === "product" && project.productForm && <><div className="artifact-title"><span className="pill">완성품 미리보기</span><h3>{project.name}</h3></div><MockupView blueprint={project.build?.blueprint ?? { title: project.name, board: "", supplyVoltage: 5, components: [], nets: [], enclosure: { widthMm: 40, depthMm: 40, heightMm: 40, wallMm: 2 }, firmware: { platform: "arduino", behavior: "", pinAssignments: [], loopSteps: [] }, assumptions: [], humanChecks: [] }} form={project.productForm} /></>}
         {item.kind === "contract" && project.dataContract && <ContractView project={project} onAction={onAction} busy={busy} />}
         {item.kind === "power" && project.power && <PowerView project={project} />}
@@ -138,5 +140,26 @@ function PrintFiles({ project }: { project: LocalProject }) {
     <p className="muted">직접 다듬고 싶다면: <a href={href("mockup:scad")} download>OpenSCAD 파일</a> · <a href={href("mockup:cadquery")} download>CadQuery 파일</a> <small>({stem})</small></p>
     {notes.length > 0 && <><h5>뽑기 전에 확인할 것</h5><ul className="print-notes">{notes.map((note, i) => <li key={i}>{note}</li>)}</ul></>}
     <p className="muted"><small>첫 출력은 맞춤 확인용이에요. 안 맞는 곳을 재서 알려주면 달그락이 치수를 고쳐 다시 만들어요.</small></p>
+  </section>;
+}
+
+// ID 초안 뒤에 사람이 마무리할 길을 고르는 자리.
+function FinishView({ project, onAction, busy }: { project: LocalProject; onAction: (body: Record<string, unknown>) => void; busy: boolean }) {
+  const f = project.designFinish!;
+  return <section className="finish-view">
+    <div className="artifact-title"><span className="pill">디자인 마무리</span><h3>초안까지 만들었어요</h3></div>
+    <p>{f.draft}</p>
+    <h4>사람 손이 필요한 곳</h4>
+    <ul className="finish-limits">{f.limits.map((l, i) => <li key={i}><b>{l.what}</b><span>{l.why}</span></li>)}</ul>
+    {f.toolsOnHand.length > 0 && <p className="muted">다룰 수 있는 도구: {f.toolsOnHand.join(", ")}</p>}
+    <h4>마무리할 길을 골라주세요</h4>
+    <div className="finish-routes">{f.routes.map((r, i) => <article key={r.route} className={f.chosen === r.route ? "chosen" : ""}>
+      <header><b>{FINISH_ROUTES[r.route]}</b>{i === 0 && <span className="pill">추천</span>}</header>
+      <p>{r.why}</p>
+      <p className="muted">{[r.tool && `도구: ${r.tool}`, r.costKRW != null && `약 ${r.costKRW.toLocaleString("ko-KR")}원`, r.time].filter(Boolean).join(" · ")}</p>
+      <ol>{r.steps.map((step, k) => <li key={k}>{step}</li>)}</ol>
+      <button type="button" disabled={busy || f.chosen === r.route} onClick={() => onAction({ action: "choose_finish", route: r.route })}>{f.chosen === r.route ? "이 길로 가는 중" : "이 길로 할게요"}</button>
+    </article>)}</div>
+    {f.brief && <details><summary>가져갈 의뢰서</summary><pre className="finish-brief">{f.brief}</pre></details>}
   </section>;
 }

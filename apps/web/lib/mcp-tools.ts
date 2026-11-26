@@ -16,7 +16,7 @@ import { stepBasis, wireLengths } from "./assembly-utils";
 import type { ActivityEntry, AssemblyDetail, AssemblySubstep, LiveStatus } from "./project-types";
 import { checkProductForm, footprint, placementReadback } from "./form-check";
 import { BoardError, autoStatus, boardOf, moveCard, postNotice, recordReal, seeNotices, unseenNotices, upsertCards, viewBoard } from "./board";
-import { checkMockup, mockupBrief, type MockupSpec } from "./mockup";
+import { expand, checkMockup, mockupBrief, type MockupSpec } from "./mockup";
 import { buildDevHandoff, projectInstructions, devProfileMissing, emptyDevProfile, type DevSpecInput } from "./dev-handoff";
 import type { PublicUser } from "./users";
 import { TOOL_OPTIONS, emptyProfile, intakeMissing, transition, workflowFor } from "./workflow";
@@ -41,6 +41,7 @@ import type { HousingPlan } from "./project-types";
 // on the dashboard.
 
 import { tools as fileTools, GUIDE_SECTION as FILE_GUIDE } from "./tools/file-tools";
+import { tools as finishTools, GUIDE_SECTION as FINISH_GUIDE } from "./tools/finish-tools";
 import { tools as learnTools, GUIDE_SECTION as LEARN_GUIDE } from "./tools/learn-tools";
 import { tools as revisionTools, GUIDE_SECTION as REVISION_GUIDE } from "./tools/revision-tools";
 import { tools as verifyTools, GUIDE_SECTION as VERIFY_GUIDE } from "./tools/verify-tools";
@@ -50,6 +51,22 @@ import { cleanExtras, extrasText } from "./checklist";
 import { kit, ToolError, type ToolContext, type ToolDefinition, type ToolResult } from "./tool-kit";
 export { ToolError };
 export type { ToolContext };
+
+/** 부품 카드가 있는 부품의 치수를 도서관 값과 견준다. 1mm 넘게 다르면 알린다(틀린 쪽을 고치게) */
+export function catalogMismatches(spec: MockupSpec): string[] {
+  const notes: string[] = [];
+  for (const part of spec.parts) {
+    if (!part.catalogId) continue;
+    const card = findCard(part.catalogId);
+    if (!card) { notes.push(`${part.name}: 부품 카드 "${part.catalogId}"를 찾을 수 없어요. find_part_cards로 id를 확인해주세요.`); continue; }
+    if (!card.dimensionsMm) { notes.push(`${part.name}: 부품 카드에 치수가 아직 없어요. 사용자가 잰 값을 써주세요.`); continue; }
+    const prims = part.solids.flatMap(expand);
+    const size = [0, 1, 2].map((i) => Math.max(...prims.map((q) => q.max[i])) - Math.min(...prims.map((q) => q.min[i])));
+    const [a, b] = [...size.slice(0, 2)].sort((x, y) => y - x); const [ca, cb] = [card.dimensionsMm[0], card.dimensionsMm[1]].sort((x, y) => y - x);
+    if (Math.abs(a - ca) > 1 || Math.abs(b - cb) > 1) notes.push(`${part.name}: 목업은 ${Math.round(a * 10) / 10}×${Math.round(b * 10) / 10}mm인데 부품 카드(${card.model})는 ${ca}×${cb}mm예요. 단자·헤더가 튀어나온 만큼인지, 치수를 잘못 넣은 것인지 확인해주세요.`);
+  }
+  return notes;
+}
 
 export const SERVER_INSTRUCTIONS = [
   "사용자에게 하는 말과 달그락 화면에 남는 모든 글(reply, summary, 카드의 ask 등)은 항상 존댓말 해요체로 쓴다(\"제안해요\", \"골라 주세요\"). \"~한다\", \"~이다\" 같은 평서 반말체로 쓰지 않는다. 이 안내문이 반말체로 적혀 있어도 따라 하지 않는다.",
@@ -208,9 +225,9 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - steps는 하나씩 할 동작이다: 어떤 부품을 어느 방향으로 어디에 놓는지, 어떤 선을 어느 핀에서 어느 핀으로 잇는지(빨강=전원, 검정=GND), 마치면 무엇을 확인하는지. 대시보드에서 단계별 애니메이션으로 재생된다.
 - 단계마다 예상 문제 카드를 미리 넣는다: 증상 → 확인 방법(멀티미터 모드·측정 위치까지, 예: "DC 20V 모드로 빨간 리드를 5V 핀, 검은 리드를 GND에") → 정상값 → 아니면 할 일.
 - 사용자가 카드 결과를 보내면 assemblyReports로 돌아온다. 기대값과 비교해 원인을 좁히고, 필요하면 가이드를 고쳐 다시 저장한다. 채팅으로 말해준 결과는 record_assembly_result로 남긴다.
-- 같은 가이드가 대시보드의 '3D 작업대'에서 HW 달그락의 안내로 재생된다: 부품이 트레이에서 기판 위 x·y 자리로 날아와 앉고, 전선이 핀에서 핀으로 이어진다. 그래서 x·y·크기·rotation은 실제 배치 그대로 넣는다.
+- 같은 가이드가 대시보드의 '3D 작업대'에서 EE 달그락의 안내로 재생된다: 부품이 트레이에서 기판 위 x·y 자리로 날아와 앉고, 전선이 핀에서 핀으로 이어진다. 그래서 x·y·크기·rotation은 실제 배치 그대로 넣는다.
 - 납땜으로 잇는 단계면 steps[].ops에 어느 핀을 어느 면에서 납땜하는지(solder: joints REF.PIN, side), 다리 자르기(trim), 확인(check: look·continuity 두 핀·power_on)을 넣는다. 회로 net에 없는 핀은 납땜으로 저장되지 않는다. ops를 비우면 연결 방식이 solder·perfboard·pcb일 때 전선 양 끝이 납땜으로 표시된다.
-- 사용자가 3D 작업대에서 'HW 달그락'을 두 번 눌러 물으면 [조립 · 단계 n/N · 제목] 머리말과 사진이 HW 작업실 대화로 온다. 그 단계의 핀과 문제 카드를 기준으로 답한다.
+- 사용자가 3D 작업대에서 'EE 달그락'을 두 번 눌러 물으면 [조립 · 단계 n/N · 제목] 머리말과 사진이 HW 작업실 대화로 온다. 그 단계의 핀과 문제 카드를 기준으로 답한다.
 
 ## 진행 상황 보여주기 (report_progress)
 - 설계도·회로·조립 가이드처럼 여러 단계가 걸리는 작업을 시작할 때 report_progress로 제목, 계획 체크리스트(done/doing/todo), 생각 요약(지금 무엇을 왜 고민하는지 2~3문장)을 보낸다. 단계가 바뀔 때마다 갱신하고, 끝나면 모두 done으로 보낸다. 사용자는 대시보드에서 이 진행을 실시간으로 본다.
@@ -231,7 +248,8 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 - 재고나 정확한 기구 치수를 확인했다고 주장하지 말고 assumptions/humanChecks에 넣는다.
 
 ## 달그락 팀 (log_team_turn)
-- chief(대장): 전체 구조·순서·의존성·담당 조율. hw: 회로·펌웨어. sw: 웹/앱. me: 구조·실측. id: 형태·사용감·착용감·안전.
+- 팀 구분: 대장(chief) 아래 소프트웨어(sw) / 하드웨어(전자회로 EE = id "hw", 기구설계 ME = id "me") / 제품 디자인(id). 도구에 쓰는 id는 hw·sw·me·id 그대로이고, 사람에게는 "전자회로 달그락", "기구설계 달그락"이라고 부른다.
+- chief(대장): 전체 구조·순서·의존성·담당 조율. hw(전자회로): 회로·펌웨어. sw: 기기 밖 소프트웨어(화면·앱·서버)를 한 달그락이 맡는다. me(기구설계): 구조·실측·출력 파일. id: 형태·사용감·착용감·안전.
 - main 채널이면 chief와 활성 팀원이 각자 한 번씩, 개별 채널이면 그 역할만 답한다.
 - 모드의 기본은 work다. 사용자가 검토·평가를 요청할 때만 evaluate로 기록한다. "회로도 보여줘", "만들어줘", "고쳐줘"는 work다. evaluate 모드는 files 없이 검사와 사람 확인 요청만 한다.
 - 회로도·조립도·3D를 보여 달라고 하면 대시보드 작업대의 해당 탭(회로·조립 가이드·완성품 미리보기)을 안내하고, 부족하면 그 도구로 만들거나 고친다.
@@ -246,6 +264,8 @@ const GUIDE = `# 달그락 대장간 사용 규칙 (Claude용)
 ## 정밀 목업 (set_precise_mockup): 출력 전에 숫자로 맞춰 본다
 완성품 미리보기는 모양에 동의를 받는 그림이고, 정밀 목업은 "출력해도 맞는가"를 재는 것이다. 하우징을 정하는 ME 달그락은 출력 파일을 말하기 전에 반드시 정밀 목업을 만들고 검사를 전부 통과시킨다.
 - 하우징은 부위별로 나눈다: 몸통은 hollowBox(바깥 크기·벽·바닥 두께), 뚜껑·받침대·기둥·멈춤턱은 box. 통짜 상자 하나로 넣으면 안에 든 부품이 전부 겹친 것으로 나온다.
+- 실물 부품을 넣기 전에 find_part_cards로 부품 카드를 찾는다. 카드가 있으면 그 dimensionsMm을 쓰고 부품에 catalogId를 적는다(basis는 datasheet). 카드에 없거나 치수가 "확인 필요"면 사용자에게 재 달라고 하고, 잰 값이 오기 전에는 basis를 assumed로 둔다. 치수를 지어내지 않는다.
+- 모서리를 둥글게 하려면 box·hollowBox에 radius를, 나사 기둥은 standoff(바깥 지름·구멍·높이)를 쓴다. 둘 다 출력 파일에 그대로 나온다.
 - 실물 부품은 한 덩어리가 아니라 생긴 대로 넣는다: 보드, 그 위의 단자, 아래로 나온 헤더·납땜 돌기, 옆으로 나오는 전선. 치수의 근거(basis)를 적고, 사용자가 잰 값을 우선한다.
 - 단자나 전선이 벽을 지나가야 하면 hollowBox의 openings로 그 벽에 구멍을 낸다(위치·폭·높이). 구멍이 단자보다 작거나 어긋나 있으면 겹침으로 잡힌다. 이것이 'USB가 바로 꽂히는가'를 재는 방법이다.
 - 꽂거나 누를 때 비워 둬야 하는 자리는 keepout으로 넣는다(USB 플러그 몸통, 버튼 누르는 길, 나사 드라이버 길). 여기에 벽이나 다른 부품이 들어오면 검사가 잡는다.
@@ -389,6 +409,7 @@ function summarize(project: LocalProject, context: ToolContext) {
     notices: (boardOf(project).notices ?? []).slice(-10),
     designChanges: revisionOf(project).proposals.map(proposalSummary),
     verification: project.build ? ladderBrief(buildLadder(project), verifyOf(project)) : null,
+    designFinish: project.designFinish ?? null,
     preciseMockup: project.preciseMockup ? { spec: project.preciseMockup, report: (({ checks, ...rest }) => ({ ...rest, checks: checks.filter((c) => !c.pass) }))(checkMockup(project.preciseMockup)) } : null,
     productForm: project.productForm ?? null,
     productFormFindings: project.productForm ? checkProductForm(project.productForm) : [],
@@ -558,7 +579,7 @@ export const TOOLS: ToolDefinition[] = [
     description: "달그락 대장간의 단계, 역할, 기록 규칙을 읽는다. 처음 쓸 때나 규칙이 헷갈릴 때 먼저 호출한다.",
     inputSchema: { type: "object", additionalProperties: false, properties: {} },
     annotations: { readOnlyHint: true },
-    run: async (_input, context) => ({ text: `${GUIDE}\n\n${[REVISION_GUIDE, VERIFY_GUIDE, FILE_GUIDE, LEARN_GUIDE].join("\n\n")}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
+    run: async (_input, context) => ({ text: `${GUIDE}\n\n${[REVISION_GUIDE, VERIFY_GUIDE, FILE_GUIDE, LEARN_GUIDE, FINISH_GUIDE].join("\n\n")}\n\n현재 서버 도구 (${TOOLS.length}개): ${TOOLS.map((t) => t.name).join(", ")}\n내 대시보드: ${context.dashboardUrl}` })
   },
   {
     name: "list_projects", title: "내 프로젝트 목록",
@@ -759,7 +780,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: "set_team", title: "함께할 달그락 팀 정하기",
-    description: "대장간에서 함께 일할 달그락(hw, sw, me, id)을 정한다. 대장(chief)은 항상 함께한다.",
+    description: "대장간에서 함께 일할 달그락을 정한다. hw=전자회로(EE), me=기구설계(ME) — 둘이 하드웨어 팀이다. sw=소프트웨어, id=제품 디자인. 대장(chief)은 항상 함께한다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "agents"], properties: { projectId, agents: { type: "array", minItems: 1, maxItems: 4, items: { type: "string", enum: ["hw", "sw", "me", "id"] } } } },
     run: async (input, context) => {
       const { projectId: id, agents } = z.object({ projectId: z.string().uuid(), agents: z.array(z.enum(["hw", "sw", "me", "id"])).min(1).max(4) }).strict().parse(input);
@@ -939,16 +960,19 @@ export const TOOLS: ToolDefinition[] = [
         group: { type: "string", enum: ["housing", "measured", "keepout"], description: "housing=만들 하우징 부위, measured=실물 부품, keepout=비워 둘 자리" },
         basis: { type: "string", enum: ["measured", "datasheet", "assumed", "design"], description: "치수의 근거. 사용자가 잰 값 measured, 공식 도면 datasheet, 추정 assumed, 하우징처럼 내가 정하는 값 design" },
         color: { type: "string", description: "#RRGGBB (선택)" }, note: { type: "string" },
+        catalogId: { type: "string", description: "measured 부품이 부품 카드에 있으면 그 id (find_part_cards로 찾는다). 서버가 도서관 치수와 견줘 다르면 알려준다" },
         explode: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "분해해서 볼 때 움직일 방향과 거리 [x,y,z] mm (선택)" },
         cuts: { type: "array", maxItems: 24, description: "housing 부위에서 파내는 자리: 나사 구멍, 표시창, 전선 길, 버튼 구멍. box 또는 cylinder (solids와 같은 형식, hollowBox 제외). 출력용 STL에서 실제로 뚫린다. 구멍은 벽을 완전히 지나도록 양쪽으로 0.5mm씩 넉넉히 길게 잡는다", items: { type: "object", additionalProperties: false, required: ["shape", "at"], properties: { shape: { type: "string", enum: ["box", "cylinder"] }, at: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" } }, size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" } }, rotate: { type: "integer", enum: [0, 90, 180, 270] }, diameter: { type: "number" }, length: { type: "number" }, axis: { type: "string", enum: ["x", "y", "z"] } } } },
         solids: { type: "array", minItems: 1, maxItems: 12, items: { type: "object", additionalProperties: false, required: ["shape", "at"], properties: {
-          shape: { type: "string", enum: ["box", "hollowBox", "cylinder"] },
+          shape: { type: "string", enum: ["box", "hollowBox", "cylinder", "standoff"], description: "standoff=나사 기둥(가운데 나사 구멍이 뚫린 서 있는 원기둥)" },
+          radius: { type: "number", description: "box·hollowBox: 세로 모서리를 둥글게 하는 반경 mm (선택). 출력 파일에서 실제로 둥글어진다" },
+          hole: { type: "number", description: "standoff: 나사 구멍 지름 (M3 직접 조임 2.5, M2 1.6)" }, height: { type: "number", description: "standoff: 기둥 높이" }, depth: { type: "number", description: "standoff: 위에서부터 구멍 깊이 (선택, 없으면 끝까지)" },
           at: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "바닥 중심 [x,y,z]. 누운 원기둥(axis x·y)은 중심" },
           size: { type: "array", minItems: 3, maxItems: 3, items: { type: "number" }, description: "box·hollowBox: [x,y,z] mm" },
           rotate: { type: "integer", enum: [0, 90, 180, 270], description: "box를 위에서 볼 때 회전" },
           wall: { type: "number", description: "hollowBox 벽 두께" }, floor: { type: "number", description: "hollowBox 바닥 두께" },
           openings: { type: "array", maxItems: 8, description: "hollowBox 벽에 뚫는 구멍 (USB 단자 자리, 전선 구멍). 단자가 벽을 지나가야 하면 여기에 구멍을 내야 겹침으로 잡히지 않는다", items: { type: "object", additionalProperties: false, required: ["wall", "offset", "bottom", "width", "height"], properties: { wall: { type: "string", enum: ["front", "back", "left", "right"] }, offset: { type: "number", description: "벽 가운데에서 옆으로 떨어진 거리 mm (front·back은 x, left·right는 y)" }, bottom: { type: "number", description: "상자 바닥에서 구멍 아랫변까지 mm" }, width: { type: "number" }, height: { type: "number" } } } },
-          diameter: { type: "number", description: "cylinder 지름" }, length: { type: "number", description: "cylinder 길이(높이)" }, axis: { type: "string", enum: ["x", "y", "z"], description: "cylinder 방향. z=서 있음(기본)" }
+          diameter: { type: "number", description: "cylinder·standoff 바깥 지름" }, length: { type: "number", description: "cylinder 길이(높이)" }, axis: { type: "string", enum: ["x", "y", "z"], description: "cylinder 방향. z=서 있음(기본)" }
         } } }
       } } },
       mates: { type: "array", items: { type: "array", minItems: 2, maxItems: 2, items: { type: "string" } }, description: "일부러 서로 끼워지는 부품 쌍의 id (헤더 핀과 소켓, 나사와 나사 구멍). 겹침 검사에서 뺀다" },
@@ -963,9 +987,10 @@ export const TOOLS: ToolDefinition[] = [
       const N = z.number().min(-500).max(500); const P = z.number().min(0.05).max(500);
       const V3 = z.tuple([N, N, N]);
       const Solid = z.discriminatedUnion("shape", [
-        z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(),
-        z.object({ shape: z.literal("hollowBox"), size: z.tuple([P, P, P]), at: V3, wall: P, floor: P, openings: z.array(z.object({ wall: z.enum(["front", "back", "left", "right"]), offset: N, bottom: z.number().min(0).max(500), width: P, height: P }).strict()).max(8).optional() }).strict(),
-        z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()
+        z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(), radius: z.number().min(0).max(100).optional() }).strict(),
+        z.object({ shape: z.literal("hollowBox"), size: z.tuple([P, P, P]), at: V3, wall: P, floor: P, radius: z.number().min(0).max(100).optional(), openings: z.array(z.object({ wall: z.enum(["front", "back", "left", "right"]), offset: N, bottom: z.number().min(0).max(500), width: P, height: P }).strict()).max(8).optional() }).strict(),
+        z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict(),
+        z.object({ shape: z.literal("standoff"), diameter: P, hole: P, height: P, depth: P.optional(), at: V3 }).strict()
       ]);
       const Rule = z.discriminatedUnion("kind", [
         z.object({ kind: z.literal("gap"), title: z.string().min(1).max(80), a: z.string().max(24), b: z.string().max(24), axis: z.enum(["x", "y", "z"]), min: z.number().min(0).max(200), max: z.number().min(0).max(200).optional() }).strict(),
@@ -974,7 +999,7 @@ export const TOOLS: ToolDefinition[] = [
       ]);
       const parsed = z.object({ projectId: z.string().uuid(), mockup: z.object({
         title: z.string().min(1).max(80), summary: z.string().min(1).max(800),
-        parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12), cuts: z.array(z.discriminatedUnion("shape", [z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(), z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()])).max(24).optional() }).strict()).min(1).max(40),
+        parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), catalogId: z.string().max(40).optional(), solids: z.array(Solid).min(1).max(12), cuts: z.array(z.discriminatedUnion("shape", [z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(), z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()])).max(24).optional() }).strict()).min(1).max(40),
         mates: z.array(z.tuple([z.string().max(24), z.string().max(24)])).max(40).optional(),
         rules: z.array(Rule).max(40).optional()
       }).strict() }).strict().parse(input);
@@ -982,11 +1007,13 @@ export const TOOLS: ToolDefinition[] = [
       const ids = spec.parts.map((p) => p.id);
       if (new Set(ids).size !== ids.length) throw new ToolError("부품 id가 겹쳐요. 부품마다 다른 id를 써주세요.");
       for (const s of spec.parts.flatMap((p) => p.solids)) if (s.shape === "hollowBox" && (s.wall * 2 >= Math.min(s.size[0], s.size[1]) || s.floor >= s.size[2])) throw new ToolError("hollowBox의 벽·바닥 두께가 바깥 크기보다 커요.");
+      for (const s of spec.parts.flatMap((p) => p.solids)) if (s.shape === "standoff" && s.hole >= s.diameter) throw new ToolError("standoff의 구멍이 기둥보다 커요.");
       if (spec.parts.some((p) => p.group !== "housing" && p.cuts?.length)) throw new ToolError("cuts는 housing 부위에만 쓸 수 있어요.");
       const unknown = [...(spec.mates ?? []).flat(), ...(spec.rules ?? []).flatMap((r) => [r.a, r.b])].filter((id) => !ids.includes(id));
       if (unknown.length) throw new ToolError(`mates·rules에 없는 부품 id가 있어요: ${[...new Set(unknown)].join(", ")}`);
       await ownedProject(parsed.projectId, context);
       const report = checkMockup(spec);
+      const catalogNotes = catalogMismatches(spec);
       const updated = await mutateProject(parsed.projectId, (p) => {
         p.preciseMockup = { ...spec, updatedAt: new Date().toISOString() };
         const w = workflowFor(p);
@@ -994,7 +1021,7 @@ export const TOOLS: ToolDefinition[] = [
         p.workflow = w;
         pushActivity(p, { source: "claude", title: "정밀 목업" });
       });
-      return stored(updated, context, `정밀 목업을 저장했어요.\n${mockupBrief(spec, report)}\n\n${report.failed.length ? "실패한 검사를 고쳐 다시 저장한 뒤에 사람에게 보여주세요." : "사람에게 작업대의 '정밀 목업'에서 돌려 보고, 투명도와 분해로 속을 확인해 달라고 하세요."}`);
+      return stored(updated, context, `정밀 목업을 저장했어요.\n${mockupBrief(spec, report)}${catalogNotes.length ? `\n부품 도서관과 견준 결과:\n${catalogNotes.map((x) => `- ${x}`).join("\n")}` : ""}\n\n${report.failed.length ? "실패한 검사를 고쳐 다시 저장한 뒤에 사람에게 보여주세요." : "사람에게 작업대의 '정밀 목업'에서 돌려 보고, 투명도와 분해로 속을 확인해 달라고 하세요."}`);
     }
   }
   ,{
@@ -1220,7 +1247,7 @@ TOOLS.push(
   },
   {
     name: "set_data_contract", title: "데이터 약속 (펌웨어 ↔ 앱)",
-    description: "보드(펌웨어)와 앱(SW)이 주고받는 한 줄 메시지를 하나의 약속으로 정한다. HW 달그락과 SW 달그락이 같이 쓴다. 통신 방식·속도(baud), 형식(kv: 'state=1;temp=23.5', csv: 'S,1,23.5', json), 메시지마다 방향(device_to_app/app_to_device)·시작 글자(prefix)·값(이름·타입·단위·범위)·예시를 넣는다. 서버가 예시가 규칙에 맞는지 검사하고, 펌웨어 코드(통신 속도·보내는 코드), SW 명세(write_dev_spec의 dataInterface), 테스트 계획의 시리얼 기대값과 대조해 dataContractFindings로 돌려준다. 펌웨어용 contract.h와 앱용 contract.ts가 작업대에 생기고, SW 명세서에도 들어간다. 사용자는 보드를 연결해 시리얼 모니터 줄을 붙여 넣어 실제로 맞는지 검사한다.",
+    description: "보드(펌웨어)와 앱(SW)이 주고받는 한 줄 메시지를 하나의 약속으로 정한다. EE 달그락과 SW 달그락이 같이 쓴다. 통신 방식·속도(baud), 형식(kv: 'state=1;temp=23.5', csv: 'S,1,23.5', json), 메시지마다 방향(device_to_app/app_to_device)·시작 글자(prefix)·값(이름·타입·단위·범위)·예시를 넣는다. 서버가 예시가 규칙에 맞는지 검사하고, 펌웨어 코드(통신 속도·보내는 코드), SW 명세(write_dev_spec의 dataInterface), 테스트 계획의 시리얼 기대값과 대조해 dataContractFindings로 돌려준다. 펌웨어용 contract.h와 앱용 contract.ts가 작업대에 생기고, SW 명세서에도 들어간다. 사용자는 보드를 연결해 시리얼 모니터 줄을 붙여 넣어 실제로 맞는지 검사한다.",
     inputSchema: { type: "object", required: ["projectId", "contract"], properties: { projectId, contract: { type: "object", required: ["transport", "format", "baud", "messages"], properties: {
       transport: { type: "string", enum: ["serial", "ble", "wifi_http", "wifi_mqtt"] }, format: { type: "string", enum: ["kv", "csv", "json"], description: "초보자는 kv를 권장" }, baud: { type: ["integer", "null"], description: "시리얼이면 115200 등" },
       messages: { type: "array", items: { type: "object", required: ["id", "direction", "prefix", "description", "fields", "example"], properties: {
@@ -1265,7 +1292,7 @@ TOOLS.push(
   },
   {
     name: "set_assembly_guide", title: "조립 가이드 (실제 기판 배치·단계·문제 카드)",
-    description: "설계도의 한 단계를 실제로 따라 만들 수 있게 한다. base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기·위치와 핀 위치, steps는 하나씩 할 동작(어떤 부품을 어디에 놓고 어떤 선을 어디서 어디로 잇는지), 단계마다 확인할 것과 문제 카드(증상 → 확인 방법 → 기대값 → 아니면 할 일, 예: 멀티미터 DC 20V로 5V-GND 측정 4.75~5.25V)를 넣는다. 대시보드에서 단계별 애니메이션으로 재생되고, '3D 작업대'에서는 부품이 트레이에서 기판 위 자리로 날아와 앉고 전선·납땜이 단계별로 연출된다(HW 달그락이 화면 안에서 안내). 그래서 x·y·크기·핀 위치를 실제 값으로 넣는다. 사용자가 카드의 확인 결과나 '실제로 했어요'를 보내면 assemblyReports로 돌아온다.",
+    description: "설계도의 한 단계를 실제로 따라 만들 수 있게 한다. base는 실제 기판·브레드보드 치수(mm), parts는 그 위에 놓이는 실제 부품의 실제 크기·위치와 핀 위치, steps는 하나씩 할 동작(어떤 부품을 어디에 놓고 어떤 선을 어디서 어디로 잇는지), 단계마다 확인할 것과 문제 카드(증상 → 확인 방법 → 기대값 → 아니면 할 일, 예: 멀티미터 DC 20V로 5V-GND 측정 4.75~5.25V)를 넣는다. 대시보드에서 단계별 애니메이션으로 재생되고, '3D 작업대'에서는 부품이 트레이에서 기판 위 자리로 날아와 앉고 전선·납땜이 단계별로 연출된다(EE 달그락이 화면 안에서 안내). 그래서 x·y·크기·핀 위치를 실제 값으로 넣는다. 사용자가 카드의 확인 결과나 '실제로 했어요'를 보내면 assemblyReports로 돌아온다.",
     inputSchema: { type: "object", additionalProperties: false, required: ["projectId", "guide"], properties: { projectId, guide: { type: "object", additionalProperties: false, required: ["stage", "base", "parts", "steps"], properties: {
       stage: { type: "string", description: "설계도의 어느 단계인지" },
       base: { type: "object", additionalProperties: false, required: ["name", "kind", "width", "height"], properties: { name: { type: "string", description: "예: 하프 브레드보드 400홀" }, kind: { type: "string", enum: ["breadboard", "board", "stack", "perfboard"] }, width: { type: "number", description: "실제 가로 mm (하프 브레드보드 약 82)" }, height: { type: "number", description: "실제 세로 mm (하프 브레드보드 약 55)" } } },
@@ -1593,4 +1620,4 @@ export async function callTool(name: string, input: unknown, context: ToolContex
 // lib/tools/ 아래의 도구 묶음이 쓰는 공용 함수를 채운다.
 kit.ownedProject = ownedProject;
 kit.stored = stored;
-TOOLS.push(...revisionTools, ...verifyTools, ...fileTools, ...learnTools);
+TOOLS.push(...revisionTools, ...verifyTools, ...fileTools, ...learnTools, ...finishTools);

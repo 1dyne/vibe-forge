@@ -40,9 +40,10 @@ const ProductFormSchema = z.object({
 const P = z.number().min(0.05).max(500);
 const V3 = z.tuple([N, N, N]);
 const Solid = z.discriminatedUnion("shape", [
-  z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(),
-  z.object({ shape: z.literal("hollowBox"), size: z.tuple([P, P, P]), at: V3, wall: P, floor: P, openings: z.array(z.object({ wall: z.enum(["front", "back", "left", "right"]), offset: N, bottom: z.number().min(0).max(500), width: P, height: P }).strict()).max(8).optional() }).strict(),
-  z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()
+  z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(), radius: z.number().min(0).max(100).optional() }).strict(),
+  z.object({ shape: z.literal("hollowBox"), size: z.tuple([P, P, P]), at: V3, wall: P, floor: P, radius: z.number().min(0).max(100).optional(), openings: z.array(z.object({ wall: z.enum(["front", "back", "left", "right"]), offset: N, bottom: z.number().min(0).max(500), width: P, height: P }).strict()).max(8).optional() }).strict(),
+  z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict(),
+        z.object({ shape: z.literal("standoff"), diameter: P, hole: P, height: P, depth: P.optional(), at: V3 }).strict()
 ]);
 const Rule = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("gap"), title: z.string().min(1).max(80), a: z.string().max(24), b: z.string().max(24), axis: z.enum(["x", "y", "z"]), min: z.number().min(0).max(200), max: z.number().min(0).max(200).optional() }).strict(),
@@ -51,7 +52,7 @@ const Rule = z.discriminatedUnion("kind", [
 ]);
 const MockupSchema = z.object({
   title: z.string().min(1).max(80), summary: z.string().min(1).max(800),
-  parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), solids: z.array(Solid).min(1).max(12), cuts: z.array(z.discriminatedUnion("shape", [z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(), z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()])).max(24).optional() }).strict()).min(1).max(40),
+  parts: z.array(z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,23}$/), name: z.string().min(1).max(40), group: z.enum(["housing", "measured", "keepout"]), basis: z.enum(["measured", "datasheet", "assumed", "design"]), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), note: z.string().max(200).optional(), explode: V3.optional(), catalogId: z.string().max(40).optional(), solids: z.array(Solid).min(1).max(12), cuts: z.array(z.discriminatedUnion("shape", [z.object({ shape: z.literal("box"), size: z.tuple([P, P, P]), at: V3, rotate: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional() }).strict(), z.object({ shape: z.literal("cylinder"), diameter: P, length: P, at: V3, axis: z.enum(["x", "y", "z"]).optional() }).strict()])).max(24).optional() }).strict()).min(1).max(40),
   mates: z.array(z.tuple([z.string().max(24), z.string().max(24)])).max(40).optional(),
   rules: z.array(Rule).max(40).optional()
 }).strict();

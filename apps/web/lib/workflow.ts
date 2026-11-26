@@ -4,11 +4,16 @@ import type { AgentId, LocalProject, MakerProfile, Workflow } from "./project-ty
 // 대신 짧게 보기를 켜면 약어로 바꾼다(익숙한 사람에게는 긴 이름이 자리만 차지한다).
 export const AGENTS: Record<AgentId, { name: string; short: string; title: string; description: string }> = {
   chief: { name: "대장 달그락", short: "대장", title: "프로젝트 총괄", description: "아이디어를 정리하고 팀의 방향과 다음 작업을 조율해요." },
-  hw: { name: "하드웨어 달그락", short: "HW", title: "회로 · 펌웨어", description: "회로와 펌웨어를 만들고, 계측으로 문제를 찾아요." },
+  hw: { name: "전자회로 달그락", short: "EE", title: "하드웨어 · 회로와 펌웨어", description: "회로와 펌웨어(보드 안에서 도는 프로그램)를 만들고, 계측으로 문제를 찾아요." },
   sw: { name: "소프트웨어 달그락", short: "SW", title: "웹 · 앱 · 소프트웨어", description: "필요한 소프트웨어를 만들고 완성된 결과를 검사해요." },
-  me: { name: "기구설계 달그락", short: "ME", title: "기구 설계", description: "부품의 배치와 구조를 설계하고 실측 치수로 조정해요." },
+  me: { name: "기구설계 달그락", short: "ME", title: "하드웨어 · 기구 설계", description: "부품의 배치와 구조를 설계하고 실측 치수로 조정해요." },
   id: { name: "제품 디자인 달그락", short: "ID", title: "산업 디자인", description: "형태와 사용 경험, 착용감과 안전성의 충돌을 살펴봐요." }
 };
+
+// 팀 구분: 대장 아래 소프트웨어(SW) / 하드웨어(HW: 전자회로 EE + 기구설계 ME) / 제품 디자인(ID).
+// 안쪽 id는 예전 그대로다(hw = 전자회로). 기록과 주소가 그 id로 남아 있어 바꾸지 않는다.
+export const AGENT_TEAM: Record<AgentId, "총괄" | "소프트웨어" | "하드웨어" | "제품 디자인"> = { chief: "총괄", sw: "소프트웨어", hw: "하드웨어", me: "하드웨어", id: "제품 디자인" };
+export const TEAM_ORDER: AgentId[] = ["chief", "sw", "hw", "me", "id"];
 
 // 화면에 쓸 이름. 짧게 보기를 켜면 약어만 보여준다.
 export const agentName = (agent: AgentId, short = false) => short ? AGENTS[agent].short : AGENTS[agent].name;

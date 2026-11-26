@@ -3,6 +3,7 @@ import { housingFiles, housingMarkdown } from "./housing";
 import { provisionalReasons, stickerHtml } from "./provisional";
 import { contractHeader, contractMarkdown, contractTs } from "./contract";
 import { workflowFor } from "./workflow";
+import { FINISH_ROUTES } from "./tools/finish-labels";
 import { housingParts, mockupCadQuery, mockupScad } from "./mockup-export";
 
 export type WorkbenchItem = {
@@ -11,7 +12,7 @@ export type WorkbenchItem = {
   /** 탭에 보일 짧은 이름. 파일명은 내려받을 때 프로젝트를 알아볼 수 있게 길지만,
       화면의 탭 줄에서는 프로젝트 이름이 탭마다 되풀이돼 정작 무슨 파일인지가 잘린다. */
   label: string;
-  kind: "mockup" | "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
+  kind: "mockup" | "finish" | "product" | "assembly" | "housing" | "power" | "tests" | "safety" | "contract" | "plan" | "circuit" | "cad" | "firmware" | "file" | "bom" | "tasks" | "record";
   mimeType: string;
   content: string;
   /** 내려받을 때 서버가 만들어 내는 파일(출력용 STL). content에는 바뀜을 알아보는 원본만 든다 */
@@ -61,6 +62,11 @@ export function workbenchItems(project: LocalProject | null, opts: { files?: boo
     const spec = project.preciseMockup;
     for (const part of housingParts(spec)) items.push({ id: `mockup:${part.id}:stl`, filename: `${stem}-${part.name}-출력용.stl`, kind: "file", mimeType: "model/stl", content: JSON.stringify({ solids: part.solids, cuts: part.cuts ?? [] }), generate: { kind: "mockup-stl", partId: part.id } });
     items.push({ id: "mockup:scad", filename: `${stem}-하우징.scad`, kind: "file", mimeType: "text/plain; charset=utf-8", content: mockupScad(spec) }, { id: "mockup:cadquery", filename: `${stem}-하우징-cadquery.py`, kind: "file", mimeType: "text/plain; charset=utf-8", content: mockupCadQuery(spec) });
+  }
+  if (project.designFinish) {
+    const f = project.designFinish;
+    const routes = f.routes.map((r, i) => [`### ${i + 1}. ${FINISH_ROUTES[r.route]}${i === 0 ? " (추천)" : ""}${f.chosen === r.route ? " ← 고른 길" : ""}`, r.why, ...(r.tool ? [`- 도구: ${r.tool}`] : []), ...(r.costKRW != null ? [`- 비용: 약 ${r.costKRW.toLocaleString("ko-KR")}원`] : []), ...(r.time ? [`- 시간: ${r.time}`] : []), "", ...r.steps.map((step, k) => `${k + 1}. ${step}`)].join("\n")).join("\n\n");
+    items.push({ id: "document:finish", filename: `${stem}-디자인마무리.md`, kind: "finish", mimeType: "text/markdown; charset=utf-8", content: `# ${project.name} · 디자인 마무리\n\n## 초안\n${f.draft}\n\n## 사람 손이 필요한 곳\n${f.limits.map((l) => `- **${l.what}**: ${l.why}`).join("\n")}\n\n## 마무리할 길\n${routes}${f.brief ? `\n\n## 의뢰서\n${f.brief}` : ""}\n` });
   }
   if (project.productForm) items.push({ id: "document:product", filename: `${stem}-완성품.json`, kind: "product", mimeType: "application/json; charset=utf-8", content: JSON.stringify(project.productForm, null, 2) });
   if (project.assembly) {

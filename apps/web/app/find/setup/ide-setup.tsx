@@ -82,7 +82,7 @@ export default function IdeSetup({ initialBoard, back }: { initialBoard: string 
 
       {screen === "done" && <>
         <h1>준비 끝 🔥</h1>
-        <p className="lead">이제 달그락이 만든 코드를 받으면 붙여 넣고 업로드만 하면 돼요. 막히면 HW 달그락에게 화면 사진을 보내 주세요.</p>
+        <p className="lead">이제 달그락이 만든 코드를 받으면 붙여 넣고 업로드만 하면 돼요. 막히면 EE 달그락에게 화면 사진을 보내 주세요.</p>
         <a className="btn" href={back} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>돌아가기</a>
       </>}
 

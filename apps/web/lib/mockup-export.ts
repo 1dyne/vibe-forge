@@ -22,6 +22,7 @@ export function printNotes(spec: MockupSpec): string[] {
     for (const s of part.solids) {
       if (s.shape === "hollowBox" && (s.wall < 1.2 || s.floor < 0.8)) notes.push(`${part.name}: 벽 ${n(s.wall)}mm · 바닥 ${n(s.floor)}mm는 얇아요. 벽 1.6mm, 바닥 1.2mm 이상을 권해요.`);
       if (s.shape === "box" && Math.min(...s.size) < 0.8) notes.push(`${part.name}: 가장 얇은 곳이 ${n(Math.min(...s.size))}mm예요. 0.8mm보다 얇으면 잘 안 뽑혀요.`);
+      if (s.shape === "standoff" && (s.diameter - s.hole) / 2 < 1.2) notes.push(`${part.name}: 나사 기둥의 살이 ${n((s.diameter - s.hole) / 2)}mm예요. 1.2mm 이상이어야 나사를 조일 때 터지지 않아요.`);
       if (s.shape === "cylinder" && s.diameter < 2) notes.push(`${part.name}: 지름 ${n(s.diameter)}mm 기둥은 부러지기 쉬워요.`);
     }
     for (const c of part.cuts ?? []) if (c.shape === "cylinder" && c.diameter < 1.5) notes.push(`${part.name}: 지름 ${n(c.diameter)}mm 구멍은 출력하면 막힐 수 있어요. 2mm 이상을 권해요.`);
@@ -35,7 +36,11 @@ export function printNotes(spec: MockupSpec): string[] {
 function scadSolid(s: MockupSolid): string {
   if (s.shape === "box") {
     const [x, y, z] = s.size; const [sx, sy] = s.rotate === 90 || s.rotate === 270 ? [y, x] : [x, y];
-    return `translate([${n(s.at[0] - sx / 2)}, ${n(s.at[1] - sy / 2)}, ${n(s.at[2])}]) cube([${n(sx)}, ${n(sy)}, ${n(z)}]);`;
+    return `rbox(${n(sx)}, ${n(sy)}, ${n(z)}, ${n(s.at[0])}, ${n(s.at[1])}, ${n(s.at[2])}, ${n(s.radius ?? 0)});`;
+  }
+  if (s.shape === "standoff") {
+    const depth = Math.min(s.depth ?? s.height, s.height);
+    return `difference() { translate([${s.at.map(n).join(", ")}]) cylinder(d=${n(s.diameter)}, h=${n(s.height)}); translate([${n(s.at[0])}, ${n(s.at[1])}, ${n(s.at[2] + s.height - depth)}]) cylinder(d=${n(s.hole)}, h=${n(depth + 0.2)}); }`;
   }
   if (s.shape === "cylinder") {
     const turn = s.axis === "x" ? "rotate([0, 90, 0]) " : s.axis === "y" ? "rotate([90, 0, 0]) " : "";
@@ -43,7 +48,7 @@ function scadSolid(s: MockupSolid): string {
   }
   const [x, y, z] = s.size; const [cx, cy, z0] = s.at;
   const holes = openingBoxes(s).map((o) => `    ${scadSolid({ shape: "box", ...o })}`).join("\n");
-  return `difference() {\n    translate([${n(cx - x / 2)}, ${n(cy - y / 2)}, ${n(z0)}]) cube([${n(x)}, ${n(y)}, ${n(z)}]);\n    translate([${n(cx - x / 2 + s.wall)}, ${n(cy - y / 2 + s.wall)}, ${n(z0 + s.floor)}]) cube([${n(x - 2 * s.wall)}, ${n(y - 2 * s.wall)}, ${n(z)}]);\n${holes}${holes ? "\n" : ""}  }`;
+  return `difference() {\n    rbox(${n(x)}, ${n(y)}, ${n(z)}, ${n(cx)}, ${n(cy)}, ${n(z0)}, ${n(s.radius ?? 0)});\n    rbox(${n(x - 2 * s.wall)}, ${n(y - 2 * s.wall)}, ${n(z)}, ${n(cx)}, ${n(cy)}, ${n(z0 + s.floor)}, ${n(Math.max(0, (s.radius ?? 0) - s.wall))});\n${holes}${holes ? "\n" : ""}  }`;
 }
 
 const ident = (id: string) => id.replace(/[^a-z0-9]/g, "_");
@@ -57,6 +62,12 @@ export function mockupScad(spec: MockupSpec): string {
 show = "all";
 $fn = 64;
 
+// 바닥 중심이 (cx, cy, z0)인 상자. r > 0이면 세로 모서리가 둥글다.
+module rbox(sx, sy, sz, cx, cy, z0, r) {
+  if (r > 0.05) hull() for (a = [-1, 1], b = [-1, 1]) translate([cx + a * (sx / 2 - r), cy + b * (sy / 2 - r), z0]) cylinder(r=r, h=sz);
+  else translate([cx - sx / 2, cy - sy / 2, z0]) cube([sx, sy, sz]);
+}
+
 ${modules}
 
 ${parts.map((p) => `if (show == "all" || show == "${p.id}") part_${ident(p.id)}();`).join("\n")}
@@ -68,11 +79,15 @@ ${parts.map((p) => `if (show == "all" || show == "${p.id}") part_${ident(p.id)}(
 function cqSolid(s: MockupSolid): string {
   if (s.shape === "box") {
     const [x, y, z] = s.size; const [sx, sy] = s.rotate === 90 || s.rotate === 270 ? [y, x] : [x, y];
-    return `box(${n(sx)}, ${n(sy)}, ${n(z)}, ${n(s.at[0])}, ${n(s.at[1])}, ${n(s.at[2])})`;
+    return `box(${n(sx)}, ${n(sy)}, ${n(z)}, ${n(s.at[0])}, ${n(s.at[1])}, ${n(s.at[2])}, ${n(s.radius ?? 0)})`;
+  }
+  if (s.shape === "standoff") {
+    const depth = Math.min(s.depth ?? s.height, s.height);
+    return `cyl(${n(s.diameter)}, ${n(s.height)}, ${s.at.map(n).join(", ")}).cut(cyl(${n(s.hole)}, ${n(depth + 0.2)}, ${n(s.at[0])}, ${n(s.at[1])}, ${n(s.at[2] + s.height - depth)}))`;
   }
   if (s.shape === "cylinder") return `cyl(${n(s.diameter)}, ${n(s.length)}, ${s.at.map(n).join(", ")}, "${s.axis ?? "z"}")`;
   const [x, y, z] = s.size; const [cx, cy, z0] = s.at;
-  const shell = `box(${n(x)}, ${n(y)}, ${n(z)}, ${n(cx)}, ${n(cy)}, ${n(z0)}).cut(box(${n(x - 2 * s.wall)}, ${n(y - 2 * s.wall)}, ${n(z)}, ${n(cx)}, ${n(cy)}, ${n(z0 + s.floor)}))`;
+  const shell = `box(${n(x)}, ${n(y)}, ${n(z)}, ${n(cx)}, ${n(cy)}, ${n(z0)}, ${n(s.radius ?? 0)}).cut(box(${n(x - 2 * s.wall)}, ${n(y - 2 * s.wall)}, ${n(z)}, ${n(cx)}, ${n(cy)}, ${n(z0 + s.floor)}, ${n(Math.max(0, (s.radius ?? 0) - s.wall))}))`;
   return shell + openingBoxes(s).map((o) => `.cut(${cqSolid({ shape: "box", ...o })})`).join("");
 }
 
@@ -88,9 +103,12 @@ export function mockupCadQuery(spec: MockupSpec): string {
 import cadquery as cq
 
 
-def box(sx, sy, sz, cx, cy, z0):
-    """바닥 중심이 (cx, cy, z0)인 상자"""
-    return cq.Workplane("XY").box(sx, sy, sz, centered=(True, True, False)).translate((cx, cy, z0))
+def box(sx, sy, sz, cx, cy, z0, r=0):
+    """바닥 중심이 (cx, cy, z0)인 상자. r > 0이면 세로 모서리가 둥글다"""
+    solid = cq.Workplane("XY").box(sx, sy, sz, centered=(True, True, False))
+    if r > 0.05:
+        solid = solid.edges("|Z").fillet(min(r, sx / 2 - 0.01, sy / 2 - 0.01))
+    return solid.translate((cx, cy, z0))
 
 
 def cyl(d, length, x, y, z, axis="z"):

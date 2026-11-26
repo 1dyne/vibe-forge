@@ -96,6 +96,8 @@ export type LocalProject = {
   board?: import("./board").Board;
   // 정밀 목업: 하우징 부위와 실측 부품을 실제 치수로 놓고 서버가 겹침·틈을 잰다. mockup.ts
   preciseMockup?: import("./mockup").MockupSpec;
+  /** ID 초안과 사람이 마무리할 길 */
+  designFinish?: import("./tools/finish-labels").DesignFinish;
   // 제작 후 수정: 승인된 설계에 대한 수정안과 그 영향. revision.ts
   revision?: import("./revision").RevisionState;
   // 회로 검증 사다리의 진행과 사람이 준 값. verify-ladder.ts

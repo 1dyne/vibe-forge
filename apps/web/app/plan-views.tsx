@@ -46,7 +46,7 @@ export function TestView({ project, onAction, busy }: { project: LocalProject; o
       <div className="evidence-input"><textarea aria-label={`${c.title} 결과`} placeholder="시리얼 모니터에 찍힌 줄이나 본 것을 붙여 넣어 주세요" value={text[c.id] ?? ""} onChange={(e) => setText({ ...text, [c.id]: e.target.value })} />
         <div className="row-btns">{(["pass", "fail", "unknown"] as const).map((st) => <button key={st} disabled={busy || !(text[c.id] ?? "").trim()} onClick={() => { onAction({ action: "test_result", caseId: c.id, status: st, evidence: text[c.id] }); setText({ ...text, [c.id]: "" }); }}>{{ pass: "기대대로 돼요", fail: "달라요", unknown: "모르겠어요" }[st]}</button>)}</div></div>
     </article>)}
-    <p className="muted">결과를 보내도 자동으로 통과 처리되지 않아요. HW 달그락이 로그를 보고 함께 판단해요.</p>
+    <p className="muted">결과를 보내도 자동으로 통과 처리되지 않아요. EE 달그락이 로그를 보고 함께 판단해요.</p>
   </div>;
 }
 

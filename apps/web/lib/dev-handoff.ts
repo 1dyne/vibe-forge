@@ -62,7 +62,7 @@ function hardwareSection(project: LocalProject): string {
 |---|---|---|
 ${pins || "| - | - | - |"}
 
-핀 배치와 전압은 HW 달그락과 사람이 정한 값이에요. 바꿔야 하면 코드에서 먼저 고치지 말고 달그락 대장간에 변경 제안으로 남겨요.`;
+핀 배치와 전압은 EE 달그락과 사람이 정한 값이에요. 바꿔야 하면 코드에서 먼저 고치지 말고 달그락 대장간에 변경 제안으로 남겨요.`;
 }
 
 export function buildDevHandoff(project: LocalProject, spec: DevSpecInput): Array<{ filename: string; content: string }> {
@@ -122,7 +122,7 @@ ${spec.learningSteps.map((s, i) => `${i + 1}. **${s.step}**\n   ${s.explain}`).j
 
 ## 달그락 대장간 연결 (커넥터가 연결된 경우)
 - 시작할 때 \`get_project\`를 프로젝트 ID \`${project.id}\`로 호출해 최신 회로와 결정 사항을 확인해요.
-- 의미 있는 진행이 있을 때마다 \`log_dev_progress\`로 한 일·다음 할 일·막힌 점을 남겨요. HW 달그락과 대시보드가 이 기록을 봐요.
+- 의미 있는 진행이 있을 때마다 \`log_dev_progress\`로 한 일·다음 할 일·막힌 점을 남겨요. EE 달그락과 대시보드가 이 기록을 봐요.
 `;
   return [
     { filename: "SPEC.md", content: specDoc },

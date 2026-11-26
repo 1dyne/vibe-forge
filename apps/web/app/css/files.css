@@ -34,3 +34,10 @@
 .print-files ul a{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:9px;background:#2e6b5c;color:#fff;font-size:13px;font-weight:600;text-decoration:none}
 .print-files ul.print-notes{display:block;list-style:disc;padding-left:18px;font-size:12.5px;color:#5a4a1e}
 .print-files .print-warn{margin:6px 0;padding:8px 10px;border-radius:8px;background:#fdecea;color:#a2331f;font-size:13px}
+.finish-view h4{margin:16px 0 6px;font-size:14px}
+.finish-limits{list-style:none;padding:0;margin:0;display:grid;gap:6px}.finish-limits li{padding:9px 12px;border-radius:9px;background:#fbf4e6;display:grid;gap:2px;font-size:13px}.finish-limits span{color:#5a4a1e}
+.finish-routes{display:grid;gap:10px}.finish-routes article{border:1px solid #d7e2dc;border-radius:12px;padding:12px 14px;background:#fff}.finish-routes article.chosen{border-color:#3f7a6c;background:#eef6f2}
+.finish-routes header{display:flex;gap:8px;align-items:center}.finish-routes p{margin:6px 0;font-size:13px}.finish-routes ol{margin:6px 0 10px;padding-left:20px;font-size:13px}
+.finish-routes button{min-height:36px;padding:0 14px;border-radius:9px;border:0;background:#2e6b5c;color:#fff;font-weight:600;cursor:pointer}.finish-routes button:disabled{background:#b9cbc4;cursor:default}
+.finish-brief{white-space:pre-wrap;font:13px/1.7 inherit;background:#f6f8f7;padding:12px;border-radius:9px}
+.room-team{display:block;margin:6px 0 2px 10px;font-size:11px;color:#7b8a84}

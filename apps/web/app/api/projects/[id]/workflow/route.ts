@@ -27,6 +27,7 @@ const Input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("dev_profile"), devProfile: z.object({ codingExperience: z.enum(["unanswered", "none", "guided", "independent"]), tool: z.enum(["undecided", "claude_code", "codex"]), os: z.enum(["unanswered", "mac", "windows", "linux"]), installed: z.array(z.string().max(40)).max(12), confirmed: z.boolean() }).strict() }),
   z.object({ action: z.literal("assembly_report"), step: z.number().int().min(1).max(20), cardId: z.string().regex(/^(s\d+-c\d+|lib:[a-z0-9-]+)$/).optional(), text: z.string().trim().min(1).max(1000), value: z.number().finite().nullable().optional(), yes: z.boolean().nullable().optional() }),
   z.object({ action: z.literal("detail_request"), step: z.number().int().min(1).max(20), level: z.enum(["beginner", "micro"]) }),
+  z.object({ action: z.literal("choose_finish"), route: z.enum(["own_tool", "easy_tool", "learn", "outsource", "hand_finish", "makerspace", "simplify"]) }),
   z.object({ action: z.literal("reset_stage"), stage: z.enum(["product_form", "plan"]) }),
   z.object({ action: z.literal("safety_ack"), itemId: z.string().max(32) }),
   z.object({ action: z.literal("test_result"), caseId: z.string().max(32), status: z.enum(["pass", "fail", "unknown"]), evidence: z.string().trim().min(1).max(2000) }),
@@ -81,6 +82,10 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
         p.assemblyRequests = [...(p.assemblyRequests ?? []).filter((r) => r.step !== input.step || r.doneAt), { step: input.step, level: input.level, requestedAt: now, doneAt: null }];
         p.messages.push({ id: randomUUID(), role: "user", channel: "main", text: `${input.step}단계를 ${input.level === "micro" ? "한 동작 단위로" : "초보자용으로"} 더 잘게 나눠주세요.`, createdAt: now, shared: true });
         pushActivity(p, { source: "person", title: `${input.step}단계 더 잘게 보기 요청` });
+      } else if (input.action === "choose_finish") {
+        if (!p.designFinish?.routes.some((r) => r.route === input.route)) throw new Error("고를 수 있는 길이 아니에요.");
+        p.designFinish.chosen = input.route;
+        pushActivity(p, { source: "person", title: "디자인 마무리할 길을 골랐어요" });
       } else if (input.action === "reset_stage") {
         resetStage(p, input.stage);
       } else if (input.action === "safety_ack") {

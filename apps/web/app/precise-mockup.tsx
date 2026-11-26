@@ -43,6 +43,7 @@ function pieces(solid: MockupSolid): Piece[] {
     // 검사와 똑같은 조각(바닥 + 벽, 구멍이 있으면 구멍 둘레 조각)을 그린다. 보이는 것과 재는 것이 같아야 한다.
     return expand(solid).map((p) => ({ kind: "box" as const, size: [p.max[0] - p.min[0], p.max[1] - p.min[1], p.max[2] - p.min[2]] as [number, number, number], center: [(p.min[0] + p.max[0]) / 2, (p.min[1] + p.max[1]) / 2, (p.min[2] + p.max[2]) / 2] as [number, number, number] }));
   }
+  if (solid.shape === "standoff") return [{ kind: "cyl", d: solid.diameter, len: solid.height, axis: "z", center: [solid.at[0], solid.at[1], solid.at[2] + solid.height / 2] }];
   const axis = solid.axis ?? "z";
   const [cx, cy, cz] = solid.at;
   return [{ kind: "cyl", d: solid.diameter, len: solid.length, axis, center: axis === "z" ? [cx, cy, cz + solid.length / 2] : [cx, cy, cz] }];

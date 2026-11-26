@@ -7,7 +7,7 @@ import { workbenchDownloadUrl } from "../lib/workbench";
 // 데이터 약속 (펌웨어 ↔ 앱): 설계물 대조 + 실제 줄 검사기
 type Act = (input: Record<string, unknown>) => void;
 const ICON = { ok: "✅", warn: "⚠️", fail: "❌", unknown: "❔" } as const;
-const SIDE = { firmware: "펌웨어 (HW 달그락)", sw: "앱 (SW 달그락)", tests: "테스트 계획" } as const;
+const SIDE = { firmware: "펌웨어 (EE 달그락)", sw: "앱 (SW 달그락)", tests: "테스트 계획" } as const;
 
 type SerialPortLike = { open: (o: { baudRate: number }) => Promise<void>; close: () => Promise<void>; readable: ReadableStream<Uint8Array> | null };
 

@@ -19,10 +19,21 @@ async function load(): Promise<Kernel> {
 const SEGMENTS = 64;
 
 function solidOf(M: any, s: MockupSolid): any { // eslint-disable-line @typescript-eslint/no-explicit-any
-  const cube = (sx: number, sy: number, sz: number, cx: number, cy: number, z0: number) => M.cube([sx, sy, sz]).translate([cx - sx / 2, cy - sy / 2, z0]);
+  const plain = (sx: number, sy: number, sz: number, cx: number, cy: number, z0: number) => M.cube([sx, sy, sz]).translate([cx - sx / 2, cy - sy / 2, z0]);
+  // 세로 모서리가 둥근 상자: 네 귀퉁이의 원기둥을 감싼 모양.
+  const cube = (sx: number, sy: number, sz: number, cx: number, cy: number, z0: number, radius = 0) => {
+    const r = Math.min(radius, sx / 2 - 0.01, sy / 2 - 0.01);
+    if (!(r > 0.05)) return plain(sx, sy, sz, cx, cy, z0);
+    const corners = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => M.cylinder(sz, r, r, SEGMENTS).translate([cx + a * (sx / 2 - r), cy + b * (sy / 2 - r), z0]));
+    return M.hull(corners);
+  };
   if (s.shape === "box") {
     const [x, y, z] = s.size; const [sx, sy] = s.rotate === 90 || s.rotate === 270 ? [y, x] : [x, y];
-    return cube(sx, sy, z, s.at[0], s.at[1], s.at[2]);
+    return cube(sx, sy, z, s.at[0], s.at[1], s.at[2], s.radius);
+  }
+  if (s.shape === "standoff") {
+    const depth = Math.min(s.depth ?? s.height, s.height);
+    return M.cylinder(s.height, s.diameter / 2, s.diameter / 2, SEGMENTS).translate(s.at).subtract(M.cylinder(depth + 0.2, s.hole / 2, s.hole / 2, SEGMENTS).translate([s.at[0], s.at[1], s.at[2] + s.height - depth]));
   }
   if (s.shape === "cylinder") {
     const r = s.diameter / 2; const axis = s.axis ?? "z";
@@ -32,8 +43,8 @@ function solidOf(M: any, s: MockupSolid): any { // eslint-disable-line @typescri
   }
   const [x, y, z] = s.size; const [cx, cy, z0] = s.at;
   // 안쪽을 위로 넉넉히 파내 윗면이 깔끔하게 열리게 한다.
-  let shell = cube(x, y, z, cx, cy, z0).subtract(cube(x - 2 * s.wall, y - 2 * s.wall, z, cx, cy, z0 + s.floor));
-  for (const o of openingBoxes(s)) shell = shell.subtract(cube(o.size[0], o.size[1], o.size[2], o.at[0], o.at[1], o.at[2]));
+  let shell = cube(x, y, z, cx, cy, z0, s.radius).subtract(cube(x - 2 * s.wall, y - 2 * s.wall, z, cx, cy, z0 + s.floor, Math.max(0, (s.radius ?? 0) - s.wall)));
+  for (const o of openingBoxes(s)) shell = shell.subtract(plain(o.size[0], o.size[1], o.size[2], o.at[0], o.at[1], o.at[2]));
   return shell;
 }
 

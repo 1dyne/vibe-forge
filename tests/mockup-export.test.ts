@@ -44,3 +44,26 @@ describe("printable files from the precise mockup", () => {
     expect(printNotes(spec).join(" ")).toContain("보드");
   });
 });
+
+describe("rounded corners, screw posts and the parts library", () => {
+  it("rounds vertical edges and drills the post", async () => {
+    const { partStl: stl } = await import("../apps/web/lib/mockup-stl");
+    const round = await stl({ id: "b", name: "몸통", group: "housing", basis: "design", solids: [{ shape: "box", size: [40, 30, 10], at: [0, 0, 0], radius: 5 }] });
+    const expected = (40 * 30 - (4 - Math.PI) * 25) * 10;
+    expect(Math.abs(round.volumeMm3 - expected) / expected).toBeLessThan(0.005);
+    const post = await stl({ id: "p", name: "기둥", group: "housing", basis: "design", solids: [{ shape: "standoff", diameter: 6, hole: 2.5, height: 8, depth: 6, at: [0, 0, 0] }] });
+    const want = Math.PI * 9 * 8 - Math.PI * 1.25 * 1.25 * 6;
+    expect(Math.abs(post.volumeMm3 - want) / want).toBeLessThan(0.01);
+  });
+
+  it("flags a part whose size disagrees with its part card", async () => {
+    const { catalogMismatches } = await import("../apps/web/lib/mcp-tools");
+    const { PART_CARDS } = await import("../apps/web/lib/parts/catalog");
+    const card = PART_CARDS.find((c) => c.dimensionsMm)!;
+    const [w, d] = card.dimensionsMm!;
+    const part = (sx: number, sy: number) => ({ title: "t", summary: "s", parts: [{ id: "x", name: "부품", group: "measured" as const, basis: "datasheet" as const, catalogId: card.id, solids: [{ shape: "box" as const, size: [sx, sy, 2] as [number, number, number], at: [0, 0, 0] as [number, number, number] }] }] });
+    expect(catalogMismatches(part(w, d))).toEqual([]);
+    expect(catalogMismatches(part(d, w))).toEqual([]);
+    expect(catalogMismatches(part(w + 5, d))[0]).toContain(card.model);
+  });
+});

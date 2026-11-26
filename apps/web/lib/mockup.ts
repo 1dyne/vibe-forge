@@ -10,13 +10,16 @@
 // 도형의 at은 "바닥 중심"이다(상자·원기둥 모두). 원기둥을 눕히면 at은 그 중심이다.
 
 export type MockupSolid =
-  | { shape: "box"; size: [number, number, number]; at: [number, number, number]; rotate?: 0 | 90 | 180 | 270 }
+  /** radius: 세로 모서리를 둥글게(mm). 검사는 감싸는 상자로 하고, 출력 파일에서 실제로 둥글어진다 */
+  | { shape: "box"; size: [number, number, number]; at: [number, number, number]; rotate?: 0 | 90 | 180 | 270; radius?: number }
   /** 속이 빈 상자: 바깥 크기, 벽 두께, 바닥 두께. 위는 열려 있다. 바닥과 벽 넷으로 풀어 검사한다 */
-  | { shape: "hollowBox"; size: [number, number, number]; at: [number, number, number]; wall: number; floor: number;
+  | { shape: "hollowBox"; size: [number, number, number]; at: [number, number, number]; wall: number; floor: number; radius?: number;
       /** 벽에 뚫는 구멍(USB 단자 자리, 전선 구멍). offset은 벽 가운데에서 옆으로 떨어진 거리, bottom은 상자 바닥에서 구멍 아랫변까지 */
       openings?: Array<{ wall: "front" | "back" | "left" | "right"; offset: number; bottom: number; width: number; height: number }> }
   /** axis=z면 서 있는 원기둥(at=바닥 중심). x·y면 누운 원기둥(at=중심) */
-  | { shape: "cylinder"; diameter: number; length: number; at: [number, number, number]; axis?: "x" | "y" | "z" };
+  | { shape: "cylinder"; diameter: number; length: number; at: [number, number, number]; axis?: "x" | "y" | "z" }
+  /** 나사 기둥: 서 있는 원기둥 가운데에 나사 구멍(위에서 depth만큼, 없으면 끝까지)이 뚫린다. at=바닥 중심 */
+  | { shape: "standoff"; diameter: number; hole: number; height: number; depth?: number; at: [number, number, number] };
 
 export type MockupPart = {
   id: string;
@@ -27,6 +30,8 @@ export type MockupPart = {
   /** 치수의 근거 */
   basis: "measured" | "datasheet" | "assumed" | "design";
   solids: MockupSolid[];
+  /** 부품 도서관(부품 카드)의 id. 있으면 치수를 도서관 값과 견줘 다르면 알린다 */
+  catalogId?: string;
   /** 이 부위에서 파내는 자리(나사 구멍, 창, 전선 길). 하우징에만 쓴다. 출력 파일에서 실제로 뚫린다 */
   cuts?: Array<Extract<MockupSolid, { shape: "box" | "cylinder" }>>;
   /** 분해해서 볼 때 움직일 방향과 거리(mm) */
@@ -102,6 +107,7 @@ export function expand(solid: MockupSolid): Prim[] {
     }
     return out;
   }
+  if (solid.shape === "standoff") { const r0 = solid.diameter / 2; const [x0, y0, z0] = solid.at; return [{ type: "cyl", cx: x0, cy: y0, r: r0, z0, z1: z0 + solid.height, min: [x0 - r0, y0 - r0, z0], max: [x0 + r0, y0 + r0, z0 + solid.height] }]; }
   const r = solid.diameter / 2; const [cx, cy, cz] = solid.at; const axis = solid.axis ?? "z";
   if (axis === "z") return [{ type: "cyl", cx, cy, r, z0: cz, z1: cz + solid.length, min: [cx - r, cy - r, cz], max: [cx + r, cy + r, cz + solid.length] }];
   const l = solid.length;
