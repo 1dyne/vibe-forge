@@ -1,0 +1,53 @@
+/* 소개 페이지(달그락 대장간 소개, 달그락 마을 소개). 대장간과 같은 먹선 말투로, 내려가며 읽는다. */
+.intro{--ink:#232323;background:#f6f1e7;color:var(--ink);min-height:100dvh;font-size:16px;line-height:1.75;overflow-x:hidden}
+.intro h1,.intro h2,.intro h3,.intro .tag,.intro .btn-main,.intro .who b{font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400}
+.intro section{max-width:980px;margin:0 auto;padding:72px 22px}
+.intro .hero{min-height:88dvh;display:grid;align-content:center;justify-items:center;text-align:center;gap:18px;padding-top:56px}
+.intro .hero h1{font-size:clamp(32px,6.4vw,58px);line-height:1.25;margin:0}.intro .hero p{font-size:clamp(16px,2.4vw,20px);max-width:640px;margin:0;color:#4d4840}
+.intro .seed{display:inline-flex;align-items:center;gap:10px;padding:8px 16px;border:2px solid var(--ink);border-radius:999px;background:#fff;font-size:14px;max-width:100%}
+.intro .seed i{width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);flex:none}.intro .seed span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.intro .scroll-hint{margin-top:26px;font-size:13px;color:#7b756a;animation:intro-bob 1.8s ease-in-out infinite}
+@keyframes intro-bob{50%{transform:translateY(6px)}}
+.intro h2{font-size:clamp(26px,4.6vw,40px);line-height:1.3;margin:0 0 14px}.intro .lead{font-size:18px;color:#4d4840;max-width:680px;margin:0 0 26px}
+.intro .tag{display:inline-block;padding:3px 12px;border:2px solid var(--ink);border-radius:999px;background:#fff;font-size:13px;margin-bottom:14px}
+/* 내려오면 나타나기 */
+.intro .rv{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0ms)}
+.intro .rv.left{transform:translateX(-30px)}.intro .rv.right{transform:translateX(30px)}.intro .rv.pop{transform:scale(.92)}
+.intro .rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.intro .rv{opacity:1;transform:none;transition:none}.intro .scroll-hint{animation:none}}
+/* 화면 캡처 */
+.intro .shot{border:2px solid var(--ink);border-radius:18px;overflow:hidden;box-shadow:6px 6px 0 var(--ink);background:#fff;margin:0}
+.intro .shot img{display:block;width:100%;height:auto}.intro .shot figcaption{padding:10px 14px;border-top:2px solid var(--ink);font-size:13.5px;background:#fffdf8}
+.intro .split{display:grid;grid-template-columns:1fr 1.25fr;gap:34px;align-items:center}.intro .split.flip{grid-template-columns:1.25fr 1fr}.intro .split.flip .text{order:2}
+/* 세 걸음 */
+.intro .three{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.intro .three article{border:2px solid var(--ink);border-radius:18px;padding:18px;background:#fff}
+.intro .three b{display:block;font-size:17px;margin:6px 0 4px}.intro .three span{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;border:2px solid var(--ink);background:#9DD2C8;font-weight:700}
+/* 달그락들이 정하는 것 */
+.intro .crew{display:grid;gap:14px}
+.intro .who{display:grid;grid-template-columns:92px 1fr;gap:16px;align-items:center;border:2px solid var(--ink);border-radius:18px;padding:14px 18px;background:#fff}
+.intro .who img{width:92px;height:92px;object-fit:contain}.intro .who b{font-size:19px;padding:1px 10px;border-radius:999px;border:2px solid var(--ink)}
+.intro .who ul{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}.intro .who li{padding:3px 10px;border-radius:999px;background:#f1ebde;font-size:13.5px}
+.intro .who.sub{margin-left:44px}.intro .who.me{background:#fdeee3}
+.intro .count{font-size:clamp(20px,3.4vw,28px);margin:26px 0 0;text-align:center}.intro .count b{background:#EDB69A;padding:0 8px;border-radius:8px;border:2px solid var(--ink)}
+/* 견주기 */
+.intro .versus{display:grid;gap:12px}.intro .versus>div{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--ink);border-radius:16px;overflow:hidden}
+.intro .versus p{margin:0;padding:14px 16px;font-size:15px}.intro .versus p:first-child{background:#ece6d8;color:#5d574c}.intro .versus p:last-child{background:#e3f2ee;border-left:2px solid var(--ink)}
+.intro .versus small{display:block;font-size:12px;color:#7b756a;margin-bottom:2px}
+/* 만든 사람, 조건, 가입 */
+.intro .maker-note{border:2px solid var(--ink);border-radius:20px;padding:24px;background:#fff;font-size:18px;box-shadow:6px 6px 0 var(--ink)}
+.intro .needs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.intro .needs div{border:2px dashed var(--ink);border-radius:16px;padding:16px;font-size:15px}.intro .needs b{display:block;margin-bottom:4px}
+.intro .cta{text-align:center;padding-bottom:110px}
+.intro .btn-main{display:inline-flex;align-items:center;justify-content:center;min-height:58px;padding:0 34px;border:2px solid var(--ink);border-radius:16px;background:#9DD2C8;color:var(--ink);font-size:21px;text-decoration:none;box-shadow:5px 5px 0 var(--ink);cursor:pointer;transition:transform .08s,box-shadow .08s}
+.intro .btn-main:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink)}.intro .btn-sub{display:inline-block;margin-top:14px;color:#4d4840;font-size:14px}
+.intro .sticky-cta{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;gap:12px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(246,241,231,.94);border-top:2px solid var(--ink);backdrop-filter:blur(6px);transform:translateY(110%);transition:transform .35s ease}
+.intro .sticky-cta.show{transform:none}.intro .sticky-cta .btn-main{min-height:46px;font-size:17px;padding:0 22px;box-shadow:3px 3px 0 var(--ink)}.intro .sticky-cta span{font-size:13px;color:#4d4840}
+/* 마을 소개 */
+.intro .town-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.intro .town-grid article{border:2px solid var(--ink);border-radius:18px;padding:18px;background:#fff}
+.intro .town-grid b{display:block;font-size:18px;margin-bottom:4px}.intro .town-grid i{display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid var(--ink);margin-right:8px;vertical-align:-1px}
+.intro .install{border:2px solid var(--ink);border-radius:18px;padding:20px;background:#fff}.intro .install ol{margin:10px 0 0;padding-left:22px;display:grid;gap:6px}
+.intro .install kbd{border:1.5px solid var(--ink);border-radius:6px;padding:0 6px;background:#f6f1e7;font:inherit;font-size:13px}
+.intro .os-tabs{display:flex;gap:8px;margin-bottom:6px}.intro .os-tabs button{flex:1;min-height:40px;border:2px solid var(--ink);border-radius:12px;background:#fff;font-weight:600;cursor:pointer}.intro .os-tabs .on{background:#9DD2C8}
+@media(max-width:760px){.intro section{padding:52px 18px}.intro .split,.intro .split.flip{grid-template-columns:1fr}.intro .split.flip .text{order:0}.intro .three{grid-template-columns:1fr}.intro .who{grid-template-columns:64px 1fr;padding:12px}.intro .who img{width:64px;height:64px}.intro .who.sub{margin-left:18px}.intro .versus>div{grid-template-columns:1fr}.intro .versus p:last-child{border-left:0;border-top:2px solid var(--ink)}.intro .needs,.intro .town-grid{grid-template-columns:1fr}.intro .sticky-cta span{display:none}}
+/* 좁은 화면에서 넘치지 않게 */
+.intro .hero{grid-template-columns:minmax(0,1fr)}.intro .hero>*{max-width:100%;min-width:0}.intro .seed{max-width:100%}
+.intro .split>*{min-width:0}.intro .shot{max-width:460px;justify-self:center;width:100%}

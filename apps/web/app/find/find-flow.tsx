@@ -124,6 +124,17 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     setPicked([]); setWords([]); setDraft(""); setQi(0); setFire(FIRE.start); setPeak(FIRE.start); setShown(""); setResult(null);
   }
 
+  // 내 달그락을 받은 다음: 아이디어를 쪽지에 담아 달그락 대장간 소개로 간다. 가입하면 그 쪽지가 내 프로젝트가 된다.
+  async function goAbout(fireId: string | null) {
+    track("about_open", { kind: analysis?.kind ?? "hardware" });
+    let seed = "";
+    try {
+      const response = await fetch("/api/find/seed", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: [idea.trim(), ...words].join(" / ").slice(0, 300), kind: analysis?.kind ?? "hardware", fireId }) });
+      if (response.ok) seed = (await response.json()).seed ?? "";
+    } catch { /* 쪽지가 없어도 소개는 볼 수 있다 */ }
+    window.location.assign(`/find/about${seed ? `?seed=${encodeURIComponent(seed)}` : ""}`);
+  }
+
   async function submitIdea(forceHardware = false) {
     // 비워두고 누르면 입력칸에 보이던 예시를 그대로 내 아이디어로 쓴다
     const text = idea.trim() || PH[ph];
@@ -256,7 +267,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           <h2>이건 소프트웨어 달그락이<br />맡을 일이야.</h2>
           <div className="maker-card" style={{ borderColor: MAKER.software.color }}><Dokkaebi motion="blaze" fire={60} width={150} hue={MAKER.software.hue} /><b style={{ background: MAKER.software.color }}>{MAKER.software.name}</b><p>{MAKER.software.line}</p></div>
           <p className="lead">달그락 대장간에서는 앱·웹도 같은 방식으로 만들어. 무엇을 만들지 정리하고, 화면을 설계하고, 네가 쓰는 AI 코딩 도구에 그대로 넘길 수 있게 준비해 줘.</p>
-          <button className="btn btn-fire" type="button" onClick={() => { track("software_next"); go("forge"); }}>다음</button>
+          <button className="btn btn-fire" type="button" onClick={() => { track("software_next"); void goAbout(null); }}>다음</button>
           <div className="note row">
             <div style={{ width: 76, flexShrink: 0 }}><Dokkaebi motion="idle" fire={50} width={76} /></div>
             <div>
@@ -329,7 +340,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
 
       {screen === "reveal" && result && (
         <Reveal result={result} picked={picked} find={find} idea={idea} maker={analysis?.kind ?? "hardware"} onShare={() => { setShareOpen(true); track("share_open"); }}
-          onAgain={() => { resetFire(); go("stoke"); }} onMore={() => { setResult(null); go("stoke"); }} onForge={() => go("forge")} />
+          onAgain={() => { resetFire(); go("stoke"); }} onMore={() => { setResult(null); go("stoke"); }} onForge={() => void goAbout(result.fire.id)} />
       )}
 
       {screen === "forge" && (
@@ -391,7 +402,7 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
       </div>
       {forge && <div className="forge-made"><span className="tiny muted">{forge.isNew ? "달그락 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span><b>{forge.line}</b></div>}
-      <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>다음</button>
+      <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>달그락 대장간이 뭐예요? →</button>
       <a className="practice-cta" href="/find/practice" onClick={() => track("practice_from_result")}>
         <b>먼저 손으로 해보고 싶다면</b>
         <span>3D 작업대에서 납땜 미리 해 보기 →</span>

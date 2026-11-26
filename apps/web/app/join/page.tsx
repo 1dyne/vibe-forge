@@ -1,3 +1,4 @@
+import { SeedKeeper } from "../intro-kit";
 import { googleConfigured } from "../../lib/google";
 import { emailSignupOpen, signupMode } from "../../lib/policies";
 import JoinForm from "./join-form";
@@ -9,9 +10,10 @@ export default async function JoinPage({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   return (
     <main className="login-shell">
+      <SeedKeeper />
       <section className="login-card join-card">
         <img src="/characters/idle.png" alt="대장 달그락" width="85" height="85" style={{ objectFit: "contain" }} />
-        <p className="eyebrow">바이브 포저 가입</p>
+        <p className="eyebrow">달그락 대장간 가입</p>
         <h1>달그락 대장간</h1>
         {mode === "closed"
           ? <p>지금은 가입을 받지 않아요. 운영자에게 문의해주세요.</p>

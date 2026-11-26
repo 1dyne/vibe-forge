@@ -23,10 +23,35 @@ const toMail = (r: Record<string, unknown>): MailRecord => ({ id: r.id as string
 const toNotice = (r: Record<string, unknown>): NoticeRecord => ({ id: Number(r.id), title: r.title as string, body: r.body as string, kind: r.kind as NoticeRecord["kind"], publishedAt: new Date(r.published_at as string).toISOString() });
 
 // ── 대장간 ─────────────────────────────────────────────
-export async function forgeForOwner(ownerHash: string): Promise<ForgeRecord | null> {
+async function forgeByOwnerHash(ownerHash: string): Promise<ForgeRecord | null> {
   if (pg()) { const { rows } = await (await db()).query("SELECT * FROM find_forges WHERE owner_hash = $1", [ownerHash]); return rows[0] ? toForge(rows[0]) : null; }
   return serial(async () => ((await readData()).forges as ForgeRecord[] | undefined)?.find((f) => f.ownerHash === ownerHash) ?? null);
 }
+
+/**
+ * 이 기기 토큰의 대장간. 가입한 사람이 다른 기기에서 들어오면 그 기기의 토큰을 같은 대장간의
+ * 다른 열쇠(owner_alias)로 달아 둔다. 그래서 기기를 바꿔도 내 대장간이다.
+ */
+export async function forgeForOwner(ownerHash: string): Promise<ForgeRecord | null> {
+  const direct = await forgeByOwnerHash(ownerHash);
+  if (direct) return direct;
+  const alias = await getMeta(`owner_alias:${ownerHash}`);
+  return alias ? getForge(alias) : null;
+}
+/** 가입한 계정에 묶인 대장간 */
+export async function forgeForUser(userId: string): Promise<ForgeRecord | null> {
+  const id = await getMeta(`user_forge:${userId}`);
+  return id ? getForge(id) : null;
+}
+/** 대장간을 계정에 묶는다. 이미 다른 계정의 것이면 그대로 둔다. 묶이면 마을 문도 열린다 */
+export async function linkForgeToUser(forgeId: string, userId: string): Promise<boolean> {
+  const owner = await getMeta(`forge_user:${forgeId}`);
+  if (owner && owner !== userId) return false;
+  if (await getMeta(`user_forge:${userId}`) && !owner) return false; // 계정에는 대장간이 하나
+  await setMeta(`forge_user:${forgeId}`, userId); await setMeta(`user_forge:${userId}`, forgeId); await setMeta(`village_open:${forgeId}`, "account");
+  return true;
+}
+export const addOwnerAlias = (ownerHash: string, forgeId: string) => setMeta(`owner_alias:${ownerHash}`, forgeId);
 
 export async function getForge(id: string): Promise<ForgeRecord | null> {
   if (!/^[A-Za-z0-9]{4,16}$/.test(id)) return null;

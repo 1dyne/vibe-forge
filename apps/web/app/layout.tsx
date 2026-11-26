@@ -8,6 +8,7 @@ import "./css/revision.css";
 import "./css/verify.css";
 import "./css/card-prompt.css";
 import "./css/ink.css";
+import "./css/intro.css";
 
 // 글꼴 이름만 적어두고 아무 데서도 불러오지 않고 있었다(Pretendard·Noto Sans KR 모두).
 // 그래서 실제로는 운영체제 기본 한글 글꼴로 떨어졌고, 윈도우에서는 맑은 고딕이

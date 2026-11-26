@@ -108,6 +108,8 @@ export type LocalProject = {
   ownerId?: string;
   // Where the conversation happens: the in-app agents or the owner's own Claude.
   origin?: "web" | "connector";
+  /** 온보딩에서 가져온 아이디어로 만든 프로젝트의 표시(같은 쪽지로 두 번 만들지 않게) */
+  seedStamp?: string;
   // 사람이 끌어놓아 정한 목록 순서. 한 번도 정하지 않았으면 없고, 그때는 최근 작업 순서를
   // 따른다. 한 번 정하면 그 사람의 모든 프로젝트에 0..n-1이 매겨진다.
   order?: number;

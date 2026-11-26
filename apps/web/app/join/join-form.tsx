@@ -1,5 +1,6 @@
 "use client";
-import { FormEvent, useState } from "react";
+import { useInAppBrowser } from "../intro-kit";
+import { useEffect, FormEvent, useState } from "react";
 import GoogleNotice from "../google-notice";
 import RecoveryCode from "../recovery-code";
 
@@ -40,13 +41,17 @@ export default function JoinForm({ needsCode, google, email: emailOpen, askGoogl
       setBusy(false);
     }
   }
+  // 온보딩에서 들고 온 아이디어 쪽지를 가입이 끝날 때까지 이 브라우저에 맡겨 둔다.
+  useEffect(() => { try { const seed = new URLSearchParams(window.location.search).get("seed"); if (seed) localStorage.setItem("dalgrak_seed", seed); } catch { /* 없어도 가입은 된다 */ } }, []);
+  const inApp = useInAppBrowser();
   function openGoogle() {
     if (!agreedAll) { setError("구글로 가입할 때도 만 14세 이상 확인과 약관·개인정보 동의가 필요해요."); return; }
     if (needsCode && !code.trim()) { setError("초대 코드를 먼저 입력해주세요."); return; }
     setError(""); setNotice(true);
   }
   function continueGoogle() {
-    const params = new URLSearchParams({ intent: "signup", agree: "1" });
+    // 가입을 마치면 환영 화면으로 간다(마을 소개, 홈 화면에 추가, 내 아이디어로 시작).
+    const params = new URLSearchParams({ intent: "signup", agree: "1", next: "/welcome" });
     if (name.trim()) params.set("name", name.trim());
     if (needsCode) params.set("invite", code.trim());
     window.location.assign(`/api/auth/google/start?${params}`);
@@ -78,6 +83,7 @@ export default function JoinForm({ needsCode, google, email: emailOpen, askGoogl
       <label className="remember-session"><input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} /><span><a href="/terms" target="_blank">이용약관</a>에 동의해요 (필수)</span></label>
       <label className="remember-session"><input type="checkbox" checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} /><span><a href="/privacy" target="_blank">개인정보 수집·이용</a>에 동의해요 (필수)</span></label>
       {!google && !emailOpen && <p className="notice">지금은 가입 방법을 준비하고 있어요. 운영자에게 문의해주세요.</p>}
+      {inApp && <p className="notice" role="status">지금 {inApp} 안에서 열려 있어요. 여기서는 구글 가입이 막혀요. 오른쪽 위(또는 아래) 메뉴에서 <b>다른 브라우저로 열기</b>를 눌러 크롬이나 사파리에서 가입해 주세요.</p>}
       <div className={"join-methods" + (google && emailOpen ? " two" : "")}>
         {google && <button type="button" className="join-method google" onClick={openGoogle}>구글로 가입하기</button>}
         {emailOpen && <button type="button" className={"join-method" + (byEmail ? " on" : "")} aria-expanded={byEmail} onClick={() => setByEmail((v) => !v)}>이메일로 가입하기</button>}

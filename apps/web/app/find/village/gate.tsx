@@ -1,6 +1,5 @@
 "use client";
 import { track } from "../track";
-import ForgeSignup from "../waitlist";
 
 // 마을 문 앞. 대장간은 생겼는데 아직 오픈 알림을 안 받은 사람에게: 이메일을 남기면 문이 열린다.
 export default function VillageGate({ state, fire, forgeId, couponText }: { state: "none" | "locked"; fire: { id: string; name: string } | null; forgeId: string | null; couponText: string | null }) {
@@ -14,9 +13,10 @@ export default function VillageGate({ state, fire, forgeId, couponText }: { stat
         </>
       ) : (
         <>
-          <h1 style={{ fontSize: 26 }}>마을 문이 아직 닫혀 있어</h1>
-          <p className="body">대장간 오픈 알림을 받을 이메일을 남기면 문이 열려. 들어가면 다른 도깨비들이 구상 중인 것들을 구경하고, 네 대장간도 꾸밀 수 있어.</p>
-          <ForgeSignup explain fire={fire} forgeId={forgeId} refCode={null} couponText={couponText} enterVillage />
+          <h1 style={{ fontSize: 26 }}>마을은 가입하면 열려</h1>
+          <p className="body">달그락 대장간에 가입하면 마을 문이 열려. 들어가면 다른 도깨비들이 구상 중인 것들을 구경하고, 네 대장간도 꾸밀 수 있어. 네 도깨비불{fire ? ` “${fire.name}”` : ""}도 그대로 들고 가.</p>
+          <a className="btn btn-fire" href="/find/about" onClick={() => track("gate_about")} style={{ display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>달그락 대장간이 뭐야?</a>
+          <a className="link" href="/find/home" style={{ textAlign: "center" }}>이미 가입했어 (내 대장간으로)</a>
           {forgeId && <a className="link" href={`/f/${forgeId}`} style={{ textAlign: "center" }}>먼저 내 대장간 안 보기</a>}
         </>
       )}

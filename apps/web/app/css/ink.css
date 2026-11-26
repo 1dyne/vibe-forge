@@ -91,3 +91,6 @@ h1,h2,h3,h4,.brand span,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-pr
 .th-steps{padding-left:22px;display:grid;gap:12px;font-size:14px;line-height:1.7}.th-steps kbd{border:1.5px solid var(--ink);border-radius:6px;padding:1px 6px;font:inherit;font-size:12px;background:#fff}
 .th-picture{display:block;width:100%;max-width:360px;margin-top:8px}.th-cautions{padding-left:20px;display:grid;gap:6px;font-size:13px;line-height:1.7}
 .composer-tools .model-select{width:auto;flex:none;max-width:200px;text-align:right}
+/* 대장간에서 마을로 */
+.village-link{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:10px 12px;border:2px solid var(--ink);border-radius:12px;background:#f0dfa7;color:var(--ink);text-decoration:none;font-family:var(--font-display),var(--font-sans),sans-serif;font-size:13px;box-shadow:var(--pop-s)}
+.village-link em{margin-left:auto;font-style:normal;font-size:12px;opacity:.75}.village-link:active{transform:translate(2px,2px);box-shadow:none}
