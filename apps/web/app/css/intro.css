@@ -51,3 +51,11 @@
 /* 좁은 화면에서 넘치지 않게 */
 .intro .hero{grid-template-columns:minmax(0,1fr)}.intro .hero>*{max-width:100%;min-width:0}.intro .seed{max-width:100%}
 .intro .split>*{min-width:0}.intro .shot{max-width:460px;justify-self:center;width:100%}
+/* 고침: 겹친 점선 상자, 줄바꿈되는 탭, 대장장이 소개 */
+.intro .needs>div{border:0;padding:0;border-radius:0}.intro .needs>div>div{border:2px dashed var(--ink);border-radius:16px;padding:16px;font-size:15px;height:100%}
+.intro .needs>div>div b{display:block;margin-bottom:4px}
+.intro .os-tabs button{white-space:nowrap;font-size:14px;padding:0 6px}
+.intro .maker-note{font-size:16px}.intro .maker-note p{margin:12px 0 0}.intro .maker-note .contact{font-size:14.5px;color:#4d4840}.intro .maker-note a{color:#2e6b5c;font-weight:600}
+.intro .smith{display:flex;align-items:center;gap:14px}.intro .smith img{width:64px;height:64px;object-fit:contain;border:2px solid var(--ink);border-radius:50%;background:#9DD2C8;padding:4px}
+.intro .smith b{display:block;font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400;font-size:22px}.intro .smith small{color:#6f6a61;font-size:13px}
+.intro .cta h2{line-height:1.35}

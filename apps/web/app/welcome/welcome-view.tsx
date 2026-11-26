@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Reveal, StickyCta, useDeviceOs, type DeviceOs } from "../intro-kit";
+import { Reveal, StickyCta } from "../intro-kit";
 
 export const SEED_KEY = "dalgrak_seed";
 type Claimed = { projectId: string; name: string; created: boolean } | null;
@@ -14,20 +14,7 @@ const TOWN: Array<{ color: string; title: string; body: string }> = [
   { color: "#B7B3D7", title: "쪽지와 편지함", body: "놀러 온 사람이 남긴 응원이 편지함에 쌓여요. 운영자에게 바라는 것도 여기로 보내요." }
 ];
 
-function Install({ os }: { os: DeviceOs }) {
-  const [tab, setTab] = useState<DeviceOs>(os);
-  useEffect(() => setTab(os), [os]);
-  return <div className="install">
-    <div className="os-tabs" role="tablist">{(["ios", "android", "desktop"] as DeviceOs[]).map((t) => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t === "ios" ? "아이폰" : t === "android" ? "안드로이드" : "컴퓨터"}</button>)}</div>
-    {tab === "ios" && <ol><li><b>사파리</b>로 dalgrak.app을 열어요. (다른 앱 안에서 열렸다면 사파리로 다시 열어요.)</li><li>아래 가운데의 <kbd>공유</kbd> 버튼(네모에서 화살표가 올라가는 모양)을 눌러요.</li><li>목록을 내려 <kbd>홈 화면에 추가</kbd>를 누르고 <kbd>추가</kbd>를 눌러요.</li><li>홈 화면의 달그락 아이콘으로 앱처럼 열려요.</li></ol>}
-    {tab === "android" && <ol><li><b>크롬</b>으로 dalgrak.app을 열어요.</li><li>오른쪽 위 <kbd>⋮</kbd>를 누르고 <kbd>홈 화면에 추가</kbd> 또는 <kbd>앱 설치</kbd>를 눌러요.</li><li><kbd>설치</kbd>를 누르면 홈 화면에 달그락 아이콘이 생겨요.</li></ol>}
-    {tab === "desktop" && <ol><li>크롬이나 엣지로 dalgrak.app을 열어요.</li><li>주소창 오른쪽의 <kbd>설치</kbd> 아이콘(모니터에 화살표)을 눌러요.</li><li>달그락과 대화하려면 여기서 연결 프로그램도 켜요. 대장간 입력창에 켜는 방법이 그림과 함께 나와요.</li></ol>}
-    <p style={{ margin: "12px 0 0", fontSize: 14, color: "#4d4840" }}>앱스토어에서 받는 앱이 아니라, 웹을 홈 화면에 올려 두는 방식이에요. 설치해도 저장 공간을 거의 쓰지 않아요.</p>
-  </div>;
-}
-
 export default function WelcomeView() {
-  const os = useDeviceOs();
   const [claimed, setClaimed] = useState<Claimed>(null);
   const [state, setState] = useState<"checking" | "none" | "done" | "failed">("checking");
 
@@ -69,11 +56,6 @@ export default function WelcomeView() {
       <Reveal><span className="tag">달그락 마을에서는</span><h2>이런 걸 할 수 있어요</h2></Reveal>
       <div className="town-grid">{TOWN.map((t, i) => <Reveal as="article" key={t.title} delay={(i % 2) * 110} kind={i % 2 ? "right" : "left"}><b><i style={{ background: t.color }} />{t.title}</b>{t.body}</Reveal>)}</div>
       <Reveal><p style={{ textAlign: "center", marginTop: 26 }}><a className="btn-main" href="/find/home" style={{ background: "#EDB69A" }}>달그락 마을 구경하기</a></p></Reveal>
-    </section>
-
-    <section>
-      <Reveal><span className="tag">홈 화면에 두기</span><h2>앱처럼 꺼내 써요</h2><p className="lead">부품이 도착했을 때, 출력이 끝났을 때 바로 열어 기록할 수 있게 홈 화면에 올려 두세요.</p></Reveal>
-      <Reveal kind="pop"><Install os={os} /></Reveal>
     </section>
 
     <section>

@@ -47,7 +47,7 @@ export default function JoinForm({ needsCode, google, email: emailOpen, askGoogl
   function openGoogle() {
     if (!agreedAll) { setError("구글로 가입할 때도 만 14세 이상 확인과 약관·개인정보 동의가 필요해요."); return; }
     if (needsCode && !code.trim()) { setError("초대 코드를 먼저 입력해주세요."); return; }
-    setError(""); setNotice(true);
+    setError(""); continueGoogle();
   }
   function continueGoogle() {
     // 가입을 마치면 환영 화면으로 간다(마을 소개, 홈 화면에 추가, 내 아이디어로 시작).

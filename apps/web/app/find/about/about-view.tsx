@@ -1,5 +1,5 @@
 "use client";
-import { Reveal, SeedKeeper, Shot, StickyCta, useInAppBrowser } from "../../intro-kit";
+import { Install, Reveal, SeedKeeper, Shot, StickyCta, useInAppBrowser } from "../../intro-kit";
 
 const CREW: Array<{ id: string; img: string; name: string; color: string; sub?: boolean; decides: string[] }> = [
   { id: "chief", img: "/characters/idle.png", name: "대장 달그락", color: "#9DD2C8", decides: ["무엇부터 만들까", "예산 안에 들어올까", "누가 무엇을 맡을까", "지금 누구 차례일까"] },
@@ -10,7 +10,7 @@ const CREW: Array<{ id: string; img: string; name: string; color: string; sub?: 
   { id: "id", img: "/characters/id/idle.png", name: "제품 디자인 달그락", color: "#F0DFA7", decides: ["어떤 모양일까", "손에 쥐었을 때 편할까", "어떤 색과 재질일까"] }
 ];
 
-export default function AboutView({ joinUrl, seed, token }: { joinUrl: string; token: string | null; seed: { idea: string; name: string; color: string } | null }) {
+export default function AboutView({ joinUrl, seed, token, contact }: { joinUrl: string; token: string | null; contact: string; seed: { idea: string; name: string; color: string } | null }) {
   const inApp = useInAppBrowser();
   const cta = seed ? "가입하고 내 아이디어 이어 만들기" : "달그락 대장간 가입하기";
   return <main className="intro">
@@ -79,15 +79,24 @@ export default function AboutView({ joinUrl, seed, token }: { joinUrl: string; t
     </section>
 
     <section>
-      <Reveal kind="pop"><div className="maker-note">저는 정치학을 전공한 문과생이에요. AI와 대화하면서 처음으로 하드웨어를 만들었고, 그때 가장 힘들었던 건 회로가 아니라 <b>“지금 뭘 해야 하는지”</b>였어요. 그래서 그 길을 그대로 옮겨 달그락 대장간을 만들었어요.<br /><small>— 달그락 대장간을 만든 사람</small></div></Reveal>
+      <Reveal kind="pop"><div className="maker-note">
+        <div className="smith"><img src="/characters/idle.png" alt="" /><div><b>대장장이 1dyne</b><small>달그락 대장간과 달그락 마을을 만들고 지키는 사람</small></div></div>
+        <p>AI와 대화하면서 처음으로 하드웨어를 만든 문과생 메이커예요. 그때 가장 힘들었던 건 회로가 아니라 <b>“지금 뭘 해야 하는지”</b>였어요. 그래서 그 길을 그대로 옮겨 달그락 대장간을 만들었어요.</p>
+        <p className="contact">궁금한 것, 막히는 것, 같이 해보고 싶은 것은 <a href={`mailto:${contact}`}>{contact}</a> 으로 보내 주세요.</p>
+      </div></Reveal>
       <div className="needs">
         <Reveal><div><b>내가 쓰는 AI 구독 그대로</b>ChatGPT나 Claude 구독이 필요해요. 달그락 대장간은 AI 값을 따로 받지 않고, 내 구독으로 달그락들이 일해요.</div></Reveal>
         <Reveal delay={120}><div><b>대화는 컴퓨터에서</b>달그락과의 대화는 컴퓨터에서 작은 연결 프로그램을 켜고 해요. 휴대폰에서는 진행 상황 보기, 승인, 기록을 할 수 있어요.</div></Reveal>
       </div>
     </section>
 
+    <section>
+      <Reveal><span className="tag">홈 화면에 두기</span><h2>앱처럼 꺼내 써요</h2><p className="lead">부품이 도착했을 때, 출력이 끝났을 때 바로 열어 기록할 수 있게 홈 화면에 올려 둘 수 있어요. 가입한 뒤에 해도 돼요.</p></Reveal>
+      <Reveal kind="pop"><Install /></Reveal>
+    </section>
+
     <section className="cta">
-      <Reveal kind="pop"><h2>{seed ? "방금 그 아이디어, 이어서 만들어 봐요" : "첫 물건을 만들어 봐요"}</h2>
+      <Reveal kind="pop"><h2>{seed ? <>방금 그 아이디어,<br />이어서 만들어 봐요</> : <>첫 물건을<br />만들어 봐요</>}</h2>
         {inApp && <p className="lead" style={{ margin: "0 auto 18px" }}>지금 {inApp} 안에서 보고 있어요. 구글 가입은 여기서 막혀 있어서, 오른쪽 위 메뉴에서 <b>다른 브라우저로 열기</b>(크롬·사파리)를 누른 뒤 가입해 주세요.</p>}
         <a className="btn-main" href={joinUrl}>{cta}</a><br /><span className="btn-sub">구글 계정으로 10초면 돼요. 가입하면 달그락 마을도 열려요.</span></Reveal>
     </section>

@@ -12,7 +12,6 @@ import ForgeSignup from "./waitlist";
 import Mailbox from "./mailbox";
 import VillageNews from "./village-news";
 import { track } from "./track";
-import Mockup3D from "../mockup-3d";
 import { productSolids } from "./product-shape";
 
 // 장작 화면 질문: 각 질문은 한 갈래의 장작만 보여준다
@@ -61,7 +60,6 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   const writingRef = useRef(false);
   // 장작 화면: 질문 하나씩 (어디에 → 언제 → 어떻게 → 누구)
   const [qi, setQi] = useState(0);
-  const [no3d, setNo3d] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -215,7 +213,6 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   // 질문마다 그 갈래의 뿌리 장작을 첫 입력과 관련 있는 순서로 4개까지
   const optionsFor = (cat: Chip["cat"]) => tree.root.filter((c) => c.cat === cat && !picked.includes(c.id)).slice(0, 4);
   const more = follows.slice(0, 6);
-  const solids = useMemo(() => productSolids(picked, idea), [picked, idea]);
 
   return (
     <main className="find" style={{ ["--fire" as string]: result?.fire.color ?? color }}>
@@ -293,13 +290,12 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       {screen === "stoke" && (
         <section className="screen stoke2">
           <div className="s2-head">
-            <div className="s2-title">네 고민을 풀어 줄 물건을 같이 만들어 보자</div>
+            <div className="s2-title">네 아이디어에 장작을 넣어 불을 키워 보자</div>
             <div className="muted small s2-idea">“{idea.trim()}”</div>
             {analysis?.caution && <div className="s2-caution">{analysis.caution}</div>}
           </div>
           <div className="s2-stage">
-            {no3d ? <div className="stage"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} once={stokeMotion === "fallen"} /></div>
-              : <Mockup3D solids={solids} inside={false} zoom={1} resetKey={0} onFail={() => setNo3d(true)} />}
+            <div className="stage"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} hue={MAKER[analysis?.kind ?? "hardware"].hue} once={stokeMotion === "fallen"} /></div>
             <div className="s2-fire" aria-label={`도깨비불 ${fireLabel(fire)} ${Math.round(fire)}`}>
               <div className="s2-fire-dk"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} width={44} className={gulp ? "gulp" : ""} /></div>
               <div className="s2-fire-bar"><span>도깨비불 · {fireLabel(fire)}</span><div className="bar"><i style={{ width: `${fire}%` }} /></div></div>
@@ -307,7 +303,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           </div>
           {qi < QUESTIONS.length ? (
             <div className="s2-q" key={qi}>
-              <div className="s2-step">질문 {qi + 1} / {QUESTIONS.length} · 고르면 위 물건이 바뀌어</div>
+              <div className="s2-step">질문 {qi + 1} / {QUESTIONS.length} · 고를수록 불이 커져</div>
               <h2>{QUESTIONS[qi].q}</h2>
               <div className="s2-opts">
                 {optionsFor(QUESTIONS[qi].cat).map((c) => (
@@ -402,12 +398,7 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
         <div className="sentence">“{idea.trim()}”{"\n"}{fire.sentence}</div>
       </div>
       {forge && <div className="forge-made"><span className="tiny muted">{forge.isNew ? "달그락 마을에 네 대장간이 생겼어" : "네 대장간 선반에 불이 하나 더 생겼어"}</span><b>{forge.line}</b></div>}
-      <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>달그락 대장간이 뭐예요? →</button>
-      <a className="practice-cta" href="/find/practice" onClick={() => track("practice_from_result")}>
-        <b>먼저 손으로 해보고 싶다면</b>
-        <span>3D 작업대에서 납땜 미리 해 보기 →</span>
-      </a>
-      <details className="fold">
+      <details className="fold" open>
         <summary>지금 더 해보면 좋은 것</summary>
         <div className="fold-body">
           <div className="growth">
@@ -425,7 +416,7 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
           </div>
         </div>
       </details>
-      <details className="fold">
+      <details className="fold" open>
         <summary>닮은 메이커 프로젝트 {matches.length}</summary>
         <div className="fold-body">
           {matches.length > 0 && <span className="badge" style={{ alignSelf: "flex-start" }}>일치율 = 갈래별 겹친 태그</span>}
@@ -455,6 +446,7 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
           </div>
         </div>
       </details>
+      <button className="btn btn-fire" type="button" onClick={() => { track(forge?.isNew ? "forge_created" : "forge_open"); onForge(); }}>달그락 대장간이 뭐예요? →</button>
       <div className="two">
         <button className="btn btn-ghost" type="button" onClick={onShare}>카드 저장·공유</button>
         <button className="btn btn-ghost" type="button" onClick={onAgain}>다시 피우기</button>
