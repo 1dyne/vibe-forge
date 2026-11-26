@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getMakerProfile, saveMakerProfile } from "../local-project-store";
 import { emptyProfile } from "../workflow";
 import { kit, projectIdSchema, type ToolDefinition } from "../tool-kit";
+import type { MakerSpace } from "../project-types";
 
 // 메이커스페이스를 사람이 칸마다 적지 않게 한다. 예약 화면 캡처나 지도·예약 페이지 주소를
 // 대화에 올리면 달그락이 읽어서 계정에 등록한다. 등록된 곳은 모든 프로젝트가 같이 쓴다.
@@ -37,7 +38,8 @@ export const tools: ToolDefinition[] = [{
     const before = account.makerspaces ?? [];
     const same = before.find((s) => s.name.replace(/\s/g, "") === space.name.replace(/\s/g, ""));
     if (!same && before.length >= 10) return kit.stored(project, context, "메이커스페이스는 열 곳까지 등록할 수 있어요. '내 계정 → 만드는 곳'에서 안 쓰는 곳을 지운 뒤 다시 등록해 주세요.");
-    const next = same ? before.map((s) => (s === same ? { ...same, ...Object.fromEntries(Object.entries(space).filter(([, v]) => v !== "" && v !== null)) } : s)) : [...before, { ...space, id: randomUUID().slice(0, 8) }];
+    // apps/web의 tsconfig는 strict가 아니라 zod가 추론한 칸이 선택값으로 보인다. 스키마가 기본값을 채우므로 좁혀 쓴다.
+    const next = (same ? before.map((s) => (s === same ? { ...same, ...Object.fromEntries(Object.entries(space).filter(([, v]) => v !== "" && v !== null)) } : s)) : [...before, { ...space, id: randomUUID().slice(0, 8) }]) as MakerSpace[];
     await saveMakerProfile({ ...account, makerspaces: next, printerAccess: account.printerAccess === "own" ? "own" : "makerspace" }, context.user.id);
     const empty = [!space.where && "위치", !space.printers && "보유 장비", !space.maxPrintMm && "출력 가능 크기", !space.url && "예약 페이지"].filter(Boolean);
     return kit.stored(project, context, `${same ? "등록돼 있던 곳을 고쳤어요" : "메이커스페이스를 등록했어요"}: ${space.name} (${{ photo: "사진", link: "주소", said: "말씀", search: "검색" }[source]}에서 읽음).${empty.length ? ` 비어 있는 것: ${empty.join(", ")}.` : ""} 사용자에게 채운 내용을 한 번 읽어 주고, 틀린 곳은 '내 계정 → 만드는 곳'에서 고칠 수 있다고 알려주세요.${space.maxPrintMm ? ` 이제 하우징은 ${space.maxPrintMm.join("×")}mm 안에 들어가게 설계하세요.` : ""}`);
