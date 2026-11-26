@@ -75,3 +75,19 @@ h1,h2,h3,h4,.brand span,.nav-caption,.pill,.turn-badge,.workbench-toggle,.new-pr
 .welcome h2{font-size:30px}
 .idea-prompts button{border:2px solid var(--ink);box-shadow:var(--pop-s);background:#fff}
 .nav-toggle{border:2px solid var(--ink)}
+/* 모델 고르기: 상자 없이 글자만 */
+.composer .model-select,.model-select{border:0;background:transparent;box-shadow:none;padding:4px 2px;font-size:12.5px;color:var(--muted);max-width:220px;cursor:pointer;border-radius:6px}
+.model-select:hover{color:var(--ink);background:var(--soft)}
+/* 전송 실패와 고치는 법 */
+.send-failed{margin:0 0 10px;padding:12px 14px;border:2px solid var(--ink);border-radius:14px;background:#fdeee3;font-size:13px}
+.send-failed-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.send-failed-head b{color:var(--t-user)}
+.send-failed-text{flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.send-failed .retry{background:var(--ink);color:#fff;border-color:var(--ink);padding:6px 12px;box-shadow:none}
+.send-failed p{margin:8px 0 0}.fix-steps{margin:10px 0 0;padding-left:20px;display:grid;gap:8px}.fix-steps .copy-row,.send-failed .copy-row{display:flex;margin-top:6px}
+.term-link{display:inline;border:0;background:transparent;padding:0;box-shadow:none!important;color:#2e6b5c;text-decoration:underline;text-underline-offset:3px;font-weight:600;cursor:pointer}
+.term-link:hover:not(:disabled){background:transparent;color:var(--ink)}
+.terminal-help{width:min(560px,100%);max-height:90dvh;overflow:auto}.terminal-help h3{margin:16px 0 6px;font-size:15px}
+.th-tabs{display:flex;gap:8px;margin:10px 0}.th-tabs button{flex:1;box-shadow:none}.th-tabs .on{background:var(--c-chief)}
+.th-steps{padding-left:22px;display:grid;gap:12px;font-size:14px;line-height:1.7}.th-steps kbd{border:1.5px solid var(--ink);border-radius:6px;padding:1px 6px;font:inherit;font-size:12px;background:#fff}
+.th-picture{display:block;width:100%;max-width:360px;margin-top:8px}.th-cautions{padding-left:20px;display:grid;gap:6px;font-size:13px;line-height:1.7}
+.composer-tools .model-select{width:auto;flex:none;max-width:200px;text-align:right}

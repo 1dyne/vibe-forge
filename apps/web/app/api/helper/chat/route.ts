@@ -9,7 +9,7 @@ import { canAccess, getViewer, notFound, unauthorized, withViewerVault } from ".
 
 export const dynamic = "force-dynamic";
 
-const Body = z.object({ projectId: z.string().uuid().nullish(), text: z.string().trim().min(1).max(4000), channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main"), model: z.string().min(1).max(80).nullish(), images: z.array(z.object({ name: z.string().max(120).default("사진"), dataUrl: z.string().max(MAX_IMAGE_CHARS).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/) }).strict()).max(MAX_IMAGES).optional() }).strict();
+const Body = z.object({ projectId: z.string().uuid().nullish(), text: z.string().trim().min(1).max(4000), channel: z.enum(["main", "chief", "hw", "sw", "me", "id"]).default("main"), model: z.string().min(1).max(80).nullish(), images: z.array(z.object({ name: z.string().max(120).default("사진"), dataUrl: z.string().max(MAX_IMAGE_CHARS).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/) }).strict()).max(MAX_IMAGES).optional(), retry: z.boolean().optional() }).strict();
 
 // 화면(휴대폰이든 PC든)에서 한 말을 그 사람 컴퓨터의 연결 앱에게 넘긴다.
 // AI 호출은 연결 앱이 그 사람의 ChatGPT 요금제로 하므로 여기서는 비용을 세지 않는다.
@@ -28,7 +28,9 @@ async function handlePOST(request: NextRequest) {
   const images = (input.images ?? []).map((image) => ({ name: image.name ?? "사진", dataUrl: image.dataUrl as string }));
   try {
     // 말을 먼저 기록하고 넘긴다. 연결 앱은 일을 받을 때 기록을 함께 읽는다.
-    if (project) project = await mutateProject(project.id, (p) => { p.messages.push({ id: randomUUID(), role: "user", channel: input.channel, text: images.length ? `${input.text}\n\n(사진 ${images.length}장을 함께 보냈어요)` : input.text, createdAt: new Date().toISOString() }); });
+    // 다시 보내기: 방금 기록한 같은 말이 맨 끝에 있으면 한 번 더 적지 않는다.
+    const recorded = (text: string) => { const last = project!.messages.filter((m) => (m.channel ?? "main") === input.channel).at(-1); return !!input.retry && last?.role === "user" && last.text === text; };
+    if (project && !recorded(images.length ? `${input.text}\n\n(사진 ${images.length}장을 함께 보냈어요)` : input.text)) project = await mutateProject(project.id, (p) => { p.messages.push({ id: randomUUID(), role: "user", channel: input.channel, text: images.length ? `${input.text}\n\n(사진 ${images.length}장을 함께 보냈어요)` : input.text, createdAt: new Date().toISOString() }); });
     const job = enqueueJob({ userId: viewer.user.id, projectId: project?.id ?? null, channel: input.channel, text: input.text, model: input.model ?? null, images });
     return NextResponse.json({ jobId: job.id, project });
   } catch (error) {
