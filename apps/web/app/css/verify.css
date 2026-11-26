@@ -13,14 +13,14 @@
 .vf-group{margin:8px 0 2px;font-size:12px;font-weight:600;color:#3f7a6c}
 .vf-rung{border:1px solid #d8dedb;border-radius:12px;background:#fff;min-width:0;overflow:hidden}
 .vf-rung.vf-now{border-color:#8fd0c3;box-shadow:0 0 0 2px #8fd0c333}
-.vf-rung.vf-fail{border-color:#f0c4b3;background:#fdf7f4}
+.vf-rung.vf-fail{border-color:#edb69a;background:#fdf3ec}
 .vf-rung.vf-locked,.vf-rung.vf-unavailable{background:#f8f8f6}
 .vf-rung-head{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;border:0;background:none;padding:11px 13px;cursor:pointer;color:inherit;font:inherit}
 .vf-rung-head:disabled{cursor:default}
 .vf-pill{flex:none;font-size:11px;font-weight:700;line-height:1;padding:5px 8px;border-radius:999px;background:#eef1ef;color:#6f7d75;margin-top:2px;white-space:nowrap}
 .vf-current .vf-pill,.vf-now .vf-pill{background:#3f7a6c;color:#fff}
 .vf-pass .vf-pill{background:#e4f0ea;color:#2e6b5c}
-.vf-fail .vf-pill{background:#a2452c;color:#fff}
+.vf-fail .vf-pill{background:#a65a36;color:#fff}
 .vf-unknown .vf-pill{background:#f3ead2;color:#7a5a12}
 .vf-skipped .vf-pill{background:#eceae6;color:#6f6a60}
 .vf-title{min-width:0;overflow-wrap:anywhere;word-break:keep-all;font-weight:600}
@@ -39,6 +39,6 @@
 .vf-unit{font-weight:600;color:#6f7d75}
 .vf-primary,.vf-secondary{border-radius:10px;padding:9px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .vf-primary{border:0;background:#3f7a6c;color:#fff}.vf-primary:disabled{opacity:.45;cursor:default}
-.vf-secondary{border:1px solid #f0c4b3;background:#fdf7f4;color:#a2452c}
+.vf-secondary{border:1px solid #edb69a;background:#fdf3ec;color:#a65a36}
 .vf-link{justify-self:start;border:0;background:none;padding:0;font:inherit;font-size:12.5px;color:#6f7d75;text-decoration:underline;cursor:pointer}
 @media(max-width:600px){.vf-row .vf-primary,.vf-row .vf-secondary{flex:1 1 auto}}

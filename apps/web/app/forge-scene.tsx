@@ -11,7 +11,7 @@ import { agentName } from "../lib/workflow";
 export type RoomState = "my_turn" | "blocked" | "working" | "waiting" | "done" | "idle";
 
 /** styles.css의 .agent-dot.dot-* 와 같은 색 */
-export const AGENT_COLOR: Record<AgentId, string> = { chief: "#548b7c", hw: "#d2594b", sw: "#5b8fd9", me: "#d9a928", id: "#8f6fd0" };
+export const AGENT_COLOR: Record<AgentId, string> = { chief: "#9DD2C8", hw: "#9DA2DF", sw: "#AAC8DF", me: "#DCB2D2", id: "#F0DFA7" };
 /** 팀 색으로 칠한 달그락 그림 */
 const art = (room: AgentId, frame: "idle" | "thinking_1" | "thinking_2") => `/characters/${room === "chief" ? "" : `${room}/`}${frame}.png`;
 const STATE_LABEL: Record<RoomState, string> = { my_turn: "내 차례", blocked: "막힘", working: "작업 중", waiting: "기다리는 중", done: "끝남", idle: "쉬는 중" };
@@ -85,7 +85,7 @@ function Station({ room, state, count, selected, live, compact, late }: { room: 
         ? <>{/* 상자 옆에서 기다린다 */}
             <rect x="80" y="64" width="26" height="22" rx="2" fill="#e8d7b9" stroke={INK} strokeWidth="1.6" />
             <path d="M80 72h26M93 64v22" stroke={INK} strokeWidth="1.3" />
-            {late && <g><circle cx="106" cy="62" r="7" fill="#e2603f" stroke={INK} strokeWidth="1.3" /><path d="M106 58v5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" /><circle cx="106" cy="65.6" r="1" fill="#fff" /></g>}
+            {late && <g><circle cx="106" cy="62" r="7" fill="#edb69a" stroke={INK} strokeWidth="1.3" /><path d="M106 58v5" stroke="#5a2e17" strokeWidth="1.8" strokeLinecap="round" /><circle cx="106" cy="65.6" r="1" fill="#5a2e17" /></g>}
           </>
         : <Anvil color={color} />}
 
@@ -105,7 +105,7 @@ function Station({ room, state, count, selected, live, compact, late }: { room: 
     {state === "my_turn" && <g className="fs-sign">
       <path d="M96 52v32" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />
       <rect x="82" y="26" width="28" height="26" rx="4" fill="#fff7f2" stroke={INK} strokeWidth="1.6" />
-      <path d="M96 32v10" stroke="#e2603f" strokeWidth="3.2" strokeLinecap="round" /><circle cx="96" cy="47" r="1.9" fill="#e2603f" />
+      <path d="M96 32v10" stroke="#edb69a" strokeWidth="3.2" strokeLinecap="round" /><circle cx="96" cy="47" r="1.9" fill="#edb69a" />
     </g>}
 
     {state === "blocked" && <g>
@@ -121,7 +121,7 @@ function Station({ room, state, count, selected, live, compact, late }: { room: 
       <circle cx="51" cy="16" r="2" fill={INK} /><circle cx="59" cy="16" r="2" fill={INK} /><circle cx="67" cy="16" r="2" fill={INK} />
     </g>}
 
-    {count > 0 && <g><circle cx="113" cy="15" r={compact ? 12 : 10} fill="#e2603f" /><text x="113" y={compact ? 20 : 19} textAnchor="middle" fontSize={compact ? 15 : 12.5} fontWeight="700" fill="#fff">{count}</text></g>}
+    {count > 0 && <g><circle cx="113" cy="15" r={compact ? 12 : 10} fill="#edb69a" /><text x="113" y={compact ? 20 : 19} textAnchor="middle" fontSize={compact ? 15 : 12.5} fontWeight="700" fill="#5a2e17">{count}</text></g>}
     {selected && <rect className="fs-selected" x="2" y="2" width="124" height="92" rx="10" fill="none" />}
   </svg>;
 }
@@ -175,7 +175,7 @@ export default function ForgeScene({ board, shortNames, activeRoom, liveRoom, on
       <svg className="fs-art" viewBox="0 0 128 96" aria-hidden="true" focusable="false">
         <ellipse cx="64" cy="89" rx="40" ry="5" fill="#e9ebe6" />
         <rect x="42" y="50" width="44" height="36" rx="3" fill="#e8d7b9" stroke={INK} strokeWidth="1.6" /><path d="M42 62h44M64 50v36" stroke={INK} strokeWidth="1.3" />
-        <circle cx="88" cy="46" r="11" fill="#e2603f" stroke={INK} strokeWidth="1.4" /><path d="M88 40v7" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" /><circle cx="88" cy="51.5" r="1.5" fill="#fff" />
+        <circle cx="88" cy="46" r="11" fill="#edb69a" stroke={INK} strokeWidth="1.4" /><path d="M88 40v7" stroke="#5a2e17" strokeWidth="2.6" strokeLinecap="round" /><circle cx="88" cy="51.5" r="1.5" fill="#5a2e17" />
       </svg>
       <span className="fs-text"><b>예정일 지남</b>{!compact && <small className="fs-line">{clip(lateDeliveries.map((d) => d.label).join(", "), 30)}</small>}</span>
     </div>}

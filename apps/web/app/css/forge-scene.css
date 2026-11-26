@@ -16,7 +16,7 @@
 .fs-tag-my_turn{color:#c4442b!important}.fs-tag-blocked{color:#c4442b!important}.fs-tag-working{color:#3f7a6c!important}.fs-tag-done{color:#9aa69f!important}
 
 /* 상태별 모습 */
-.fs-is-my_turn{background:#fdf7f4;border-color:#f0c4b3}
+.fs-is-my_turn{background:#fdf3ec;border-color:#edb69a}
 .fs-is-waiting{border:1px dashed #c9d0cc}
 .fs-is-blocked{background:#fdf1ed;border-color:#e2a48f}
 .fs-is-done .fs-art{opacity:.55}

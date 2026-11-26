@@ -1,6 +1,6 @@
 /* 요청 · 질문 · 제안에 답하는 폼 */
 .cp{display:grid;gap:10px;margin-top:10px;width:100%}
-.cp-kind{justify-self:start;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#fff;border:1px solid #f0c4b3;color:#a2452c}
+.cp-kind{justify-self:start;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;background:#fff;border:1px solid #edb69a;color:#a65a36}
 .cp-request .cp-kind{border-color:#cfe0d9;color:#3f7a6c}.cp-question .cp-kind{border-color:#cdd3ee;color:#4a56a0}
 .cp-fields{display:grid;gap:10px}.cp-field{display:grid;gap:5px;font-size:13px}.cp-field>span:first-child{font-weight:600}.cp-field small{color:#6f7d75;font-weight:400}
 .cp input[type=text],.cp input[type=number],.cp input[type=date],.cp-foot input,.cp-plain input{border:1px solid #cfd8d2;border-radius:9px;padding:8px 10px;font-size:14px;background:#fff;color:var(--ink);min-width:0;width:100%}
