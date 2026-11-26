@@ -9,8 +9,10 @@ export type Motion = "idle" | "tilt" | "stoke" | "blaze" | "fallen";
  * - 화력이 셀수록 빠르게(프레임 120ms → 50ms), 크게, 기운(aura)이 진하게
  * - 반응 갈래 색으로 hue-rotate
  */
-export default function Dokkaebi({ motion = "idle", fire = 30, width, kind = "none", className = "", once = false }: {
+export default function Dokkaebi({ motion = "idle", fire = 30, width, kind = "none", className = "", once = false, hue }: {
   motion?: Motion; fire?: number; width?: number; kind?: ReactKind; className?: string; once?: boolean;
+  /** 달그락 종류의 색(대장간과 같은 색)으로 칠할 때. 주면 반응 갈래 색보다 먼저다 */
+  hue?: number;
 }) {
   const w = width ?? Math.round(130 + fire * 0.9);
   const frameMs = Math.round(120 - (Math.min(100, Math.max(0, fire)) / 100) * 70);
@@ -18,7 +20,7 @@ export default function Dokkaebi({ motion = "idle", fire = 30, width, kind = "no
   const style = {
     "--w": `${w}px`,
     "--dur": `${frameMs * 25}ms`,
-    "--hue": `${REACT_HUE[kind]}deg`,
+    "--hue": `${hue ?? REACT_HUE[kind]}deg`,
     "--aura": `${aura}px`,
     "--aura-o": (0.08 + fire / 450).toFixed(2),
     "--iter": once ? "1" : "infinite"

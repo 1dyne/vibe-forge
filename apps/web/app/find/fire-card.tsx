@@ -6,11 +6,12 @@ import { GRADE_CLASS } from "../../lib/find/card";
 import { NAMELESS } from "../../lib/find/nickname";
 import { PARTS_NOTE } from "../../lib/find/parts";
 import Dokkaebi from "./dokkaebi";
+import { MAKER, type MakerKind } from "../../lib/find/classify";
 
 const STAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
 
 /** 도깨비불 트레이딩 카드. 누르면 뒤집혀서 설계 정보(어림)를 보여준다. */
-export default function FireCardView({ name, owner, peak, kind, card }: { name: string; owner?: string; peak: number; kind: ReactKind; card: FireCard }) {
+export default function FireCardView({ name, owner, peak, kind, card, maker = "hardware" }: { name: string; owner?: string; peak: number; kind: ReactKind; card: FireCard; maker?: MakerKind }) {
   const [flipped, setFlipped] = useState(false);
   const stars = "★".repeat(card.build.difficulty) + "☆".repeat(5 - card.build.difficulty);
   return (
@@ -24,7 +25,10 @@ export default function FireCardView({ name, owner, peak, kind, card }: { name: 
             <span className={`attr attr-${card.attr.kind}`}><i />{card.attr.label}</span>
             <span className="grade">{card.grade}</span>
           </div>
-          <div className="art"><Dokkaebi motion="blaze" fire={peak} width={180} kind={kind} /></div>
+          <div className={"art" + (maker === "twin" ? " art-twin" : "")}>{maker === "twin"
+            ? <><Dokkaebi motion="blaze" fire={peak} width={132} hue={MAKER.hardware.hue} /><Dokkaebi motion="blaze" fire={peak} width={132} hue={MAKER.software.hue} /></>
+            : <Dokkaebi motion="blaze" fire={peak} width={180} hue={MAKER[maker].hue} />}</div>
+          <div className="maker-tag" style={{ background: MAKER[maker].color }}>{MAKER[maker].name}</div>
           {owner && owner !== NAMELESS && <div className="owner"><b>{owner}</b>의 도깨비불</div>}
           <div className="fname">{name}</div>
           <div className="fsub">화력 <b>{peak}</b> · {fireLabel(peak)}</div>

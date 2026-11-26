@@ -40,22 +40,31 @@ describe("받아 적기 문장", () => {
 });
 
 describe("규칙 기반 판별", () => {
-  it("앱·웹 일은 소프트웨어, 손에 잡히는 단서가 있으면 하드웨어", () => {
+  it("앱·웹 일은 소프트웨어, 손에 잡히는 물건은 하드웨어, 둘 다면 쌍둥이, 모양이 먼저면 디자인", () => {
+    expect(classify("고양이 모양 키링 예쁘게 만들고 싶어").kind).toBe("design");
+    expect(classify("불빛이 나는 예쁜 무드등").kind).toBe("hardware");
     expect(classify("동네 모임 예약 앱 만들고 싶어").kind).toBe("software");
     expect(classify("가계부 자동화 엑셀").kind).toBe("software");
     expect(classify("미국 정치 분석 중 텍사스 기준으로 카운티 벌 데모그라피와 중간선거 투표 분석 해보고 싶어").kind).toBe("software");
-    expect(classify("화분 흙이 마르면 불빛으로 알려주는 데이터 분석").kind).toBe("hardware");
+    expect(classify("화분 흙이 마르면 불빛으로 알려주는 데이터 분석").kind).toBe("twin");
     expect(classify("물 마시는 걸 자꾸 까먹어").kind).toBe("hardware");
-    expect(classify("화분 물 줄 때 알려주는 앱").kind).toBe("hardware");
+    expect(classify("화분 물 줄 때 알려주는 앱").kind).toBe("twin");
   });
   it("'만들고'를 '들고 다니는'으로 착각하지 않는다", () => {
     expect(classify("문서 정리 앱 만들고 싶어").kind).toBe("software");
   });
-  it("상용전원·가열·의료는 정중하게 거절한다", () => {
-    expect(classify("220V 히터를 폰으로 켜고 싶어").safety.ok).toBe(false);
-    expect(classify("혈압을 재서 진단해주는 기계").safety.ok).toBe(false);
-    expect(classify("밤에 불 끄러 일어나기 귀찮아").safety.ok).toBe(true);
+  it("아이디어는 막지 않는다: 조심할 것은 알려만 주고, 남을 해치는 것만 받지 않는다", () => {
+    const heater = classify("220V 히터를 폰으로 켜고 싶어");
+    expect(heater.safety.ok).toBe(true);
+    expect(heater.caution).toContain("220V");
+    expect(classify("혈압을 재서 진단해주는 기계").safety.ok).toBe(true);
+    expect(classify("손난로처럼 살짝 가열되는 컵받침").caution).toContain("뜨거워");
+    // 예전에는 '총'이라는 글자만 들어가도 막혔다
+    for (const idea of ["총 3개를 세는 장치", "총무가 쓰는 회비 알림판", "총합을 보여주는 저울"]) expect(classify(idea).safety.ok).toBe(true);
+    for (const idea of ["몰래 촬영하는 카메라", "전기 충격기", "장난감 총을 쏘는 장치 말고 진짜 총을 만들고 싶어"]) expect(classify(idea).safety.ok).toBe(false);
+    expect(classify("밤에 불 끄러 일어나기 귀찮아").caution).toBe("");
   });
+
   it("뿌리 장작은 갈래마다 2개 이상, 최대 10개이고 입력과 관련된 걸 먼저 준다", () => {
     for (const idea of ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "뭔가 재밌는 거", "현관문 잠갔는지 매번 불안해"]) {
       const { root } = chipTree(idea);
@@ -68,7 +77,7 @@ describe("규칙 기반 판별", () => {
   });
   it("AI 응답과 같은 모양을 돌려준다(§4)", () => {
     const a = analyzeFind("화분에 물 줄 때를 모르겠어");
-    expect(Object.keys(a).sort()).toEqual(["chips", "engine", "kind", "reason", "safety"]);
+    expect(Object.keys(a).sort()).toEqual(["caution", "chips", "engine", "kind", "reason", "safety"]);
     const reachable = new Set([...a.chips.root.map((r) => r.id), ...Object.values(a.chips.follow).flat().map((c) => c.id)]);
     expect(Object.keys(a.chips.follow).every((id) => reachable.has(id))).toBe(true);
   });

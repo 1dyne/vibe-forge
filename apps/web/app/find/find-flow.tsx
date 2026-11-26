@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CATS, FIRE, REACT_FIRE, ROOT_VISIBLE, compose, fireGain, fireLabel, fireName, lookup, reactKind, type Chip, type ChipTree, type ReactKind } from "../../lib/find/chips";
-import type { FindAnalysis } from "../../lib/find/classify";
+import { MAKER, type FindAnalysis, type MakerKind } from "../../lib/find/classify";
 import type { Maturity } from "../../lib/find/maturity";
 import type { ProjectMatch } from "../../lib/find/projects";
 import Dokkaebi from "./dokkaebi";
@@ -253,9 +253,10 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       {screen === "software" && (
         <section className="screen">
           <div className="muted small">“{idea}”</div>
-          <h2>이건 손 안 대도<br />되는 거야.</h2>
-          <p className="lead">{analysis?.reason ?? "앱이나 웹으로 충분해 보여."} 이럴 땐 바이브코딩이 제일 빨라.</p>
-          <VibeGuide idea={idea} />
+          <h2>이건 소프트웨어 달그락이<br />맡을 일이야.</h2>
+          <div className="maker-card" style={{ borderColor: MAKER.software.color }}><Dokkaebi motion="blaze" fire={60} width={150} hue={MAKER.software.hue} /><b style={{ background: MAKER.software.color }}>{MAKER.software.name}</b><p>{MAKER.software.line}</p></div>
+          <p className="lead">달그락 대장간에서는 앱·웹도 같은 방식으로 만들어. 무엇을 만들지 정리하고, 화면을 설계하고, 네가 쓰는 AI 코딩 도구에 그대로 넘길 수 있게 준비해 줘.</p>
+          <button className="btn btn-fire" type="button" onClick={() => { track("software_next"); go("forge"); }}>다음</button>
           <div className="note row">
             <div style={{ width: 76, flexShrink: 0 }}><Dokkaebi motion="idle" fire={50} width={76} /></div>
             <div>
@@ -264,16 +265,16 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
             </div>
           </div>
           <div className="spacer" />
-          <button className="btn" type="button" onClick={() => submitIdea(true)}>하드웨어로 바꿔보기</button>
+          <button className="btn btn-ghost" type="button" onClick={() => submitIdea(true)}>물건도 같이 만들어 보기 (쌍둥이 달그락)</button>
         </section>
       )}
 
       {screen === "unsafe" && (
         <section className="screen center">
           <Dokkaebi motion="fallen" fire={10} width={180} once />
-          <h2>앗, 이건 아직 못 다뤄.</h2>
+          <h2>앗, 이건 만들지 않아.</h2>
           <p className="lead" style={{ textAlign: "center" }}>{analysis?.safety.note}</p>
-          <p className="muted small" style={{ textAlign: "center" }}>대신 센서·불빛·작은 모터로 풀 수 있는 쪽으로 바꿔볼래?</p>
+          <p className="muted small" style={{ textAlign: "center" }}>다른 아이디어는 뭐든 좋아. 다시 들려줄래?</p>
           <button className="btn" type="button" onClick={() => go("intro")}>다른 걸로 해볼래</button>
         </section>
       )}
@@ -283,6 +284,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
           <div className="s2-head">
             <div className="s2-title">네 고민을 풀어 줄 물건을 같이 만들어 보자</div>
             <div className="muted small s2-idea">“{idea.trim()}”</div>
+            {analysis?.caution && <div className="s2-caution">{analysis.caution}</div>}
           </div>
           <div className="s2-stage">
             {no3d ? <div className="stage"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} once={stokeMotion === "fallen"} /></div>
@@ -326,7 +328,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       )}
 
       {screen === "reveal" && result && (
-        <Reveal result={result} picked={picked} find={find} idea={idea} onShare={() => { setShareOpen(true); track("share_open"); }}
+        <Reveal result={result} picked={picked} find={find} idea={idea} maker={analysis?.kind ?? "hardware"} onShare={() => { setShareOpen(true); track("share_open"); }}
           onAgain={() => { resetFire(); go("stoke"); }} onMore={() => { setResult(null); go("stoke"); }} onForge={() => go("forge")} />
       )}
 
@@ -365,16 +367,16 @@ function VibeGuide({ idea }: { idea: string }) {
   );
 }
 
-function Reveal({ result, picked, find, idea, onShare, onAgain, onMore, onForge }: {
-  result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
+function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, onForge }: {
+  maker: MakerKind; result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
 }) {
   const { fire, matches, unique, maturity, forge } = result;
   return (
     <section className="screen">
-      <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 도깨비불이 태어났어</div>
+      <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 아이디어를 맡을 달그락이야</div>
       {fire.card ? (
         <>
-          <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} kind={fire.reactKind as ReactKind} card={fire.card} />
+          <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} kind={fire.reactKind as ReactKind} card={fire.card} maker={maker} />
           <Roast head={fire.card.roast.head} body={fire.card.roast.body} kind={fire.reactKind as ReactKind} />
         </>
       ) : (
