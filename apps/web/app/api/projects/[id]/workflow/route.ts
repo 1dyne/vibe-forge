@@ -48,8 +48,12 @@ async function handlePOST(request: NextRequest, context: { params: Promise<{ id:
     if (input.action === "plan" && !canUseWebAi(viewer)) return webAiDenied();
     // 무료 분량이 남았는지 보고, 모자라면 여기서 멈춘다. 실패한 호출도 토큰은 나가므로
     // 보수적으로 먼저 적는다(운영자 계정은 자기 키를 쓰므로 세지 않는다).
-    { const denied = await budgetDenied(viewer, "build"); if (denied) return denied; }
-    if (process.env.APP_MODE === "live") await chargeTurn(viewer, "build");
+    // 앱 안의 AI를 부르는 것은 plan뿐이다. 승인·기록·체크는 AI를 쓰지 않으므로 세지 않는다.
+    // 전에는 모든 동작에서 세는 바람에, 승인 한 번에 하루치가 거의 다 깎여 다음 승인이 막혔다.
+    if (input.action === "plan") {
+      const denied = await budgetDenied(viewer, "build"); if (denied) return denied;
+      if (process.env.APP_MODE === "live") await chargeTurn(viewer, "build");
+    }
     const current = workflowFor(project);
     // Electrical rules marked blocked hold back approvals and assembly progress.
     const blocked = blockingChecks(project.build);

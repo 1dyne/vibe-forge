@@ -11,6 +11,7 @@ import { POST as mcpPost } from "../apps/web/app/api/mcp/[token]/route";
 import { POST as workflowPost } from "../apps/web/app/api/projects/[id]/workflow/route";
 import { createUser } from "../apps/web/lib/users";
 import { userSessionValue } from "../apps/web/lib/session";
+import { budgetDenied, chargeTurn } from "../apps/web/lib/usage";
 import type { CircuitComponent, CircuitNet } from "../apps/web/lib/project-types";
 
 const SECRET = "test-secret-for-parts-routes-0123456789";
@@ -144,6 +145,9 @@ describe("assembly guide on real parts", () => {
 
     const cookie = "dalgeurak_session=" + userSessionValue(token);
     const act = async (body: unknown) => (await workflowPost(new NextRequest(`http://localhost:3000/api/projects/${id}/workflow`, { method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie }, body: JSON.stringify(body) }), { params: Promise.resolve({ id }) })).json();
+    // 승인·기록은 앱 안의 AI를 쓰지 않는다. 무료 분량을 다 쓴 사람도 막히지 않아야 한다.
+    for (let i = 0; i < 20; i++) await chargeTurn({ kind: "user", user, vault: null } as unknown as Parameters<typeof chargeTurn>[0], "chat");
+    expect((await budgetDenied({ kind: "user", user, vault: null } as unknown as Parameters<typeof budgetDenied>[0], "build"))?.status).toBe(402);
     const reported = await act({ action: "assembly_report", step: 1, cardId: "lib:usb-5v-rail", text: "4.1V", value: 4.1 });
     expect(reported.project.assemblyReports.at(-1)).toMatchObject({ cardId: "lib:usb-5v-rail", judgement: "abnormal" });
     expect(reported.project.messages.at(-1).text).toContain("4.75~5.25V");
