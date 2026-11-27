@@ -632,6 +632,9 @@ button.world-enter { font: inherit; font-family: var(--font-display, Jua), sans-
 .find .maker-tag{align-self:center;margin:2px auto 6px;padding:3px 12px;border-radius:999px;border:2px solid #232323;color:#232323;font-size:13px;font-weight:700;width:max-content}
 .find .art.art-twin{display:flex;justify-content:center;gap:0}.find .art.art-twin .dk{margin:0 -14px}
 .find .maker-card{display:grid;justify-items:center;gap:8px;padding:18px 14px;border:3px solid;border-radius:20px;background:rgba(255,255,255,.06);text-align:center}
+.find .maker-say{display:grid;gap:8px;justify-items:center;text-align:center}
+.find .maker-say p{margin:0;max-width:32ch;word-break:keep-all}
+.find .maker-say .hand{font-weight:700;color:var(--ink)}
 .find .maker-card b{padding:3px 14px;border-radius:999px;border:2px solid #232323;color:#232323;font-size:14px}.find .maker-card p{margin:0;font-size:14px}
 .find .s2-caution{margin-top:6px;padding:8px 12px;border-radius:12px;background:rgba(237,182,154,.22);border:1.5px solid #EDB69A;font-size:12.5px;line-height:1.6;text-align:left}
 .find .steps-row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.find .steps-row span{padding:3px 10px;border-radius:999px;border:1.5px solid currentColor;font-size:12px;opacity:.4}.find .steps-row span.on{opacity:1;background:var(--fire,#4FB3A6);color:#1d1d1d;border-color:#1d1d1d}

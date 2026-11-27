@@ -22,7 +22,7 @@ const QUESTIONS: Array<{ cat: Chip["cat"]; q: string }> = [
   { cat: "누구", q: "누구를 위한 거야?" }
 ];
 
-const EXAMPLES = ["물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
+const EXAMPLES = ["재고를 하나씩 세는 게 너무 오래 걸려", "물 마시는 걸 자꾸 까먹어", "고양이가 밥 먹었는지 모르겠어", "책상에서 집중 시간을 재고 싶어"];
 const DICE = ["현관문 잠갔는지 매번 불안해", "화분에 물 줄 때를 모르겠어", "밤에 불 끄러 일어나기 귀찮아", "택배 왔는지 자꾸 나가봐", "스트레칭을 자꾸 까먹어", "방이 건조한지 모르겠어", "공부할 때 폰을 자꾸 만져", "강아지가 물을 얼마나 마셨는지 궁금해"];
 const PH = [...EXAMPLES, ...DICE];
 const WORDS_BASE = 12; // 칩 하나(6)의 두 배부터
@@ -337,7 +337,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
       )}
 
       {screen === "reveal" && result && (
-        <Reveal result={result} picked={picked} find={find} idea={idea} maker={analysis?.kind ?? "hardware"} onShare={() => { setShareOpen(true); track("share_open"); }}
+        <Reveal result={result} picked={picked} find={find} idea={idea} maker={analysis?.kind ?? "hardware"} nickname={nickname} onShare={() => { setShareOpen(true); track("share_open"); }}
           onAgain={() => { resetFire(); go("stoke"); }} onMore={() => { setResult(null); go("stoke"); }} onForge={() => void goAbout(result.fire.id)} />
       )}
 
@@ -376,13 +376,36 @@ function VibeGuide({ idea }: { idea: string }) {
   );
 }
 
-function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, onForge }: {
-  maker: MakerKind; result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
+/** 속성마다 실제로 달게 되는 부품. '빛 속성'이 무슨 말인지 모르는 사람에게는 이 한 줄이 설명의 전부다. */
+const ATTR_PART: Record<string, string> = {
+  light: "불빛을 내는 LED",
+  sound: "소리를 내는 버저",
+  move: "움직이는 모터",
+  none: "폰으로 보내는 무선 부품"
+};
+
+/** 어느 달그락이 맡는지 먼저 말해 준다. 카드의 이름표만으로는 처음 보는 사람이 읽고 넘어간다. */
+function MakerSay({ maker, card, nickname }: { maker: MakerKind; card: FireCard | null; nickname: string }) {
+  const who = nickname.trim();
+  const attr = card?.attr;
+  return (
+    <div className="maker-say">
+      <p className="tiny muted">네 아이디어를 맡을 달그락이야</p>
+      <h2>이건 {MAKER[maker].name}이<br />맡을 거야.</h2>
+      <p className="body">{MAKER[maker].line}</p>
+      {maker === "design" && <p className="body hand">디자인이 들어가야 해서 {who ? `${who}의` : "네"} 손이 더 많이 필요해!</p>}
+      {attr && <p className="small muted">카드에 붙은 <b>{attr.label}</b>은 네가 고른 반응이야. {ATTR_PART[attr.kind] ?? "알맞은 부품"} 같은 걸 달게 되고, 무엇을 보고 알려줄지는 ‘감지’에서 고른 센서가 정해.</p>}
+    </div>
+  );
+}
+
+function Reveal({ result, picked, find, idea, maker, nickname, onShare, onAgain, onMore, onForge }: {
+  maker: MakerKind; result: Result; picked: string[]; find: (id: string) => Chip | undefined; idea: string; nickname: string; onShare: () => void; onAgain: () => void; onMore: () => void; onForge: () => void;
 }) {
   const { fire, matches, unique, maturity, forge } = result;
   return (
     <section className="screen">
-      <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 아이디어를 맡을 달그락이야</div>
+      <MakerSay maker={maker} card={fire.card} nickname={nickname} />
       {fire.card ? (
         <>
           <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} card={fire.card} maker={maker} />
