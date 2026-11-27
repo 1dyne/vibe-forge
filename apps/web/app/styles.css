@@ -210,28 +210,8 @@
    계정에 속한 것과 연결에 속한 것을 작은 머리말로 갈라준다. */
 .nav-group{display:block;width:100%;font-size:10px;letter-spacing:.08em;color:#9aa49d;margin:8px 0 2px}
 
-/* 달그락은 다섯이 모두 같은 그림을 쓴다. 이름표 글자색만 달라서 어느 달그락인지
-   알아보려면 글자를 읽어야 했고, 대장과 HW는 그 색마저 같았다. 색만 바꿔 한눈에
-   구분되게 한다 — 어느 달그락이 말하고 있는지가 곧 지금 어느 일을 하는 중인지다.
-   민트(대장)를 기준으로 색상환을 돌린다. 윤곽선은 검정에 가까워 거의 영향이 없다. */
-.avatar-hw>img{filter:hue-rotate(-150deg) saturate(1.3)}
-.avatar-sw>img{filter:hue-rotate(85deg) saturate(.9)}
-.avatar-me>img{filter:hue-rotate(-105deg) saturate(.85)}
-.avatar-id>img{filter:hue-rotate(165deg) saturate(.9)}
-.avatar-hw b{background:#f3e0d1;color:#8a4e2c}
 .dot-chief{background:#548b7c}
 .dot-hw{background:#c07a4e}
-/* 말하는 사람 이름도 같은 색을 쓴다. 아바타와 이름이 따로 놀면 색이 기억에 안 남는다. */
-.chat-message.agent-chief .message-meta strong{color:#356c58}
-.chat-message.agent-hw .message-meta strong{color:#8a4e2c}
-.chat-message.agent-sw .message-meta strong{color:#686381}
-.chat-message.agent-me .message-meta strong{color:#886d42}
-.chat-message.agent-id .message-meta strong{color:#9b5d7d}
-.agent-pill-chief{background:#d5e7dd;color:#356c58}
-.agent-pill-hw{background:#f3e0d1;color:#8a4e2c}
-.agent-pill-sw{background:#e7e6f1;color:#686381}
-.agent-pill-me{background:#efdfc7;color:#886d42}
-.agent-pill-id{background:#eddde5;color:#9b5d7d}
 
 /* 새로 온 것. 숫자만 늘어나면 바뀐 줄을 모르고 지나가므로, 한 번 반짝이고
    점으로 남는다. 계속 깜빡이면 그게 더 큰 소음이라 반짝임은 한 번만 준다. */
@@ -484,4 +464,9 @@ tr.is-new{animation-name:new-flash-row}
 .shop-add{display:flex;gap:8px;margin-top:8px}.shop-add input{flex:1}
 .space-shortcut{margin:10px 0 14px;padding:12px 14px;border-radius:12px;background:#fdf3ec;border:1.5px solid var(--c-user)}.space-shortcut p{margin:4px 0 0;font-size:13px}
 .dot-hwlead{background:var(--c-hw-team)}.agent-hwlead .message-meta strong{color:#5f5a94}
+/* 아바타 밑 이름표도 같은 색 한 벌을 쓴다.
+   달그락 그림은 이미 이 색으로 칠해져 있으므로 그림에 색 필터를 걸지 않는다(걸면 색이 한 번 더 돌아간다). */
+.avatar b{border:1px solid #2323232e;color:var(--ink)}
+.avatar-chief b{background:var(--c-chief)}.avatar-hwlead b{background:var(--c-hw-team)}.avatar-hw b{background:var(--c-ee)}
+.avatar-sw b{background:var(--c-sw)}.avatar-me b{background:var(--c-me)}.avatar-id b{background:var(--c-id)}
 .rooms button.sub-room{margin-left:16px;width:calc(100% - 16px)}

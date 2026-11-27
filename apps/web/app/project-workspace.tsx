@@ -41,7 +41,7 @@ const phaseNames = {brainstorm:"아이디어",circuit:"계획 · 회로",mockup:
 // 달그락은 팀마다 색이 다르다(대장 민트, 하드웨어 붉은색, 소프트웨어 파란색, 기구설계 노란색, 제품 디자인 보라색).
 const characterSrc=(agent:AgentId,frame:"idle"|"thinking_1"|"thinking_2")=>"/characters/"+(agent==="chief"?"":agent+"/")+frame+".png";
 function Avatar({ agent="chief", busy=false, large=false }: {agent?:AgentId;busy?:boolean;large?:boolean}) {
-  return <span className={["avatar",large?"large":"","avatar-"+agent].join(" ")}><img src={characterSrc(agent,"idle")} alt={AGENTS[agent].name+" 캐릭터"} className={busy?"hidden":""}/>{busy&&<><img className="thinking first" src={characterSrc(agent,"thinking_1")} alt="생각하는 달그락"/><img className="thinking second" src={characterSrc(agent,"thinking_2")} alt=""/></>}<b>{agent==="chief"?"대장":agent.toUpperCase()}</b></span>;
+  return <span className={["avatar",large?"large":"","avatar-"+agent].join(" ")}><img src={characterSrc(agent,"idle")} alt={AGENTS[agent].name+" 캐릭터"} className={busy?"hidden":""}/>{busy&&<><img className="thinking first" src={characterSrc(agent,"thinking_1")} alt="생각하는 달그락"/><img className="thinking second" src={characterSrc(agent,"thinking_2")} alt=""/></>}<b>{AGENTS[agent].short}</b></span>;
 }
 
 export default function ProjectWorkspace() {
