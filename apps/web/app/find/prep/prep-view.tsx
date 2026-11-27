@@ -19,6 +19,7 @@ export default function PrepView({ contact }: { contact: string }) {
       <Reveal kind="pop"><img src="/characters/idle.png" alt="" width={110} height={110} /></Reveal>
       <Reveal delay={80}><h1>밋업 오기 전에<br />이것만 해 와요</h1></Reveal>
       <Reveal delay={180}><p><b>직접 해 보고 싶은 분께 추천해요.</b> 15분이면 돼요. Claude 무료 계정을 쓰고 있거나 설치가 내키지 않으면 아무것도 깔지 않고 오셔도 돼요. 현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
+      <Reveal delay={260}><p className="prep-pdf"><a href="/find/prep.pdf" download="달그락-밋업-준비.pdf">PDF로 받기 ↓</a></p></Reveal>
     </section>
 
     <section style={{ paddingTop: 24 }}>
@@ -29,6 +30,7 @@ export default function PrepView({ contact }: { contact: string }) {
         <Reveal as="article"><b>휴대폰</b>만든 저울을 휴대폰 앱과 이어 볼 거예요. 블루투스가 되면 돼요.</Reveal>
         <Reveal as="article" delay={100}><b>구글 계정</b>달그락 대장간 가입에 써요.</Reveal>
       </div>
+      <Reveal><p className="prep-note">납땜 도구와 부품은 가져오지 않아도 돼요. 납땜과 펌웨어(보드 안에서 도는 프로그램) 올리기는 미리 해서 가져가요. 현장에서는 그런 단계가 있다는 것을 함께 보기만 해요.</p></Reveal>
     </section>
 
     <section>
@@ -44,13 +46,13 @@ export default function PrepView({ contact }: { contact: string }) {
       <Reveal><span className="tag">2</span><h2>Node.js를 설치해요</h2><p className="lead">Claude Code와 연결 프로그램을 돌리는 데 필요해요. 무료이고, 한 번만 깔면 돼요.</p></Reveal>
       <Reveal><div className="install"><ol>
         <li><a href="https://nodejs.org/ko" target="_blank" rel="noreferrer noopener">nodejs.org</a>에서 <b>LTS</b>라고 적힌 것을 내려받아 설치해요. 묻는 것은 모두 기본값으로 <b>다음</b>을 눌러요.</li>
-        <li>{term("터미널(윈도우는 PowerShell)", "node -v")}을 <b>새로</b> 열고 아래를 붙여넣어 Enter를 눌러요. 처음 듣는 말이라면 저 글자를 눌러 보세요. 여는 법이 그림으로 나와요.<Copy text="node -v" /></li>
+        <li>{term("터미널(윈도우는 PowerShell)", "node -v")}을 <b>새로</b> 열고 아래를 붙여넣어 Enter를 눌러요. 처음 듣는 말이라면 아래 ‘터미널 여는 법’을 보세요. (화면에서는 저 글자를 누르면 그림으로도 나와요.)<Copy text="node -v" /></li>
         <li><code>v20</code> 이상의 숫자가 나오면 된 거예요. (예: <code>v22.11.0</code>)</li>
       </ol></div></Reveal>
     </section>
 
     <section>
-      <Reveal><span className="tag">3</span><h2>Claude Code를 설치하고 로그인해요</h2><p className="lead">Claude Code는 Anthropic이 만든 프로그램이에요. 달그락 대장간은 내 컴퓨터의 Claude Code에게 일을 부탁해요. <b>Claude 유료 구독(Pro 이상)</b>이 필요해요.</p></Reveal>
+      <Reveal><span className="tag">3</span><h2>Claude Code를 설치하고 로그인해요</h2><p className="lead">Claude Code는 Anthropic이 만든 프로그램이에요. 달그락 대장간은 내 컴퓨터의 Claude Code에게 일을 부탁해요. <b>Claude 유료 구독(Pro 이상)</b>이 필요해요. 달그락 대장간은 ChatGPT로도 쓸 수 있지만, <b>이번 밋업에서는 Claude를 써요.</b></p></Reveal>
       <Reveal><div className="install"><ol>
         <li>{term("터미널", CLAUDE_INSTALL)}에 아래를 붙여넣고 Enter를 눌러요. 1~2분 걸려요.<Copy text={CLAUDE_INSTALL} /></li>
         <li>끝나면 아래를 치고 Enter를 눌러요.<Copy text="claude" /></li>
@@ -68,8 +70,17 @@ export default function PrepView({ contact }: { contact: string }) {
         <li>터미널에 <b>“준비됐어요”</b>가 보이면 끝이에요. <a href="/" target="_blank" rel="noreferrer">dalgrak.app</a>을 열어, 아래 입력창의 모델 고르기에 <b>Claude</b>가 있는지 확인해요.</li>
         <li>확인했으면 터미널 창을 닫아요. 밋업 날에는 1번 줄만 다시 붙여넣으면 바로 켜져요.</li>
       </ol>
-      <details className="prep-alt"><summary>Claude 구독은 없고 ChatGPT 유료 요금제만 있어요</summary><p>3번을 건너뛰고 4번만 해요. 달그락 로그인 다음에 브라우저가 한 번 더 열리면 <b>ChatGPT</b>에 로그인하고 “ChatGPT 요금제 사용”을 허용해요. 이때는 연결 프로그램이 ChatGPT 로그인 증표를 내 컴퓨터에 잠가서 보관해요.</p></details>
       </div></Reveal>
+    </section>
+
+    <section>
+      <Reveal><span className="tag">처음이라면</span><h2>터미널 여는 법</h2><p className="lead">터미널은 컴퓨터에게 글자로 일을 시키는 창이에요. 여기서는 한 줄을 붙여넣고 Enter만 누르면 돼요. 컴퓨터에 원래 들어 있어요.</p></Reveal>
+      <div className="needs" style={{ marginTop: 0 }}>
+        <Reveal><div><b>윈도우</b>키보드의 <kbd>⊞ Win</kbd> 키를 누르고 <code>powershell</code>이라고 쳐요. 맨 위의 <b>Windows PowerShell</b>을 눌러 열어요. “관리자 권한으로 실행”은 고르지 않아요. 붙여넣기는 <kbd>Ctrl</kbd>+<kbd>V</kbd> 또는 마우스 오른쪽 버튼.</div></Reveal>
+        <Reveal delay={100}><div><b>맥</b><kbd>⌘</kbd>+<kbd>Space</kbd>를 눌러 검색창을 열고 <code>터미널</code>이라고 쳐요. 맨 위의 <b>터미널</b>을 눌러 열어요. 붙여넣기는 <kbd>⌘</kbd>+<kbd>V</kbd>.</div></Reveal>
+        <Reveal><div><b>주의</b>비밀번호는 터미널에 치지 않아요. 로그인은 항상 브라우저에서 해요. 이 안내에 적힌 줄만 붙여넣어요.</div></Reveal>
+        <Reveal delay={100}><div><b>‘명령을 찾을 수 없다’고 나오면</b>Node.js 설치 뒤에 터미널을 닫았다가 다시 열어야 해요. 그래도 안 되면 2번부터 다시 봐요.</div></Reveal>
+      </div>
     </section>
 
     <section>

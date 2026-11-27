@@ -69,3 +69,9 @@
 .prep a{color:#2e6b5c;font-weight:600}.prep .btn-main{color:var(--ink)}
 .prep .install{overflow:hidden}.prep .install ol{min-width:0}.prep .install li{min-width:0;overflow-wrap:anywhere}.prep .prep-copy{max-width:100%}.prep .prep-copy code{width:0}
 .prep .prep-alt{margin-top:12px;font-size:14px}.prep .prep-alt summary{cursor:pointer;font-weight:600;color:#4d4840}.prep .prep-alt p{margin:8px 0 0}
+.prep .prep-pdf a{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;border:2px solid var(--ink);border-radius:999px;background:#fff;text-decoration:none;color:var(--ink)}
+.prep kbd{border:1.5px solid var(--ink);border-radius:6px;padding:0 6px;background:#fff;font:inherit;font-size:13px}.prep .needs code{background:#f1ebde;border-radius:5px;padding:1px 5px}
+/* 인쇄·PDF: 숨겨 둔 것 없이, 버튼 없이 */
+@media print{.intro{background:#fff}.intro .rv{opacity:1!important;transform:none!important}.intro .sticky-cta,.intro .scroll-hint,.prep .prep-pdf,.prep .prep-copy button{display:none!important}.intro section{padding:18px 8px;break-inside:avoid}.intro .hero{min-height:auto!important;padding-top:8px}.intro .shot,.intro .maker-note,.intro .btn-main{box-shadow:none}.prep .install,.prep .needs>div,.prep .town-grid article{break-inside:avoid}.prep .prep-copy code{width:auto;white-space:normal}}
+.prep .needs>div>div b:not(:first-child){display:inline}
+@media print{.intro section{break-inside:auto;padding:10px 8px}.intro h2{break-after:avoid}.intro .lead{break-after:avoid}.intro .cta{padding-bottom:0!important}.intro .hero img{width:80px;height:80px}.intro .hero h1{font-size:34px}}
