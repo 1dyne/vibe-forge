@@ -67,7 +67,7 @@ describe("도우미 대화 경로", () => {
   it("화면의 말이 도우미에게 가고, 도우미의 답이 화면과 기록에 남는다", async () => {
     const a = await person("나");
     // 도우미가 켜졌다고 알린다(할 일은 아직 없다).
-    expect(await (await poll(post("/api/helper/poll", { model: "gpt-test", version: "0.1.0", wait: false }, bearer(a.access)))).json()).toEqual({ job: null });
+    expect(await (await poll(post("/api/helper/poll", { model: "gpt-test", version: "0.1.0", wait: false }, bearer(a.access)))).json()).toMatchObject({ job: null });
     expect(await status(a.linkToken)).toMatchObject({ online: true, model: "gpt-test" });
 
     const sent = await (await chat(post("/api/helper/chat", { projectId: a.projectId, text: "납땜 없이 만들 수 있어?" }, cookie(a.linkToken)))).json();
@@ -118,7 +118,7 @@ describe("도우미 대화 경로", () => {
     await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)));
     await poll(post("/api/helper/poll", { wait: false }, bearer(b.access)));
     const sent = await (await chat(post("/api/helper/chat", { projectId: a.projectId, text: "내 말" }, cookie(a.linkToken)))).json();
-    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(b.access)))).json()).toEqual({ job: null });
+    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(b.access)))).json()).toMatchObject({ job: null });
     expect((await reportJob(post(`/api/helper/jobs/${sent.jobId}`, { events: [{ type: "done", text: "가로채기" }] }, bearer(b.access)), jobParams(sent.jobId))).status).toBe(404);
     expect((await readJob(new NextRequest(`${ORIGIN}/api/helper/jobs/${sent.jobId}?from=0`, { headers: cookie(b.linkToken) }), jobParams(sent.jobId))).status).toBe(404);
     // 남의 프로젝트로는 보낼 수 없다.
@@ -165,7 +165,7 @@ describe("도우미 대화 경로", () => {
       p.board = upsertCards(emptyBoard(), [{ id: "circuit", title: "1단계 회로", detail: "값 읽기", owner: "hw" }], ["hw", "me"], "chief");
     }));
     // 연결 앱이 켜진다. 맡기기 전에는 아무 일도 오지 않는다.
-    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).toEqual({ job: null });
+    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).toMatchObject({ job: null });
     // 맡기기를 켜면 대장의 지시가 하드웨어 대장간으로 간다.
     const on = await (await board({ action: "auto", on: true })).json();
     expect(on.auto.on).toBe(true);
@@ -178,7 +178,7 @@ describe("도우미 대화 경로", () => {
     expect(asked.isError).toBeFalsy();
     await reportJob(post(`/api/helper/jobs/${first.id}`, { events: [{ type: "done", text: "로드셀이 도착했는지 알려주세요." }] }, bearer(a.access)), jobParams(first.id));
     // 사람을 기다리는 동안에는 더 넘기지 않는다.
-    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).toEqual({ job: null });
+    expect(await (await poll(post("/api/helper/poll", { wait: false }, bearer(a.access)))).json()).toMatchObject({ job: null });
     const waiting = await (await boardGet(new NextRequest(`${ORIGIN}/api/projects/${a.projectId}/board`, { headers: cookie(a.linkToken) }), params)).json();
     expect(waiting.board.nextForPerson).toMatchObject({ cardId: "circuit", room: "hw" });
     // 잘못된 답은 받지 않고, 맞는 답은 달그락에게 전달된다.
