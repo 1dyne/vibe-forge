@@ -85,10 +85,11 @@ export default function PrepView({ contact }: { contact: string }) {
       </div></Reveal>
 
       <Reveal><div className="install"><h3><i>1</i>달그락 대장간에 가입해요</h3><ol>
-        <li>노트북에서 <a href="/join" target="_blank" rel="noreferrer">dalgrak.app/join</a>을 열어요.</li>
-        <li>별명을 적고 동의 칸을 누른 뒤 <b>구글로 가입하기</b>를 눌러요.</li>
-        <li>아래 그림 같은 화면이 나오면 끝이에요. 이 화면을 ‘대장간’이라고 불러요.</li>
-      </ol><figure className="prep-shot"><img src="/find/forge-screen.png" alt="달그락 대장간 화면. 왼쪽에 프로젝트 목록, 가운데에 대화, 아래에 글을 쓰는 칸이 있다" /><figcaption>달그락 대장간 화면이에요. 왼쪽은 내 프로젝트, 가운데는 달그락과의 대화, 맨 아래는 글을 쓰는 칸이에요. (그림 속 내용은 예시예요.)</figcaption></figure><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
+        <li>노트북에서 <a href="/meetup" target="_blank" rel="noreferrer">dalgrak.app/meetup</a>을 열어요.</li>
+        <li>가입 화면이 나와요. 별명을 적고 동의 칸 세 개를 누른 뒤 <b>구글로 가입하기</b>를 눌러요.</li>
+        <li>구글 계정을 고르면 잠시 뒤 아래 그림 같은 화면이 나와요. 왼쪽에 <b>사만다 재고 저울</b>이 보이면 끝이에요. 밋업에서 함께 볼 프로젝트예요.</li>
+        <li>다음에 다시 올 때도 <b>dalgrak.app/meetup</b>을 열면 이 화면으로 와요.</li>
+      </ol><figure className="prep-shot"><img src="/find/forge-screen.png" alt="달그락 대장간 화면. 왼쪽 목록에 사만다 재고 저울 프로젝트가 있고 가운데에 대장 달그락과의 대화가 있다" /><figcaption>달그락 대장간 화면이에요. 왼쪽은 내 프로젝트(사만다 재고 저울), 가운데는 달그락과의 대화예요. 맨 아래는 글을 쓰는 칸이에요.</figcaption></figure><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
 
       <Reveal><div className="install"><h3><i>2</i>Node.js를 설치해요</h3>
         <p>3번과 4번을 돌리는 데 필요한 무료 프로그램이에요.</p><ol>

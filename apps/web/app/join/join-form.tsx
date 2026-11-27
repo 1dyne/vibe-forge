@@ -51,7 +51,9 @@ export default function JoinForm({ needsCode, google, email: emailOpen, askGoogl
   }
   function continueGoogle() {
     // 가입을 마치면 환영 화면으로 간다(마을 소개, 홈 화면에 추가, 내 아이디어로 시작).
-    const params = new URLSearchParams({ intent: "signup", agree: "1", next: "/welcome" });
+    // 다른 곳에서 가입하러 온 사람은(예: 밋업 주소) 가입 뒤 그곳으로 돌려보낸다.
+    const back = new URLSearchParams(window.location.search).get("next");
+    const params = new URLSearchParams({ intent: "signup", agree: "1", next: back && /^\/(?!\/)[\w\-./]*$/.test(back) ? back : "/welcome" });
     if (name.trim()) params.set("name", name.trim());
     if (needsCode) params.set("invite", code.trim());
     window.location.assign(`/api/auth/google/start?${params}`);
