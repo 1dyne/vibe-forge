@@ -60,3 +60,10 @@
 .intro .smith b{display:block;font-family:var(--font-display),var(--font-sans),sans-serif;font-weight:400;font-size:22px}.intro .smith small{color:#6f6a61;font-size:13px}
 .intro .cta h2{line-height:1.35}
 .intro .smith img{width:84px;height:104px;border-radius:16px;background:#fff;padding:2px;object-fit:cover}
+/* 밋업 준비 안내 */
+.prep .prep-copy{display:flex;gap:8px;align-items:center;margin:8px 0}.prep .prep-copy code{flex:1;min-width:0;overflow:auto;white-space:nowrap;padding:10px 12px;border:2px solid var(--ink);border-radius:10px;background:#fffdf8;font-size:14px}
+.prep .prep-copy button{flex:none;min-height:42px;padding:0 14px;border:2px solid var(--ink);border-radius:10px;background:#9DD2C8;font-weight:700;cursor:pointer}
+.prep .prep-link{display:inline;border:0;background:transparent;padding:0;color:#2e6b5c;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.prep .prep-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:#fdeee3;font-size:14px}
+.prep .install ol{font-size:15.5px;line-height:1.8}.prep .install code{background:#f1ebde;border-radius:5px;padding:1px 5px}.prep .os-tabs button{font-size:14px;white-space:normal;min-height:46px}
+.prep a{color:#2e6b5c;font-weight:600}.prep .btn-main{color:var(--ink)}
