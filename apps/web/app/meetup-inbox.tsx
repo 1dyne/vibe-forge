@@ -26,17 +26,18 @@ export default function MeetupInbox({ project, onProject }: { project: LocalProj
     return () => { stop = true; clearTimeout(timer); };
   }, [id]);
 
-  if (!code) return null;
+  // 주소 목록은 평소에는 숨긴다(참가자 화면에 보일 이유가 없다). 발표자가 주소 끝에 #links 를 붙여 열 때만 보인다.
+  if (!code || typeof window === "undefined" || window.location.hash !== "#links") return null;
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const links: Array<[string, string, string]> = [
     ["아이디어 보내기", `${origin}/find/idea/${code}`, "로그인 없이 한 줄 보내기"],
-    ["내 계정에 받기", `${origin}/api/meetup/start`, "가입한 사람이 이 프로젝트를 자기 것으로"],
+    ["내 계정에 받기", `${origin}/meetup`, "가입한 사람이 이 프로젝트를 자기 것으로"],
     ["셈 사용설명서", `${origin}/find/sam`, "설치법과 쓰는 법"],
     ["3D 조립 따라 하기", `${origin}/find/practice/sam-scale`, "로그인 없이 조립만"]
   ];
   const copy = (label: string, url: string) => { void navigator.clipboard?.writeText(url).then(() => { setCopied(label); setTimeout(() => setCopied(""), 1800); }); };
   return (
-    <details className="meetup-inbox">
+    <details className="meetup-inbox" open>
       <style>{`
         .meetup-inbox{margin:0 0 10px;border:1.5px dashed var(--ink,#232323);border-radius:12px;background:#fffdf8;padding:7px 12px;font-size:13.5px}
         .meetup-inbox summary{cursor:pointer;font-weight:700}

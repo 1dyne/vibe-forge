@@ -96,3 +96,4 @@
 .prep .prep-block button{display:block;width:100%;min-height:44px;border:0;border-top:2px solid var(--ink);background:#9DD2C8;font-weight:700;cursor:pointer}
 .prep .prep-manual{margin-top:18px}.prep .prep-manual>summary{cursor:pointer;font-weight:700;padding:10px 0;color:#4d4840}
 @media print{.prep .prep-manual,.prep .prep-block button{display:none!important}.prep .prep-block{break-inside:avoid}}
+@media print{html,body,.intro,.intro.prep{background:#fff!important;min-height:0!important}.intro .cta{background:transparent}}
