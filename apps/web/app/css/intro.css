@@ -67,3 +67,4 @@
 .prep .prep-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:#fdeee3;font-size:14px}
 .prep .install ol{font-size:15.5px;line-height:1.8}.prep .install code{background:#f1ebde;border-radius:5px;padding:1px 5px}.prep .os-tabs button{font-size:14px;white-space:normal;min-height:46px}
 .prep a{color:#2e6b5c;font-weight:600}.prep .btn-main{color:var(--ink)}
+.prep .install{overflow:hidden}.prep .install ol{min-width:0}.prep .install li{min-width:0;overflow-wrap:anywhere}.prep .prep-copy{max-width:100%}.prep .prep-copy code{width:0}
