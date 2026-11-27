@@ -14,7 +14,6 @@ function Copy({ text }: { text: string }) {
 // 밋업 참가자가 오기 전에 읽는 안내. 대부분 PDF로 본다. 터미널을 처음 보는 사람이 읽는다.
 export default function PrepView({ contact }: { contact: string }) {
   const [terminal, setTerminal] = useState<string | null>(null);
-  const picture = (command: string) => <button type="button" className="prep-link" onClick={() => setTerminal(command)}>그림으로 보기</button>;
   return <main className="intro prep">
     <section className="hero" style={{ minHeight: "auto", paddingBottom: 20 }}>
       <Reveal kind="pop"><img src="/characters/idle.png" alt="" width={100} height={100} /></Reveal>
@@ -44,7 +43,12 @@ export default function PrepView({ contact }: { contact: string }) {
     <section>
       <Reveal><span className="tag">가져올 것</span><h2>가방에 넣을 것</h2></Reveal>
       <div className="prep-facts">
-        <Reveal><div><b>노트북과 충전기</b>윈도우나 맥. 충전기 대신 노트북을 충전할 수 있는 보조배터리도 좋아요.</div></Reveal>
+        <Reveal><div><b>노트북</b>윈도우나 맥이면 돼요.</div></Reveal>
+        <Reveal><div><b>노트북 충전기, 또는 노트북을 충전할 수 있는 보조배터리</b>
+          <p>우리가 만드는 스마트 재고 측정기 ‘셈’은 전기를 아주 조금만 쓰는 기기예요.</p>
+          <p>일반 보조배터리는 전기를 조금만 쓰면 “다 썼나 보다” 하고 전원을 스스로 끊어 버려요. 그래서 일반 보조배터리에 꽂으면 연결이 안 될 때가 있어요.</p>
+          <p>현장에서는 <b>노트북의 USB-C 구멍</b>에 꽂아서 써요. 그래서 노트북이 꺼지지 않게 충전기를 챙기거나, 노트북을 충전할 수 있는 보조배터리를 가져오면 돼요.</p>
+        </div></Reveal>
         <Reveal><div><b>휴대폰</b>완성된 저울을 휴대폰과 이어 보는 순서가 있어요.</div></Reveal>
         <Reveal><div><b>가져오지 않아도 되는 것</b>납땜 도구와 부품. 납땜과 펌웨어(보드 안에서 도는 프로그램) 올리기는 미리 해서 가져가요. 현장에서는 그런 단계가 있다는 것을 함께 보기만 해요.</div></Reveal>
       </div>
@@ -63,7 +67,7 @@ export default function PrepView({ contact }: { contact: string }) {
         </ul>
         <p><b>붙여넣는 법</b>: 윈도우는 창 안에서 <b>마우스 오른쪽 버튼</b>을 한 번, 맥은 <kbd>⌘</kbd>+<kbd>V</kbd>.</p>
         <p className="prep-note"><b>“스크립트를 실행할 수 없습니다”</b>나 빨간 글씨가 나오면 PowerShell을 연 거예요. 그 창을 닫고 위 방법대로 <b>명령 프롬프트</b>를 열어 다시 해요. <b>“…은(는) 내부 또는 외부 명령이 아닙니다”</b>가 나오면 창을 닫았다가 새로 열어요(설치한 뒤에는 새 창이어야 해요).</p>
-        <p className="prep-screen">{picture("node -v")} <small>(이 페이지에서만 눌러져요)</small></p>
+        <figure className="prep-shot"><img src="/find/cmd-open.png" alt="윈도우 검색창에 cmd를 입력하자 맨 위에 명령 프롬프트가 나온 실제 화면. 검색창과 명령 프롬프트에 빨간 상자가 쳐져 있다" /><figcaption>윈도우 실제 화면이에요. <b>위 빨간 칸</b>에 <code>cmd</code>를 치고, <b>아래 빨간 칸</b>의 명령 프롬프트를 눌러요.</figcaption></figure>
       </div></Reveal>
 
       <Reveal><div className="install"><h3><i>1</i>달그락 대장간에 가입해요</h3><ol>
@@ -92,7 +96,7 @@ export default function PrepView({ contact }: { contact: string }) {
         <li>터미널을 <b>새로</b> 열고, 아래 글자를 붙여넣고 <kbd>Enter</kbd>.<Copy text={COMMAND} /></li>
         <li><code>Ok to proceed? (y)</code>라고 나오면 <kbd>y</kbd>를 누르고 <kbd>Enter</kbd>.</li>
         <li>브라우저가 열리면 달그락 대장간에 로그인하고 <b>허용</b>을 눌러요.</li>
-        <li>터미널에 <b>“준비됐어요”</b>가 나오면 성공이에요.</li>
+        <li>터미널에 <b>“준비됐어요. 모델: claude…”</b>가 나오면 성공이에요.</li>
         <li>창을 닫아요. 밋업 날에는 1번만 다시 하면 바로 켜져요.</li>
       </ol><p className="prep-note">이 프로그램은 내 컴퓨터의 파일을 읽거나 고치지 않고, 내 Claude 로그인 정보를 달그락 서버로 보내지 않아요. 코드는 공개돼 있어요(<a href="https://github.com/1dyne/dalgrak-helper/blob/main/SECURITY.md" target="_blank" rel="noreferrer noopener">보안 안내</a>). 지우려면 터미널에 <code>{COMMAND} logout</code>.</p></div></Reveal>
     </section>

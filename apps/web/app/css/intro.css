@@ -83,3 +83,9 @@
 .prep .install p{margin:6px 0}.prep .prep-term{background:#fdf7e6}.prep .prep-term>b{font-size:18px}.prep .prep-term ul{margin:4px 0;padding-left:20px;display:grid;gap:6px}
 .prep .prep-screen small{color:#7b756a}
 @media print{.prep .prep-facts>.rv,.prep .install,.prep .rv{break-inside:avoid}.prep .prep-screen{display:none}.prep section{padding:8px 8px!important}.prep .hero{padding-top:0!important}.prep h2{margin-top:6px}.prep .cta{break-inside:avoid}}
+/* 한글은 낱말 가운데에서 줄이 바뀌지 않게 ("없어 / 요"처럼 끊기지 않게) */
+.intro{word-break:keep-all;overflow-wrap:break-word}.intro code{word-break:break-all}
+.prep .prep-facts{gap:16px}.prep .prep-facts p{margin:8px 0 0}
+.prep .prep-shot{margin:12px 0 0;border:2px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff}.prep .prep-shot img{display:block;width:100%;height:auto}.prep .prep-shot figcaption{padding:8px 12px;border-top:2px solid var(--ink);font-size:14px}
+@media print{.prep .prep-shot{break-inside:avoid;max-width:420px}.prep .prep-facts{gap:12px}}
+.prep .prep-facts p b,.prep .prep-facts li b{display:inline!important;font-size:inherit!important;margin:0!important}
