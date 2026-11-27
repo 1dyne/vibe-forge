@@ -66,7 +66,7 @@ describe("SAM 시드", () => {
       expect(pin("HX1", hx).y).toBeCloseTo(pin("U1", atom).y, 1);
     }
     expect(kit.parts.find((p) => p.ref === "U1")!.spec!.foot!.lift).toBe(6.8);
-    expect(kit.steps.slice(0, 5).map((s) => !!s.prepared)).toEqual([true, true, false, false, false]);
+    expect(kit.steps.slice(0, 5).map((s) => !!s.prepared)).toEqual([true, true, true, false, false]); // 납땜 두 번과 로드셀 고정은 미리 해 온다
     expect(kit.steps.some((s) => s.ops.some((o) => o.op === "enclose"))).toBe(true);
   });
 });

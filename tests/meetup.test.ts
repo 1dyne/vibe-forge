@@ -125,7 +125,7 @@ describe("밋업 시연 모드", () => {
     const list = (await asGuest("list_projects", {})).structuredContent!.projects as Array<{ id: string; name: string }>;
     expect(list.map((p) => p.name)).toEqual(["사만다 재고 저울"]);
     const theirs = (await asGuest("get_project", { projectId: where })).structuredContent!;
-    expect(theirs.assembly.steps).toHaveLength(5);
+    expect(theirs.assembly.steps).toHaveLength(6);
     expect(theirs.testPlan.cases).toHaveLength(6);
     expect((await asGuest("set_test_plan", { projectId: where, cases: [] })).isError).toBe(true);
 

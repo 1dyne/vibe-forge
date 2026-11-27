@@ -112,7 +112,7 @@ export function guideToKit(project: LocalProject): BenchKit | null {
     const order = [...housing.assemblyOrder, ...housing.regions.map((r) => r.id)].filter((id, i, a) => a.indexOf(id) === i);
     const colors = ["#e9a48c", "#9ed3cb", "#cdbdff", "#ffc48a", "#f7c1d4", "#b9d98a"];
     for (const id of order) {
-      const r = housing.regions.find((x) => x.id === id); if (!r || r.method === "none") continue;
+      const r = housing.regions.find((x) => x.id === id); if (!r || r.method === "none" || r.prepared) continue;
       const ri = housing.regions.indexOf(r);
       const refs = r.shapeRefs.filter((i) => form.shape[i]).map((i) => { const s = form.shape[i]; const ref = `H_${r.id}_${i}`; parts.push({ ref, kind: "housing_shape", label: `${r.name} (${FAB_LABEL[r.method]})`, about: `${r.role}. ${r.material.name}${r.material.thicknessMm != null ? ` ${r.material.thicknessMm}mm` : ""}`, spec: { primitive: s.primitive, sizeMm: s.size, posMm: s.position, color: colors[ri % colors.length], around: baseRef } }); return ref; });
       if (!refs.length) continue;

@@ -159,14 +159,17 @@ const seedArgs = (tool: string) => (seed.calls as unknown as SeedCall[]).find((c
 const SEED_FORM = seedArgs("set_product_form").form as Pick<NonNullable<LocalProject["productForm"]>, "summary" | "shape" | "features" | "material"> | undefined;
 const SEED_PLAN = seedArgs("set_housing_plan").plan as Pick<NonNullable<LocalProject["housing"]>, "summary" | "regions" | "assemblyOrder" | "risks"> | undefined;
 const SEED_STEPS = ((seedArgs("set_assembly_guide").guide as { steps?: NonNullable<LocalProject["assembly"]>["steps"] } | undefined)?.steps) ?? [];
+const SEED_STAGE = (seedArgs("set_assembly_guide").guide as { stage?: string } | undefined)?.stage;
 export function meetupFresh<T extends LocalProject | null | undefined>(project: T): T {
   if (!project || !isMeetup(project)) return project;
   const next: LocalProject = { ...project };
   if (project.productForm && SEED_FORM) next.productForm = { ...project.productForm, summary: SEED_FORM.summary, shape: SEED_FORM.shape, features: SEED_FORM.features, material: SEED_FORM.material };
   if (project.housing && SEED_PLAN) {
-    const regions = SEED_PLAN.regions.flatMap((fresh) => { const old = project.housing!.regions.find((r) => r.id === fresh.id); return old ? [{ ...old, shapeRefs: fresh.shapeRefs, why: fresh.why, join: fresh.join, access: fresh.access, easy: fresh.easy }] : []; });
+    // 조각 구성 자체가 바뀌었다(얼굴 캡 빠짐, 받침대 추가). 시드의 조각을 그대로 쓰되, 저장된 조각에만 있는 값은 살린다
+    const regions = SEED_PLAN.regions.map((fresh) => { const old = project.housing!.regions.find((r) => r.id === fresh.id); return { ...old, ...fresh, feasible: old?.feasible ?? fresh.feasible ?? "unknown" }; });
     next.housing = { ...project.housing, summary: SEED_PLAN.summary, regions, assemblyOrder: SEED_PLAN.assemblyOrder, risks: SEED_PLAN.risks };
   }
-  if (project.assembly) next.assembly = { ...project.assembly, steps: project.assembly.steps.map((old, i) => { const fresh = SEED_STEPS[i]; return fresh && fresh.title === old.title ? { ...old, action: fresh.action, easy: fresh.easy } : old; }) };
+  // 조립 순서를 실제 현장 순서로 바꿨다. 단계를 통째로 시드의 것으로 그린다
+  if (project.assembly && SEED_STEPS.length) next.assembly = { ...project.assembly, stage: SEED_STAGE ?? project.assembly.stage, steps: SEED_STEPS };
   return next as T;
 }

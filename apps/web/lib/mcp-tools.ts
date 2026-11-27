@@ -553,7 +553,8 @@ const HousingSchema = z.object({
     process: z.array(z.string().min(1).max(300)).min(1).max(12),
     costKRW: z.number().int().min(0).max(10_000_000).nullable(), timeHours: z.number().min(0).max(500).nullable(),
     feasible: z.enum(["yes", "needs_service", "no", "unknown"]).optional(),
-    easy: z.array(z.string().min(1).max(160)).max(10).optional()
+    easy: z.array(z.string().min(1).max(160)).max(10).optional(),
+    prepared: z.boolean().optional()
   }).strict()).min(1).max(10),
   environment: z.object({ indoorOutdoor: z.enum(["indoor", "outdoor", "both"]), water: z.enum(["none", "splash", "rain", "submerge"]), heatSources: z.array(z.string().max(60)).max(6), skinContact: z.boolean(), childUse: z.boolean() }).strict(),
   assemblyOrder: z.array(z.string().max(24)).max(10),

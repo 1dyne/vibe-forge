@@ -339,6 +339,8 @@ export type HousingRegion = {
   feasible: "yes" | "needs_service" | "no" | "unknown";
   /** 이 부위를 씌울 때의 아주 쉬운 순서 (작업대에서 체크하며 따라 한다) */
   easy?: string[];
+  /** 미리 끼워 둔 부위: 작업대의 씌우기 단계에서 뺀다 */
+  prepared?: boolean;
 };
 export type HousingPlan = {
   summary: string;
