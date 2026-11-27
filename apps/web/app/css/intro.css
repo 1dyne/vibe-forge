@@ -68,3 +68,4 @@
 .prep .install ol{font-size:15.5px;line-height:1.8}.prep .install code{background:#f1ebde;border-radius:5px;padding:1px 5px}.prep .os-tabs button{font-size:14px;white-space:normal;min-height:46px}
 .prep a{color:#2e6b5c;font-weight:600}.prep .btn-main{color:var(--ink)}
 .prep .install{overflow:hidden}.prep .install ol{min-width:0}.prep .install li{min-width:0;overflow-wrap:anywhere}.prep .prep-copy{max-width:100%}.prep .prep-copy code{width:0}
+.prep .prep-alt{margin-top:12px;font-size:14px}.prep .prep-alt summary{cursor:pointer;font-weight:600;color:#4d4840}.prep .prep-alt p{margin:8px 0 0}
