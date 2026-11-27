@@ -11,90 +11,93 @@ function Copy({ text }: { text: string }) {
   return <div className="prep-copy"><code>{text}</code><button type="button" onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? "복사됨" : "복사"}</button></div>;
 }
 
+// 밋업 참가자가 오기 전에 읽는 안내. 대부분 PDF로 본다. 터미널을 처음 보는 사람이 읽는다.
 export default function PrepView({ contact }: { contact: string }) {
   const [terminal, setTerminal] = useState<string | null>(null);
-  const term = (label: string, command = COMMAND) => <button type="button" className="prep-link" onClick={() => setTerminal(command)}>{label}</button>;
+  const picture = (command: string) => <button type="button" className="prep-link" onClick={() => setTerminal(command)}>그림으로 보기</button>;
   return <main className="intro prep">
-    <section className="hero" style={{ minHeight: "auto", paddingBottom: 24 }}>
-      <Reveal kind="pop"><img src="/characters/idle.png" alt="" width={110} height={110} /></Reveal>
-      <Reveal delay={80}><h1>밋업 오기 전에<br />이것만 해 와요</h1></Reveal>
-      <Reveal delay={180}><p><b>직접 해 보고 싶은 분께 추천해요.</b> 15분이면 돼요. Claude 무료 계정을 쓰고 있거나 설치가 내키지 않으면 아무것도 깔지 않고 오셔도 돼요. 현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
-      <Reveal delay={260}><p className="prep-pdf"><a href="/find/prep.pdf" download="달그락-밋업-준비.pdf">PDF로 받기 ↓</a></p></Reveal>
+    <section className="hero" style={{ minHeight: "auto", paddingBottom: 20 }}>
+      <Reveal kind="pop"><img src="/characters/idle.png" alt="" width={100} height={100} /></Reveal>
+      <Reveal delay={80}><h1>밋업 오기 전에</h1></Reveal>
+      <Reveal delay={160}><p><b>직접 해 보고 싶은 분만 하시면 돼요.</b> 아무것도 준비하지 않고 오셔도 괜찮아요. 현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
+      <Reveal delay={240}><p className="prep-pdf"><a href="/find/prep.pdf" download="달그락-밋업-준비.pdf">PDF로 받기 ↓</a></p></Reveal>
     </section>
 
-    <section style={{ paddingTop: 24 }}>
+    <section>
+      <Reveal><span className="tag">먼저 읽어 주세요</span><h2>달그락 대장간에 대해</h2></Reveal>
+      <div className="prep-facts">
+        <Reveal><div><b>가입은 필수가 아니에요</b>달그락 대장간에 가입하지 않아도 하드웨어를 만들 수 있고, 밋업에도 참여할 수 있어요. 현장에서 같은 화면을 보며 빠르게 진행하려고 쓰는 도구예요.</div></Reveal>
+        <Reveal><div><b>돈을 받지 않아요</b>가입도 사용도 무료예요. 결제 기능이 없고, 가입했다고 나중에 비용이 생기지도 않아요. 이 밋업에서 무엇을 판매하지 않아요.</div></Reveal>
+        <Reveal><div><b>어떻게 생긴 도구인가요</b>화면은 웹사이트(dalgrak.app)예요. AI는 달그락이 따로 갖고 있지 않고, <b>내 컴퓨터의 Claude</b>가 내 구독으로 답해요. 그래서 직접 해 보려면 Claude 유료 구독이 있어야 해요.</div></Reveal>
+        <Reveal><div><b>무엇을 받고, 어떻게 지키나요</b>
+          <ul>
+            <li>가입할 때 받는 것: 구글 계정의 이메일 주소와 이름(별명으로 바꿀 수 있어요).</li>
+            <li>받지 않는 것: 전화번호, 결제 정보, 내 Claude 계정의 로그인 정보.</li>
+            <li>실습하며 적은 내용은 암호화해서 저장해요. 운영자 화면에는 다른 사람의 기록을 여는 기능이 없어요.</li>
+            <li>AI와 나눈 대화는 내 Claude 계정으로 Anthropic에 가요. 평소 Claude를 쓸 때와 같아요.</li>
+          </ul>
+        </div></Reveal>
+        <Reveal><div><b>지우고 싶을 때</b>직접 지울 수 있어요: 달그락 대장간 → 내 계정 → “탈퇴하고 모두 삭제”. 누르는 즉시 계정과 실습 기록이 지워져요. 불편한 점이 있거나 대신 지워 주기를 원하시면 <a href={`mailto:${contact}`}>{contact}</a>으로, 또는 밋업이 끝난 뒤 현장에서 말씀해 주세요. 실습 데이터 삭제와 처리를 도와드릴게요.</div></Reveal>
+      </div>
+    </section>
+
+    <section>
       <Reveal><span className="tag">가져올 것</span><h2>가방에 넣을 것</h2></Reveal>
-      <div className="town-grid">
-        <Reveal as="article"><b>노트북</b>윈도우나 맥. 크롬·엣지·사파리 같은 브라우저가 있으면 돼요.</Reveal>
-        <Reveal as="article" delay={100}><b>충전기 또는 보조배터리</b>노트북 C타입 충전기, 또는 노트북을 충전할 수 있는 보조배터리(PD 지원). 콘센트 자리가 넉넉하지 않을 수 있어요.</Reveal>
-        <Reveal as="article"><b>휴대폰</b>만든 저울을 휴대폰 앱과 이어 볼 거예요. 블루투스가 되면 돼요.</Reveal>
-        <Reveal as="article" delay={100}><b>구글 계정</b>달그락 대장간 가입에 써요.</Reveal>
+      <div className="prep-facts">
+        <Reveal><div><b>노트북과 충전기</b>윈도우나 맥. 충전기 대신 노트북을 충전할 수 있는 보조배터리도 좋아요.</div></Reveal>
+        <Reveal><div><b>휴대폰</b>완성된 저울을 휴대폰과 이어 보는 순서가 있어요.</div></Reveal>
+        <Reveal><div><b>가져오지 않아도 되는 것</b>납땜 도구와 부품. 납땜과 펌웨어(보드 안에서 도는 프로그램) 올리기는 미리 해서 가져가요. 현장에서는 그런 단계가 있다는 것을 함께 보기만 해요.</div></Reveal>
       </div>
-      <Reveal><p className="prep-note">납땜 도구와 부품은 가져오지 않아도 돼요. 납땜과 펌웨어(보드 안에서 도는 프로그램) 올리기는 미리 해서 가져가요. 현장에서는 그런 단계가 있다는 것을 함께 보기만 해요.</p></Reveal>
     </section>
 
     <section>
-      <Reveal><span className="tag">1</span><h2>달그락 대장간에 가입해요</h2></Reveal>
-      <Reveal><div className="install"><ol>
-        <li>노트북에서 <a href="/find" target="_blank" rel="noreferrer">dalgrak.app/find</a>를 열어요. 만들고 싶은 것을 한 줄 적으면 내 달그락 카드가 나와요.</li>
-        <li><b>이 아이디어 직접 만들어 보기</b>를 누르고, 소개 끝에서 <b>구글로 가입</b>해요.</li>
-        <li>가입이 끝나 대장간 화면이 보이면 된 거예요. 창은 닫아도 돼요.</li>
-      </ol><p className="prep-note">카카오톡에서 이 페이지를 열었다면, 오른쪽 위 메뉴에서 <b>다른 브라우저로 열기</b>를 먼저 눌러 주세요. 카카오톡 안에서는 구글 가입이 막혀요.</p></div></Reveal>
-    </section>
+      <Reveal><span className="tag">직접 해 볼 분</span><h2>미리 해 올 네 가지</h2><p className="lead">15분쯤 걸려요. 순서대로 따라 하면 돼요. 중간에 막히면 거기까지만 하고 오세요.</p></Reveal>
 
-    <section>
-      <Reveal><span className="tag">2</span><h2>Node.js를 설치해요</h2><p className="lead">Claude Code와 연결 프로그램을 돌리는 데 필요해요. 무료이고, 한 번만 깔면 돼요.</p></Reveal>
-      <Reveal><div className="install"><ol>
-        <li><a href="https://nodejs.org/ko" target="_blank" rel="noreferrer noopener">nodejs.org</a>에서 <b>LTS</b>라고 적힌 것을 내려받아 설치해요. 묻는 것은 모두 기본값으로 <b>다음</b>을 눌러요.</li>
-        <li>{term("터미널(윈도우는 PowerShell)", "node -v")}을 <b>새로</b> 열고 아래를 붙여넣어 Enter를 눌러요. 처음 듣는 말이라면 아래 ‘터미널 여는 법’을 보세요. (화면에서는 저 글자를 누르면 그림으로도 나와요.)<Copy text="node -v" /></li>
-        <li><code>v20</code> 이상의 숫자가 나오면 된 거예요. (예: <code>v22.11.0</code>)</li>
-      </ol></div></Reveal>
-    </section>
-
-    <section>
-      <Reveal><span className="tag">3</span><h2>Claude Code를 설치하고 로그인해요</h2><p className="lead">Claude Code는 Anthropic이 만든 프로그램이에요. 달그락 대장간은 내 컴퓨터의 Claude Code에게 일을 부탁해요. <b>Claude 유료 구독(Pro 이상)</b>이 필요해요. 달그락 대장간은 ChatGPT로도 쓸 수 있지만, <b>이번 밋업에서는 Claude를 써요.</b></p></Reveal>
-      <Reveal><div className="install"><ol>
-        <li>{term("터미널", CLAUDE_INSTALL)}에 아래를 붙여넣고 Enter를 눌러요. 1~2분 걸려요.<Copy text={CLAUDE_INSTALL} /></li>
-        <li>끝나면 아래를 치고 Enter를 눌러요.<Copy text="claude" /></li>
-        <li>처음이면 로그인하라고 물어요. 브라우저가 열리면 <b>내 Claude 계정</b>으로 로그인하고 허용해요. (API 키가 아니라 <b>Claude 구독 계정</b>을 골라요.)</li>
-        <li>터미널에 글을 입력하는 줄이 보이면 로그인된 거예요. <code>/exit</code>를 치거나 창을 닫아요.</li>
-      </ol></div></Reveal>
-    </section>
-
-    <section>
-      <Reveal><span className="tag">4</span><h2>연결 프로그램을 한 번 켜 봐요</h2><p className="lead">달그락 화면과 내 Claude Code를 이어 주는 작은 프로그램이에요. 집에서 한 번 켜 보면 밋업 날에는 한 줄이면 돼요.</p></Reveal>
-      <Reveal><div className="install"><ol>
-        <li>새 {term("터미널")}에 아래를 붙여넣고 Enter를 눌러요.<Copy text={COMMAND} /></li>
-        <li><code>Ok to proceed? (y)</code>라고 물으면 <kbd>y</kbd>를 치고 Enter를 눌러요.</li>
-        <li>브라우저가 열리면 <b>달그락 대장간</b>에 로그인하고 <b>허용</b>을 눌러요.</li>
-        <li>터미널에 <b>“준비됐어요”</b>가 보이면 끝이에요. <a href="/" target="_blank" rel="noreferrer">dalgrak.app</a>을 열어, 아래 입력창의 모델 고르기에 <b>Claude</b>가 있는지 확인해요.</li>
-        <li>확인했으면 터미널 창을 닫아요. 밋업 날에는 1번 줄만 다시 붙여넣으면 바로 켜져요.</li>
-      </ol>
+      <Reveal><div className="install prep-term">
+        <b>먼저, ‘터미널’이 뭐예요?</b>
+        <p>컴퓨터에 원래 들어 있는 <b>글자 입력 창</b>이에요. 까만(또는 파란) 창이 뜨고, 거기에 글자를 붙여넣고 <kbd>Enter</kbd>를 누르면 컴퓨터가 그 일을 해요. 아래 2~4번에서 이 창을 써요. 할 일은 <b>복사 → 붙여넣기 → Enter</b> 뿐이에요.</p>
+        <p><b>여는 법</b></p>
+        <ul>
+          <li><b>윈도우</b>: 키보드의 <kbd>⊞ 윈도우 키</kbd>를 누르고 <code>powershell</code>이라고 친 다음, 맨 위에 나온 <b>Windows PowerShell</b>을 눌러요.</li>
+          <li><b>맥</b>: <kbd>⌘</kbd>+<kbd>스페이스</kbd>를 누르고 <code>터미널</code>이라고 친 다음 <kbd>Enter</kbd>를 눌러요.</li>
+        </ul>
+        <p><b>붙여넣는 법</b>: 윈도우는 창 안에서 <b>마우스 오른쪽 버튼</b>을 한 번, 맥은 <kbd>⌘</kbd>+<kbd>V</kbd>.</p>
+        <p className="prep-screen">{picture("node -v")} <small>(이 페이지에서만 눌러져요)</small></p>
       </div></Reveal>
+
+      <Reveal><div className="install"><h3><i>1</i>달그락 대장간에 가입해요</h3><ol>
+        <li>노트북에서 <a href="/join" target="_blank" rel="noreferrer">dalgrak.app/join</a>을 열어요.</li>
+        <li>별명을 적고 동의 칸을 누른 뒤 <b>구글로 가입하기</b>를 눌러요.</li>
+        <li>대장간 화면이 보이면 끝이에요.</li>
+      </ol><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
+
+      <Reveal><div className="install"><h3><i>2</i>Node.js를 설치해요</h3>
+        <p>3번과 4번을 돌리는 데 필요한 무료 프로그램이에요.</p><ol>
+        <li><a href="https://nodejs.org/ko" target="_blank" rel="noreferrer noopener">nodejs.org</a>를 열고 <b>LTS</b>라고 적힌 버튼으로 내려받아요.</li>
+        <li>내려받은 파일을 열고, 묻는 것은 전부 <b>다음</b>을 눌러 설치해요.</li>
+        <li><b>확인</b>: 터미널을 열고, 아래 글자를 복사해 붙여넣고 <kbd>Enter</kbd>.<Copy text="node -v" /><code>v22.11.0</code>처럼 <b>v20보다 큰 숫자</b>가 나오면 된 거예요.</li>
+      </ol></div></Reveal>
+
+      <Reveal><div className="install"><h3><i>3</i>Claude Code를 설치하고 로그인해요</h3>
+        <p>Anthropic이 만든 프로그램이에요. <b>Claude 유료 구독</b>이 필요해요. (달그락 대장간은 ChatGPT로도 쓸 수 있지만, 이번 밋업에서는 Claude를 써요.)</p><ol>
+        <li>터미널에 아래 글자를 붙여넣고 <kbd>Enter</kbd>. 1~2분 기다려요.<Copy text={CLAUDE_INSTALL} /></li>
+        <li>글자가 멈추면, 아래 글자를 붙여넣고 <kbd>Enter</kbd>.<Copy text="claude" /></li>
+        <li>브라우저가 열리면 <b>내 Claude 계정</b>으로 로그인하고 <b>허용</b>을 눌러요. 고르는 칸이 나오면 <b>Claude 구독 계정</b> 쪽을 골라요.</li>
+        <li>터미널에 글을 쓸 수 있는 칸이 보이면 로그인된 거예요. 창을 닫아요.</li>
+      </ol></div></Reveal>
+
+      <Reveal><div className="install"><h3><i>4</i>연결 프로그램을 한 번 켜 봐요</h3>
+        <p>달그락 화면과 내 Claude를 이어 주는 작은 프로그램이에요.</p><ol>
+        <li>터미널을 <b>새로</b> 열고, 아래 글자를 붙여넣고 <kbd>Enter</kbd>.<Copy text={COMMAND} /></li>
+        <li><code>Ok to proceed? (y)</code>라고 나오면 <kbd>y</kbd>를 누르고 <kbd>Enter</kbd>.</li>
+        <li>브라우저가 열리면 달그락 대장간에 로그인하고 <b>허용</b>을 눌러요.</li>
+        <li>터미널에 <b>“준비됐어요”</b>가 나오면 성공이에요.</li>
+        <li>창을 닫아요. 밋업 날에는 1번만 다시 하면 바로 켜져요.</li>
+      </ol><p className="prep-note">이 프로그램은 내 컴퓨터의 파일을 읽거나 고치지 않고, 내 Claude 로그인 정보를 달그락 서버로 보내지 않아요. 코드는 공개돼 있어요(<a href="https://github.com/1dyne/dalgrak-helper/blob/main/SECURITY.md" target="_blank" rel="noreferrer noopener">보안 안내</a>). 지우려면 터미널에 <code>{COMMAND} logout</code>.</p></div></Reveal>
     </section>
 
-    <section>
-      <Reveal><span className="tag">처음이라면</span><h2>터미널 여는 법</h2><p className="lead">터미널은 컴퓨터에게 글자로 일을 시키는 창이에요. 여기서는 한 줄을 붙여넣고 Enter만 누르면 돼요. 컴퓨터에 원래 들어 있어요.</p></Reveal>
-      <div className="needs" style={{ marginTop: 0 }}>
-        <Reveal><div><b>윈도우</b>키보드의 <kbd>⊞ Win</kbd> 키를 누르고 <code>powershell</code>이라고 쳐요. 맨 위의 <b>Windows PowerShell</b>을 눌러 열어요. “관리자 권한으로 실행”은 고르지 않아요. 붙여넣기는 <kbd>Ctrl</kbd>+<kbd>V</kbd> 또는 마우스 오른쪽 버튼.</div></Reveal>
-        <Reveal delay={100}><div><b>맥</b><kbd>⌘</kbd>+<kbd>Space</kbd>를 눌러 검색창을 열고 <code>터미널</code>이라고 쳐요. 맨 위의 <b>터미널</b>을 눌러 열어요. 붙여넣기는 <kbd>⌘</kbd>+<kbd>V</kbd>.</div></Reveal>
-        <Reveal><div><b>주의</b>비밀번호는 터미널에 치지 않아요. 로그인은 항상 브라우저에서 해요. 이 안내에 적힌 줄만 붙여넣어요.</div></Reveal>
-        <Reveal delay={100}><div><b>‘명령을 찾을 수 없다’고 나오면</b>Node.js 설치 뒤에 터미널을 닫았다가 다시 열어야 해요. 그래도 안 되면 2번부터 다시 봐요.</div></Reveal>
-      </div>
-    </section>
-
-    <section>
-      <Reveal><span className="tag">알아 둘 것</span><h2>이 프로그램이 하는 일</h2></Reveal>
-      <div className="needs" style={{ marginTop: 0 }}>
-        <Reveal><div><b>하는 일</b>달그락 화면에서 보낸 말을 내 AI에게 전하고, 답을 화면으로 돌려보내요. AI 값은 내 구독에서 나가요.</div></Reveal>
-        <Reveal delay={100}><div><b>하지 않는 일</b>내 Claude 로그인에 손대지 않아요(로그인은 Claude Code가 직접 해요). 내 컴퓨터의 파일을 읽거나 고치지 않아요. 달그락 서버는 내 AI 계정 정보를 받지 않아요.</div></Reveal>
-        <Reveal><div><b>끄기와 지우기</b>터미널 창을 닫으면 꺼져요. 로그인 정보까지 지우려면 <code>{COMMAND} logout</code>.</div></Reveal>
-        <Reveal delay={100}><div><b>더 자세히</b>코드는 공개돼 있어요. <a href="https://github.com/1dyne/dalgrak-helper/blob/main/SECURITY.md" target="_blank" rel="noreferrer noopener">보안 안내 읽기</a>. 내키지 않으면 깔지 않고 오셔도 돼요.</div></Reveal>
-      </div>
-    </section>
-
-    <section className="cta" style={{ paddingBottom: 70 }}>
-      <Reveal kind="pop"><h2>막히면 그대로 오세요</h2><p className="lead" style={{ margin: "0 auto 14px" }}>어디서 멈췄는지 화면을 찍어 <a href={`mailto:${contact}`}>{contact}</a>으로 보내 주시거나, 조금 일찍 오시면 같이 봐요.</p><a className="btn-main" href="/find">1번부터 시작하기</a></Reveal>
+    <section className="cta" style={{ paddingBottom: 60 }}>
+      <Reveal kind="pop"><h2>막히면 그대로 오세요</h2><p className="lead" style={{ margin: "0 auto" }}>안 되는 화면을 찍어 <a href={`mailto:${contact}`}>{contact}</a>으로 보내 주시거나, 현장에서 말씀해 주세요. 준비가 안 돼도 밋업은 그대로 즐길 수 있어요.</p></Reveal>
     </section>
     {terminal && <TerminalHelp command={terminal} onClose={() => setTerminal(null)} />}
   </main>;

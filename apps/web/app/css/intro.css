@@ -75,3 +75,11 @@
 @media print{.intro{background:#fff}.intro .rv{opacity:1!important;transform:none!important}.intro .sticky-cta,.intro .scroll-hint,.prep .prep-pdf,.prep .prep-copy button{display:none!important}.intro section{padding:18px 8px;break-inside:avoid}.intro .hero{min-height:auto!important;padding-top:8px}.intro .shot,.intro .maker-note,.intro .btn-main{box-shadow:none}.prep .install,.prep .needs>div,.prep .town-grid article{break-inside:avoid}.prep .prep-copy code{width:auto;white-space:normal}}
 .prep .needs>div>div b:not(:first-child){display:inline}
 @media print{.intro section{break-inside:auto;padding:10px 8px}.intro h2{break-after:avoid}.intro .lead{break-after:avoid}.intro .cta{padding-bottom:0!important}.intro .hero img{width:80px;height:80px}.intro .hero h1{font-size:34px}}
+/* 준비 안내 v2: 쉬운 말, PDF에서 잘리지 않게 */
+.prep .prep-facts{display:grid;gap:12px}.prep .prep-facts>div>div,.prep .prep-facts>.rv>div{border:2px solid var(--ink);border-radius:16px;padding:16px 18px;background:#fff;font-size:15.5px;line-height:1.75}
+.prep .prep-facts b:first-child{display:block;font-size:17px;margin-bottom:4px}.prep .prep-facts ul{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.prep .install{margin-top:14px}.prep .install h3{display:flex;align-items:center;gap:10px;margin:0 0 8px;font-size:21px}
+.prep .install h3 i{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;border:2px solid var(--ink);background:#9DD2C8;font-style:normal;font-size:17px;flex:none}
+.prep .install p{margin:6px 0}.prep .prep-term{background:#fdf7e6}.prep .prep-term>b{font-size:18px}.prep .prep-term ul{margin:4px 0;padding-left:20px;display:grid;gap:6px}
+.prep .prep-screen small{color:#7b756a}
+@media print{.prep .prep-facts>.rv,.prep .install,.prep .rv{break-inside:avoid}.prep .prep-screen{display:none}.prep section{padding:8px 8px!important}.prep .hero{padding-top:0!important}.prep h2{margin-top:6px}.prep .cta{break-inside:avoid}}
