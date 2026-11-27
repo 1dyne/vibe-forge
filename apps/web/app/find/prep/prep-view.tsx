@@ -18,7 +18,7 @@ export default function PrepView({ contact }: { contact: string }) {
     <section className="hero" style={{ minHeight: "auto", paddingBottom: 20 }}>
       <Reveal kind="pop"><img src="/characters/idle.png" alt="" width={100} height={100} /></Reveal>
       <Reveal delay={80}><h1>밋업 오기 전에</h1></Reveal>
-      <Reveal delay={160}><p><b>직접 해 보고 싶은 분만 하시면 돼요.</b> 아무것도 준비하지 않고 오셔도 괜찮아요. 현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
+      <Reveal delay={160}><p><b>직접 해 보고 싶은 분만 하시면 돼요.</b> 아무것도 준비하지 않고 오셔도 괜찮아요.<br />현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
       <Reveal delay={240}><p className="prep-pdf"><a href="/find/prep.pdf" download="달그락-밋업-준비.pdf">PDF로 받기 ↓</a></p></Reveal>
     </section>
 
@@ -60,44 +60,62 @@ export default function PrepView({ contact }: { contact: string }) {
       <Reveal><div className="install prep-term">
         <b>먼저, ‘터미널’이 뭐예요?</b>
         <p>컴퓨터에 원래 들어 있는 <b>글자 입력 창</b>이에요. 까만(또는 파란) 창이 뜨고, 거기에 글자를 붙여넣고 <kbd>Enter</kbd>를 누르면 컴퓨터가 그 일을 해요. 아래 2~4번에서 이 창을 써요. 할 일은 <b>복사 → 붙여넣기 → Enter</b> 뿐이에요.</p>
-        <p><b>여는 법</b></p>
+        <p className="keep"><b>여는 법</b></p>
         <ul>
           <li><b>윈도우</b>: 키보드의 <kbd>⊞ 윈도우 키</kbd>를 누르고 <code>cmd</code>라고 친 다음, 맨 위에 나온 <b>명령 프롬프트</b>를 눌러요. (PowerShell이 아니라 <b>명령 프롬프트</b>예요.)</li>
           <li><b>맥</b>: <kbd>⌘</kbd>+<kbd>스페이스</kbd>를 누르고 <code>터미널</code>이라고 친 다음 <kbd>Enter</kbd>를 눌러요.</li>
         </ul>
-        <p><b>붙여넣는 법</b>: 윈도우는 창 안에서 <b>마우스 오른쪽 버튼</b>을 한 번, 맥은 <kbd>⌘</kbd>+<kbd>V</kbd>.</p>
-        <p className="prep-note"><b>“스크립트를 실행할 수 없습니다”</b>나 빨간 글씨가 나오면 PowerShell을 연 거예요. 그 창을 닫고 위 방법대로 <b>명령 프롬프트</b>를 열어 다시 해요. <b>“…은(는) 내부 또는 외부 명령이 아닙니다”</b>가 나오면 창을 닫았다가 새로 열어요(설치한 뒤에는 새 창이어야 해요).</p>
         <figure className="prep-shot"><img src="/find/cmd-open.png" alt="윈도우 검색창에 cmd를 입력하자 맨 위에 명령 프롬프트가 나온 실제 화면. 검색창과 명령 프롬프트에 빨간 상자가 쳐져 있다" /><figcaption>윈도우 실제 화면이에요. <b>위 빨간 칸</b>에 <code>cmd</code>를 치고, <b>아래 빨간 칸</b>의 명령 프롬프트를 눌러요.</figcaption></figure>
+        <p className="keep"><b>글자를 넣는 법</b> (2~4번에서 계속 이렇게 해요)</p>
+        <ol>
+          <li>이 안내의 회색 칸에 있는 글자를 마우스로 끌어 고르고 <b>복사</b>해요. (윈도우 <kbd>Ctrl</kbd>+<kbd>C</kbd>, 맥 <kbd>⌘</kbd>+<kbd>C</kbd>. 웹 페이지에서는 옆의 “복사” 버튼을 눌러도 돼요.)</li>
+          <li>까만 창 <b>안쪽을 마우스로 한 번</b> 눌러요.</li>
+          <li><b>붙여넣어요.</b> 윈도우는 까만 창 안에서 <b>마우스 오른쪽 버튼</b>을 한 번 누르면 붙어요. 맥은 <kbd>⌘</kbd>+<kbd>V</kbd>.</li>
+          <li>키보드의 <kbd>Enter</kbd>를 눌러요.</li>
+        </ol>
+        <p className="keep"><b>글자가 안 들어갈 때</b></p>
+        <ul>
+          <li>창 맨 위 제목에 <b>“선택”</b>이라는 글자가 보이면 잠깐 멈춘 상태예요. <kbd>Enter</kbd>를 한 번 누르면 풀려요.</li>
+          <li>앞에서 시킨 일이 아직 안 끝났으면 글자가 안 들어가요. 글자가 더 올라오지 않고, 맨 아래 줄 끝에 <code>&gt;</code> 표시와 깜빡이는 막대가 보일 때까지 기다려요.</li>
+          <li>그래도 안 되면 그 창을 <b>닫고 새로 열어요.</b> 창은 몇 번을 닫고 열어도 괜찮아요.</li>
+        </ul>
+        <p>윈도우에서 ‘관리자 권한으로 실행’은 고르지 않아도 돼요. 그냥 눌러 열면 돼요.</p>
+        <p className="prep-note"><b>“스크립트를 실행할 수 없습니다”</b>나 빨간 글씨가 나오면 PowerShell을 연 거예요. 그 창을 닫고 위 방법대로 <b>명령 프롬프트</b>를 열어 다시 해요. <b>“…은(는) 내부 또는 외부 명령이 아닙니다”</b>가 나오면 창을 닫았다가 새로 열어요(설치한 뒤에는 새 창이어야 해요).</p>
+
       </div></Reveal>
 
       <Reveal><div className="install"><h3><i>1</i>달그락 대장간에 가입해요</h3><ol>
         <li>노트북에서 <a href="/join" target="_blank" rel="noreferrer">dalgrak.app/join</a>을 열어요.</li>
         <li>별명을 적고 동의 칸을 누른 뒤 <b>구글로 가입하기</b>를 눌러요.</li>
-        <li>대장간 화면이 보이면 끝이에요.</li>
-      </ol><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
+        <li>아래 그림 같은 화면이 나오면 끝이에요. 이 화면을 ‘대장간’이라고 불러요.</li>
+      </ol><figure className="prep-shot"><img src="/find/forge-screen.png" alt="달그락 대장간 화면. 왼쪽에 프로젝트 목록, 가운데에 대화, 아래에 글을 쓰는 칸이 있다" /><figcaption>달그락 대장간 화면이에요. 왼쪽은 내 프로젝트, 가운데는 달그락과의 대화, 맨 아래는 글을 쓰는 칸이에요. (그림 속 내용은 예시예요.)</figcaption></figure><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
 
       <Reveal><div className="install"><h3><i>2</i>Node.js를 설치해요</h3>
         <p>3번과 4번을 돌리는 데 필요한 무료 프로그램이에요.</p><ol>
         <li><a href="https://nodejs.org/ko" target="_blank" rel="noreferrer noopener">nodejs.org</a>를 열고 <b>LTS</b>라고 적힌 버튼으로 내려받아요.</li>
         <li>내려받은 파일을 열고, 묻는 것은 전부 <b>다음</b>을 눌러 설치해요.</li>
-        <li><b>확인</b>: 터미널을 열고, 아래 글자를 복사해 붙여넣고 <kbd>Enter</kbd>.<Copy text="node -v" /><code>v22.11.0</code>처럼 <b>v20보다 큰 숫자</b>가 나오면 된 거예요.</li>
+        <li>설치가 끝나면, 위 ‘여는 법’대로 까만 창(터미널)을 <b>새로 하나</b> 열어요. 설치하기 전에 열어 둔 창이 있으면 닫고 새로 열어야 해요.</li>
+        <li>아래 글자를 복사해서 까만 창에 붙여넣고 <kbd>Enter</kbd>를 눌러요.<Copy text="node -v" /></li>
+        <li><code>v22.11.0</code>처럼 <b>v 다음에 20보다 큰 숫자</b>가 한 줄 나오면 된 거예요. 이 창은 닫지 말고 3번에서 계속 써요.</li>
       </ol></div></Reveal>
 
       <Reveal><div className="install"><h3><i>3</i>Claude Code를 설치하고 로그인해요</h3>
         <p>Anthropic이 만든 프로그램이에요. <b>Claude 유료 구독</b>이 필요해요. (달그락 대장간은 ChatGPT로도 쓸 수 있지만, 이번 밋업에서는 Claude를 써요.)</p><ol>
-        <li>터미널에 아래 글자를 붙여넣고 <kbd>Enter</kbd>. 1~2분 기다려요.<Copy text={CLAUDE_INSTALL} /></li>
-        <li>글자가 멈추면, 아래 글자를 붙여넣고 <kbd>Enter</kbd>.<Copy text="claude" /></li>
+        <li>2번에서 쓰던 <b>같은 까만 창</b>에 아래 글자를 붙여넣고 <kbd>Enter</kbd>를 눌러요.<Copy text={CLAUDE_INSTALL} /></li>
+        <li>글자가 올라오다가 멈출 때까지 1~2분 기다려요. 맨 아래 줄 끝에 <code>&gt;</code>와 깜빡이는 막대가 다시 보이면 끝난 거예요.</li>
+        <li>같은 창에 아래 글자를 붙여넣고 <kbd>Enter</kbd>를 눌러요.<Copy text="claude" /></li>
         <li>브라우저가 열리면 <b>내 Claude 계정</b>으로 로그인하고 <b>허용</b>을 눌러요. 고르는 칸이 나오면 <b>Claude 구독 계정</b> 쪽을 골라요.</li>
-        <li>터미널에 글을 쓸 수 있는 칸이 보이면 로그인된 거예요. 창을 닫아요.</li>
+        <li>까만 창으로 돌아오면 Claude가 말을 기다리는 화면이 보여요. 로그인된 거예요. <b>이 창은 닫아요</b> (오른쪽 위 <kbd>×</kbd>).</li>
       </ol></div></Reveal>
 
       <Reveal><div className="install"><h3><i>4</i>연결 프로그램을 한 번 켜 봐요</h3>
         <p>달그락 화면과 내 Claude를 이어 주는 작은 프로그램이에요.</p><ol>
-        <li>터미널을 <b>새로</b> 열고, 아래 글자를 붙여넣고 <kbd>Enter</kbd>.<Copy text={COMMAND} /></li>
+        <li>까만 창을 <b>새로 하나</b> 열어요. 아래 글자를 붙여넣고 <kbd>Enter</kbd>를 눌러요.<Copy text={COMMAND} /></li>
         <li><code>Ok to proceed? (y)</code>라고 나오면 <kbd>y</kbd>를 누르고 <kbd>Enter</kbd>.</li>
         <li>브라우저가 열리면 달그락 대장간에 로그인하고 <b>허용</b>을 눌러요.</li>
         <li>터미널에 <b>“준비됐어요. 모델: claude…”</b>가 나오면 성공이에요.</li>
-        <li>창을 닫아요. 밋업 날에는 1번만 다시 하면 바로 켜져요.</li>
+        <li><b>여기서 까만 창이 멈춘 것처럼 보이는 게 정상이에요.</b> 이 창은 달그락과 Claude를 이어 주느라 계속 일하는 중이라, 다른 글자를 넣어도 받지 않아요. 고장이 아니에요.</li>
+        <li>확인이 끝났으니 이 창을 닫아요 (오른쪽 위 <kbd>×</kbd>). 닫으면 연결이 꺼져요. 밋업 날에는 1번만 다시 하면 바로 켜지고, 그때는 창을 <b>켜 둔 채로</b> 써요.</li>
       </ol><p className="prep-note">이 프로그램은 내 컴퓨터의 파일을 읽거나 고치지 않고, 내 Claude 로그인 정보를 달그락 서버로 보내지 않아요. 코드는 공개돼 있어요(<a href="https://github.com/1dyne/dalgrak-helper/blob/main/SECURITY.md" target="_blank" rel="noreferrer noopener">보안 안내</a>). 지우려면 터미널에 <code>{COMMAND} logout</code>.</p></div></Reveal>
     </section>
 

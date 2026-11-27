@@ -89,3 +89,6 @@
 .prep .prep-shot{margin:12px 0 0;border:2px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff}.prep .prep-shot img{display:block;width:100%;height:auto}.prep .prep-shot figcaption{padding:8px 12px;border-top:2px solid var(--ink);font-size:14px}
 @media print{.prep .prep-shot{break-inside:avoid;max-width:420px}.prep .prep-facts{gap:12px}}
 .prep .prep-facts p b,.prep .prep-facts li b{display:inline!important;font-size:inherit!important;margin:0!important}
+.prep .prep-term ol{margin:4px 0;padding-left:22px;display:grid;gap:6px}
+@media print{.prep .prep-shot{max-width:none!important;width:86%}.prep .install.prep-term{break-inside:auto!important}.prep .prep-term ol,.prep .prep-term ul,.prep .prep-term p{break-inside:avoid}}
+@media print{.prep .keep{break-after:avoid!important;break-inside:avoid}.prep .prep-shot{width:74%}}
