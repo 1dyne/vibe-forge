@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   await withVault(session.vault, () => dispatchForUser(session.user.id)).catch(() => null);
   const job = await claimJob(session.user.id, hello.data.wait ? undefined : 0);
   touchHelper(session.user.id);
-  if (!job) return NextResponse.json({ job: null });
+  if (!job) return NextResponse.json({ job: null, account: session.user.name });
   const project = job.projectId ? await withVault(session.vault, () => getProject(job.projectId!)) : null;
   const owned = project && project.ownerId === session.user.id ? project : null;
   // 지금 넘기는 말은 job.text로 따로 가므로 기록에서는 뺀다. 맨 끝만 보면 안 된다:
