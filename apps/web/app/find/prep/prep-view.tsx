@@ -5,10 +5,26 @@ import TerminalHelp from "../../terminal-help";
 
 const COMMAND = "npx github:1dyne/dalgrak-helper";
 const CLAUDE_INSTALL = "npm install -g @anthropic-ai/claude-code";
+const CLAUDE_PROMPT = `달그락 대장간 연결 프로그램을 내 컴퓨터에서 켜 줘. 아래 순서대로 해 줘.
+
+1. node -v 로 Node.js가 20 이상인지 확인해 줘. 없거나 낮으면 나에게 묻고 설치해 줘. (윈도우: winget install OpenJS.NodeJS.LTS / 맥: brew install node, 둘 다 안 되면 nodejs.org 에서 LTS를 받으라고 알려 줘.)
+2. claude --version 이 되는지 확인해 줘. 안 되면 npm install -g @anthropic-ai/claude-code 로 설치해 줘.
+3. 다음 명령을 백그라운드로 실행해 줘. 끝나지 않고 계속 켜져 있는 프로그램이니 끝나기를 기다리지 마:
+   npx -y github:1dyne/dalgrak-helper
+4. 그 출력에 로그인 안내가 나오면 브라우저가 열려. 내가 로그인할 테니 출력을 지켜봐 줘.
+5. 출력에 "준비됐어요"가 보이면 나에게 "연결됐어요"라고 알려 주고, 프로그램은 끄지 말고 그대로 켜 둬.
+6. 오류가 나면 출력의 마지막 몇 줄을 보여 주고 무엇을 하면 되는지 쉬운 말로 알려 줘.
+
+이 밖의 파일은 만들거나 고치지 마.`;
 
 function Copy({ text }: { text: string }) {
   const [done, setDone] = useState(false);
   return <div className="prep-copy"><code>{text}</code><button type="button" onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? "복사됨" : "복사"}</button></div>;
+}
+
+function CopyBlock({ text }: { text: string }) {
+  const [done, setDone] = useState(false);
+  return <div className="prep-block"><pre>{text}</pre><button type="button" onClick={() => { void navigator.clipboard?.writeText(text).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? "복사됨" : "통째로 복사"}</button></div>;
 }
 
 // 밋업 참가자가 오기 전에 읽는 안내. 대부분 PDF로 본다. 터미널을 처음 보는 사람이 읽는다.
@@ -18,7 +34,7 @@ export default function PrepView({ contact }: { contact: string }) {
     <section className="hero" style={{ minHeight: "auto", paddingBottom: 20 }}>
       <Reveal kind="pop"><img src="/characters/idle.png" alt="" width={100} height={100} /></Reveal>
       <Reveal delay={80}><h1>밋업 오기 전에</h1></Reveal>
-      <Reveal delay={160}><p><b>직접 해 보고 싶은 분만 하시면 돼요.</b> 아무것도 준비하지 않고 오셔도 괜찮아요.<br />현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
+      <Reveal delay={160}><p><b>가입 하나만 해 오면 돼요.</b> 그것도 어렵다면 아무것도 준비하지 않고 오셔도 괜찮아요.<br />현장에서 함께 보는 화면을 따라오면 돼요.</p></Reveal>
       <Reveal delay={240}><p className="prep-pdf"><a href="/find/prep.pdf" download="달그락-밋업-준비.pdf">PDF로 받기 ↓</a></p></Reveal>
     </section>
 
@@ -55,8 +71,33 @@ export default function PrepView({ contact }: { contact: string }) {
     </section>
 
     <section>
-      <Reveal><span className="tag">직접 해 볼 분</span><h2>미리 해 올 네 가지</h2><p className="lead">15분쯤 걸려요. 순서대로 따라 하면 돼요. 중간에 막히면 거기까지만 하고 오세요.</p></Reveal>
+      <Reveal><span className="tag">할 일은 하나</span><h2>달그락 대장간에 가입해 와요</h2><p className="lead">2분이면 돼요. 이것만 해 오면 현장에서 내 노트북으로 같은 화면을 보며 따라올 수 있어요. 설치할 것은 없어요.</p></Reveal>
+      <Reveal><div className="install"><h3>이렇게 해요</h3><ol>
+        <li>노트북에서 <a href="/meetup" target="_blank" rel="noreferrer">dalgrak.app/meetup</a>을 열어요.</li>
+        <li>가입 화면이 나와요. 별명을 적고 동의 칸 세 개를 누른 뒤 <b>구글로 가입하기</b>를 눌러요.</li>
+        <li>구글 계정을 고르면 잠시 뒤 아래 그림 같은 화면이 나와요. 왼쪽에 <b>사만다 재고 저울</b>이 보이면 끝이에요. 밋업에서 함께 볼 프로젝트예요.</li>
+        <li>다음에 다시 올 때도 <b>dalgrak.app/meetup</b>을 열면 이 화면으로 와요.</li>
+      </ol><figure className="prep-shot"><img src="/find/forge-screen.png" alt="달그락 대장간 화면. 왼쪽 목록에 사만다 재고 저울 프로젝트가 있고 가운데에 대장 달그락과의 대화가 있다" /><figcaption>달그락 대장간 화면이에요. 왼쪽은 내 프로젝트(사만다 재고 저울), 가운데는 달그락과의 대화예요. 맨 아래는 글을 쓰는 칸이에요.</figcaption></figure><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
 
+    </section>
+
+    <section>
+      <Reveal><span className="tag">선택 · Claude Code를 쓰는 분만</span><h2>내 Claude로 대장 달그락의 답까지 받고 싶다면</h2><p className="lead">평소 <b>Claude Code</b>를 쓰는 분은, 아래 글을 Claude Code에 그대로 붙여넣으면 Claude가 알아서 설치하고 연결해 줘요. Claude Code가 없거나 처음 듣는다면 이 칸은 건너뛰세요. 밋업을 따라오는 데는 지장이 없어요.</p></Reveal>
+      <Reveal><div className="install">
+        <ol>
+          <li>Claude Code를 열어요. (Claude 데스크톱 앱의 Code 탭, 또는 터미널의 <code>claude</code>.)</li>
+          <li>아래 글을 통째로 복사해 붙여넣고 보내요.</li>
+        </ol>
+        <CopyBlock text={CLAUDE_PROMPT} />
+        <ol start={3}>
+          <li>Claude가 “이 명령을 실행해도 될까요?” 하고 물으면 <b>허용</b>을 눌러요.</li>
+          <li>브라우저가 열리면 달그락 대장간에 <b>가입할 때 쓴 구글 계정</b>으로 로그인하고 <b>허용</b>을 눌러요.</li>
+          <li>Claude가 “연결됐어요”라고 하면 끝이에요. <a href="/meetup" target="_blank" rel="noreferrer">dalgrak.app/meetup</a>을 새로고침하면 아래쪽에 글을 쓰는 칸이 생겨요.</li>
+          <li>Claude Code 창을 닫으면 연결도 꺼져요. 밋업 날에는 같은 글을 한 번 더 붙여넣으면 돼요.</li>
+        </ol>
+        <p className="prep-note">이 연결 프로그램은 내 컴퓨터의 파일을 읽거나 고치지 않고, 내 Claude 로그인 정보를 달그락 서버로 보내지 않아요. 코드는 공개돼 있어요(<a href="https://github.com/1dyne/dalgrak-helper/blob/main/SECURITY.md" target="_blank" rel="noreferrer noopener">보안 안내</a>). 달그락 대장간은 ChatGPT로도 쓸 수 있지만, 이번 밋업에서는 Claude를 써요.</p>
+      </div></Reveal>
+      <details className="prep-manual"><summary>Claude에게 맡기지 않고 직접 하나씩 하고 싶어요</summary>
       <Reveal><div className="install prep-term">
         <b>먼저, ‘터미널’이 뭐예요?</b>
         <p>컴퓨터에 원래 들어 있는 <b>글자 입력 창</b>이에요. 까만(또는 파란) 창이 뜨고, 거기에 글자를 붙여넣고 <kbd>Enter</kbd>를 누르면 컴퓨터가 그 일을 해요. 아래 2~4번에서 이 창을 써요. 할 일은 <b>복사 → 붙여넣기 → Enter</b> 뿐이에요.</p>
@@ -83,13 +124,6 @@ export default function PrepView({ contact }: { contact: string }) {
         <p className="prep-note"><b>“스크립트를 실행할 수 없습니다”</b>나 빨간 글씨가 나오면 PowerShell을 연 거예요. 그 창을 닫고 위 방법대로 <b>명령 프롬프트</b>를 열어 다시 해요. <b>“…은(는) 내부 또는 외부 명령이 아닙니다”</b>가 나오면 창을 닫았다가 새로 열어요(설치한 뒤에는 새 창이어야 해요).</p>
 
       </div></Reveal>
-
-      <Reveal><div className="install"><h3><i>1</i>달그락 대장간에 가입해요</h3><ol>
-        <li>노트북에서 <a href="/meetup" target="_blank" rel="noreferrer">dalgrak.app/meetup</a>을 열어요.</li>
-        <li>가입 화면이 나와요. 별명을 적고 동의 칸 세 개를 누른 뒤 <b>구글로 가입하기</b>를 눌러요.</li>
-        <li>구글 계정을 고르면 잠시 뒤 아래 그림 같은 화면이 나와요. 왼쪽에 <b>사만다 재고 저울</b>이 보이면 끝이에요. 밋업에서 함께 볼 프로젝트예요.</li>
-        <li>다음에 다시 올 때도 <b>dalgrak.app/meetup</b>을 열면 이 화면으로 와요.</li>
-      </ol><figure className="prep-shot"><img src="/find/forge-screen.png" alt="달그락 대장간 화면. 왼쪽 목록에 사만다 재고 저울 프로젝트가 있고 가운데에 대장 달그락과의 대화가 있다" /><figcaption>달그락 대장간 화면이에요. 왼쪽은 내 프로젝트(사만다 재고 저울), 가운데는 달그락과의 대화예요. 맨 아래는 글을 쓰는 칸이에요.</figcaption></figure><p className="prep-note">카카오톡에서 연 화면에서는 구글 가입이 막혀요. 크롬이나 사파리에서 주소를 직접 열어 주세요.</p></div></Reveal>
 
       <Reveal><div className="install"><h3><i>2</i>Node.js를 설치해요</h3>
         <p>3번과 4번을 돌리는 데 필요한 무료 프로그램이에요.</p><ol>
@@ -118,6 +152,7 @@ export default function PrepView({ contact }: { contact: string }) {
         <li><b>여기서 까만 창이 멈춘 것처럼 보이는 게 정상이에요.</b> 이 창은 달그락과 Claude를 이어 주느라 계속 일하는 중이라, 다른 글자를 넣어도 받지 않아요. 고장이 아니에요.</li>
         <li>확인이 끝났으니 이 창을 닫아요 (오른쪽 위 <kbd>×</kbd>). 닫으면 연결이 꺼져요. 밋업 날에는 1번만 다시 하면 바로 켜지고, 그때는 창을 <b>켜 둔 채로</b> 써요.</li>
       </ol><p className="prep-note">이 프로그램은 내 컴퓨터의 파일을 읽거나 고치지 않고, 내 Claude 로그인 정보를 달그락 서버로 보내지 않아요. 코드는 공개돼 있어요(<a href="https://github.com/1dyne/dalgrak-helper/blob/main/SECURITY.md" target="_blank" rel="noreferrer noopener">보안 안내</a>). 지우려면 터미널에 <code>{COMMAND} logout</code>.</p></div></Reveal>
+      </details>
     </section>
 
     <section className="cta" style={{ paddingBottom: 60 }}>

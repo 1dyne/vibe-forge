@@ -92,3 +92,7 @@
 .prep .prep-term ol{margin:4px 0;padding-left:22px;display:grid;gap:6px}
 @media print{.prep .prep-shot{max-width:none!important;width:86%}.prep .install.prep-term{break-inside:auto!important}.prep .prep-term ol,.prep .prep-term ul,.prep .prep-term p{break-inside:avoid}}
 @media print{.prep .keep{break-after:avoid!important;break-inside:avoid}.prep .prep-shot{width:74%}}
+.prep .prep-block{margin:10px 0;border:2px solid var(--ink);border-radius:12px;background:#fffdf8;overflow:hidden}.prep .prep-block pre{margin:0;padding:14px;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;font:13.5px/1.7 var(--font-sans),sans-serif}
+.prep .prep-block button{display:block;width:100%;min-height:44px;border:0;border-top:2px solid var(--ink);background:#9DD2C8;font-weight:700;cursor:pointer}
+.prep .prep-manual{margin-top:18px}.prep .prep-manual>summary{cursor:pointer;font-weight:700;padding:10px 0;color:#4d4840}
+@media print{.prep .prep-manual,.prep .prep-block button{display:none!important}.prep .prep-block{break-inside:avoid}}
