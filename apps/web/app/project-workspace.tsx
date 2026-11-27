@@ -33,7 +33,7 @@ import MeetupFinish from "./meetup-finish";
 import MeetupLetter from "./meetup-letter";
 import MeetupInbox from "./meetup-inbox";
 import { MeetupOrder, SamFirmware, SamHousing, SamStory } from "./meetup-sam";
-import { isMeetup, meetupChat, meetupItems, meetupLetterIds, meetupLocked } from "../lib/meetup";
+import { isMeetup, meetupChat, meetupFresh, meetupItems, meetupLetterIds, meetupLocked } from "../lib/meetup";
 import { suggestNext } from "../lib/suggest";
 
 type ViewerInfo = { kind: "operator" } | { kind: "user"; name: string; webAi: boolean; projectLimit?: number; credit?: { remainingUsd: number; allowanceUsd: number } | null };
@@ -71,7 +71,8 @@ export default function ProjectWorkspace() {
   const {preferences,setWorkbench,expand,toggleProjects,toggleFolder,toggleShortNames,setShortNames,setTutorialSeen,markSeen,ready:prefsReady}=useWorkspacePreferences();
   const end=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
-  const project=projects.find(p=>p.id===selectedId)??null;
+  const storedProject=projects.find(p=>p.id===selectedId)??null;
+  const project=useMemo(()=>meetupFresh(storedProject),[storedProject]); // MEETUP: 시드를 고친 뒤의 값으로 그린다
   const items=meetupItems(project,workbenchItems(project)); // MEETUP: 누를 순서대로 번호
   const workbenchPreference=project?preferences.workbenches[project.id]:undefined;
   const selectedItem=items.find(i=>i.id===workbenchPreference?.selected)??items[0];

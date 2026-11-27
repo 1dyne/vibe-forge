@@ -7,10 +7,10 @@ import { CircuitPartsView } from "./circuit-parts";
 import Mockup3D, { type MockSolid } from "./mockup-3d";
 import { IconUndo } from "./icons";
 
-export function CircuitView({ blueprint }: { blueprint: BuildBlueprint }) {
+export function CircuitView({ blueprint, plain = false }: { blueprint: BuildBlueprint; plain?: boolean }) {
   // Circuits built from part cards are drawn as real parts; older circuits
   // without cards keep the net diagram below.
-  if (blueprint.components.some((c) => c.catalogId)) return <CircuitPartsView blueprint={blueprint} />;
+  if (blueprint.components.some((c) => c.catalogId)) return <CircuitPartsView blueprint={blueprint} plain={plain} />;
   return <NetDiagram blueprint={blueprint} />;
 }
 

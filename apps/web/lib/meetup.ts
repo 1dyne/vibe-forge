@@ -151,3 +151,22 @@ export function meetupItems<T extends { id: string; kind: string; filename: stri
   const ids = new Set(picked.map((i) => i.id));
   return [...picked, ...items.filter((i) => !ids.has(i.id))];
 }
+
+// 시드를 고친 뒤에도, 그 전에 만들어진 시연용 프로젝트가 같은 화면을 보게 한다.
+// 저장된 값은 건드리지 않고, 화면에 그릴 때만 시드의 지금 값(얼굴 캡 없는 하우징, 나사 설명, 쉬운 순서)을 덮어쓴다.
+type SeedCall = { tool: string; args: Record<string, unknown> };
+const seedArgs = (tool: string) => (seed.calls as unknown as SeedCall[]).find((c) => c.tool === tool)?.args ?? {};
+const SEED_FORM = seedArgs("set_product_form").form as Pick<NonNullable<LocalProject["productForm"]>, "summary" | "shape" | "features" | "material"> | undefined;
+const SEED_PLAN = seedArgs("set_housing_plan").plan as Pick<NonNullable<LocalProject["housing"]>, "summary" | "regions" | "assemblyOrder" | "risks"> | undefined;
+const SEED_STEPS = ((seedArgs("set_assembly_guide").guide as { steps?: NonNullable<LocalProject["assembly"]>["steps"] } | undefined)?.steps) ?? [];
+export function meetupFresh<T extends LocalProject | null | undefined>(project: T): T {
+  if (!project || !isMeetup(project)) return project;
+  const next: LocalProject = { ...project };
+  if (project.productForm && SEED_FORM) next.productForm = { ...project.productForm, summary: SEED_FORM.summary, shape: SEED_FORM.shape, features: SEED_FORM.features, material: SEED_FORM.material };
+  if (project.housing && SEED_PLAN) {
+    const regions = SEED_PLAN.regions.flatMap((fresh) => { const old = project.housing!.regions.find((r) => r.id === fresh.id); return old ? [{ ...old, shapeRefs: fresh.shapeRefs, why: fresh.why, join: fresh.join, access: fresh.access, easy: fresh.easy }] : []; });
+    next.housing = { ...project.housing, summary: SEED_PLAN.summary, regions, assemblyOrder: SEED_PLAN.assemblyOrder, risks: SEED_PLAN.risks };
+  }
+  if (project.assembly) next.assembly = { ...project.assembly, steps: project.assembly.steps.map((old, i) => { const fresh = SEED_STEPS[i]; return fresh && fresh.title === old.title ? { ...old, action: fresh.action, easy: fresh.easy } : old; }) };
+  return next as T;
+}

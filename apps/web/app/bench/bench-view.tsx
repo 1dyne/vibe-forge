@@ -91,6 +91,9 @@ export default function BenchViewScreen({ kit, tint = "none", mode, backHref = "
   const userOff = useRef(false);
   const bendable = useMemo(() => bendableRefs(kit), [kit]);
   const [drawer, setDrawer] = useState(false);
+  // 쉬운 순서: 달그락을 한 번 누르면 켜진다. 위에서 내려다보는 구도로 멈추고, 한 줄씩 체크하며 따라 한다
+  const [easy, setEasy] = useState(false);
+  const [easyTicks, setEasyTicks] = useState<Record<string, boolean>>({});
   const [chat, setChat] = useState<Array<{ who: "me" | "hw"; text: string }>>([]);
   const [started, setStarted] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -121,7 +124,7 @@ export default function BenchViewScreen({ kit, tint = "none", mode, backHref = "
     const now = Date.now();
     if (now - lastTap.current < 360) { clearTimeout(tapTimer.current); lastTap.current = 0; setDrawer(true); motion("blaze"); return; }
     lastTap.current = now;
-    tapTimer.current = window.setTimeout(() => { const s = kit.steps[stepRef.current]; say(s ? `${s.doneWhen}면 성공이야. ${s.caution ?? ""}`.trim() : "두 번 누르면 나랑 얘기할 수 있어", 4200); motion("tilt"); }, 370);
+    tapTimer.current = window.setTimeout(() => { const s = kit.steps[stepRef.current]; if (s?.easy?.length) { setEasy((on) => { if (!on) { setView("top"); api.current?.setView("top"); } return !on; }); motion("tilt"); return; } say(s ? `${s.doneWhen}면 성공이야. ${s.caution ?? ""}`.trim() : "두 번 누르면 나랑 얘기할 수 있어", 4200); motion("tilt"); }, 370);
   };
 
   // 저장된 진행 불러오기
@@ -401,7 +404,7 @@ export default function BenchViewScreen({ kit, tint = "none", mode, backHref = "
       </header>
 
       {bubble && <div className="bench-bubble" role="status">{bubble}</div>}
-      <button type="button" className="bench-mascot" onClick={onMascot} aria-label="EE 달그락 (두 번 누르면 물어보기)" style={{ ["--tint" as string]: tintCss(tint) }}>
+      <button type="button" className="bench-mascot" onClick={onMascot} aria-label="EE 달그락 (한 번 누르면 쉬운 순서, 두 번 누르면 물어보기)" style={{ ["--tint" as string]: tintCss(tint) }}>
         <span className="aura" />
         <span key={mot.k} className={`dk-sprite m-${mot.m}`} />
       </button>
@@ -432,8 +435,10 @@ export default function BenchViewScreen({ kit, tint = "none", mode, backHref = "
               {tools.length > 0 && <span className="tools" aria-label="이번에 쓰는 연장">{tools.map((t) => <button key={t} type="button" className={`tool ${gloss?.term === TOOL_NAME[t] ? "on" : ""}`} onClick={() => { const e = lookupGlossary(TOOL_NAME[t]); setGloss(gloss && e && gloss.term === e.term ? null : e); api.current?.peek(t); }}>{TOOL_NAME[t]}<sup aria-hidden>ⓘ</sup></button>)}</span>}
             </div>
             {(() => { const seen = new Set<string>(); const onTerm = (e: GlossaryEntry) => setGloss((g) => (g?.term === e.term ? null : e)); return <>
+              {cur.easy?.length ? <button type="button" className={`easy-toggle ${easy ? "on" : ""}`} aria-pressed={easy} onClick={() => { if (!easy) pickView("top"); setEasy(!easy); }}>{easy ? "원래 설명 보기" : "✅ 쉬운 순서로 보기"}</button> : null}
+              {easy && cur.easy?.length ? <ol className="easy-list">{cur.easy.map((line, i) => { const k = `${step}:${i}`; return <li key={k} className={easyTicks[k] ? "done" : ""}><label><input type="checkbox" checked={!!easyTicks[k]} onChange={(e) => setEasyTicks((t) => ({ ...t, [k]: e.target.checked }))} /><span>{rich(line, seen, onTerm)}</span></label></li>; })}</ol> : <>
               <p className="action">{rich(cur.action, seen, onTerm)}</p>
-              <p className="why">{rich(cur.why, seen, onTerm)}</p>
+              <p className="why">{rich(cur.why, seen, onTerm)}</p></>}
               {cur.caution && <p className="caution">⚠ {rich(cur.caution, seen, onTerm)}</p>}
             </>; })()}
             {gloss && <p className="gloss-note" role="note"><b>{gloss.term}</b> {gloss.short} <button type="button" className="link" onClick={() => { setDrawer(true); ask(`‘${gloss.term}’ 뜻이 뭐예요?`, gloss.short); }}>달그락에게 더 묻기</button><button type="button" className="x" aria-label="닫기" onClick={() => setGloss(null)}>×</button></p>}

@@ -10,12 +10,48 @@
           "oneLiner": "작은 부품을 통째로 올리면 무게를 재서 휴대폰으로 보내고, 셈 앱이 개수로 바꿔 주는 책상 위 저울이에요.",
           "reply": "세기 힘든 재고를 무게로 세는 저울이군요.\n\n제가 이해한 건 이래요.\n\n- 5kg 로드셀로 무게를 재요.\n- 화면 없이 휴대폰 앱(셈)이 숫자를 보여 줘요.\n- 블루투스로 바로 이어요.\n\n개수는 (올린 무게 − 통 무게) ÷ 개당 무게로 구해요. 그래서 저울은 무게만 정확히 재면 돼요.",
           "slotUpdates": [
-            { "key": "sensing", "status": "filled", "valueText": "5kg 바형 로드셀 + HX711 앰프", "assumption": null, "acknowledged": true },
-            { "key": "wireless", "status": "filled", "valueText": "블루투스(안드로이드는 웹 블루투스, 아이폰은 BLE 키보드)", "assumption": null, "acknowledged": true },
-            { "key": "power", "status": "filled", "valueText": "USB-C 5V (노트북·충전기)", "assumption": null, "acknowledged": true },
-            { "key": "data_sink", "status": "filled", "valueText": "휴대폰의 셈 앱(PWA)", "assumption": null, "acknowledged": true },
-            { "key": "form", "status": "filled", "valueText": "88×58mm 책상 위 상자, 위에 저울판", "assumption": null, "acknowledged": true },
-            { "key": "fab", "status": "filled", "valueText": "3D 프린트 4조각", "assumption": null, "acknowledged": true }
+            {
+              "key": "sensing",
+              "status": "filled",
+              "valueText": "5kg 바형 로드셀 + HX711 앰프",
+              "assumption": null,
+              "acknowledged": true
+            },
+            {
+              "key": "wireless",
+              "status": "filled",
+              "valueText": "블루투스(안드로이드는 웹 블루투스, 아이폰은 BLE 키보드)",
+              "assumption": null,
+              "acknowledged": true
+            },
+            {
+              "key": "power",
+              "status": "filled",
+              "valueText": "USB-C 5V (노트북·충전기)",
+              "assumption": null,
+              "acknowledged": true
+            },
+            {
+              "key": "data_sink",
+              "status": "filled",
+              "valueText": "휴대폰의 셈 앱(PWA)",
+              "assumption": null,
+              "acknowledged": true
+            },
+            {
+              "key": "form",
+              "status": "filled",
+              "valueText": "88×58mm 책상 위 상자, 위에 저울판",
+              "assumption": null,
+              "acknowledged": true
+            },
+            {
+              "key": "fab",
+              "status": "filled",
+              "valueText": "3D 프린트 4조각",
+              "assumption": null,
+              "acknowledged": true
+            }
           ],
           "tasks": []
         }
@@ -26,7 +62,12 @@
       "args": {
         "projectId": "$PROJECT",
         "coreBehavior": "물건을 저울판에 올리면 무게를 재서 블루투스로 휴대폰에 보내고, 앱이 개수로 바꿔 보여 준다",
-        "tools": ["납땜 도구", "멀티미터", "니퍼", "3D 프린터"],
+        "tools": [
+          "납땜 도구",
+          "멀티미터",
+          "니퍼",
+          "3D 프린터"
+        ],
         "toolsConfirmed": true,
         "firmwareExperience": "guided"
       }
@@ -36,29 +77,161 @@
       "args": {
         "projectId": "$PROJECT",
         "form": {
-          "summary": "가로 88mm, 깊이 58mm, 높이 26mm쯤 되는 납작한 상자예요. 뒤쪽 절반은 저울판이라 물건을 올리고, 앞쪽 띠에는 얼굴 캡이 있어서 누르면 영점이 맞춰져요. 캡의 두 눈으로 LED 색이 보여요. 앞벽의 홈으로 USB-C를 꽂아요.",
+          "summary": "가로 88mm, 깊이 58mm, 높이 26mm쯤 되는 납작한 상자예요. 뒤쪽 절반은 저울판이라 물건을 올려요. 앞쪽 띠의 네모 구멍으로 보드 윗면이 보이고, 그 윗면을 누르면 영점이 맞춰져요. LED 색도 그 구멍으로 보여요. 앞벽의 홈으로 USB-C를 꽂아요.",
           "answers": [
-            { "question": "어디에 두고 쓰나요?", "answer": "책상 위에 두고 써요." },
-            { "question": "화면이 필요한가요?", "answer": "없어요. 휴대폰이 화면이에요. 상태는 LED 색으로만 알려요." },
-            { "question": "버튼은요?", "answer": "하나예요. 한 번 누르면 영점, 세 번 누르면 연결 방식 바꾸기, 3초 누르면 보정이에요." },
-            { "question": "전원은요?", "answer": "USB-C로 노트북이나 충전기에 꽂아요." }
+            {
+              "question": "어디에 두고 쓰나요?",
+              "answer": "책상 위에 두고 써요."
+            },
+            {
+              "question": "화면이 필요한가요?",
+              "answer": "없어요. 휴대폰이 화면이에요. 상태는 LED 색으로만 알려요."
+            },
+            {
+              "question": "버튼은요?",
+              "answer": "하나예요. 한 번 누르면 영점, 세 번 누르면 연결 방식 바꾸기, 3초 누르면 보정이에요."
+            },
+            {
+              "question": "전원은요?",
+              "answer": "USB-C로 노트북이나 충전기에 꽂아요."
+            }
           ],
           "shape": [
-            { "name": "몸통", "primitive": "box", "size": [88, 58, 21], "position": [0, 0, 0], "color": "#2b2c30" },
-            { "name": "앞쪽 띠", "primitive": "box", "size": [88, 28, 3], "position": [0, 15, 21], "color": "#3a3b40" },
-            { "name": "저울판", "primitive": "box", "size": [88, 28.5, 3], "position": [0, -14.75, 23], "color": "#4a4b52" },
-            { "name": "얼굴 캡", "primitive": "box", "size": [14, 13, 6.3], "position": [0, 14.5, 19.2], "color": "#f5f2ec" }
+            {
+              "name": "몸통",
+              "primitive": "box",
+              "size": [
+                88,
+                58,
+                21
+              ],
+              "position": [
+                0,
+                0,
+                0
+              ],
+              "color": "#2b2c30"
+            },
+            {
+              "name": "앞쪽 띠",
+              "primitive": "box",
+              "size": [
+                88,
+                28,
+                3
+              ],
+              "position": [
+                0,
+                15,
+                21
+              ],
+              "color": "#3a3b40"
+            },
+            {
+              "name": "저울판",
+              "primitive": "box",
+              "size": [
+                88,
+                28.5,
+                3
+              ],
+              "position": [
+                0,
+                -14.75,
+                23
+              ],
+              "color": "#4a4b52"
+            }
           ],
           "features": [
-            { "name": "USB-C 홈", "kind": "port", "facing": "front", "position": [0, 29, 17], "size": [13, 6], "linkedRef": "U1" },
-            { "name": "얼굴 캡(버튼·LED 눈)", "kind": "button", "facing": "top", "position": [0, 14.5, 25.5], "size": [14, 13] }
+            {
+              "name": "USB-C 홈",
+              "kind": "port",
+              "facing": "front",
+              "position": [
+                0,
+                29,
+                17
+              ],
+              "size": [
+                13,
+                6
+              ],
+              "linkedRef": "U1"
+            },
+            {
+              "name": "보드 윗면(버튼·LED)",
+              "kind": "button",
+              "facing": "top",
+              "position": [
+                0,
+                14.5,
+                25.5
+              ],
+              "size": [
+                14,
+                13
+              ]
+            }
           ],
           "internals": [
-            { "ref": "U1", "label": "ATOMS3 Lite", "size": [24, 24, 9.5], "position": [0, 14.5, 8.8], "catalogId": "m5stack-atoms3-lite", "sizeBasis": "measured", "stackedWith": ["HX1"] },
-            { "ref": "HX1", "label": "HX711 앰프", "size": [33.7, 21, 3], "position": [21.24, 13.91, 3], "rotation": 180, "catalogId": "hx711-module", "sizeBasis": "measured", "stackedWith": ["U1"] },
-            { "ref": "LC1", "label": "5kg 로드셀", "size": [80.6, 12.7, 12.7], "position": [0, -19.15, 6], "catalogId": "loadcell-bar-5kg", "sizeBasis": "measured" }
+            {
+              "ref": "U1",
+              "label": "ATOMS3 Lite",
+              "size": [
+                24,
+                24,
+                9.5
+              ],
+              "position": [
+                0,
+                14.5,
+                8.8
+              ],
+              "catalogId": "m5stack-atoms3-lite",
+              "sizeBasis": "measured",
+              "stackedWith": [
+                "HX1"
+              ]
+            },
+            {
+              "ref": "HX1",
+              "label": "HX711 앰프",
+              "size": [
+                33.7,
+                21,
+                3
+              ],
+              "position": [
+                21.24,
+                13.91,
+                3
+              ],
+              "rotation": 180,
+              "catalogId": "hx711-module",
+              "sizeBasis": "measured",
+              "stackedWith": [
+                "U1"
+              ]
+            },
+            {
+              "ref": "LC1",
+              "label": "5kg 로드셀",
+              "size": [
+                80.6,
+                12.7,
+                12.7
+              ],
+              "position": [
+                0,
+                -19.15,
+                6
+              ],
+              "catalogId": "loadcell-bar-5kg",
+              "sizeBasis": "measured"
+            }
           ],
-          "material": "PLA 3D 프린트, 검정. 얼굴 캡만 흰색이고 눈 구멍에 광섬유를 끼워요."
+          "material": "PLA 3D 프린트, 검정."
         }
       }
     },
@@ -80,36 +253,165 @@
             "method": "mixed",
             "why": "로드셀 선 4가닥과 HX711의 4핀 헤더만 납땜해요. 보드는 그 헤더에 꽂기만 해서 점퍼선이 하나도 없어요."
           },
-          "io": { "inputs": ["무게(로드셀)", "버튼(내장 G41)"], "outputs": ["RGB LED(내장 G35)", "블루투스로 무게 보내기"], "wireless": "both" },
+          "io": {
+            "inputs": [
+              "무게(로드셀)",
+              "버튼(내장 G41)"
+            ],
+            "outputs": [
+              "RGB LED(내장 G35)",
+              "블루투스로 무게 보내기"
+            ],
+            "wireless": "both"
+          },
           "preBuyChecks": [
-            { "item": "보드 이름이 ATOMS3 'Lite'인지 (화면 있는 ATOMS3, 구형 ATOM Lite와 다름)", "status": "confirmed", "source": "https://docs.m5stack.com/en/core/AtomS3%20Lite" },
-            { "item": "HX711 모듈에 4핀 헤더가 들어 있는지", "status": "confirmed", "source": "" },
-            { "item": "USB-C 케이블이 데이터용인지 (충전 전용이면 업로드가 안 돼요)", "status": "unknown", "source": "" },
-            { "item": "HX711을 3.3V로 돌렸을 때 값이 안정적인지", "status": "unknown", "source": "" }
+            {
+              "item": "보드 이름이 ATOMS3 'Lite'인지 (화면 있는 ATOMS3, 구형 ATOM Lite와 다름)",
+              "status": "confirmed",
+              "source": "https://docs.m5stack.com/en/core/AtomS3%20Lite"
+            },
+            {
+              "item": "HX711 모듈에 4핀 헤더가 들어 있는지",
+              "status": "confirmed",
+              "source": ""
+            },
+            {
+              "item": "USB-C 케이블이 데이터용인지 (충전 전용이면 업로드가 안 돼요)",
+              "status": "unknown",
+              "source": ""
+            },
+            {
+              "item": "HX711을 3.3V로 돌렸을 때 값이 안정적인지",
+              "status": "unknown",
+              "source": ""
+            }
           ],
           "modules": [
-            { "function": "두뇌·블루투스·버튼·LED", "part": "M5Stack ATOMS3 Lite", "why": "작고, 버튼과 LED가 들어 있어요.", "connection": "HX711의 4핀 헤더에 꽂기", "whereToBuy": "국내 M5Stack 판매처", "searchKeyword": "ATOMS3 Lite", "estPriceKRW": null, "difficulty": "쉬움" },
-            { "function": "무게 신호를 숫자로 바꾸기", "part": "HX711 로드셀 앰프 모듈 (SZH-SSBH-016)", "why": "로드셀 신호는 너무 작아서 보드가 바로 못 읽어요.", "connection": "로드셀 선 4가닥 납땜, 4핀 헤더 납땜", "whereToBuy": "디바이스마트 등", "searchKeyword": "HX711 로드셀 앰프", "estPriceKRW": null, "difficulty": "보통" },
-            { "function": "무게 느끼기", "part": "5kg 바형 로드셀 (4선)", "why": "나사 한 줌에서 몇 kg까지 재기에 알맞아요.", "connection": "HX711에 납땜, 한쪽 끝만 바닥에 나사 고정", "whereToBuy": "디바이스마트 등", "searchKeyword": "로드셀 5kg", "estPriceKRW": null, "difficulty": "보통" },
-            { "function": "고정", "part": "M5 접시머리 나사 2개, M4 접시머리 나사 2개", "why": "로드셀을 바닥에, 저울판을 로드셀에 고정해요.", "connection": "나사", "whereToBuy": "철물점·온라인", "searchKeyword": "M5 접시머리 나사", "estPriceKRW": null, "difficulty": "쉬움" }
+            {
+              "function": "두뇌·블루투스·버튼·LED",
+              "part": "M5Stack ATOMS3 Lite",
+              "why": "작고, 버튼과 LED가 들어 있어요.",
+              "connection": "HX711의 4핀 헤더에 꽂기",
+              "whereToBuy": "국내 M5Stack 판매처",
+              "searchKeyword": "ATOMS3 Lite",
+              "estPriceKRW": null,
+              "difficulty": "쉬움"
+            },
+            {
+              "function": "무게 신호를 숫자로 바꾸기",
+              "part": "HX711 로드셀 앰프 모듈 (SZH-SSBH-016)",
+              "why": "로드셀 신호는 너무 작아서 보드가 바로 못 읽어요.",
+              "connection": "로드셀 선 4가닥 납땜, 4핀 헤더 납땜",
+              "whereToBuy": "디바이스마트 등",
+              "searchKeyword": "HX711 로드셀 앰프",
+              "estPriceKRW": null,
+              "difficulty": "보통"
+            },
+            {
+              "function": "무게 느끼기",
+              "part": "5kg 바형 로드셀 (4선)",
+              "why": "나사 한 줌에서 몇 kg까지 재기에 알맞아요.",
+              "connection": "HX711에 납땜, 한쪽 끝만 바닥에 나사 고정",
+              "whereToBuy": "디바이스마트 등",
+              "searchKeyword": "로드셀 5kg",
+              "estPriceKRW": null,
+              "difficulty": "보통"
+            },
+            {
+              "function": "고정",
+              "part": "짧고 굵은 나사(M5×16) 2개, 길고 가는 나사(M4×20) 2개",
+              "why": "로드셀을 바닥에, 저울판을 로드셀에 고정해요.",
+              "connection": "나사",
+              "whereToBuy": "철물점·온라인",
+              "searchKeyword": "M5 접시머리 나사",
+              "estPriceKRW": null,
+              "difficulty": "쉬움"
+            }
           ],
           "structure": [
-            { "name": "무게 감지", "role": "로드셀이 눌린 만큼 전압 차이를 내요", "connectsTo": "HX711의 E+·E−·A−·A+" },
-            { "name": "신호 변환", "role": "HX711이 1초에 10번 숫자로 바꿔요", "connectsTo": "ATOMS3 Lite의 G5(SCK)·G6(DT)" },
-            { "name": "계산·통신", "role": "ATOMS3 Lite가 영점·보정·안정 판정을 하고 블루투스로 보내요", "connectsTo": "휴대폰의 셈 앱" },
-            { "name": "개수 세기", "role": "셈 앱이 (무게 − 통 무게) ÷ 개당 무게로 개수를 구해요", "connectsTo": "사람" }
+            {
+              "name": "무게 감지",
+              "role": "로드셀이 눌린 만큼 전압 차이를 내요",
+              "connectsTo": "HX711의 E+·E−·A−·A+"
+            },
+            {
+              "name": "신호 변환",
+              "role": "HX711이 1초에 10번 숫자로 바꿔요",
+              "connectsTo": "ATOMS3 Lite의 G5(SCK)·G6(DT)"
+            },
+            {
+              "name": "계산·통신",
+              "role": "ATOMS3 Lite가 영점·보정·안정 판정을 하고 블루투스로 보내요",
+              "connectsTo": "휴대폰의 셈 앱"
+            },
+            {
+              "name": "개수 세기",
+              "role": "셈 앱이 (무게 − 통 무게) ÷ 개당 무게로 개수를 구해요",
+              "connectsTo": "사람"
+            }
           ],
           "stages": [
-            { "title": "1. 원시값 보기", "goal": "로드셀을 누르면 숫자가 바뀌는 걸 봐요", "learn": "로드셀과 HX711이 하는 일", "practice": "시리얼 모니터에서 log 2", "doneWhen": "raw 값이 누르면 줄고 떼면 돌아온다", "parts": ["ATOMS3 Lite", "HX711", "로드셀"] },
-            { "title": "2. g 단위로 보정", "goal": "1kg 분동으로 숫자를 g로 맞춰요", "learn": "영점과 보정", "practice": "cal 1000", "doneWhen": "분동을 올리면 1000.0g 근처가 나온다", "parts": ["1kg 분동"] },
-            { "title": "3. 휴대폰 연결", "goal": "셈 앱에서 무게가 흐르게 해요", "learn": "블루투스 GATT와 키보드 모드", "practice": "앱에서 사만다 찾기", "doneWhen": "앱 화면의 무게가 저울과 같이 움직인다", "parts": ["휴대폰"] },
-            { "title": "4. 하우징 조립", "goal": "상자에 넣고 저울판을 달아요", "learn": "로드셀은 한쪽만 고정한다", "practice": "나사 4개", "doneWhen": "저울판을 눌러도 벽에 닿지 않는다", "parts": ["몸통", "앞쪽 띠", "저울판", "얼굴 캡"] }
+            {
+              "title": "1. 원시값 보기",
+              "goal": "로드셀을 누르면 숫자가 바뀌는 걸 봐요",
+              "learn": "로드셀과 HX711이 하는 일",
+              "practice": "시리얼 모니터에서 log 2",
+              "doneWhen": "raw 값이 누르면 줄고 떼면 돌아온다",
+              "parts": [
+                "ATOMS3 Lite",
+                "HX711",
+                "로드셀"
+              ]
+            },
+            {
+              "title": "2. g 단위로 보정",
+              "goal": "1kg 분동으로 숫자를 g로 맞춰요",
+              "learn": "영점과 보정",
+              "practice": "cal 1000",
+              "doneWhen": "분동을 올리면 1000.0g 근처가 나온다",
+              "parts": [
+                "1kg 분동"
+              ]
+            },
+            {
+              "title": "3. 휴대폰 연결",
+              "goal": "셈 앱에서 무게가 흐르게 해요",
+              "learn": "블루투스 GATT와 키보드 모드",
+              "practice": "앱에서 사만다 찾기",
+              "doneWhen": "앱 화면의 무게가 저울과 같이 움직인다",
+              "parts": [
+                "휴대폰"
+              ]
+            },
+            {
+              "title": "4. 하우징 조립",
+              "goal": "상자에 넣고 저울판을 달아요",
+              "learn": "로드셀은 한쪽만 고정한다",
+              "practice": "나사 4개",
+              "doneWhen": "저울판을 눌러도 벽에 닿지 않는다",
+              "parts": [
+                "몸통",
+                "앞쪽 띠",
+                "저울판"
+              ]
+            }
           ],
           "prerequisites": [
-            { "skill": "가는 선 납땜", "why": "로드셀 선이 머리카락처럼 가늘어요", "practice": "미리 만들어보기의 납땜 첫걸음", "timeEstimate": "15분" }
+            {
+              "skill": "가는 선 납땜",
+              "why": "로드셀 선이 머리카락처럼 가늘어요",
+              "practice": "미리 만들어보기의 납땜 첫걸음",
+              "timeEstimate": "15분"
+            }
           ],
-          "cost": { "options": [], "marginNote": "" },
-          "fabrication": { "needs3DPrint": true, "plan": "몸통·앞쪽 띠·저울판·얼굴 캡 4조각을 PLA로 출력해요. 서포트 없이 나오게 띠·저울판·캡은 뒤집어서 뽑아요." },
+          "cost": {
+            "options": [],
+            "marginNote": ""
+          },
+          "fabrication": {
+            "needs3DPrint": true,
+            "plan": "몸통·앞쪽 띠·저울판 3조각을 PLA로 출력해요. 서포트 없이 나오게 띠와 저울판은 뒤집어서 뽑아요."
+          },
           "risks": [
             "HX711의 GND를 진짜 GND가 아니라 G7에 꽂아요. 펌웨어가 G7을 LOW로 붙들어 GND 노릇을 시켜요. G7을 HIGH로 바꾸면 HX711 전원이 끊겨요.",
             "한 칸 밀려 꽂으면 HX711이 응답하지 않아 LED가 빨강으로 고정돼요.",
@@ -130,31 +432,140 @@
           "sensor": "5kg 로드셀 + HX711",
           "actuator": "없음",
           "camera": "없음",
-          "enclosure": { "widthMm": 88, "depthMm": 58, "heightMm": 26, "wallMm": 2 },
+          "enclosure": {
+            "widthMm": 88,
+            "depthMm": 58,
+            "heightMm": 26,
+            "wallMm": 2
+          },
           "behavior": "HX711에서 1초에 10번 무게를 읽어 영점·보정을 거쳐 g으로 바꾸고, 값이 멈추면 안정으로 표시해 블루투스로 보내요. 버튼 한 번은 영점이에요.",
           "pinAssignments": [
-            { "symbol": "HX_SCK", "pin": 5, "role": "digital_output" },
-            { "symbol": "HX_DT", "pin": 6, "role": "digital_input" },
-            { "symbol": "HX_GND", "pin": 7, "role": "digital_output" },
-            { "symbol": "LED", "pin": 35, "role": "digital_output" }
+            {
+              "symbol": "HX_SCK",
+              "pin": 5,
+              "role": "digital_output"
+            },
+            {
+              "symbol": "HX_DT",
+              "pin": 6,
+              "role": "digital_input"
+            },
+            {
+              "symbol": "HX_GND",
+              "pin": 7,
+              "role": "digital_output"
+            },
+            {
+              "symbol": "LED",
+              "pin": 35,
+              "role": "digital_output"
+            }
           ],
-          "loopSteps": ["HX711 값 읽기", "필터·영점·보정으로 g 계산", "안정 판정", "블루투스로 보내기"],
-          "assumptions": ["G7을 출력 LOW로 두어 HX711의 GND로 써요", "HX711은 3.3V로 돌려요"],
-          "humanChecks": ["3V3와 G7 사이 전압이 약 3.3V인지", "헤더가 한 칸 밀리지 않았는지"],
+          "loopSteps": [
+            "HX711 값 읽기",
+            "필터·영점·보정으로 g 계산",
+            "안정 판정",
+            "블루투스로 보내기"
+          ],
+          "assumptions": [
+            "G7을 출력 LOW로 두어 HX711의 GND로 써요",
+            "HX711은 3.3V로 돌려요"
+          ],
+          "humanChecks": [
+            "3V3와 G7 사이 전압이 약 3.3V인지",
+            "헤더가 한 칸 밀리지 않았는지"
+          ],
           "components": [
-            { "ref": "U1", "type": "board", "valueOrModel": "M5Stack ATOMS3 Lite", "reason": "블루투스·버튼·LED가 한 몸", "connection": "socket", "catalogId": "m5stack-atoms3-lite" },
-            { "ref": "HX1", "type": "sensor", "valueOrModel": "HX711 로드셀 앰프 (SZH-SSBH-016)", "reason": "로드셀 신호를 숫자로", "connection": "socket", "catalogId": "hx711-module" },
-            { "ref": "LC1", "type": "sensor", "valueOrModel": "5kg 바형 로드셀", "reason": "무게 감지", "connection": "solder", "catalogId": "loadcell-bar-5kg" }
+            {
+              "ref": "U1",
+              "type": "board",
+              "valueOrModel": "M5Stack ATOMS3 Lite",
+              "reason": "블루투스·버튼·LED가 한 몸",
+              "connection": "socket",
+              "catalogId": "m5stack-atoms3-lite"
+            },
+            {
+              "ref": "HX1",
+              "type": "sensor",
+              "valueOrModel": "HX711 로드셀 앰프 (SZH-SSBH-016)",
+              "reason": "로드셀 신호를 숫자로",
+              "connection": "socket",
+              "catalogId": "hx711-module"
+            },
+            {
+              "ref": "LC1",
+              "type": "sensor",
+              "valueOrModel": "5kg 바형 로드셀",
+              "reason": "무게 감지",
+              "connection": "solder",
+              "catalogId": "loadcell-bar-5kg"
+            }
           ],
           "nets": [
-            { "name": "3V3", "kind": "power", "members": ["U1.3V3", "HX1.VCC"] },
-            { "name": "GND(G7 대용)", "kind": "ground", "members": ["U1.G7", "HX1.GND"] },
-            { "name": "HX_SCK", "kind": "signal", "members": ["U1.G5", "HX1.SCK"] },
-            { "name": "HX_DT", "kind": "signal", "members": ["U1.G6", "HX1.DT"] },
-            { "name": "E+", "kind": "signal", "members": ["HX1.E+", "LC1.RED"] },
-            { "name": "E-", "kind": "signal", "members": ["HX1.E-", "LC1.BLK"] },
-            { "name": "A-", "kind": "signal", "members": ["HX1.A-", "LC1.WHT"] },
-            { "name": "A+", "kind": "signal", "members": ["HX1.A+", "LC1.GRN"] }
+            {
+              "name": "3V3",
+              "kind": "power",
+              "members": [
+                "U1.3V3",
+                "HX1.VCC"
+              ]
+            },
+            {
+              "name": "GND(G7 대용)",
+              "kind": "ground",
+              "members": [
+                "U1.G7",
+                "HX1.GND"
+              ]
+            },
+            {
+              "name": "HX_SCK",
+              "kind": "signal",
+              "members": [
+                "U1.G5",
+                "HX1.SCK"
+              ]
+            },
+            {
+              "name": "HX_DT",
+              "kind": "signal",
+              "members": [
+                "U1.G6",
+                "HX1.DT"
+              ]
+            },
+            {
+              "name": "E+",
+              "kind": "signal",
+              "members": [
+                "HX1.E+",
+                "LC1.RED"
+              ]
+            },
+            {
+              "name": "E-",
+              "kind": "signal",
+              "members": [
+                "HX1.E-",
+                "LC1.BLK"
+              ]
+            },
+            {
+              "name": "A-",
+              "kind": "signal",
+              "members": [
+                "HX1.A-",
+                "LC1.WHT"
+              ]
+            },
+            {
+              "name": "A+",
+              "kind": "signal",
+              "members": [
+                "HX1.A+",
+                "LC1.GRN"
+              ]
+            }
           ]
         },
         "review": {
@@ -173,42 +584,139 @@
       "args": {
         "projectId": "$PROJECT",
         "plan": {
-          "summary": "네 조각을 PLA로 뽑아요. 몸통에 로드셀과 보드가 들어가고, 앞쪽 띠가 보드 위를 덮고, 저울판은 로드셀의 뜬 쪽 끝에만 달려요. 얼굴 캡은 띠의 구멍에 걸려서 보드의 버튼을 눌러 줘요.",
+          "summary": "세 조각을 PLA로 뽑아요. 몸통에 로드셀과 보드가 들어가고, 앞쪽 띠가 보드 위를 덮고, 저울판은 로드셀의 뜬 쪽 끝에만 달려요. 띠의 네모 구멍으로 보드 윗면(버튼)을 직접 눌러요.",
           "regions": [
             {
-              "id": "body", "name": "몸통", "role": "로드셀과 보드를 담는 상자", "shapeRefs": [0], "method": "print_fdm",
+              "id": "body",
+              "name": "몸통",
+              "role": "로드셀과 보드를 담는 상자",
+              "shapeRefs": [
+                0
+              ],
+              "method": "print_fdm",
               "why": "받침과 나사 구멍을 한 번에 뽑을 수 있어요.",
-              "material": { "name": "PLA", "thicknessMm": 2, "color": "검정" },
-              "join": [{ "to": "internal", "method": "screw", "detail": "M5 접시머리 2개로 로드셀 한쪽 끝을 밑에서 고정" }],
-              "toleranceMm": 0.3, "outputs": [], "process": ["바닥을 아래로 두고 출력", "서포트 없음"], "costKRW": null, "timeHours": null,
-              "access": { "purpose": "charging", "how": "앞벽의 U자 홈으로 USB-C를 꽂아요" }
+              "material": {
+                "name": "PLA",
+                "thicknessMm": 2,
+                "color": "검정"
+              },
+              "join": [
+                {
+                  "to": "internal",
+                  "method": "screw",
+                  "detail": "짧고 굵은 나사(M5×16) 2개를 상자 바닥 밑에서 위로 넣어, 로드셀 한쪽 끝을 고정"
+                }
+              ],
+              "toleranceMm": 0.3,
+              "outputs": [],
+              "process": [
+                "바닥을 아래로 두고 출력",
+                "서포트 없음"
+              ],
+              "costKRW": null,
+              "timeHours": null,
+              "access": {
+                "purpose": "charging",
+                "how": "앞벽의 U자 홈으로 USB-C를 꽂아요"
+              }
             },
             {
-              "id": "brow", "name": "앞쪽 띠", "role": "보드 위를 덮는 뚜껑", "shapeRefs": [1], "method": "print_fdm",
-              "why": "보드를 가리면서 얼굴 캡 자리를 만들어요.",
-              "material": { "name": "PLA", "thicknessMm": 3, "color": "검정" },
-              "join": [{ "to": "body", "method": "snap", "detail": "핀 3개를 몸통 보스 구멍에 끼움" }],
-              "toleranceMm": 0.3, "outputs": [], "process": ["뒤집어서 출력", "서포트 없음"], "costKRW": null, "timeHours": null
+              "id": "brow",
+              "name": "앞쪽 띠",
+              "role": "보드 위를 덮는 뚜껑",
+              "shapeRefs": [
+                1
+              ],
+              "method": "print_fdm",
+              "why": "보드를 가리고, 네모 구멍으로 보드 윗면(버튼·LED)만 보이게 해요.",
+              "material": {
+                "name": "PLA",
+                "thicknessMm": 3,
+                "color": "검정"
+              },
+              "join": [
+                {
+                  "to": "body",
+                  "method": "snap",
+                  "detail": "핀 3개를 몸통 보스 구멍에 끼움"
+                }
+              ],
+              "toleranceMm": 0.3,
+              "outputs": [],
+              "process": [
+                "뒤집어서 출력",
+                "서포트 없음"
+              ],
+              "costKRW": null,
+              "timeHours": null,
+              "access": {
+                "purpose": "button",
+                "how": "띠의 네모 구멍으로 보드 윗면을 누르면 버튼이 눌려요"
+              },
+              "easy": [
+                "앞쪽 띠(작은 검은 판)를 찾아요.",
+                "띠를 뒤집어 작은 기둥 3개를 찾아요.",
+                "검은 상자의 앞쪽에서 구멍 3개를 찾아요.",
+                "기둥을 구멍에 맞추고 눌러서 끼워요.",
+                "띠의 네모 구멍으로 흰 부품이 보이면 맞아요."
+              ]
             },
             {
-              "id": "cap", "name": "얼굴 캡", "role": "보드 버튼을 눌러 주고 LED 빛을 눈으로 내보냄", "shapeRefs": [3], "method": "print_fdm",
-              "why": "작은 조각이라 색만 바꿔 뽑기 좋아요.",
-              "material": { "name": "PLA", "thicknessMm": 2, "color": "흰색" },
-              "join": [{ "to": "brow", "method": "slot", "detail": "걸림턱이 띠 밑에 걸려 빠지지 않음" }],
-              "toleranceMm": 0.3, "outputs": [], "process": ["뒤집어서 출력", "서포트 없음", "눈 구멍에 3mm 광섬유 끼우기"], "costKRW": null, "timeHours": null,
-              "access": { "purpose": "button", "how": "캡을 누르면 보드 버튼이 눌려요" }
-            },
-            {
-              "id": "pan", "name": "저울판", "role": "물건을 올리는 판", "shapeRefs": [2], "method": "print_fdm",
+              "id": "pan",
+              "name": "저울판",
+              "role": "물건을 올리는 판",
+              "shapeRefs": [
+                2
+              ],
+              "method": "print_fdm",
               "why": "밑에 휨 방지 리브와 받침을 같이 뽑아요.",
-              "material": { "name": "PLA", "thicknessMm": 3, "color": "검정" },
-              "join": [{ "to": "internal", "method": "screw", "detail": "M4 접시머리 2개로 로드셀의 뜬 쪽 끝에 위에서 고정" }],
-              "toleranceMm": 0.3, "outputs": [], "process": ["뒤집어서 출력", "서포트 없음"], "costKRW": null, "timeHours": null
+              "material": {
+                "name": "PLA",
+                "thicknessMm": 3,
+                "color": "검정"
+              },
+              "join": [
+                {
+                  "to": "internal",
+                  "method": "screw",
+                  "detail": "길고 가는 나사(M4×20) 2개를 저울판 위에서 아래로 넣어, 로드셀의 뜬 쪽 끝에 고정"
+                }
+              ],
+              "toleranceMm": 0.3,
+              "outputs": [],
+              "process": [
+                "뒤집어서 출력",
+                "서포트 없음"
+              ],
+              "costKRW": null,
+              "timeHours": null,
+              "easy": [
+                "**길고 가는 나사 2개**를 준비해요. (M4×20)",
+                "저울판(큰 검은 판)을 찾아요.",
+                "저울판을 은색 막대의 **떠 있는 쪽 끝** 위에 올려요.",
+                "저울판 **위에서 아래로** 나사 2개를 넣고 돌려요.",
+                "나사가 멈추면 그만 돌려요. 세게 조이면 막대가 비틀려요.",
+                "저울판을 살짝 눌렀다 떼요. 벽에 닿지 않고 제자리로 돌아오면 맞아요."
+              ]
             }
           ],
-          "environment": { "indoorOutdoor": "indoor", "water": "none", "heatSources": [], "skinContact": false, "childUse": false },
-          "assemblyOrder": ["body", "brow", "cap", "pan"],
-          "risks": ["저울판과 벽 사이 틈(2mm)에 부품이 끼면 무게가 틀려요.", "저울판 나사를 세게 조이면 로드셀이 비틀려요."]
+          "environment": {
+            "indoorOutdoor": "indoor",
+            "water": "none",
+            "heatSources": [],
+            "skinContact": false,
+            "childUse": false
+          },
+          "assemblyOrder": [
+            "body",
+            "brow",
+            "pan"
+          ],
+          "risks": [
+            "저울판과 벽 사이 틈(2mm)에 부품이 끼면 무게가 틀려요.",
+            "저울판 나사(길고 가는 것)를 세게 조이면 로드셀이 비틀려요.",
+            "나사 두 종류를 바꿔 끼우면 들어가지 않아요. 굵은 것이 바닥, 가는 것이 저울판이에요."
+          ]
         }
       }
     },
@@ -218,29 +726,106 @@
         "projectId": "$PROJECT",
         "guide": {
           "stage": "사만다 조립: 납땜 2번, 꽂기 1번",
-          "base": { "name": "몸통 바닥 (88×58mm)", "kind": "board", "width": 88, "height": 58 },
+          "base": {
+            "name": "몸통 바닥 (88×58mm)",
+            "kind": "board",
+            "width": 88,
+            "height": 58
+          },
           "parts": [
-            { "ref": "LC1", "label": "5kg 로드셀", "x": 3.7, "y": 3.5, "width": 80.6, "height": 12.7, "catalogId": "loadcell-bar-5kg", "lift": 4 },
-            { "ref": "HX1", "label": "HX711 앰프", "x": 48.39, "y": 32.41, "width": 33.7, "height": 21, "catalogId": "hx711-module", "rotation": 180, "lift": 1 },
-            { "ref": "U1", "label": "ATOMS3 Lite", "x": 32, "y": 31.5, "width": 24, "height": 24, "catalogId": "m5stack-atoms3-lite", "lift": 6.8 }
+            {
+              "ref": "LC1",
+              "label": "5kg 로드셀",
+              "x": 3.7,
+              "y": 3.5,
+              "width": 80.6,
+              "height": 12.7,
+              "catalogId": "loadcell-bar-5kg",
+              "lift": 4
+            },
+            {
+              "ref": "HX1",
+              "label": "HX711 앰프",
+              "x": 48.39,
+              "y": 32.41,
+              "width": 33.7,
+              "height": 21,
+              "catalogId": "hx711-module",
+              "rotation": 180,
+              "lift": 1
+            },
+            {
+              "ref": "U1",
+              "label": "ATOMS3 Lite",
+              "x": 32,
+              "y": 31.5,
+              "width": 24,
+              "height": 24,
+              "catalogId": "m5stack-atoms3-lite",
+              "lift": 6.8
+            }
           ],
           "steps": [
             {
               "title": "로드셀 선 4가닥을 HX711에 납땜",
               "action": "로드셀에서 나온 선을 HX711의 **P2 쪽 구멍**에 납땜해요. **빨강 → E+**, **검정 → E−**, **흰색 → A−**, **초록 → A+** 순서예요. B−와 B+는 비워 둬요.",
-              "place": ["LC1", "HX1"],
-              "wires": [
-                { "from": "LC1.RED", "to": "HX1.E+", "color": "#d64545", "label": "빨강 E+" },
-                { "from": "LC1.BLK", "to": "HX1.E-", "color": "#333333", "label": "검정 E−" },
-                { "from": "LC1.WHT", "to": "HX1.A-", "color": "#eeeeee", "label": "흰색 A−" },
-                { "from": "LC1.GRN", "to": "HX1.A+", "color": "#2e9e5b", "label": "초록 A+" }
+              "place": [
+                "LC1",
+                "HX1"
               ],
-              "ops": [{ "op": "solder", "joints": ["HX1.E+", "HX1.E-", "HX1.A-", "HX1.A+"], "side": "top" }],
+              "wires": [
+                {
+                  "from": "LC1.RED",
+                  "to": "HX1.E+",
+                  "color": "#d64545",
+                  "label": "빨강 E+"
+                },
+                {
+                  "from": "LC1.BLK",
+                  "to": "HX1.E-",
+                  "color": "#333333",
+                  "label": "검정 E−"
+                },
+                {
+                  "from": "LC1.WHT",
+                  "to": "HX1.A-",
+                  "color": "#eeeeee",
+                  "label": "흰색 A−"
+                },
+                {
+                  "from": "LC1.GRN",
+                  "to": "HX1.A+",
+                  "color": "#2e9e5b",
+                  "label": "초록 A+"
+                }
+              ],
+              "ops": [
+                {
+                  "op": "solder",
+                  "joints": [
+                    "HX1.E+",
+                    "HX1.E-",
+                    "HX1.A-",
+                    "HX1.A+"
+                  ],
+                  "side": "top"
+                }
+              ],
               "check": "선 색과 글자가 맞고, 이웃 구멍끼리 납이 붙지 않았다",
               "prepared": true,
               "cards": [
-                { "symptom": "물건을 올렸는데 무게가 줄어든다", "check": "흰색과 초록 선이 A−, A+에 맞게 갔는지 눈으로 봐요", "expected": "흰색 A−, 초록 A+", "ifNot": "두 선이 바뀌어 있어도 펌웨어가 보정 때 부호를 알아서 맞춰요. 그대로 두고 보정을 다시 해요." },
-                { "symptom": "값이 혼자 크게 흔들린다", "check": "멀티미터 통전 모드로 E+와 E− 사이를 대요", "expected": "소리가 나지 않는다 (로드셀 저항 약 1kΩ)", "ifNot": "소리가 나면 납이 이웃 구멍과 붙은 거예요. 인두로 쓸어 떼요." }
+                {
+                  "symptom": "물건을 올렸는데 무게가 줄어든다",
+                  "check": "흰색과 초록 선이 A−, A+에 맞게 갔는지 눈으로 봐요",
+                  "expected": "흰색 A−, 초록 A+",
+                  "ifNot": "두 선이 바뀌어 있어도 펌웨어가 보정 때 부호를 알아서 맞춰요. 그대로 두고 보정을 다시 해요."
+                },
+                {
+                  "symptom": "값이 혼자 크게 흔들린다",
+                  "check": "멀티미터 통전 모드로 E+와 E− 사이를 대요",
+                  "expected": "소리가 나지 않는다 (로드셀 저항 약 1kΩ)",
+                  "ifNot": "소리가 나면 납이 이웃 구멍과 붙은 거예요. 인두로 쓸어 떼요."
+                }
               ]
             },
             {
@@ -248,24 +833,80 @@
               "action": "HX711의 **P1 쪽**(GND·DT·SCK·VCC)에 **4핀 헤더**를 꽂고 납땜해요. 핀의 긴 쪽이 부품이 있는 면 위로 올라오게 해요. 이 핀에 보드를 꽂을 거예요.",
               "place": [],
               "wires": [],
-              "ops": [{ "op": "solder", "joints": ["HX1.GND", "HX1.DT", "HX1.SCK", "HX1.VCC"], "side": "top" }],
+              "ops": [
+                {
+                  "op": "solder",
+                  "joints": [
+                    "HX1.GND",
+                    "HX1.DT",
+                    "HX1.SCK",
+                    "HX1.VCC"
+                  ],
+                  "side": "top"
+                }
+              ],
               "check": "핀 4개가 기판에 똑바로 서 있다",
               "prepared": true,
               "cards": [
-                { "symptom": "헤더가 비스듬히 붙었다", "check": "옆에서 봐서 핀이 기판과 직각인지 봐요", "expected": "직각", "ifNot": "핀 하나만 다시 녹인 채로 헤더를 눌러 세우고, 나머지를 다시 납땜해요." }
+                {
+                  "symptom": "헤더가 비스듬히 붙었다",
+                  "check": "옆에서 봐서 핀이 기판과 직각인지 봐요",
+                  "expected": "직각",
+                  "ifNot": "핀 하나만 다시 녹인 채로 헤더를 눌러 세우고, 나머지를 다시 납땜해요."
+                }
               ]
             },
             {
               "title": "ATOMS3 Lite를 헤더에 꽂기",
               "action": "보드를 **버튼 면이 위, USB-C가 내 쪽**으로 오게 들어요. 아랫면의 **구멍 5개짜리 소켓**(3V3·G5·G6·G7·G8)을 HX711 헤더 위에 맞춰요. **VCC 핀이 3V3 구멍**에 들어가게 하고 끝까지 눌러요. 그러면 SCK는 G5, DT는 G6, GND는 G7에 들어가고 **G8 한 칸이 남아요**.",
-              "place": ["U1"],
+              "place": [
+                "U1"
+              ],
               "wires": [],
-              "ops": [{ "op": "check", "how": "look", "targets": ["HX1.VCC", "U1.3V3", "HX1.GND", "U1.G7"], "expected": "VCC는 3V3 구멍, GND는 G7 구멍. USB 쪽 G8 한 칸이 빈다" }],
+              "ops": [
+                {
+                  "op": "check",
+                  "how": "look",
+                  "targets": [
+                    "HX1.VCC",
+                    "U1.3V3",
+                    "HX1.GND",
+                    "U1.G7"
+                  ],
+                  "expected": "VCC는 3V3 구멍, GND는 G7 구멍. USB 쪽 G8 한 칸이 빈다"
+                }
+              ],
               "check": "USB 쪽으로 구멍 한 칸(G8)이 비어 있고, 보드가 기울지 않았다",
               "cards": [
-                { "symptom": "전원을 넣었더니 LED가 빨강으로 멈춰 있다", "check": "보드를 뽑아 헤더가 어느 구멍에 들어갔는지 다시 봐요. 핀 이름 스티커는 보드 아랫면에 있어요", "expected": "VCC가 3V3, GND가 G7", "ifNot": "한 칸 밀려 꽂힌 거예요. USB를 빼고, 3V3 구멍부터 맞춰 다시 꽂아요." },
-                { "symptom": "반대쪽 소켓(G39·G38·5V·G)에 꽂았다", "check": "꽂힌 쪽 소켓의 구멍 수를 세요", "expected": "구멍 5개짜리 쪽", "ifNot": "바로 USB를 빼요. 그쪽은 5V가 나오는 자리라 HX711 신호선에 5V가 걸려요." },
-                { "symptom": "꽂았는데 헐겁다", "check": "USB를 꽂고 멀티미터 DC 20V로 HX711의 VCC와 GND 핀 사이를 재요", "expected": "3.2~3.4V", "ifNot": "0V 근처면 덜 들어간 거예요. 끝까지 눌러요." }
+                {
+                  "symptom": "전원을 넣었더니 LED가 빨강으로 멈춰 있다",
+                  "check": "보드를 뽑아 헤더가 어느 구멍에 들어갔는지 다시 봐요. 핀 이름 스티커는 보드 아랫면에 있어요",
+                  "expected": "VCC가 3V3, GND가 G7",
+                  "ifNot": "한 칸 밀려 꽂힌 거예요. USB를 빼고, 3V3 구멍부터 맞춰 다시 꽂아요."
+                },
+                {
+                  "symptom": "반대쪽 소켓(G39·G38·5V·G)에 꽂았다",
+                  "check": "꽂힌 쪽 소켓의 구멍 수를 세요",
+                  "expected": "구멍 5개짜리 쪽",
+                  "ifNot": "바로 USB를 빼요. 그쪽은 5V가 나오는 자리라 HX711 신호선에 5V가 걸려요."
+                },
+                {
+                  "symptom": "꽂았는데 헐겁다",
+                  "check": "USB를 꽂고 멀티미터 DC 20V로 HX711의 VCC와 GND 핀 사이를 재요",
+                  "expected": "3.2~3.4V",
+                  "ifNot": "0V 근처면 덜 들어간 거예요. 끝까지 눌러요."
+                }
+              ],
+              "easy": [
+                "부품을 책상에 내려놓아요.",
+                "**초록색 직사각형** 부품을 찾아요. 이게 HX711이에요.",
+                "초록 부품에 서 있는 **검은 갈퀴**(핀 4개)를 찾아요.",
+                "갈퀴 옆에 **VCC**라고 쓰인 글자를 찾아요.",
+                "**흰색 정사각형** 부품을 찾아요. 이게 ATOMS3예요.",
+                "흰 부품을 뒤집어 밑면에서 **3V3**라고 쓰인 구멍을 찾아요.",
+                "**VCC 핀이 3V3 구멍**에 오게 방향을 맞춰요.",
+                "흰 부품의 구멍을 갈퀴에 대고 끝까지 눌러요.",
+                "USB 구멍 쪽으로 **구멍 한 칸이 남으면** 맞아요."
               ]
             },
             {
@@ -273,22 +914,71 @@
               "action": "**USB-C 케이블**을 꽂아요. LED가 **파랑**으로 켜졌다가 **청록으로 깜빡**이면 블루투스 연결을 기다리는 거예요. 저울판을 살짝 누르고 떼어 봐요.",
               "place": [],
               "wires": [],
-              "ops": [{ "op": "check", "how": "power_on", "targets": ["U1"], "expected": "파랑 → 청록 깜빡" }],
+              "ops": [
+                {
+                  "op": "check",
+                  "how": "power_on",
+                  "targets": [
+                    "U1"
+                  ],
+                  "expected": "파랑 → 청록 깜빡"
+                }
+              ],
               "check": "LED가 빨강이 아니다",
               "cards": [
-                { "symptom": "LED가 아예 안 켜진다", "check": "케이블을 다른 포트나 충전기에 꽂아 봐요", "expected": "파랑으로 켜진다", "ifNot": "작은 보조배터리는 스스로 꺼지기도 해요. 충전기나 노트북에 꽂아요." },
-                { "symptom": "LED가 빨강으로 멈춰 있다", "check": "3단계의 꽂은 자리를 다시 봐요", "expected": "VCC가 3V3, GND가 G7", "ifNot": "HX711이 1초 동안 대답이 없다는 뜻이에요. USB를 빼고 다시 꽂아요." }
+                {
+                  "symptom": "LED가 아예 안 켜진다",
+                  "check": "케이블을 다른 포트나 충전기에 꽂아 봐요",
+                  "expected": "파랑으로 켜진다",
+                  "ifNot": "작은 보조배터리는 스스로 꺼지기도 해요. 충전기나 노트북에 꽂아요."
+                },
+                {
+                  "symptom": "LED가 빨강으로 멈춰 있다",
+                  "check": "3단계의 꽂은 자리를 다시 봐요",
+                  "expected": "VCC가 3V3, GND가 G7",
+                  "ifNot": "HX711이 1초 동안 대답이 없다는 뜻이에요. USB를 빼고 다시 꽂아요."
+                }
+              ],
+              "easy": [
+                "USB-C 케이블을 흰 부품에 꽂아요.",
+                "반대쪽을 노트북에 꽂아요.",
+                "흰 부품의 불빛 색을 봐요.",
+                "**파랑이나 청록**이면 성공이에요.",
+                "**빨강**이면 케이블을 빼고, 흰 부품을 뺐다가 다시 꽂아요."
               ]
             },
             {
               "title": "로드셀 한쪽 끝을 바닥에 고정",
-              "action": "로드셀의 **한쪽 끝**만 몸통 바닥의 받침 위에 올리고, 밑에서 **M5 나사 2개**로 조여요. 반대쪽 끝과 가운데는 **공중에 떠 있어야** 해요.",
+              "action": "나사는 두 종류예요. **짧고 굵은 나사**(M5×16) 2개와 **길고 가는 나사**(M4×20) 2개. 여기서는 **짧고 굵은 나사**를 써요. 로드셀의 **한쪽 끝**만 몸통 바닥의 받침 위에 올리고, **상자 바닥 밑에서 위로** 나사 2개를 넣어 조여요. 반대쪽 끝과 가운데는 **공중에 떠 있어야** 해요.",
               "place": [],
               "wires": [],
-              "ops": [{ "op": "check", "how": "look", "targets": ["LC1"], "expected": "가운데 흰 부분이 바닥·벽·선 어디에도 닿지 않는다" }],
+              "ops": [
+                {
+                  "op": "check",
+                  "how": "look",
+                  "targets": [
+                    "LC1"
+                  ],
+                  "expected": "가운데 흰 부분이 바닥·벽·선 어디에도 닿지 않는다"
+                }
+              ],
               "check": "뜬 쪽 끝을 손가락으로 누르면 아주 조금 휘었다가 돌아온다",
               "cards": [
-                { "symptom": "빈 저울인데 무게가 몇 g 남아 있다", "check": "로드셀 밑과 옆에 선이 끼어 있지 않은지 봐요", "expected": "아무것도 닿지 않는다", "ifNot": "선을 기둥 쪽으로 돌려 정리하고, 버튼을 한 번 눌러 영점을 다시 맞춰요." }
+                {
+                  "symptom": "빈 저울인데 무게가 몇 g 남아 있다",
+                  "check": "로드셀 밑과 옆에 선이 끼어 있지 않은지 봐요",
+                  "expected": "아무것도 닿지 않는다",
+                  "ifNot": "선을 기둥 쪽으로 돌려 정리하고, 버튼을 한 번 눌러 영점을 다시 맞춰요."
+                }
+              ],
+              "easy": [
+                "나사를 두 종류로 나눠요. **짧고 굵은 것 2개**, 길고 가는 것 2개.",
+                "지금은 **짧고 굵은 나사 2개**만 써요. (M5×16)",
+                "검은 상자를 뒤집어 **바닥의 구멍 2개**를 찾아요.",
+                "은색 막대(로드셀)의 한쪽 끝을 상자 안 받침 위에 올려요.",
+                "상자 **바닥 밑에서 위로** 나사 2개를 넣고 돌려요.",
+                "나사가 멈추면 그만 돌려요.",
+                "막대의 반대쪽 끝을 살짝 눌러요. 조금 휘었다 돌아오면 맞아요."
               ]
             }
           ]
@@ -300,18 +990,90 @@
       "args": {
         "projectId": "$PROJECT",
         "cases": [
-          { "id": "t1-raw", "stage": 1, "title": "원시값이 움직인다", "setup": "USB를 꽂고 시리얼 모니터를 115200으로 열어요", "do": "log 2 를 입력하고 로드셀 끝을 손가락으로 눌렀다 떼요", "expect": { "serial": ["[M] raw="], "observe": "누르면 raw 숫자가 줄고, 떼면 처음 값 근처로 돌아온다" } },
-          { "id": "t2-cal", "stage": 2, "title": "1kg이 1000g으로 나온다", "setup": "저울판을 달고 빈 상태로 둬요", "do": "cal 1000 을 입력하고 안내대로 비운 뒤 1kg 분동을 올려요", "expect": { "serial": ["[CAL] ok"], "measure": { "what": "1kg 분동을 올렸을 때 w 값", "min": 995, "max": 1005, "unit": "g" } } },
-          { "id": "t3-stable", "stage": 2, "title": "값이 멈추면 안정으로 바뀐다", "setup": "보정을 마친 상태", "do": "동전 한 줌을 올려요", "expect": { "observe": "1초쯤 뒤 stable=1 로 바뀌고 LED가 초록이 된다" } },
-          { "id": "t4-ble", "stage": 3, "title": "휴대폰에서 무게가 흐른다", "setup": "안드로이드 크롬으로 셈 앱을 열어요", "do": "사만다 찾기를 눌러 dalgrak-scale-번호를 골라요", "expect": { "observe": "앱의 무게가 저울과 같이 움직이고, 화면 속 사만다 눈 색이 LED와 같다" } },
-          { "id": "t5-count", "stage": 3, "title": "개수가 맞는다", "setup": "앱에서 무게로 세기를 시작해요", "do": "빈 통 → 동전 10개 → 동전 30개 순서로 올려요", "expect": { "observe": "앱이 30개라고 한다" } },
-          { "id": "t6-button", "stage": 4, "title": "얼굴 캡이 버튼을 누른다", "setup": "하우징을 다 닫아요", "do": "캡을 한 번 눌러요", "expect": { "observe": "LED가 흰색으로 잠깐 바뀌고 무게가 0으로 돌아온다" } }
+          {
+            "id": "t1-raw",
+            "stage": 1,
+            "title": "원시값이 움직인다",
+            "setup": "USB를 꽂고 시리얼 모니터를 115200으로 열어요",
+            "do": "log 2 를 입력하고 로드셀 끝을 손가락으로 눌렀다 떼요",
+            "expect": {
+              "serial": [
+                "[M] raw="
+              ],
+              "observe": "누르면 raw 숫자가 줄고, 떼면 처음 값 근처로 돌아온다"
+            }
+          },
+          {
+            "id": "t2-cal",
+            "stage": 2,
+            "title": "1kg이 1000g으로 나온다",
+            "setup": "저울판을 달고 빈 상태로 둬요",
+            "do": "cal 1000 을 입력하고 안내대로 비운 뒤 1kg 분동을 올려요",
+            "expect": {
+              "serial": [
+                "[CAL] ok"
+              ],
+              "measure": {
+                "what": "1kg 분동을 올렸을 때 w 값",
+                "min": 995,
+                "max": 1005,
+                "unit": "g"
+              }
+            }
+          },
+          {
+            "id": "t3-stable",
+            "stage": 2,
+            "title": "값이 멈추면 안정으로 바뀐다",
+            "setup": "보정을 마친 상태",
+            "do": "동전 한 줌을 올려요",
+            "expect": {
+              "observe": "1초쯤 뒤 stable=1 로 바뀌고 LED가 초록이 된다"
+            }
+          },
+          {
+            "id": "t4-ble",
+            "stage": 3,
+            "title": "휴대폰에서 무게가 흐른다",
+            "setup": "안드로이드 크롬으로 셈 앱을 열어요",
+            "do": "사만다 찾기를 눌러 dalgrak-scale-번호를 골라요",
+            "expect": {
+              "observe": "앱의 무게가 저울과 같이 움직이고, 화면 속 사만다 눈 색이 LED와 같다"
+            }
+          },
+          {
+            "id": "t5-count",
+            "stage": 3,
+            "title": "개수가 맞는다",
+            "setup": "앱에서 무게로 세기를 시작해요",
+            "do": "빈 통 → 동전 10개 → 동전 30개 순서로 올려요",
+            "expect": {
+              "observe": "앱이 30개라고 한다"
+            }
+          },
+          {
+            "id": "t6-button",
+            "stage": 4,
+            "title": "띠의 구멍으로 버튼이 눌린다",
+            "setup": "하우징을 다 닫아요",
+            "do": "띠의 구멍으로 보드 윗면을 한 번 눌러요",
+            "expect": {
+              "observe": "LED가 흰색으로 잠깐 바뀌고 무게가 0으로 돌아온다"
+            }
+          }
         ]
       }
     },
     {
       "tool": "set_team",
-      "args": { "projectId": "$PROJECT", "agents": ["hw", "sw", "me"] }
+      "args": {
+        "projectId": "$PROJECT",
+        "agents": [
+          "hw",
+          "sw",
+          "me"
+        ]
+      }
     }
   ]
 }

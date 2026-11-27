@@ -552,7 +552,8 @@ const HousingSchema = z.object({
     outputs: z.array(z.object({ kind: z.enum(["stl", "scad", "dxf_unfold", "svg_cut", "pattern_pdf", "mold_plan", "buy_link"]), status: z.enum(["ready", "todo", "unknown"]), note: z.string().max(200), url: z.string().url().max(500).optional() }).strict()).max(8),
     process: z.array(z.string().min(1).max(300)).min(1).max(12),
     costKRW: z.number().int().min(0).max(10_000_000).nullable(), timeHours: z.number().min(0).max(500).nullable(),
-    feasible: z.enum(["yes", "needs_service", "no", "unknown"]).optional()
+    feasible: z.enum(["yes", "needs_service", "no", "unknown"]).optional(),
+    easy: z.array(z.string().min(1).max(160)).max(10).optional()
   }).strict()).min(1).max(10),
   environment: z.object({ indoorOutdoor: z.enum(["indoor", "outdoor", "both"]), water: z.enum(["none", "splash", "rain", "submerge"]), heatSources: z.array(z.string().max(60)).max(6), skinContact: z.boolean(), childUse: z.boolean() }).strict(),
   assemblyOrder: z.array(z.string().max(24)).max(10),
@@ -574,7 +575,8 @@ const AssemblySchema = z.object({
       z.object({ op: z.literal("trim"), refs: z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,15}$/)).min(1).max(8) }).strict(),
       z.object({ op: z.literal("check"), how: z.enum(["look", "continuity", "power_on"]), targets: z.array(z.string().min(1).max(40)).min(1).max(4), expected: z.string().min(1).max(120) }).strict()
     ])).max(8).optional(),
-    prepared: z.boolean().optional()
+    prepared: z.boolean().optional(),
+    easy: z.array(z.string().min(1).max(160)).max(10).optional()
   }).strict()).min(1).max(20)
 }).strict();
 

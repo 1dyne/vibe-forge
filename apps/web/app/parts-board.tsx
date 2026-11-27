@@ -41,9 +41,11 @@ export function pinPointOf(placed: Placed[], end: string): [number, number] | nu
   return [p.x + rx, p.y + ry];
 }
 
-export function PartsBoard({ base, placed, wires, freshRefs = new Set(), pastRefs = new Set(), activePins = new Set(), replayKey = "", label }: {
+export function PartsBoard({ base, placed, wires, freshRefs = new Set(), pastRefs = new Set(), activePins = new Set(), replayKey = "", label, plain = false }: {
   base: { kind: "breadboard" | "board" | "stack" | "perfboard" | "canvas"; width: number; height: number };
   placed: Placed[]; wires: BoardWire[]; freshRefs?: Set<string>; pastRefs?: Set<string>; activePins?: Set<string>; replayKey?: string; label: string;
+  /** 모양이 준비되지 않은 부품의 '대체 표시' 글자를 숨긴다 (자리가 맞다고 확인된 설계에서) */
+  plain?: boolean;
 }) {
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -74,7 +76,7 @@ export function PartsBoard({ base, placed, wires, freshRefs = new Set(), pastRef
             {placed.filter((p) => !p.tag).map((p) => <g key={p.ref} className={freshRefs.has(p.ref) ? "assembly-fresh" : ""} opacity={pastRefs.has(p.ref) ? 0.75 : 1} transform={`rotate(${p.rotation ?? 0} ${p.x + p.w / 2} ${p.y + p.h / 2})`}>
               <rect x={p.x} y={p.y} width={p.w} height={p.h} rx={0.8} fill={p.color ?? "#5b6b66"} stroke="#e0a43a" strokeDasharray="1 0.8" strokeWidth={0.4} />
               <text x={p.x + p.w / 2} y={p.y + p.h / 2 - 1} textAnchor="middle" fontSize={Math.min(3, p.w / 5)} fill="#fff" fontWeight={700}>{p.ref}</text>
-              <text x={p.x + p.w / 2} y={p.y + p.h / 2 + 2.4} textAnchor="middle" fontSize={1.8} fill="#ffe2a8">대체 표시</text>
+              {!plain && <text x={p.x + p.w / 2} y={p.y + p.h / 2 + 2.4} textAnchor="middle" fontSize={1.8} fill="#ffe2a8">대체 표시</text>}
               <title>{p.ref} · {p.card?.model ?? p.label} (대체 표시)</title>
             </g>)}
           </svg>

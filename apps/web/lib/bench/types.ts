@@ -74,6 +74,8 @@ export type BenchStep = {
   doneWhen: string;
   /** 미리 해 둔 단계: 화면을 따라 하지 않아도 바로 완료로 넘길 수 있다 */
   prepared?: boolean;
+  /** 아주 쉬운 순서: 한 줄에 동작 하나. 있으면 달그락을 눌러 체크하며 따라 할 수 있다 */
+  easy?: string[];
 };
 
 export type BenchFaq = { q: string; a: string };

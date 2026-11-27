@@ -6,6 +6,7 @@ import { stepBasis, wireLengths } from "../lib/assembly-utils";
 import { PartsBoard, placeParts } from "./parts-board";
 import { createPortal } from "react-dom";
 import BenchViewScreen, { type BenchPhoto } from "./bench/bench-view";
+import { isMeetup } from "../lib/meetup";
 import GuideBench from "./bench/guide-bench";
 import { guideToKit } from "../lib/bench/from-guide";
 import { workflowFor } from "../lib/workflow";
@@ -124,14 +125,14 @@ export function AssemblyView({ project, busy, onAction, connectorOnly = false }:
     <div className="artifact-title"><span className="pill">조립 가이드</span><h3>{guide.stage}</h3></div>
     {blocked.length > 0 && <p className="notice danger-notice">회로에 꼭 고쳐야 할 문제가 있어 조립을 진행할 수 없어요: {blocked.map((c) => c.message).join(" / ")}</p>}
     {kit && !flat && !no3d && !bench ? <GuideBench kit={kit} step={step} replayKey={replay} onFail={() => setNo3d(true)} />
-    : <PartsBoard base={guide.base} placed={placed} label={`${guide.base.name} · ${W}×${H}mm 실제 비율`} replayKey={`${step}-${replay}`}
+    : <PartsBoard plain={isMeetup(project)} base={guide.base} placed={placed} label={`${guide.base.name} · ${W}×${H}mm 실제 비율`} replayKey={`${step}-${replay}`}
       wires={wires.map((w) => ({ from: w.from, to: w.to, stroke: w.stroke, fresh: w.fresh }))} freshRefs={new Set(visible.filter((p) => placedAt.get(p.ref) === step).map((p) => p.ref))}
       pastRefs={new Set(visible.filter((p) => (placedAt.get(p.ref) ?? 0) < step).map((p) => p.ref))} activePins={activePins} />}
     <div className="board-actions"><button className="primary bench-open" onClick={() => setBench(true)}>🔥 3D 작업대에서 따라 하기</button><button onClick={() => setReplay(replay + 1)}>↺ 이 단계 다시 보기</button>{kit && !no3d && <button aria-pressed={flat} onClick={() => setFlat(!flat)}>{flat ? "3D로 보기" : "평면 배치도"}</button>}</div>
     {bench && kit && typeof document !== "undefined" && createPortal(
       <div className="bench-overlay"><BenchViewScreen kit={kit} mode="project" onClose={() => setBench(false)} onAsk={connectorOnly ? askHelper : askHw} connectorOnly={connectorOnly} reported={reportedSteps}
         onReport={(n, text) => onAction({ action: "assembly_report", step: n, text })} /></div>, document.body)}
-    {fallbacks.length > 0 && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 준비되지 않아 사각형으로 보여요. 핀 위치는 {fallbacks.some((p) => p.card?.pins.length) ? "부품 카드" : "가이드"} 기준이니, 판매 페이지 사진과 핀 이름으로 방향을 확인하세요.</p>}
+    {fallbacks.length > 0 && !isMeetup(project) && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 준비되지 않아 사각형으로 보여요. 핀 위치는 {fallbacks.some((p) => p.card?.pins.length) ? "부품 카드" : "가이드"} 기준이니, 판매 페이지 사진과 핀 이름으로 방향을 확인하세요.</p>}
     <div className="assembly-controls">
       <button disabled={step === 0} onClick={() => { setPlaying(false); setStep(step - 1); setShowDetail(false); }}>◀ 이전</button>
       <button className="primary" onClick={() => { if (!playing && step === guide.steps.length - 1) setStep(0); setPlaying(!playing); }}>{playing ? "⏸ 멈춤" : "▶ 전체 재생"}</button>

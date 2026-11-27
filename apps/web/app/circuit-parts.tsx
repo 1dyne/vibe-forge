@@ -8,7 +8,7 @@ const RED = "#d64545", BLACK = "#222222", SIGNAL = ["#2e7bd6", "#e0a43a", "#3fa3
 // The circuit as real parts: the board on the left, other parts beside it
 // at real size, and every net drawn pin to pin. Parts without a card get a
 // fallback box with pins spaced along one edge (approximate positions).
-export function CircuitPartsView({ blueprint }: { blueprint: BuildBlueprint }) {
+export function CircuitPartsView({ blueprint, plain = false }: { blueprint: BuildBlueprint; plain?: boolean }) {
   const components = blueprint.components;
   const boardIndex = Math.max(0, components.findIndex((c) => findCard(c.catalogId)?.type === "board" || c.type === "controller"));
   const ordered = [components[boardIndex], ...components.filter((_, i) => i !== boardIndex)].filter(Boolean);
@@ -43,9 +43,9 @@ export function CircuitPartsView({ blueprint }: { blueprint: BuildBlueprint }) {
   });
   const fallbacks = placed.filter((p) => !p.tag);
   return <div className="circuit-parts">
-    <PartsBoard base={{ kind: "canvas", width, height }} placed={placed} wires={wires} label={`실제 부품 배치도 · ${blueprint.board}`} />
+    <PartsBoard base={{ kind: "canvas", width, height }} placed={placed} wires={wires} plain={plain} label={`실제 부품 배치도 · ${blueprint.board}`} />
     <ul className="net-legend">{blueprint.nets.map((net, i) => <li key={net.name}><span style={{ background: net.kind === "power" ? RED : net.kind === "ground" ? BLACK : SIGNAL[blueprint.nets.slice(0, i).filter((n) => n.kind === "signal").length % SIGNAL.length] }} /><b>{net.name}</b> {net.members.join(" · ")}</li>)}</ul>
-    {fallbacks.length > 0 && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 없어 사각형으로 보여요.{approximate.length ? ` ${approximate.join(", ")}의 핀 위치는 대략적인 표시라, 실물의 핀 이름으로 확인하세요.` : ""}</p>}
+    {fallbacks.length > 0 && !plain && <p className="notice">대체 표시: {fallbacks.map((p) => `${p.ref}(${p.card?.model ?? p.label})`).join(", ")}는 실제 모양이 아직 없어 사각형으로 보여요.{approximate.length ? ` ${approximate.join(", ")}의 핀 위치는 대략적인 표시라, 실물의 핀 이름으로 확인하세요.` : ""}</p>}
     <p className="muted">부품은 실제 크기 비율이에요. 실제 기판 위 배치와 단계별 순서는 조립 가이드에서 볼 수 있어요.</p>
   </div>;
 }

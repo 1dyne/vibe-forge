@@ -231,7 +231,9 @@ export type AssemblyOp =
   | { op: "check"; how: "look" | "continuity" | "power_on"; targets: string[]; expected: string };
 export type AssemblyStep = { title: string; action: string; place: string[]; wires: AssemblyWire[]; check: string; cards: TroubleCard[]; ops?: AssemblyOp[];
   /** 미리 해 둔 단계 (예: 납땜을 끝내서 가져온 부품). 작업대에서 화면을 따라 하지 않고 바로 완료로 넘길 수 있다 */
-  prepared?: boolean };
+  prepared?: boolean;
+  /** 처음인 사람을 위한 아주 쉬운 순서. 한 줄에 동작 하나, 작업대에서 체크하며 따라 한다 */
+  easy?: string[] };
 export type AssemblyGuide = {
   stage: string;
   base: { name: string; kind: "breadboard" | "board" | "stack" | "perfboard"; width: number; height: number };
@@ -335,6 +337,8 @@ export type HousingRegion = {
   costKRW: number | null;
   timeHours: number | null;
   feasible: "yes" | "needs_service" | "no" | "unknown";
+  /** 이 부위를 씌울 때의 아주 쉬운 순서 (작업대에서 체크하며 따라 한다) */
+  easy?: string[];
 };
 export type HousingPlan = {
   summary: string;
