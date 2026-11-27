@@ -162,7 +162,7 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
   if (!status) return <div className="connector-composer"><p>연결 상태를 확인하고 있어요…</p></div>;
   if (!status.online && !offlineOk) return <div className="connector-composer">
     <strong>달그락 연결 앱이 꺼져 있어요 · 켜면 여기서 바로 대화할 수 있어요</strong>
-    <p>내 컴퓨터의 <button type="button" className="term-link" onClick={() => setTerminal(HELPER_COMMAND)}>터미널(윈도우는 PowerShell)</button>에 아래를 붙여넣고 Enter를 누르세요. 전에 로그인했다면 다시 묻지 않고 바로 켜져요. “준비됐어요”가 뜨면 이 화면이 몇 초 안에 입력창으로 바뀌어요.</p>
+    <p>내 컴퓨터의 <button type="button" className="term-link" onClick={() => setTerminal(HELPER_COMMAND)}>터미널(윈도우는 명령 프롬프트)</button>에 아래를 붙여넣고 Enter를 누르세요. 전에 로그인했다면 다시 묻지 않고 바로 켜져요. “준비됐어요”가 뜨면 이 화면이 몇 초 안에 입력창으로 바뀌어요.</p>
     <div className="copy-row"><code>{HELPER_COMMAND}</code><button type="button" className="copy-button" onClick={() => { void navigator.clipboard?.writeText(HELPER_COMMAND).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "복사됨" : "복사"}</button></div>
     <p>터미널 창을 닫으면 연결 앱도 꺼져요. 대화하는 동안에는 켜 두세요. 꺼져 있어도 기록·설계·파일 보기, 승인, 구매·측정 기록은 여기서 그대로 할 수 있어요. <a href={HELPER_REPO_URL} target="_blank" rel="noreferrer noopener">처음 설치하는 방법 · 더블클릭으로 켜는 파일 받기</a> · <a href={HELPER_REPO_URL + "/blob/main/SECURITY.md"} target="_blank" rel="noreferrer noopener">이 앱이 하는 일과 하지 않는 일(보안 안내)</a></p>
     {terminal && <TerminalHelp command={terminal} onClose={() => setTerminal(null)} />}
@@ -172,7 +172,7 @@ export default function HelperComposer({ project, channel, speaker, placeholder,
       <div className="send-failed-head"><b>전송 실패</b><span className="send-failed-text" title={failed.text}>{failed.text}</span><button type="button" className="retry" disabled={busy} onClick={() => void submit(null, failed)}>↻ 다시 보내기</button><button type="button" className="link-button" onClick={() => setFailed(null)}>지우기</button></div>
       <p>{failed.message} {failed.usage && <a href={USAGE_URL} target="_blank" rel="noreferrer noopener">사용량 관리</a>}</p>
       {(failed.code === "claude_signed_out" || failed.code === "claude_missing") && <ol className="fix-steps">
-        <li>내 컴퓨터에서 <button type="button" className="term-link" onClick={() => setTerminal(failed.code === "claude_missing" ? CLAUDE_INSTALL : CLAUDE_LOGIN)}>터미널(윈도우는 PowerShell)</button>을 새로 하나 열어요. 달그락 연결 앱이 켜져 있는 창은 그대로 두세요.</li>
+        <li>내 컴퓨터에서 <button type="button" className="term-link" onClick={() => setTerminal(failed.code === "claude_missing" ? CLAUDE_INSTALL : CLAUDE_LOGIN)}>터미널(윈도우는 명령 프롬프트)</button>을 새로 하나 열어요. 달그락 연결 앱이 켜져 있는 창은 그대로 두세요.</li>
         {failed.code === "claude_missing" && <li>아래를 붙여넣고 Enter를 눌러 Claude Code를 설치해요.<CopyRow text={CLAUDE_INSTALL} /></li>}
         <li>아래를 붙여넣고 Enter를 눌러요. 로그인 안내가 나오면 브라우저에서 Claude 계정으로 로그인해요.<CopyRow text={CLAUDE_LOGIN} /></li>
         <li>“무엇을 도와드릴까요” 같은 입력 줄이 보이면 로그인된 거예요. 그 창은 닫아도 돼요. 여기로 돌아와 <b>다시 보내기</b>를 눌러요.</li>

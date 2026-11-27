@@ -58,10 +58,11 @@ export default function PrepView({ contact }: { contact: string }) {
         <p>컴퓨터에 원래 들어 있는 <b>글자 입력 창</b>이에요. 까만(또는 파란) 창이 뜨고, 거기에 글자를 붙여넣고 <kbd>Enter</kbd>를 누르면 컴퓨터가 그 일을 해요. 아래 2~4번에서 이 창을 써요. 할 일은 <b>복사 → 붙여넣기 → Enter</b> 뿐이에요.</p>
         <p><b>여는 법</b></p>
         <ul>
-          <li><b>윈도우</b>: 키보드의 <kbd>⊞ 윈도우 키</kbd>를 누르고 <code>powershell</code>이라고 친 다음, 맨 위에 나온 <b>Windows PowerShell</b>을 눌러요.</li>
+          <li><b>윈도우</b>: 키보드의 <kbd>⊞ 윈도우 키</kbd>를 누르고 <code>cmd</code>라고 친 다음, 맨 위에 나온 <b>명령 프롬프트</b>를 눌러요. (PowerShell이 아니라 <b>명령 프롬프트</b>예요.)</li>
           <li><b>맥</b>: <kbd>⌘</kbd>+<kbd>스페이스</kbd>를 누르고 <code>터미널</code>이라고 친 다음 <kbd>Enter</kbd>를 눌러요.</li>
         </ul>
         <p><b>붙여넣는 법</b>: 윈도우는 창 안에서 <b>마우스 오른쪽 버튼</b>을 한 번, 맥은 <kbd>⌘</kbd>+<kbd>V</kbd>.</p>
+        <p className="prep-note"><b>“스크립트를 실행할 수 없습니다”</b>나 빨간 글씨가 나오면 PowerShell을 연 거예요. 그 창을 닫고 위 방법대로 <b>명령 프롬프트</b>를 열어 다시 해요. <b>“…은(는) 내부 또는 외부 명령이 아닙니다”</b>가 나오면 창을 닫았다가 새로 열어요(설치한 뒤에는 새 창이어야 해요).</p>
         <p className="prep-screen">{picture("node -v")} <small>(이 페이지에서만 눌러져요)</small></p>
       </div></Reveal>
 
