@@ -1,18 +1,21 @@
 "use client";
 import { useState } from "react";
-import { fireLabel, type ReactKind } from "../../lib/find/chips";
+import { fireLabel } from "../../lib/find/chips";
 import type { FireCard } from "../../lib/find/card";
 import { GRADE_CLASS } from "../../lib/find/card";
 import { NAMELESS } from "../../lib/find/nickname";
 import { PARTS_NOTE } from "../../lib/find/parts";
-import Dokkaebi from "./dokkaebi";
-import { MAKER, type MakerKind } from "../../lib/find/classify";
+import Dokkaebi, { ReactMark } from "./dokkaebi";
+import { MAKER, fireMaker, fireReacts, type MakerKind } from "../../lib/find/classify";
 
 const STAT_COLOR: Record<string, string> = { 형태: "var(--cat-form)", 반응: "var(--cat-react)", 감지: "var(--cat-sense)", 누구: "var(--cat-who)" };
 
 /** 도깨비불 트레이딩 카드. 누르면 뒤집혀서 설계 정보(어림)를 보여준다. */
-export default function FireCardView({ name, owner, peak, kind, card, maker = "hardware" }: { name: string; owner?: string; peak: number; kind: ReactKind; card: FireCard; maker?: MakerKind }) {
+export default function FireCardView({ name, owner, peak, card, maker: given }: { name: string; owner?: string; peak: number; card: FireCard; maker?: MakerKind }) {
   const [flipped, setFlipped] = useState(false);
+  // 몸 색은 이 불을 맡은 달그락의 색. 반응(빛·소리·움직임)은 옆의 작은 도형과 속성 이름표로만 보인다.
+  const maker = given ?? fireMaker({ card });
+  const reacts = fireReacts({ card });
   const stars = "★".repeat(card.build.difficulty) + "☆".repeat(5 - card.build.difficulty);
   return (
     <div className={`fcard grade-${GRADE_CLASS[card.grade] ?? "common"}${flipped ? " flipped" : ""}`}
@@ -22,12 +25,12 @@ export default function FireCardView({ name, owner, peak, kind, card, maker = "h
         <div className="fcard-face front">
           <div className="holo" />
           <div className="fcard-top">
-            <span className={`attr attr-${card.attr.kind}`}><i />{card.attr.label}</span>
+            <span className={`attr attr-${card.attr.kind}`}>{card.attr.kind === "none" ? <i /> : <ReactMark kind={card.attr.kind} />}{card.attr.label}</span>
             <span className="grade">{card.grade}</span>
           </div>
           <div className={"art" + (maker === "twin" ? " art-twin" : "")}>{maker === "twin"
-            ? <><Dokkaebi motion="blaze" fire={peak} width={132} hue={MAKER.hardware.hue} /><Dokkaebi motion="blaze" fire={peak} width={132} hue={MAKER.software.hue} /></>
-            : <Dokkaebi motion="blaze" fire={peak} width={180} hue={MAKER[maker].hue} />}</div>
+            ? <><Dokkaebi motion="blaze" fire={peak} width={132} maker="hardware" reacts={reacts} /><Dokkaebi motion="blaze" fire={peak} width={132} maker="software" /></>
+            : <Dokkaebi motion="blaze" fire={peak} width={180} maker={maker} reacts={reacts} />}</div>
           <div className="maker-tag" style={{ background: MAKER[maker].color }}>{MAKER[maker].name}</div>
           {owner && owner !== NAMELESS && <div className="owner"><b>{owner}</b>의 도깨비불</div>}
           <div className="fname">{name}</div>
@@ -79,10 +82,10 @@ export default function FireCardView({ name, owner, peak, kind, card, maker = "h
   );
 }
 
-export function Roast({ head, body, kind }: { head: string; body: string; kind: ReactKind }) {
+export function Roast({ head, body, maker }: { head: string; body: string; maker?: MakerKind }) {
   return (
     <div className="roast">
-      <div className="roast-dk"><Dokkaebi motion="idle" fire={40} width={58} kind={kind} /></div>
+      <div className="roast-dk"><Dokkaebi motion="idle" fire={40} width={58} maker={maker} /></div>
       <div className="roast-bubble"><b>{head}</b><br />{body}</div>
     </div>
   );

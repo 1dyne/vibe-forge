@@ -3,6 +3,7 @@ import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { dexOf, forgeForOwner, hashToken } from "../../../lib/find/village-store";
 import { GRADE_ORDER } from "../../../lib/find/card";
 import Dokkaebi from "../dokkaebi";
+import { fireMaker } from "../../../lib/find/classify";
 import "../fonts";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function Dex() {
                 <div className="dex-grid">
                   {list.map((f) => (
                     <a key={f.id} className="dex-card" href={`/f/${f.id}`} style={{ borderColor: f.color }}>
-                      <Dokkaebi motion="idle" fire={f.peak} width={70} kind={f.reactKind as never} />
+                      <Dokkaebi motion="idle" fire={f.peak} width={70} maker={fireMaker(f)} />
                       <b>{f.name}</b>
                       <small>{f.card?.grade ?? "흔함"} · {f.nickname}</small>
                     </a>

@@ -24,7 +24,8 @@ type Props = {
   notes: number;
   neighbors: number;
   /** 집 주인 달그락 색 (온보딩 때 받은 색) */
-  hue: number;
+  /** 내 달그락의 색: 달그락 종류 이름 또는 "none"(대장 민트) */
+  tint: string;
   /** 전체 화면으로 보일 때 */
   full?: boolean;
   /** 작업실 메모 수: 설계도 판에 쪽지가 붙는다 */
@@ -47,7 +48,7 @@ const STYLE: Record<string, { wall: string; wall2: string; floor: string; floor2
 };
 const LABEL: Record<RoomObj, string> = { hearth: "화덕", blueprint: "설계도", shelf: "도깨비불 선반", invention: "작업대", mailbox: "편지함", woodpile: "장작더미", tools: "연장 걸이", display: "소반" };
 
-export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, hue, full = false, memos = 0, lanternsLit = 0, lanternsDone = 0, onPick, onExit, fallback }: Props) {
+export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, neighbors, tint, full = false, memos = 0, lanternsLit = 0, lanternsDone = 0, onPick, onExit, fallback }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -311,7 +312,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       let sp: T.Sprite | null = null;
       if (tex && !disposed) {
         for (const t0 of [tex, walkTex]) if (t0) { t0.colorSpace = three.SRGBColorSpace; t0.repeat.set(1 / 25, 1); }
-        const spMat = hueSpriteMaterial(three, tex, hue);
+        const spMat = hueSpriteMaterial(three, tex, tint);
         sp = new three.Sprite(spMat); sp.scale.set(1.4, 1.4, 1); scene.add(sp);
         const shadow = new three.Mesh(new three.CircleGeometry(0.32, 16), new three.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.18 }));
         shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
@@ -402,7 +403,7 @@ export default function ForgeRoom({ village, fires, peak, fuel, wants, notes, ne
       };
     })().catch((e) => { console.error("3D 장면을 만들지 못함", e); setFailed(true); });
     return () => { disposed = true; cleanup(); };
-  }, [village, fires, peak, fuel, wants, notes, neighbors, hue, full, memos, lanternsLit, lanternsDone]);
+  }, [village, fires, peak, fuel, wants, notes, neighbors, tint, full, memos, lanternsLit, lanternsDone]);
 
   if (failed) return <>{fallback}</>;
   return <div className={full ? "room3d room3d-full" : "room3d"} ref={mount} role="img" aria-label="대장간 안. 화로, 도깨비불 선반, 설계도, 작업대, 우체통이 있어." />;

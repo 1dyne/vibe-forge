@@ -1,17 +1,13 @@
 import type * as T from "three";
+import { tintMatrix } from "../../lib/find/classify";
 
-// 온보딩 화면의 달그락은 CSS hue-rotate(각도)로 불 색을 입는다(REACT_HUE).
-// 3D에서도 같은 색이 나오도록 CSS filter 규격의 hue-rotate 행렬을 sRGB 공간에서 그대로 적용한다.
-export function hueSpriteMaterial(three: typeof T, map: T.Texture, deg: number) {
+// 온보딩 화면의 달그락은 CSS filter(hue-rotate → saturate → brightness)로 달그락 색을 입는다(MAKER.tint).
+// 3D에서도 같은 색이 나오도록 같은 행렬을 sRGB 공간에서 그대로 적용한다.
+export function hueSpriteMaterial(three: typeof T, map: T.Texture, tint: string) {
   const m = new three.SpriteMaterial({ map, transparent: true });
-  if (!deg) return m;
-  const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  const k = tintMatrix(tint);
   // Matrix3.set 은 행 순서로 받는다 (r' = 첫 행 · rgb)
-  const mat = new three.Matrix3().set(
-    0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928,
-    0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.14, 0.072 - c * 0.072 - s * 0.283,
-    0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072
-  );
+  const mat = new three.Matrix3().set(k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8]);
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uHue = { value: mat };
     shader.fragmentShader = shader.fragmentShader
@@ -21,6 +17,6 @@ export function hueSpriteMaterial(three: typeof T, map: T.Texture, deg: number) 
         srgb = clamp(uHue * srgb, 0.0, 1.0);
         diffuseColor.rgb = pow(srgb, vec3(2.2));`);
   };
-  m.customProgramCacheKey = () => `hue${deg}`;
+  m.customProgramCacheKey = () => `tint-${tint}`;
   return m;
 }

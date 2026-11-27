@@ -1,13 +1,53 @@
-import { CATS, FOLLOW, ROOTS, toChip, type ChipTree } from "./chips";
+import { CATS, FOLLOW, ROOTS, toChip, type ChipTree, type ReactKind } from "./chips";
 
 export type MakerKind = "hardware" | "software" | "twin" | "design";
-/** 달그락 대장간에서 쓰는 색 그대로 */
-export const MAKER: Record<MakerKind, { name: string; color: string; hue: number; line: string }> = {
-  hardware: { name: "하드웨어 달그락", color: "#B7B3D7", hue: 78, line: "손에 잡히는 물건이야. 회로와 몸체를 같이 짜야 해." },
-  software: { name: "소프트웨어 달그락", color: "#AAC8DF", hue: 37, line: "화면 안에서 끝나는 일이야. 앱이나 웹으로 만들어." },
-  twin: { name: "쌍둥이 달그락", color: "#B7B3D7", hue: 78, line: "물건과 화면이 같이 움직여야 해. 하드웨어와 소프트웨어 달그락이 함께 가." },
-  design: { name: "디자인 달그락", color: "#F0DFA7", hue: -123, line: "생김새와 쓰임새가 먼저야. 모양부터 잡고 필요한 것을 채워." }
+/** 도깨비 그림의 민트(#96C6BC쯤)를 달그락 색으로 옮기는 값. CSS filter(hue-rotate → saturate → brightness)와 3D 셰이더가 같은 값을 쓴다. */
+export type Tint = { deg: number; sat: number; bri: number };
+/** 달그락 대장간에서 쓰는 색 그대로. tint는 도깨비 그림을 정확히 그 색으로 옮기도록 맞춘 값이다(색을 바꾸면 같이 다시 구한다). */
+export const MAKER: Record<MakerKind, { name: string; color: string; tint: Tint; line: string }> = {
+  hardware: { name: "하드웨어 달그락", color: "#B7B3D7", tint: { deg: 89.5, sat: 0.9, bri: 0.975 }, line: "손에 잡히는 물건이야. 회로와 몸체를 같이 짜야 해." },
+  software: { name: "소프트웨어 달그락", color: "#AAC8DF", tint: { deg: 46.2, sat: 0.97, bri: 1.044 }, line: "화면 안에서 끝나는 일이야. 앱이나 웹으로 만들어." },
+  twin: { name: "쌍둥이 달그락", color: "#B7B3D7", tint: { deg: 89.5, sat: 0.9, bri: 0.975 }, line: "물건과 화면이 같이 움직여야 해. 하드웨어와 소프트웨어 달그락이 함께 가." },
+  design: { name: "디자인 달그락", color: "#F0DFA7", tint: { deg: -108.9, sat: 1.32, bri: 1.19 }, line: "생김새와 쓰임새가 먼저야. 모양부터 잡고 필요한 것을 채워." }
 };
+/** 아직 어느 달그락의 일인지 모를 때의 도깨비: 대장 민트 */
+export const CHIEF_COLOR = "#9DD2C8";
+const CHIEF_TINT: Tint = { deg: 1.4, sat: 1.045, bri: 1.058 };
+export const isMaker = (v: unknown): v is MakerKind => typeof v === "string" && Object.prototype.hasOwnProperty.call(MAKER, v);
+/** 달그락 종류 이름(또는 "none")으로 색 옮김 값을 찾는다. 모르는 값이면 대장 민트다. */
+export const tintOf = (key?: string | null): Tint => (isMaker(key) ? MAKER[key].tint : CHIEF_TINT);
+export const tintCss = (key?: string | null) => { const t = tintOf(key); return `hue-rotate(${t.deg}deg) saturate(${t.sat}) brightness(${t.bri})`; };
+/** 같은 색 옮김을 3×3 행렬(행 순서)로. 밝기 · 채도 · 색상환 순으로 곱한 것이다. */
+export function tintMatrix(key?: string | null): number[] {
+  const { deg, sat, bri } = tintOf(key);
+  const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  const H = [
+    [0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928],
+    [0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.14, 0.072 - c * 0.072 - s * 0.283],
+    [0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072]
+  ];
+  const S = [
+    [0.213 + 0.787 * sat, 0.715 - 0.715 * sat, 0.072 - 0.072 * sat],
+    [0.213 - 0.213 * sat, 0.715 + 0.285 * sat, 0.072 - 0.072 * sat],
+    [0.213 - 0.213 * sat, 0.715 - 0.715 * sat, 0.072 + 0.928 * sat]
+  ];
+  const out: number[] = [];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) out.push(bri * (S[i][0] * H[0][j] + S[i][1] * H[1][j] + S[i][2] * H[2][j]));
+  return out;
+}
+
+/** 불 하나를 어느 달그락이 맡는가. 새 불은 카드에 적혀 있고, 예전 불은 아이디어로 다시 가른다. */
+export function fireMaker(f: { maker?: string | null; card?: { maker?: string } | null; idea?: string | null }): MakerKind {
+  if (isMaker(f.maker)) return f.maker;
+  const fromCard = f.card?.maker;
+  if (isMaker(fromCard)) return fromCard;
+  return f.idea ? classify(f.idea).kind : "hardware";
+}
+/** 도깨비 옆에 작은 도형으로 보여 줄 반응(빛·소리·움직임). 예전 불은 처음 고른 반응 하나만 안다. */
+export function fireReacts(f: { card?: { reacts?: string[]; attr?: { kind?: string } } | null; reactKind?: string | null }): ReactKind[] {
+  const list = f.card?.reacts ?? [f.card?.attr?.kind ?? f.reactKind ?? "none"];
+  return [...new Set(list)].filter((k): k is ReactKind => k === "light" || k === "sound" || k === "move");
+}
 
 // HANDOFF §4의 AI 응답과 같은 모양. 지금은 규칙 기반이고, 나중에 AI 호출로 바꿔도 화면은 그대로 쓴다.
 export type FindAnalysis = {

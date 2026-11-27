@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fireOg, forgeOg } from "../../../../lib/find/og-render";
+import { fireMaker } from "../../../../lib/find/classify";
 import { siteOrigin } from "../../../../lib/find/site";
 import { getFire } from "../../../../lib/find/store";
 import { alleyName } from "../../../../lib/find/village";
@@ -12,7 +13,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   if (forge) {
     if (forge.visibility === "private") return NextResponse.json({ error: "not found" }, { status: 404 });
     const fires = await forgeFires(forge.id);
-    return forgeOg({ nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, fires: fires.length, color: fires[0]?.color ?? "#4FB3A6", reactKind: fires[0]?.reactKind ?? "none" }, host);
+    return forgeOg({ nickname: forge.nickname, alley: alleyName(forge.theme, forge.alleySeq), plotNo: forge.plotNo, fires: fires.length, color: fires[0]?.color ?? "#4FB3A6", maker: fires[0] ? fireMaker(fires[0]) : "none" }, host);
   }
   const fire = await getFire(id);
   if (!fire) return NextResponse.json({ error: "not found" }, { status: 404 });

@@ -15,6 +15,10 @@ export type Rarity = { total: number; sameCombo: number; higherPeak: number };
 export type FireCard = {
   grade: Grade;
   attr: { kind: ReactKind; label: string };
+  /** 이 불을 맡은 달그락(도깨비 몸 색과 불 색을 정한다). 예전에 저장된 카드에는 없다 */
+  maker?: "hardware" | "software" | "twin" | "design";
+  /** 고른 반응 갈래 전부. 도깨비 옆 작은 도형으로 보여 준다. 예전 카드에는 없다 */
+  reacts?: ReactKind[];
   /** 도깨비불이 30개 미만이면 null (숫자가 작아서 비교가 의미 없다) */
   rarityLine: string | null;
   peakLine: string | null;

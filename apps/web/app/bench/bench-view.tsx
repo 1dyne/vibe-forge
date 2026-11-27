@@ -7,6 +7,7 @@ import { GRADE_TEXT, HOLD_MS, TOOL_NAME, bendableRefs, handsStages, stageText, s
 
 type Motion = "idle" | "tilt" | "stoke" | "blaze" | "fallen";
 import "./bench.css";
+import { tintCss } from "../../lib/find/classify";
 
 /** **굵게**와 사전 말(ⓘ)을 함께 그린다. seen = 이 단계에서 이미 ⓘ를 단 말 */
 function rich(text: string, seen: Set<string>, onTerm: (e: GlossaryEntry) => void): ReactNode[] {
@@ -41,7 +42,7 @@ function HoldRing({ x, y, start }: { x: number; y: number; start: number }) {
 
 export type BenchPhoto = { name: string; dataUrl: string };
 type Props = {
-  kit: BenchKit; hue?: number; mode: "practice" | "project"; backHref?: string; onClose?: () => void; onFinish?: () => void;
+  kit: BenchKit; tint?: string; mode: "practice" | "project"; backHref?: string; onClose?: () => void; onFinish?: () => void;
   /** 프로젝트: HW 작업실에 실제로 묻는다. 답 첫 문단을 돌려준다 (실패하면 오류 문구를 던진다) */
   onAsk?: (text: string, photos: BenchPhoto[]) => Promise<string>;
   /** 프로젝트: 실물로 이 단계를 마쳤다고 기록한다 (1부터) */
@@ -58,7 +59,7 @@ const PRAISE = ["좋아! 반짝이는 원뿔이야", "깔끔해!", "그렇지, �
 function s0Saved() { try { return (JSON.parse(localStorage.getItem("bench:" + (location.pathname.split("/").pop() ?? "")) ?? "null") as { step: number } | null)?.step ?? 0; } catch { return 0; } }
 function fmt(sec: number) { return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`; }
 
-export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", onClose, onFinish, onAsk, onReport, connectorOnly = false, reported = [] }: Props) {
+export default function BenchViewScreen({ kit, tint = "none", mode, backHref = "/", onClose, onFinish, onAsk, onReport, connectorOnly = false, reported = [] }: Props) {
   const [askText, setAskText] = useState("");
   const [photos, setPhotos] = useState<BenchPhoto[]>([]);
   const [asking, setAsking] = useState(false);
@@ -254,7 +255,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
         const { createBench } = await import("./bench-scene");
         if (disposed || !mount.current) return;
         const a = await createBench(mount.current, kit, {
-          hue, light: startLight,
+          hue: 0, light: startLight,
           cb: {
             onTarget: (ok, message) => onTargetRef.current(ok, message),
             onHold: (e) => onHoldRef.current(e),
@@ -400,7 +401,7 @@ export default function BenchViewScreen({ kit, hue = 0, mode, backHref = "/", on
       </header>
 
       {bubble && <div className="bench-bubble" role="status">{bubble}</div>}
-      <button type="button" className="bench-mascot" onClick={onMascot} aria-label="EE 달그락 (두 번 누르면 물어보기)" style={{ ["--hue" as string]: `${hue}deg` }}>
+      <button type="button" className="bench-mascot" onClick={onMascot} aria-label="EE 달그락 (두 번 누르면 물어보기)" style={{ ["--tint" as string]: tintCss(tint) }}>
         <span className="aura" />
         <span key={mot.k} className={`dk-sprite m-${mot.m}`} />
       </button>

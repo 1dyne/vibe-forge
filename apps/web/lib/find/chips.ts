@@ -33,9 +33,12 @@ export const FIRE = {
   typeMs: 38
 } as const;
 
-export const REACT_FIRE: Record<ReactKind, string> = { light: "#9B7BFF", sound: "#FF8F3F", move: "#3FBF6E", none: "#4FB3A6" };
-// 캐릭터 청록을 불 색 쪽으로 돌리는 각도. scripts/build-dokkaebi-sprites.py 의 HUE와 같아야 한다.
-export const REACT_HUE: Record<ReactKind, number> = { none: 0, light: 83, sound: -146, move: -29 };
+/** 고른 장작에 들어 있는 반응 갈래 전부(고른 순서, 겹치지 않게). 도깨비 옆 작은 도형으로 보여 준다. */
+export function reactKinds(picked: string[], find: (id: string) => Chip | undefined): ReactKind[] {
+  const out: ReactKind[] = [];
+  for (const id of picked) { const r = find(id)?.react; if (r && r !== "none" && !out.includes(r)) out.push(r); }
+  return out;
+}
 
 export const fireLabel = (v: number) => (v < 30 ? "불씨" : v < 55 ? "모닥불" : v < 80 ? "활활" : "도깨비불 만개");
 

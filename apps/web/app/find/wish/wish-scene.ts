@@ -17,7 +17,7 @@ export type WishScene = {
   leave: () => void;
   dispose: () => void;
 };
-type Opts = { el: HTMLElement; hue: number; onPick: (id: string | null) => void; onExit: () => void; onRiseDone: (id: string) => void };
+type Opts = { el: HTMLElement; tint: string; onPick: (id: string | null) => void; onExit: () => void; onRiseDone: (id: string) => void };
 
 const MAX_HANG = 120, MAX_PER_ROPE = 16, MAX_FLOAT = 30;
 const HANJI = "#F3E7C9", AMBER = "#F2A65A", GOLD = "#FFD27A", WOOD = "#6E5236", WOOD2 = "#5E4430", WOOD3 = "#4E3A2A";
@@ -193,7 +193,7 @@ export async function createWishScene(three: typeof T, o: Opts): Promise<WishSce
   let sp: T.Sprite | null = null;
   if (idleTex) {
     for (const t0 of [idleTex, walkTex]) if (t0) { t0.colorSpace = three.SRGBColorSpace; t0.repeat.set(1 / 25, 1); disposables.push(t0); }
-    sp = new three.Sprite(hueSpriteMaterial(three, idleTex, o.hue)); sp.scale.set(1.15, 1.15, 1); scene.add(sp);
+    sp = new three.Sprite(hueSpriteMaterial(three, idleTex, o.tint)); sp.scale.set(1.15, 1.15, 1); scene.add(sp);
     const shadow = new three.Mesh(new three.CircleGeometry(0.3, 14), new three.MeshBasicMaterial({ color: "#000", transparent: true, opacity: 0.25 })); shadow.rotation.x = -Math.PI / 2; scene.add(shadow);
     let f = 0, clockF = 0;
     anim.push((t, dt) => {

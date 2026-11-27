@@ -114,7 +114,7 @@ body:has(.bench){background:#e9e5dd;overflow:hidden}
 /* 장면 위의 HW 달그락 (온보딩 도깨비 스프라이트). 한 번 = 팁, 두 번 = HW 서랍 */
 .bench-mascot{position:absolute;right:6px;bottom:calc(var(--panel-real,var(--panel-h)) + 58px);width:92px;height:92px;border:none;background:none;padding:0;z-index:3;-webkit-tap-highlight-color:transparent}
 .bench-mascot .aura{position:absolute;left:14px;top:18px;width:64px;height:64px;border-radius:50%;background:#ffb46b;filter:blur(22px);opacity:.35}
-.bench-mascot .dk-sprite{--w:92px;position:relative;display:block;width:var(--w);height:var(--w);background-repeat:no-repeat;background-size:calc(var(--w) * 25) var(--w);filter:hue-rotate(var(--hue));animation:bench-play 2s steps(25,jump-end) infinite,bench-bob 2.6s ease-in-out infinite}
+.bench-mascot .dk-sprite{--w:92px;position:relative;display:block;width:var(--w);height:var(--w);background-repeat:no-repeat;background-size:calc(var(--w) * 25) var(--w);filter:var(--tint);animation:bench-play 2s steps(25,jump-end) infinite,bench-bob 2.6s ease-in-out infinite}
 .bench-mascot .m-idle{background-image:url(/find/sprites/idle.webp)}
 .bench-mascot .m-tilt{background-image:url(/find/sprites/tilt.webp)}
 .bench-mascot .m-stoke{background-image:url(/find/sprites/stoke.webp);animation-duration:1.2s,2.6s}

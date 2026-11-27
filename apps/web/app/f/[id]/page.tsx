@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { fireLabel } from "../../../lib/find/chips";
+import { fireMaker, fireReacts } from "../../../lib/find/classify";
 import { OWNER_COOKIE, ownerTokenFrom } from "../../../lib/find/owner";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
 import { getFire } from "../../../lib/find/store";
@@ -69,7 +70,7 @@ export default async function SharedPage({ params, searchParams }: Props) {
     const progress = readProgress(await getMeta(`forge_progress:${forge.id}`));
     const grown = roomStage(progress);
     const CAT: Record<string, string> = { f: "형태", r: "반응", s: "감지", w: "누구" };
-    const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, peak: f.peak, sentence: f.sentence, card: f.card, stage: Math.max(houseStage(f.picked), grown) as 1 | 2 | 3, cats: [...new Set(f.picked.map((c) => CAT[c.split("_")[0]]).filter(Boolean))] }));
+    const fires = (await forgeFires(forge.id)).map((f) => ({ id: f.id, name: f.name, color: f.color, reactKind: f.reactKind, maker: fireMaker(f), peak: f.peak, sentence: f.sentence, card: f.card, stage: Math.max(houseStage(f.picked), grown) as 1 | 2 | 3, cats: [...new Set(f.picked.map((c) => CAT[c.split("_")[0]]).filter(Boolean))] }));
     // 놀러 온 사람: 방문 기록 + 이 집 도깨비불을 내 도감에 한 칸씩
     const dexAdded = owner ? 0 : await recordVisit(viewer?.id ?? null, forge.id, fires.slice(0, 5).map((f) => f.id)).catch(() => 0);
     const social = await socialState(forge.id, viewer?.id ?? null);
@@ -97,12 +98,12 @@ export default async function SharedPage({ params, searchParams }: Props) {
         <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>친구가 찾은 도깨비불</div>
         {fire.card ? (
           <>
-            <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} kind={fire.reactKind as never} card={fire.card} />
-            <Roast head={fire.card.roast.head} body={fire.card.roast.body} kind={fire.reactKind as never} />
+            <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} card={fire.card} maker={fireMaker(fire)} />
+            <Roast head={fire.card.roast.head} body={fire.card.roast.body} maker={fireMaker(fire)} />
           </>
         ) : (
           <div className="shared-card">
-            <Dokkaebi motion="blaze" fire={fire.peak} width={170} kind={fire.reactKind as never} />
+            <Dokkaebi motion="blaze" fire={fire.peak} width={170} maker={fireMaker(fire)} reacts={fireReacts(fire)} />
             <div className="display" style={{ fontSize: 28 }}>{fire.name}</div>
             <div className="muted small">화력 <span className="display ink" style={{ fontSize: 22 }}>{fire.peak}</span> · {fireLabel(fire.peak)}</div>
             <div className="chips shared-chips">{fire.labels.slice(0, 6).map((l) => <span key={l}>{l}</span>)}</div>

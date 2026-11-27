@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
-import { REACT_HUE, type ReactKind } from "../../../lib/find/chips";
+import { fireMaker } from "../../../lib/find/classify";
 import { villageGate } from "../../../lib/find/village-gate";
 import { forgeFires, touchForge } from "../../../lib/find/village-store";
 import { forgeLanterns, lanternAllowance, publicLanternGroups } from "../../../lib/find/lantern";
@@ -30,12 +30,11 @@ export default async function Wish() {
   const me = gate.forge;
   await touchForge(me.id).catch(() => undefined);
   const [fires, groups, mine] = await Promise.all([forgeFires(me.id), publicLanternGroups(me.id), forgeLanterns(me.id)]);
-  // 마을과 같은 내 달그락 색 (가장 최근 도깨비불의 반응 색)
-  const myKind = fires[0]?.reactKind as ReactKind | undefined;
-  const myHue = myKind ? REACT_HUE[myKind] ?? 0 : 0;
+  // 마을과 같은 내 달그락 색 (가장 최근 도깨비불을 맡은 달그락의 색)
+  const myTint = fires[0] ? fireMaker(fires[0]) : "none";
   return (
     <main className="find world-page">
-      <WishView groups={groups} hue={myHue} mine={{ lanterns: mine, allowance: lanternAllowance(fires.length), fires: fires.map((f) => ({ id: f.id, name: f.name })) }} />
+      <WishView groups={groups} tint={myTint} mine={{ lanterns: mine, allowance: lanternAllowance(fires.length), fires: fires.map((f) => ({ id: f.id, name: f.name })) }} />
     </main>
   );
 }

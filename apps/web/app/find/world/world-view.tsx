@@ -13,9 +13,9 @@ import { buildWorld, PALETTE, START, villageCenter, type Phase, type Spot, type 
 // 걷는 달그락 마을 (프로토타입). 가운데 본관 광장과 다섯 마을이 이어진 섬을 달그락이 걸어 다닌다.
 // 땅·집은 로우폴리 3D, 캐릭터는 다인이 그린 스프라이트를 종이 인형처럼 세운다.
 
-type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myHue: number; lanterns: LanternGroup[]; giwa?: number; myName?: string };
+type Props = { houses: WorldHouse[]; villages: WorldVillage[]; hallStage: number; hallPct: number; myForgeId: string | null; myTint: string; lanterns: LanternGroup[]; giwa?: number; myName?: string };
 
-export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns, giwa = 0, myName = "" }: Props) {
+export default function WorldView({ houses, villages, hallStage, hallPct, myForgeId, myTint, lanterns, giwa = 0, myName = "" }: Props) {
   const [rope, setRope] = useState<LanternGroup | null>(null);
   const [ropes, setRopes] = useState(false);
   // 처음 들어온 사람에게 마을 구조를 알려주는 안내 (이 기기에서 한 번, ? 버튼으로 다시)
@@ -134,7 +134,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       const loader = new three.TextureLoader();
       const [idleTex, walkTex] = await Promise.all([loader.loadAsync("/find/sprites/idle.webp"), loader.loadAsync("/find/sprites/stoke.webp")]);
       for (const t of [idleTex, walkTex]) { t.colorSpace = three.SRGBColorSpace; t.repeat.set(1 / 25, 1); }
-      const playerMat = hueSpriteMaterial(three, idleTex, myHue);
+      const playerMat = hueSpriteMaterial(three, idleTex, myTint);
       const player = new three.Sprite(playerMat);
       player.scale.set(2.4, 2.4, 1);
       scene.add(player);
@@ -343,7 +343,7 @@ export default function WorldView({ houses, villages, hallStage, hallPct, myForg
       };
     })().catch((e) => { console.error("3D 장면을 만들지 못함", e); setFailed(true); });
     return () => { disposed = true; cleanup(); };
-  }, [houses, villages, hallStage, hallPct, myForgeId, myHue, lanterns, giwa]);
+  }, [houses, villages, hallStage, hallPct, myForgeId, myTint, lanterns, giwa]);
 
   // 마을에 들어서면 이름표를 잠깐 띄운다
   const [banner, setBanner] = useState<WorldVillage | null>(null);

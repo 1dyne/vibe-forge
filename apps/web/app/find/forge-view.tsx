@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { FireCard } from "../../lib/find/card";
-import { REACT_HUE, type ReactKind } from "../../lib/find/chips";
+import { fireMaker, fireReacts, type MakerKind } from "../../lib/find/classify";
 import Dokkaebi from "./dokkaebi";
 import ForgeRoom, { type RoomObj } from "./forge-room";
 import { FURTHEST_LABEL, type ForgeProgress } from "../../lib/find/progress";
@@ -17,7 +17,7 @@ import Kkachi from "./kkachi";
 import { PracticeSheet, SkillsSheet } from "./practice-sheet";
 import { createForgeSound } from "./world/world-sound";
 
-export type ForgeFire = { id: string; name: string; color: string; reactKind: string; peak: number; sentence: string; card: FireCard | null; stage: 1 | 2 | 3; cats: string[] };
+export type ForgeFire = { id: string; name: string; color: string; reactKind: string; maker?: MakerKind; peak: number; sentence: string; card: FireCard | null; stage: 1 | 2 | 3; cats: string[] };
 export type Social = { fuelToday: number; fuelTotal: number; wants: number; notes: Array<{ phrase: string; from: string; nickname: string; at: string }>; neighbors: number; visitsWeek: number; mine: { fuelGivenToday: boolean; wanted: boolean; notedToday: boolean; neighbor: boolean } };
 type Props = {
   /** 주인이 달그락 대장간에서 진행한 만큼(숫자만) */
@@ -76,7 +76,8 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   const latest = fires[0] ?? null;
   // 받은 장작만큼 화로의 불이 커진다
   const glow = Math.min(100, (latest?.peak ?? 20) + social.fuelTotal * 2);
-  const kind = (latest?.reactKind ?? "none") as ReactKind;
+  // 화로의 도깨비와 마을을 걷는 내 달그락은 가장 최근 불을 맡은 달그락의 색을 입는다
+  const maker: MakerKind | "none" = latest ? fireMaker(latest) : "none";
   const [wall, wall2, floor] = ROOM_TINT[forge.theme] ?? ROOM_TINT.desk;
   const roles = (latest?.card?.build.parts ?? []).map((p) => (typeof p === "string" ? p : p.role));
 
@@ -124,7 +125,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
   return (
     <section className="forge-full" style={{ ["--fire" as string]: latest?.color ?? "#4FB3A6" }}>
       <div className="forge-stage">
-      <ForgeRoom full onExit={() => { track("forge_exit"); window.location.href = `/find/village?house=${forge.id}`; }} memos={memoCount} lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} hue={REACT_HUE[kind] ?? 0} onPick={pickRoom} fallback={
+      <ForgeRoom full onExit={() => { track("forge_exit"); window.location.href = `/find/village?house=${forge.id}`; }} memos={memoCount} lanternsLit={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "lit").length} lanternsDone={(lanterns.mine ?? lanterns.shown).filter((l) => l.status === "done").length} village={forge.village} fires={roomFires} peak={latest?.peak ?? 20} fuel={social.fuelTotal} wants={social.wants} notes={social.notes.length} neighbors={social.neighbors} tint={maker} onPick={pickRoom} fallback={
       <div className="room" style={{ ["--wall" as string]: wall, ["--wall2" as string]: wall2, ["--floor" as string]: floor }}>
         <svg className="room-bg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           <polygon points="4,64 4,24 50,4 50,44" fill="var(--wall)" stroke="#232323" strokeWidth=".6" />
@@ -140,7 +141,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
           <em>도깨비불 선반</em>
         </button>
         <button type="button" className="obj obj-hearth" onClick={() => show("hearth")} aria-label="화로의 도깨비불 보기">
-          {latest ? <Dokkaebi motion="blaze" fire={glow} width={Math.round(96 + social.fuelTotal * 1.5 > 140 ? 140 : 96 + social.fuelTotal * 1.5)} kind={kind} /> : <Dokkaebi motion="idle" fire={20} width={90} />}
+          {latest ? <Dokkaebi motion="blaze" fire={glow} width={Math.round(96 + social.fuelTotal * 1.5 > 140 ? 140 : 96 + social.fuelTotal * 1.5)} maker={maker} reacts={fireReacts(latest)} /> : <Dokkaebi motion="idle" fire={20} width={90} />}
           <em>화로</em>
         </button>
         <button type="button" className="obj obj-invention" onClick={() => show("invention")} aria-label="발명품 보기">
@@ -300,7 +301,7 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
         </div>
       )}
       {tut !== null && <ForgeTutorial step={tut} onStep={setTut} onDone={endTut} />}
-      {open === "practice" && isOwner && <PracticeSheet forgeId={forge.id} hue={REACT_HUE[kind] ?? 0} onClose={() => setOpen(null)} />}
+      {open === "practice" && isOwner && <PracticeSheet forgeId={forge.id} tint={maker} onClose={() => setOpen(null)} />}
       {open === "memo" && isOwner && <MemoSheet fires={fires.map((f) => ({ id: f.id, name: f.name, sentence: f.sentence }))} onCount={setMemoCount} onClose={() => setOpen(null)} />}
       {open === "lantern" && (isOwner && lanterns.mine
         ? <MyLanterns initial={lanterns.mine} allowance={lanterns.allowance} fires={fires.map((f) => ({ id: f.id, name: f.name }))} onClose={() => setOpen(null)} />
@@ -313,8 +314,8 @@ export default function ForgeView({ forge, fires, isOwner, couponText, social: i
           <div className="sheet tall">
             {open === "hearth" && (latest?.card ? (
               <>
-                <FireCardView name={latest.name} owner={forge.nickname} peak={latest.peak} kind={kind} card={latest.card} />
-                <Roast head={latest.card.roast.head} body={latest.card.roast.body} kind={kind} />
+                <FireCardView name={latest.name} owner={forge.nickname} peak={latest.peak} card={latest.card} maker={fireMaker(latest)} />
+                <Roast head={latest.card.roast.head} body={latest.card.roast.body} maker={fireMaker(latest)} />
               </>
             ) : <p className="body">아직 화로가 비어 있어.</p>)}
             {open === "blueprint" && (

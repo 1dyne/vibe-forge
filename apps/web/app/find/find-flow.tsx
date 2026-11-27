@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CATS, FIRE, REACT_FIRE, ROOT_VISIBLE, compose, fireGain, fireLabel, fireName, lookup, reactKind, type Chip, type ChipTree, type ReactKind } from "../../lib/find/chips";
-import { MAKER, type FindAnalysis, type MakerKind } from "../../lib/find/classify";
+import { CATS, FIRE, ROOT_VISIBLE, compose, fireGain, fireLabel, fireName, lookup, reactKinds, type Chip, type ChipTree } from "../../lib/find/chips";
+import { CHIEF_COLOR, MAKER, fireReacts, type FindAnalysis, type MakerKind } from "../../lib/find/classify";
 import type { Maturity } from "../../lib/find/maturity";
 import type { ProjectMatch } from "../../lib/find/projects";
 import Dokkaebi from "./dokkaebi";
@@ -69,8 +69,10 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
   fireRef.current = fire;
 
   const find = useMemo(() => lookup(tree), [tree]);
-  const kind = reactKind(picked, find);
-  const color = REACT_FIRE[kind];
+  // 불 색과 도깨비 몸 색은 이 아이디어를 맡는 달그락의 색. 반응(빛·소리·움직임)은 도깨비 옆 작은 도형으로 보인다.
+  const maker: MakerKind | null = analysis?.kind ?? null;
+  const color = maker ? MAKER[maker].color : CHIEF_COLOR;
+  const reacts = reactKinds(picked, find);
   const scrollText = useMemo(() => {
     const body = compose(picked, find);
     return `“${idea.trim()}”` + (body ? `\n${body}` : "") + words.map((w) => `\n+ ${w}`).join("");
@@ -190,7 +192,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
     setError("");
     track("fire_locked", { peak: Math.round(peak), picked });
     try {
-      const response = await fetch("/api/find/fires", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: [idea.trim(), ...words].join(" / ").slice(0, 300), picked: picked.map((id) => find(id)), peak, nickname }) });
+      const response = await fetch("/api/find/fires", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idea: [idea.trim(), ...words].join(" / ").slice(0, 300), picked: picked.map((id) => find(id)), peak, nickname, ...(maker ? { maker } : {}) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "불을 저장하지 못했어.");
       setResult(body as Result);
@@ -262,7 +264,7 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
         <section className="screen">
           <div className="muted small">“{idea}”</div>
           <h2>이건 소프트웨어 달그락이<br />맡을 일이야.</h2>
-          <div className="maker-card" style={{ borderColor: MAKER.software.color }}><Dokkaebi motion="blaze" fire={60} width={150} hue={MAKER.software.hue} /><b style={{ background: MAKER.software.color }}>{MAKER.software.name}</b><p>{MAKER.software.line}</p></div>
+          <div className="maker-card" style={{ borderColor: MAKER.software.color }}><Dokkaebi motion="blaze" fire={60} width={150} maker="software" /><b style={{ background: MAKER.software.color }}>{MAKER.software.name}</b><p>{MAKER.software.line}</p></div>
           <p className="lead">달그락 대장간에서는 앱·웹도 같은 방식으로 만들어. 무엇을 만들지 정리하고, 화면을 설계하고, 네가 쓰는 AI 코딩 도구에 그대로 넘길 수 있게 준비해 줘.</p>
           <button className="btn btn-fire" type="button" onClick={() => { track("software_next"); void goAbout(null); }}>다음</button>
           <div className="note row">
@@ -295,9 +297,9 @@ export default function FindFlow({ couponText }: { couponText: string | null }) 
             {analysis?.caution && <div className="s2-caution">{analysis.caution}</div>}
           </div>
           <div className="s2-stage">
-            <div className="stage"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} hue={MAKER[analysis?.kind ?? "hardware"].hue} once={stokeMotion === "fallen"} /></div>
+            <div className="stage"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} maker={maker ?? "hardware"} reacts={reacts} once={stokeMotion === "fallen"} /></div>
             <div className="s2-fire" aria-label={`도깨비불 ${fireLabel(fire)} ${Math.round(fire)}`}>
-              <div className="s2-fire-dk"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} kind={kind} width={44} className={gulp ? "gulp" : ""} /></div>
+              <div className="s2-fire-dk"><Dokkaebi key={gulp} motion={stokeMotion} fire={fire} maker={maker ?? "hardware"} width={44} className={gulp ? "gulp" : ""} /></div>
               <div className="s2-fire-bar"><span>도깨비불 · {fireLabel(fire)}</span><div className="bar"><i style={{ width: `${fire}%` }} /></div></div>
             </div>
           </div>
@@ -383,12 +385,12 @@ function Reveal({ result, picked, find, idea, maker, onShare, onAgain, onMore, o
       <div className="muted small" style={{ textAlign: "center", letterSpacing: 2 }}>네 아이디어를 맡을 달그락이야</div>
       {fire.card ? (
         <>
-          <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} kind={fire.reactKind as ReactKind} card={fire.card} maker={maker} />
-          <Roast head={fire.card.roast.head} body={fire.card.roast.body} kind={fire.reactKind as ReactKind} />
+          <FireCardView name={fire.name} owner={fire.nickname} peak={fire.peak} card={fire.card} maker={maker} />
+          <Roast head={fire.card.roast.head} body={fire.card.roast.body} maker={maker} />
         </>
       ) : (
         <div className="card">
-          <Dokkaebi motion="blaze" fire={fire.peak} width={160} kind={fire.reactKind as never} />
+          <Dokkaebi motion="blaze" fire={fire.peak} width={160} maker={maker} reacts={fireReacts(fire)} />
           <div className="display" style={{ fontSize: 26, textAlign: "center" }}>{fire.name}</div>
           <div className="muted small">최고 화력 <span className="display ink" style={{ fontSize: 20 }}>{fire.peak}</span> · {fireLabel(fire.peak)}</div>
         </div>

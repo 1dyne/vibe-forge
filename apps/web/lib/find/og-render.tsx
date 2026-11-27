@@ -1,11 +1,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
-import { fireLabel, type ReactKind } from "./chips";
+import { fireLabel } from "./chips";
+import { fireMaker } from "./classify";
 import type { FireRecord } from "./store";
 
 // 공유 이미지: 카톡 미리보기용 2:1(1200×600)과 저장·스토리용 9:16(1080×1920).
-// 캐릭터는 scripts/build-dokkaebi-sprites.py가 불 색으로 돌려 둔 정지 프레임을 쓴다.
+// 캐릭터는 scripts/build-dokkaebi-sprites.py가 달그락 색으로 칠해 둔 정지 프레임을 쓴다(쌍둥이는 하드웨어 색).
 
 function ogDir() {
   const cwd = process.cwd();
@@ -25,7 +26,7 @@ function fonts() {
 
 const spriteCache = new Map<string, Promise<string>>();
 function dokkaebi(kind: string) {
-  const safe = ["light", "sound", "move", "none"].includes(kind) ? kind : "none";
+  const safe = kind === "twin" ? "hardware" : ["hardware", "software", "design"].includes(kind) ? kind : "none";
   if (!spriteCache.has(safe)) spriteCache.set(safe, readFile(/* turbopackIgnore: true */ path.join(ogDir(), `dokkaebi-${safe}.png`)).then((b) => `data:image/png;base64,${b.toString("base64")}`));
   return spriteCache.get(safe)!;
 }
@@ -75,7 +76,7 @@ export async function landingOg(host: string) {
 }
 
 export async function fireOg(fire: FireRecord, host: string) {
-  const img = await dokkaebi(fire.reactKind as ReactKind);
+  const img = await dokkaebi(fireMaker(fire));
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", background: "#fff", padding: "0 80px", fontFamily: "Plex" }}>
@@ -107,7 +108,7 @@ export async function fireOg(fire: FireRecord, host: string) {
 }
 
 export async function fireCard(fire: FireRecord, host: string) {
-  const img = await dokkaebi(fire.reactKind as ReactKind);
+  const img = await dokkaebi(fireMaker(fire));
   const [first, ...rest] = fire.name.split(" ");
   return new ImageResponse(
     (
@@ -162,8 +163,8 @@ export async function fireCard(fire: FireRecord, host: string) {
   );
 }
 
-export async function forgeOg(input: { nickname: string; alley: string; plotNo: number; fires: number; color: string; reactKind: string }, host: string) {
-  const img = await dokkaebi(input.reactKind as ReactKind);
+export async function forgeOg(input: { nickname: string; alley: string; plotNo: number; fires: number; color: string; maker: string }, host: string) {
+  const img = await dokkaebi(input.maker);
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", background: "#fff", padding: "0 80px", fontFamily: "Plex" }}>

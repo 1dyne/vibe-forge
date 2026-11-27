@@ -7,7 +7,7 @@ import { createWishSound } from "../world/world-sound";
 import type { WishFilter, WishScene } from "./wish-scene";
 
 type Mine = { lanterns: LanternRecord[]; allowance: number; fires: Array<{ id: string; name: string }> };
-type Props = { groups: LanternGroup[]; hue: number; mine: Mine };
+type Props = { groups: LanternGroup[]; tint: string; mine: Mine };
 
 const FILTERS: Array<{ id: WishFilter; label: string; empty: string }> = [
   { id: "all", label: "전체", empty: "" },
@@ -22,7 +22,7 @@ const TUT: Array<{ title: string; body: string }> = [
   { title: "내 등불도 걸 수 있어", body: "아래 ‘내 등 달기’를 누르고 누구를 위해, 기원 한 줄을 적어. 달그락이 선착장에서 띄운 등불이 같은 소원 줄에 가서 걸려. 선착장의 주황 화살표를 누르면 마을로 돌아가." }
 ];
 
-export default function WishView({ groups: initialGroups, hue, mine: initialMine }: Props) {
+export default function WishView({ groups: initialGroups, tint, mine: initialMine }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<WishScene | null>(null);
   // 선착장 소리: 물결·바람·풀벌레·대금 가락 (켜야 난다, 브라우저 규칙)
@@ -66,7 +66,7 @@ export default function WishView({ groups: initialGroups, hue, mine: initialMine
       if ("fonts" in document) await document.fonts.load("40px Jua").catch(() => {});
       if (disposed || !mount.current) return;
       const s = await createWishScene(three, {
-        el: mount.current, hue,
+        el: mount.current, tint,
         onPick: (id) => { setSelected(id); if (id) track("wish_card"); },
         onExit: exit,
         onRiseDone: (id) => { setSelected(id); sceneRef.current?.select(id); }
@@ -77,7 +77,7 @@ export default function WishView({ groups: initialGroups, hue, mine: initialMine
       setReady(true);
     })().catch((e) => { console.error("3D 장면을 만들지 못함", e); setFailed(true); });
     return () => { disposed = true; sceneRef.current?.dispose(); sceneRef.current = null; };
-  }, [hue, exit]);
+  }, [tint, exit]);
 
   const showToast = (m: string) => { setToast(m); window.setTimeout(() => setToast((t) => (t === m ? "" : t)), 3200); };
   // 장면은 고른 등불과 거르기를 기억한 채 줄과 등불만 다시 만든다

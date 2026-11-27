@@ -57,7 +57,16 @@ body:has(.find){background:#fff}
 .find .dk .aura{position:absolute;width:var(--aura);height:var(--aura);border-radius:50%;background:var(--fire);filter:blur(34px);opacity:var(--aura-o);transition:width .25s,height .25s,opacity .25s}
 .find .dk-body{position:relative;animation:fd-bob 2.6s ease-in-out infinite}
 .find .dk.gulp .dk-body{animation:fd-gulp .35s ease-out}
-.find .dk-sprite{width:var(--w);height:var(--w);background-repeat:no-repeat;background-size:calc(var(--w) * 25) var(--w);background-position:0 0;filter:hue-rotate(var(--hue));animation-name:fd-play;animation-duration:var(--dur);animation-timing-function:steps(25,jump-end);animation-iteration-count:var(--iter);animation-fill-mode:none;transition:width .25s,height .25s}
+.find .dk-sprite{width:var(--w);height:var(--w);background-repeat:no-repeat;background-size:calc(var(--w) * 25) var(--w);background-position:0 0;filter:var(--tint);animation-name:fd-play;animation-duration:var(--dur);animation-timing-function:steps(25,jump-end);animation-iteration-count:var(--iter);animation-fill-mode:none;transition:width .25s,height .25s}
+/* 반응(빛·소리·움직임)은 도깨비 몸 색을 바꾸지 않고 옆에 작은 도형으로 띄운다 */
+.find .dk-marks{position:absolute;inset:0;pointer-events:none}
+.find .dk-mark{position:absolute;width:max(14px,calc(var(--w) * .2));height:max(14px,calc(var(--w) * .2));animation:fd-mark 2.4s ease-in-out infinite}
+.find .dk-mark svg{display:block;width:100%;height:100%;overflow:visible}
+.find .mk-light{top:4%;right:2%}
+.find .mk-sound{top:34%;left:-5%;animation-delay:-.8s}
+.find .mk-move{bottom:14%;right:0;animation-delay:-1.6s}
+@keyframes fd-mark{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10%) scale(1.08)}}
+.find .attr svg{width:13px;height:13px;display:block;overflow:visible}
 .find .dk-sprite.hold{animation-name:fd-hold;animation-timing-function:steps(24,jump-end);animation-fill-mode:forwards}
 .find .m-idle{background-image:url(/find/sprites/idle.webp)}
 .find .m-tilt{background-image:url(/find/sprites/tilt.webp)}

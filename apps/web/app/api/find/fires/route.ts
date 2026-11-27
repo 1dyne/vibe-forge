@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { ChipSchema, IdeaSchema } from "../../../../lib/find/api-schema";
-import { FIRE, REACT_FIRE, ROOTS, compose, fireName, reactKind, type Chip } from "../../../../lib/find/chips";
+import { FIRE, ROOTS, compose, fireName, reactKind, reactKinds, type Chip } from "../../../../lib/find/chips";
+import { MAKER, classify } from "../../../../lib/find/classify";
 import { assessMaturity } from "../../../../lib/find/maturity";
 import { buildCard, comboKey } from "../../../../lib/find/card";
 import { cleanNickname } from "../../../../lib/find/nickname";
@@ -17,7 +18,9 @@ const Body = z.object({
   idea: IdeaSchema,
   picked: z.array(ChipSchema).min(1).max(24),
   peak: z.number().min(0).max(FIRE.max),
-  nickname: z.string().max(40).optional()
+  nickname: z.string().max(40).optional(),
+  /** 화면에서 정해진 달그락(쌍둥이로 바꿔 시작한 경우 포함). 없으면 아이디어로 다시 가른다 */
+  maker: z.enum(["hardware", "software", "twin", "design"]).optional()
 }).strict();
 
 // "이 불로 할래!" — 고른 장작으로 문장·이름·닮은 프로젝트를 만들고 공유 링크(/f/:id)를 발급한다.
@@ -40,7 +43,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("find rarity failed", error instanceof Error ? error.message : "unknown");
   }
-  const card = buildCard([...chips.values()], Math.round(peak), rarity, matches);
+  // 불 색과 도깨비 몸 색은 이 아이디어를 맡는 달그락이 정한다. 반응(빛·소리·움직임)은 도깨비 옆 작은 도형으로만 보인다.
+  const maker = parsed.data.maker ?? classify(idea).kind;
+  const card = { ...buildCard([...chips.values()], Math.round(peak), rarity, matches), maker, reacts: reactKinds(ids, find) };
   const nickname = cleanNickname(parsed.data.nickname);
   // 이 기기의 대장간: 처음이면 장작과 맞는 골목의 다음 빈 터에 짓고, 있으면 선반에 불을 하나 더 얹는다
   const existingToken = ownerTokenFrom(request.cookies.get(OWNER_COOKIE)?.value);
@@ -58,7 +63,7 @@ export async function POST(request: NextRequest) {
     picked: ids,
     labels: ids.map((id) => chips.get(id)!.label),
     peak: Math.round(peak),
-    color: REACT_FIRE[kind],
+    color: MAKER[maker].color,
     reactKind: kind,
     name: fireName(ids, find),
     matches: matches.map((m) => ({ id: m.id, match: m.match })),

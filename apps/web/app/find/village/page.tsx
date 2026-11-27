@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { COUPON_TEXT, siteOrigin } from "../../../lib/find/site";
 import { VILLAGES, hallProgress } from "../../../lib/find/village";
-import { REACT_HUE, type ReactKind } from "../../../lib/find/chips";
+import { fireMaker } from "../../../lib/find/classify";
 import { villageGate } from "../../../lib/find/village-gate";
 import { forgeFires, touchForge, worldHouses } from "../../../lib/find/village-store";
 import { publicLanternGroups } from "../../../lib/find/lantern";
@@ -32,13 +32,13 @@ export default async function Village() {
   const me = gate.forge;
   const world = await worldHouses(me?.id ?? null);
   if (me) await touchForge(me.id).catch(() => undefined);
-  // 온보딩에서 받은 내 달그락 색 그대로 마을을 걷는다 (가장 최근 도깨비불의 반응 색)
-  const myKind = (me ? (await forgeFires(me.id))[0]?.reactKind : undefined) as ReactKind | undefined;
-  const myHue = myKind ? REACT_HUE[myKind] ?? 0 : 0;
+  // 온보딩에서 받은 내 달그락 색 그대로 마을을 걷는다 (가장 최근 도깨비불을 맡은 달그락의 색)
+  const myFire = me ? (await forgeFires(me.id))[0] : undefined;
+  const myTint = myFire ? fireMaker(myFire) : "none";
   const hall = hallProgress(world.totalFuel);
   return (
     <main className="find world-page">
-      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.ideas, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myHue={myHue} lanterns={await publicLanternGroups(me.id)} giwa={(await listGiwa(1)).total} myName={me.nickname} />
+      <WorldView houses={world.houses} villages={VILLAGES.map((v) => ({ id: v.id, name: v.name, topics: v.ideas, mood: v.mood, themes: v.themes }))} hallStage={hall.stage} hallPct={hall.pct} myForgeId={me?.id ?? null} myTint={myTint} lanterns={await publicLanternGroups(me.id)} giwa={(await listGiwa(1)).total} myName={me.nickname} />
     </main>
   );
 }
