@@ -134,3 +134,20 @@ export function parseMeetupLetter(text: string): MeetupLetterParts {
   }
   return out;
 }
+
+/** 작업대 목록을 발표에서 누를 순서대로 놓고 번호를 붙인다. 순서에 없는 파일은 뒤에 그대로 둔다 */
+const MEETUP_ORDER: Array<[test: (i: { id: string; kind: string; filename: string }) => boolean, label: string]> = [
+  [(i) => i.kind === "circuit" || /^circuit-plan/i.test(i.filename), "01 회로도"],
+  [(i) => i.kind === "cad" || /mockup.*\.scad$/i.test(i.filename), "02 3D 목업"],
+  [(i) => i.kind === "bom", "03 부품목록"],
+  [(i) => i.kind === "assembly", "04 조립 가이드"],
+  [(i) => i.kind === "housing", "05 하우징"],
+  [(i) => i.kind === "tests", "06 테스트"]
+];
+export function meetupItems<T extends { id: string; kind: string; filename: string; label: string }>(project: LocalProject | null | undefined, items: T[]): T[] {
+  if (!meetupLocked(project)) return items;
+  const picked: T[] = [];
+  for (const [test, label] of MEETUP_ORDER) { const hit = items.find((i) => !picked.includes(i) && test(i)); if (hit) picked.push({ ...hit, label }); }
+  const ids = new Set(picked.map((i) => i.id));
+  return [...picked, ...items.filter((i) => !ids.has(i.id))];
+}

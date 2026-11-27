@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 // 시연용 프로젝트의 방마다 맨 위에 붙는 안내 카드와, 로그인 없이 여는 '셈 사용설명서'(/find/sam)의 내용.
 //  · 대장 방: 오늘의 순서
 //  · 전자회로 달그락 방: 펌웨어 올리기 (원래 회로와 펌웨어를 맡는 달그락)
+//  · 기구설계 달그락 방: 하우징 조립
 //  · 소프트웨어 달그락 방: 재고 측정기 '셈' 소개와 사용설명서
 // 값의 출처: 1dyne/sam-stock-audit-mate 의 README.md, firmware/README.md, SAM_SPEC.md §2~3.
 
@@ -45,20 +46,38 @@ const Card = ({ kick, title, children }: { kick: string; title: string; children
   <section className="msam"><style>{CSS}</style><span className="kick">{kick}</span><h3>{title}</h3>{children}</section>
 );
 
-/** 대장 방: 오늘 어떤 순서로 가는지 */
-export function MeetupOrder({ onRoom, rooms }: { onRoom?: (room: "main" | "hw" | "sw") => void; rooms: boolean }) {
-  const go = (room: "hw" | "sw", label: string) => (rooms && onRoom ? <button type="button" onClick={() => onRoom(room)}>{label} →</button> : <span />);
+/** 대장 방: 오늘 어떤 순서로 가는지. 실제 제품을 만드는 순서와 같다 */
+export function MeetupOrder({ onRoom, rooms }: { onRoom?: (room: "main" | "hw" | "me" | "sw") => void; rooms: boolean }) {
+  const go = (room: "hw" | "me" | "sw", label: string) => (rooms && onRoom ? <button type="button" onClick={() => onRoom(room)}>{label} →</button> : <span />);
   return (
     <Card kick="오늘의 순서" title="사만다를 같이 만들어요">
       <p>설계도는 이미 정해져 있어요. 오늘은 그대로 끝까지 만들고, 떠오른 아이디어는 적어만 둬요. 다 만든 뒤 <b>완성 🎉</b>을 누르면 대장 달그락이 아이디어마다 편지로 답해요.</p>
       <ol className="steps">
         <li><i>1</i><div><b>아이디어 더하기</b><small>이 방에 한 줄씩 적어요. 설계는 바뀌지 않아요.</small></div><span /></li>
-        <li><i>2</i><div><b>부품 조립</b><small>회로 승인 → 3D 승인 → 대장간 입장 뒤, 작업대의 조립 가이드에서 3D 작업대를 열어요.</small></div><span /></li>
-        <li><i>3</i><div><b>펌웨어</b><small>보드 안에서 도는 프로그램. 전자회로 달그락이 맡아요.</small></div>{go("hw", "전자회로 방")}</li>
-        <li><i>4</i><div><b>소프트웨어: 셈</b><small>휴대폰에서 개수를 세어 주는 앱. 소프트웨어 달그락이 소개해요.</small></div>{go("sw", "소프트웨어 방")}</li>
-        <li><i>5</i><div><b>실제로 재 보기</b><small>셈 앱에서 빈 통 → 10개 → 전부 순서로 올려요.</small></div><span /></li>
-        <li><i>6</i><div><b>QA와 편지</b><small>작업대의 테스트 6개를 훑고, 이 방에서 완성 🎉을 눌러요.</small></div><span /></li>
+        <li><i>2</i><div><b>회로도와 3D 목업 확인</b><small>작업대의 01 회로도를 보고 회로 승인 → 02 3D 목업을 돌려 보고 3D 승인 → 대장간 입장.</small></div><span /></li>
+        <li><i>3</i><div><b>부품 확인</b><small>작업대의 03 부품목록. 오늘은 키트로 받았어요.</small></div><span /></li>
+        <li><i>4</i><div><b>회로 작업</b><small>작업대의 04 조립 가이드에서 3D 작업대를 열고, 보드를 핀에 맞춰 꽂아요.</small></div>{go("hw", "전자회로 방")}</li>
+        <li><i>5</i><div><b>하우징 조립</b><small>작업대의 05 하우징을 보며 나사로 케이스를 조립해요.</small></div>{go("me", "기구설계 방")}</li>
+        <li><i>6</i><div><b>셈 앱 깔고 재 보기</b><small>휴대폰에 셈을 깔고, 빈 통 → 10개 → 전부 순서로 올려요.</small></div>{go("sw", "소프트웨어 방")}</li>
+        <li><i>7</i><div><b>QA와 편지</b><small>작업대의 06 테스트를 훑고, 이 방에서 완성 🎉을 눌러요.</small></div><span /></li>
       </ol>
+    </Card>
+  );
+}
+
+/** 기구설계 달그락 방: 하우징을 나사로 조립할 때 볼 것 */
+export function SamHousing() {
+  return (
+    <Card kick="기구설계 달그락 · 하우징" title="집을 입혀요: 하우징 조립">
+      <p>하우징은 부품을 담는 케이스예요. 3D 목업으로 본 그 모양을 3D 프린터로 미리 뽑아 왔어요. 모양과 치수는 작업대의 <b>05 하우징</b>에 있어요.</p>
+      <h4>조립할 때 볼 것</h4>
+      <ol>
+        <li><b>로드셀은 한쪽 끝만 고정해요.</b> 막대가 아주 조금 휘면서 무게를 느끼기 때문에, 반대쪽 끝은 어디에도 닿지 않고 떠 있어야 해요.</li>
+        <li><b>나사는 멈출 때까지만 돌려요.</b> 힘을 더 주면 플라스틱이 깨지거나 로드셀이 비틀려요.</li>
+        <li><b>선이 끼지 않았는지 봐요.</b> 로드셀 밑이나 저울판과 벽 사이 틈에 선이 끼면 무게가 틀려요.</li>
+        <li>뚜껑을 덮고 USB-C를 꽂아 불이 켜지는지 봐요.</li>
+      </ol>
+      <p className="note">무게가 이상하면 저울판이 벽에 닿아 있지 않은지 먼저 봐요.</p>
     </Card>
   );
 }
@@ -107,6 +126,13 @@ export function SamStory({ standalone = false }: { standalone?: boolean }) {
         <div className="who"><img src="/find/meetup/sem.webp" alt="삼각형 돌멩이 셈" /><div><b>셈 · 새뮤엘</b>삼각형 돌멩이. 앱 안에서 무엇을 어떻게 셀지 묻고 안내해요. 사진으로 셀 때 개수를 잡아 주는 것도 셈이에요.</div></div>
         <div className="who"><img src="/find/meetup/sam-green.webp" alt="네모난 돌멩이 사만다" /><div><b>사만다</b>네모난 돌멩이 모양 저울. 오늘 만든 바로 그 기계예요. 화면 속 사만다의 눈 색이 저울의 LED 색과 같아요.</div></div>
       </div>
+      {!standalone && <><h4>지금 할 일</h4>
+      <ol>
+        <li>휴대폰으로 <b>셈 앱 열기</b> 주소를 열어요. 아이폰은 Safari, 안드로이드는 Chrome이에요.</li>
+        <li><b>홈 화면에 추가</b>를 눌러 앱처럼 깔아요. 이렇게 주소로 까는 앱을 PWA라고 해요.</li>
+        <li>깔린 셈을 열고 사만다를 연결해요. 방법은 아래 &lsquo;사만다 연결하기&rsquo;에 있어요.</li>
+        <li><b>빈 통 → 10개 → 전부</b> 순서로 올려서 개수를 봐요.</li>
+      </ol></>}
       <div className="btns"><a className="main" href={SAM_APP_URL} target="_blank" rel="noreferrer">셈 앱 열기</a><a href={SAM_REPO_URL} target="_blank" rel="noreferrer">GitHub에서 받기 (MIT)</a>{!standalone && <a href="/find/sam" target="_blank" rel="noreferrer">이 설명서만 따로 열기</a>}</div>
 
       <h4>무엇을 하는 앱인가요</h4>

@@ -23,6 +23,8 @@ function rangeText(range: ExpectedRange | null): string {
 export function AssemblyView({ project, busy, onAction, connectorOnly = false }: { project: LocalProject; busy: boolean; onAction: (input: Record<string, unknown>) => void; connectorOnly?: boolean }) {
   const guide = project.assembly!;
   const [bench, setBench] = useState(false);
+  // 3D 작업대는 화면을 다 덮는다. Esc로도 닫히게 해서 뒤 화면이 안 눌리는 채로 남지 않게 한다
+  useEffect(() => { if (!bench) return; const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setBench(false); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, [bench]);
   const kit = useMemo(() => guideToKit(project), [project.assembly, project.build, project.buildPlan]); // eslint-disable-line react-hooks/exhaustive-deps
   // 단계 그림은 3D 작업대 장면으로 보여주고, WebGL을 못 쓰거나 평면 배치도를 고르면 예전 그림을 쓴다
   const [flat, setFlat] = useState(false);
@@ -68,7 +70,8 @@ export function AssemblyView({ project, busy, onAction, connectorOnly = false }:
 
   const reports = project.assemblyReports ?? [];
   const reportedSteps = [...new Set(reports.filter((r) => !r.cardId).map((r) => r.step))];
-  const [step, setStep] = useState(0);
+  // 미리 해 둔 단계(납땜을 끝내 온 부품 등)는 건너뛰고, 처음 손댈 단계에서 시작한다
+  const [step, setStep] = useState(() => { const i = guide.steps.findIndex((s) => !s.prepared); return i > 0 ? i : 0; });
   const [playing, setPlaying] = useState(false);
   const [replay, setReplay] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -135,9 +138,9 @@ export function AssemblyView({ project, busy, onAction, connectorOnly = false }:
       <button disabled={step === guide.steps.length - 1} onClick={() => { setPlaying(false); setStep(step + 1); setShowDetail(false); }}>다음 ▶</button>
       <span>{step + 1} / {guide.steps.length}</span>
     </div>
-    <ol className="assembly-steps">{guide.steps.map((s, i) => <li key={i} className={i === step ? "current" : reports.some((r) => r.step === i + 1 && !r.cardId) ? "done" : ""}><button onClick={() => { setPlaying(false); setStep(i); setShowDetail(false); }}>{s.title}</button></li>)}</ol>
+    <ol className="assembly-steps">{guide.steps.map((s, i) => <li key={i} className={i === step ? "current" : reports.some((r) => r.step === i + 1 && !r.cardId) ? "done" : ""}><button onClick={() => { setPlaying(false); setStep(i); setShowDetail(false); }}>{s.title}{s.prepared && <small className="prepared-tag"> · 미리 해 뒀어요 ✓</small>}</button></li>)}</ol>
     <section className="assembly-step">
-      <h4>{step + 1}단계 · {current.title}</h4>
+      <h4>{step + 1}단계 · {current.title}{current.prepared && <small className="prepared-tag"> · 미리 해 뒀어요 ✓</small>}</h4>
       <p>{current.action}</p>
       {current.wires.length > 0 && <ul className="wire-list">{current.wires.map((wire, i) => { const len = lengths.find((l) => l.from === wire.from && l.to === wire.to); return <li key={i}><span style={{ background: wireColor(wire.from, wire.to, wire.color) }} />{wire.from} → {wire.to}{wire.label ? ` · ${wire.label}` : ""}{len ? <small> · 선 약 {len.suggestedMm}mm (핀 사이 {len.directMm}mm + 여유)</small> : null}</li>; })}</ul>}
       <p className="assembly-check"><b>확인</b> {current.check}</p>

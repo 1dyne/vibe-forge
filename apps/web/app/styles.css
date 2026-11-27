@@ -470,3 +470,4 @@ tr.is-new{animation-name:new-flash-row}
 .avatar-chief b{background:var(--c-chief)}.avatar-hwlead b{background:var(--c-hw-team)}.avatar-hw b{background:var(--c-ee)}
 .avatar-sw b{background:var(--c-sw)}.avatar-me b{background:var(--c-me)}.avatar-id b{background:var(--c-id)}
 .rooms button.sub-room{margin-left:16px;width:calc(100% - 16px)}
+.prepared-tag{font-weight:500;color:#6f6a61}
